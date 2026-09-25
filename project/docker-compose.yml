@@ -1,0 +1,129 @@
+# ============================================
+# Palacio del Mar - Docker Compose
+#   web     -> nginx: sirve el frontend y reenvía /api al backend
+#   backend -> API Node.js / Express
+#   mongo   -> MongoDB (datos en memoria, se reinician en cada arranque)
+#
+# Uso: clona el repo y ejecuta
+#   docker compose up -d --build
+# El .env de la raíz YA viene versionado con credenciales para esta
+# entrega académica (ver el propio .env) — no hace falta crear nada a
+# mano. Al arrancar, el backend carga el catálogo de ejemplo y crea el
+# administrador automáticamente si hace falta (backend/bootstrap.js).
+# ============================================
+name: palacio-del-mar
+
+x-backend-environment: &backend-environment
+  NODE_ENV: production
+  PORT: "5000"
+  TRUST_PROXY: "1" # nginx va delante: req.ip = IP real del visitante
+  MONGODB_URI: mongodb://${MONGO_USER:-palacio_admin}:${MONGO_PASSWORD:?Falta MONGO_PASSWORD en el archivo .env}@mongo:27017/${MONGO_DB:-palacio_del_mar}?authSource=admin
+  DB_NAME: ${MONGO_DB:-palacio_del_mar}
+  MONGODB_TLS: "false" # Mongo local en Docker no usa TLS (Atlas sí)
+  JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en el archivo .env}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  HOTEL_WHATSAPP: ${HOTEL_WHATSAPP:-+57 300 000 0000}
+  HOTEL_TIMEZONE: ${HOTEL_TIMEZONE:-America/Bogota}
+  # El backend los usa al arrancar para crear el primer administrador si
+  # no existe ninguno (ver backend/bootstrap.js) — no solo el perfil
+  # "create-admin". Por eso viven en el bloque compartido, no solo ahí.
+  ADMIN_NAME: ${ADMIN_NAME:-Administrador}
+  ADMIN_EMAIL: ${ADMIN_EMAIL:?Falta ADMIN_EMAIL en el archivo .env}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Falta ADMIN_PASSWORD en el archivo .env}
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-palacio_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Falta MONGO_PASSWORD en el archivo .env}
+    tmpfs:
+      - /data/db
+    # Sin "ports": MongoDB solo es accesible desde los otros contenedores.
+    # Para conectarte con MongoDB Compass desde tu PC, descomenta:
+    # ports:
+    #   - "127.0.0.1:27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
+
+  backend:
+    build: ./backend
+    image: palacio-del-mar-backend
+    restart: unless-stopped
+    init: true
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment: *backend-environment
+    # Sin "ports": el navegador entra por "web" y nginx reenvía /api aquí.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # El backend YA carga el catálogo de ejemplo solo, al arrancar, si está
+  # vacío (ver backend/bootstrap.js) — este perfil ya no hace falta para el
+  # arranque normal. Se deja disponible para RECARGAR el catálogo a mano
+  # más adelante (⚠️ borra y vuelve a crear suites y experiencias):
+  #   docker compose --profile seed run --rm seed
+  seed:
+    build: ./backend
+    image: palacio-del-mar-backend
+    profiles: ["seed"]
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment: *backend-environment
+    command: ["node", "seed/seedData.js"]
+
+  # Crea (o promueve) el usuario administrador. NO arranca con "up".
+  #   docker compose --profile create-admin run --rm create-admin
+  # El backend YA crea el primer administrador solo, al arrancar, si no
+  # existe ninguno (ver backend/bootstrap.js) — este perfil ya no hace
+  # falta para el arranque normal. Se deja disponible para crear un admin
+  # ADICIONAL o promover a otro usuario más adelante:
+  #   docker compose --profile create-admin run --rm create-admin
+  create-admin:
+    build: ./backend
+    image: palacio-del-mar-backend
+    profiles: ["create-admin"]
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment: *backend-environment
+    command: ["node", "scripts/createAdmin.js"]

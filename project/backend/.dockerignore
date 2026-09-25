@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log*
+
+# Nunca meter secretos dentro de la imagen
+.env
+.env.*
+
+Dockerfile
+.dockerignore

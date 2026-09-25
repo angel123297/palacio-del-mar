@@ -1,0 +1,6 @@
+# Evita que Git en Windows convierta a CRLF archivos que Docker/nginx leen en Linux
+Dockerfile        text eol=lf
+*.conf            text eol=lf
+docker-compose.yml text eol=lf
+.dockerignore     text eol=lf
+.env.example      text eol=lf

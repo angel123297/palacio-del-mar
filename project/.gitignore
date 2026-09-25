@@ -1,0 +1,14 @@
+# El .env de la raíz SÍ se versiona a propósito para esta entrega (ver el
+# propio .env y DEPLOY-001 en README_BUGS_CRITICOS.md): así
+# "docker compose up" funciona con un solo comando, sin pasos previos.
+# Cualquier otra variante (.env.local, un .env dentro de backend/ o
+# frontend/, etc.) sigue ignorada.
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+!.env.example
+node_modules/
+dist/
+frontend/dist/
+*.log
