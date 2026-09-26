@@ -48,10 +48,8 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Falta MONGO_PASSWORD en el archivo .env}
     tmpfs:
       - /data/db
-    # Sin "ports": MongoDB solo es accesible desde los otros contenedores.
-    # Para conectarte con MongoDB Compass desde tu PC, descomenta:
-    # ports:
-    #   - "127.0.0.1:27017:27017"
+    ports:
+      - "127.0.0.1:27017:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 10s
