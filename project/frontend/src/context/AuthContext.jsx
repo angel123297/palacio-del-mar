@@ -22,9 +22,16 @@ export function AuthProvider({ children }) {
       // el usuario, así que el nombre, email, rol, etc. desaparecían del
       // perfil en cuanto se recargaba la página.
       setUser(res.data.user);
-    } catch {
-      localStorage.removeItem('palacio_token');
-      setUser(null);
+    } catch (err) {
+      // Solo se cierra la sesión si el servidor dice que el token no vale
+      // (401/403). Un corte de red, un timeout o un backend reiniciándose
+      // NO deben borrar el token: el usuario seguiría logueado al volver
+      // la conexión.
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        localStorage.removeItem('palacio_token');
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
