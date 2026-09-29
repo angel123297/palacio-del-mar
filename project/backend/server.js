@@ -108,7 +108,7 @@ const setupGracefulShutdown = (server) => {
  * Verifica variables de entorno requeridas
  */
 const validateEnvVariables = () => {
-  const required = ['JWT_SECRET'];
+  const required = ['JWT_SECRET', 'MONGODB_URI'];
   const missing = required.filter(key => !process.env[key]);
   
   if (missing.length > 0) {
@@ -169,8 +169,8 @@ const setupMiddlewares = () => {
   app.use(cors(corsOptions));
   
   // Parseo de JSON con límite
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   
   // Manejo de errores JSON
   app.use(jsonErrorHandler);
