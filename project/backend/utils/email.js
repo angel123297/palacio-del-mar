@@ -51,6 +51,11 @@ const getTransporter = () => {
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT) || 587,
       secure: Number(process.env.SMTP_PORT) === 465,
+      // Sin estos límites, un SMTP caído dejaba la petición colgada varios
+      // minutos y nginx respondía 504.
+      connectionTimeout: 10000, // conectar al servidor
+      greetingTimeout: 10000,   // esperar el saludo SMTP
+      socketTimeout: 20000,     // inactividad del socket
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS

@@ -83,7 +83,7 @@ const handleConnectionError = async (error, uri) => {
     console.log('🔍 No se pudo seleccionar un servidor - Verifica la URI y la red');
   } else if (error.code === 'ECONNREFUSED') {
     console.log('🚫 Conexión rechazada - Asegúrate de que MongoDB esté iniciado');
-  } else if (error.message.includes('authentication')) {
+  } else if (/authentication/i.test(error.message) || error.code === 18) {
     console.log('🔐 Error de autenticación - Verifica usuario y contraseña');
     return false;
   }
@@ -104,7 +104,14 @@ const handleConnectionError = async (error, uri) => {
 // EVENTOS DE CONEXIÓN
 // ============================================
 
+let listenersRegistered = false;
+
 const setupEventListeners = () => {
+  // connectDB() se vuelve a llamar en cada reintento; sin esta guarda se
+  // registraban listeners duplicados y cada evento se imprimía varias veces.
+  if (listenersRegistered) return;
+  listenersRegistered = true;
+
   mongoose.connection.on('connected', () => {
     isConnected = true;
     connectionAttempts = 0;
