@@ -41,7 +41,7 @@ x-backend-environment: &backend-environment
 
 services:
   mongo:
-    image: mongo:7
+    image: mongo:8
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-palacio_admin}
