@@ -44,8 +44,8 @@ services:
     image: mongo:8
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-palacio_admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Falta MONGO_PASSWORD en el archivo .env}
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: 1234
     tmpfs:
       - /data/db
     ports:
