@@ -18,7 +18,7 @@ export default function BookingModal() {
   const [pricing, setPricing] = useState(null);
   const [pricingLoading, setPricingLoading] = useState(false);
   const [pricingError, setPricingError] = useState('');
-  const [contact, setContact] = useState({ guestName: user?.name || '', guestEmail: user?.email || '', guestPhone: '', specialRequests: '' });
+  const [contact, setContact] = useState({ guestName: user?.name || '', guestEmail: user?.email || '', guestPhone: user?.phone || '', specialRequests: '' });
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -32,7 +32,7 @@ export default function BookingModal() {
   }, [suite]);
 
   useEffect(() => {
-    setContact((c) => ({ ...c, guestName: c.guestName || user?.name || '', guestEmail: c.guestEmail || user?.email || '' }));
+    setContact((c) => ({ ...c, guestName: c.guestName || user?.name || '', guestEmail: c.guestEmail || user?.email || '', guestPhone: c.guestPhone || user?.phone || '' }));
   }, [user]);
 
   const experienceIds = useMemo(() => experiences.map((e) => e._id), [experiences]);
@@ -83,6 +83,10 @@ if (step >= 1 && suite) {
     if (step === 2) {
       if (!contact.guestName.trim() || !contact.guestEmail.trim()) {
         toast.error('Nombre y email son obligatorios');
+        return;
+      }
+      if (!contact.guestPhone.trim()) {
+        toast.error('El teléfono es obligatorio');
         return;
       }
     }
@@ -202,7 +206,7 @@ if (step >= 1 && suite) {
                 <input value={contact.guestName} onChange={(e) => setContact({ ...contact, guestName: e.target.value })} />
                 <label className="field-label">Email</label>
                 <input type="email" value={contact.guestEmail} onChange={(e) => setContact({ ...contact, guestEmail: e.target.value })} />
-                <label className="field-label">Teléfono (opcional)</label>
+                <label className="field-label">Teléfono</label>
                 <input value={contact.guestPhone} onChange={(e) => setContact({ ...contact, guestPhone: e.target.value })} />
                 <label className="field-label">Solicitudes especiales (opcional)</label>
                 <textarea rows={3} value={contact.specialRequests}

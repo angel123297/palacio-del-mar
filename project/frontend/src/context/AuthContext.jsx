@@ -52,8 +52,8 @@ export function AuthProvider({ children }) {
     return res.data.user;
   }, []);
 
-  const register = useCallback(async (name, email, password) => {
-    const res = await api.post('/auth/register', { name, email, password });
+    const register = useCallback(async (name, email, password, phone) => {
+    const res = await api.post('/auth/register', { name, email, password, phone });
     localStorage.setItem('palacio_token', res.data.token);
     setUser(res.data.user);
     setAuthModal(null);

@@ -75,7 +75,7 @@ function LoginForm({ onSwitch, onClose }) {
 function RegisterForm({ onSwitch }) {
   const { register } = useAuth();
   const toast = useToast();
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -96,8 +96,8 @@ function RegisterForm({ onSwitch }) {
     try {
       // confirmPassword es solo una validación en el navegador: el backend
       // no acepta ese campo (Joi rechaza claves desconocidas), así que
-      // solo se envían name/email/password.
-      const user = await register(form.name.trim(), form.email.trim(), form.password);
+      // solo se envían name/email/phone/password.
+      const user = await register(form.name.trim(), form.email.trim(), form.password, form.phone.trim());
       toast.success(`Cuenta creada. ¡Bienvenido, ${user.name.split(' ')[0]}!`);
     } catch (err) {
       const msg = err.response?.data?.message;
@@ -127,6 +127,14 @@ function RegisterForm({ onSwitch }) {
         value={form.email}
         onChange={(e) => setForm({ ...form, email: e.target.value })}
         placeholder="tu@email.com"
+      />
+      <label className="field-label">Teléfono</label>
+      <input
+        type="tel"
+        required
+        value={form.phone}
+        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+        placeholder="300 123 4567"
       />
       <label className="field-label">Contraseña</label>
       <input
