@@ -13,6 +13,9 @@ const FALLBACK_EXPERIENCES = [
 
 export default function ExperiencesSection() {
   const [list, setList] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [catFilter, setCatFilter] = useState('');
+  const [featuredIds, setFeaturedIds] = useState(new Set());
   const { experiences, toggleExperience } = useBookingCart();
   const toast = useToast();
 
@@ -20,6 +23,16 @@ export default function ExperiencesSection() {
     api.get('/experiences', { params: { limit: 12 } })
       .then((res) => setList(res.data.data?.length ? res.data.data : FALLBACK_EXPERIENCES))
       .catch(() => setList(FALLBACK_EXPERIENCES));
+  }, []);
+
+  // Categorías (GET /experiences/categories) y destacadas (GET /experiences/featured)
+  useEffect(() => {
+    api.get('/experiences/categories')
+      .then((res) => setCategories(res.data.data || []))
+      .catch(() => setCategories([]));
+    api.get('/experiences/featured', { params: { limit: 12 } })
+      .then((res) => setFeaturedIds(new Set((res.data.data || []).map((e) => e._id))))
+      .catch(() => setFeaturedIds(new Set()));
   }, []);
 
   const handleToggle = (exp) => {
@@ -32,19 +45,42 @@ export default function ExperiencesSection() {
 
   if (!list) return null;
 
+  // Las destacadas van primero; el filtro de categoría se aplica sobre la lista ya cargada
+  const ordered = [...list].sort((a, b) => Number(featuredIds.has(b._id)) - Number(featuredIds.has(a._id)));
+  const visible = catFilter ? ordered.filter((e) => e.category === catFilter) : ordered;
+  const label = (c) => c.charAt(0).toUpperCase() + c.slice(1);
+
   return (
     <section id="experiences">
       <div className="rooms-header">
         <p className="sec-label">Vive Cartagena</p>
         <h2 className="sec-title">Experiencias añadidas</h2>
       </div>
+      {categories.length > 1 && (
+        <div className="filter-row" role="group" aria-label="Filtrar por categoría">
+          <button type="button" className={`filter-btn ${catFilter === '' ? 'is-active' : ''}`} onClick={() => setCatFilter('')}>
+            Todas
+          </button>
+          {categories.map((c) => (
+            <button
+              type="button"
+              key={c.category}
+              className={`filter-btn ${catFilter === c.category ? 'is-active' : ''}`}
+              onClick={() => setCatFilter(c.category)}
+            >
+              {label(c.category)} ({c.count})
+            </button>
+          ))}
+        </div>
+      )}
       <div className="exp-grid">
-        {list.map((exp) => {
+        {visible.map((exp) => {
           const added = experiences.some((e) => e._id === exp._id);
           return (
             <div className="exp-card" key={exp._id}>
               <div className="room-img-wrap">
                 <img src={exp.mainImage} alt={exp.name} loading="lazy" />
+                {featuredIds.has(exp._id) && <span className="room-avail badge-ok">Destacada</span>}
               </div>
               <span className="exp-icon">{exp.icon}</span>
               <h3>{exp.name}</h3>

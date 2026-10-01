@@ -156,7 +156,7 @@ const validateQueryParams = (query) => {
   }
   
   // Tipo de suite
-  const validTypes = ['Habitación', 'Suite Deluxe', 'Suite Premium', 'Suite Presidencial', 'Suite Exclusiva'];
+  const validTypes = ['Habitación', 'Suite Deluxe', 'Suite Premium', 'Suite Presidencial', 'Suite Exclusiva', 'Penthouse'];
   validated.type = validTypes.includes(type) ? type : null;
   
   // Disponibilidad
