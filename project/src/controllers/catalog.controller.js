@@ -61,3 +61,44 @@ export const getFeaturedExperiences = async (req, res) => {
     }
 
 };
+// 4. Obtener detalle de una suite específica
+
+export const getSuiteById = async (req, res) => {
+
+    try {
+
+        const suite = await Suite.findById(req.params.id);
+
+        if (!suite) return res.status(404).json({ message: 'Suite no encontrada' });
+
+        res.status(200).json(suite);
+
+    } catch (error) {
+
+        res.status(500).json({ message: 'Error al obtener la suite', error: error.message });
+
+    }
+
+};
+
+
+
+// 5. Obtener detalle de una experiencia específica
+
+export const getExperienceById = async (req, res) => {
+
+    try {
+
+        const experience = await Experience.findById(req.params.id);
+
+        if (!experience) return res.status(404).json({ message: 'Experiencia no encontrada' });
+
+        res.status(200).json(experience);
+
+    } catch (error) {
+
+        res.status(500).json({ message: 'Error al obtener la experiencia', error: error.message });
+
+    }
+
+};
