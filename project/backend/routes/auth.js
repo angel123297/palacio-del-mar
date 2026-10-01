@@ -106,7 +106,8 @@ const updateProfileValidation = [
   body('name')
     .optional()
     .trim()
-    .isLength({ min: 2, max: 100 }).withMessage('El nombre debe tener entre 2 y 100 caracteres'),
+    .isLength({ min: 2, max: 100 }).withMessage('El nombre debe tener entre 2 y 100 caracteres')
+    .matches(/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/).withMessage('El nombre solo puede contener letras y espacios'),
   body('lastName')
     .optional()
     .trim()

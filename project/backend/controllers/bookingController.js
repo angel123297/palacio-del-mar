@@ -229,7 +229,7 @@ export const createBooking = async (req, res) => {
       totalPrice: pricing.totalPrice,
       guestName: finalGuestName,
       guestEmail: finalGuestEmail,
-      guestPhone: guestPhone || null,
+      guestPhone: guestPhone || req.userData?.profile?.phone || null,
       specialRequests: specialRequests || null,
       status: 'pending',
       bookingDate: new Date(),
