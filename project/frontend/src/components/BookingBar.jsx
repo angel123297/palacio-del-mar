@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useBookingCart, todayISO } from '../context/BookingCartContext.jsx';
+import { useBookingCart } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import DateRangePicker from './DateRangePicker.jsx';
 
 export default function BookingBar() {
   const { search, setSearch, searchAvailability, searching } = useBookingCart();
@@ -32,26 +33,12 @@ export default function BookingBar() {
   return (
     <div id="booking-bar">
       <form className="bf-form" onSubmit={submit}>
-        <div className="bf">
-          <label className="bf-label">Llegada</label>
-          <input
-            type="date"
-            required
-            min={todayISO()}
-            value={local.checkIn}
-            onChange={(e) => setLocal({ ...local, checkIn: e.target.value })}
-          />
-        </div>
-        <div className="bf">
-          <label className="bf-label">Salida</label>
-          <input
-            type="date"
-            required
-            min={local.checkIn}
-            value={local.checkOut}
-            onChange={(e) => setLocal({ ...local, checkOut: e.target.value })}
-          />
-        </div>
+        <DateRangePicker
+          checkIn={local.checkIn}
+          checkOut={local.checkOut}
+          guests={local.guests}
+          onChange={({ checkIn, checkOut }) => setLocal({ ...local, checkIn, checkOut })}
+        />
         <div className="bf">
           <label className="bf-label">Huéspedes</label>
           <select

@@ -1,5 +1,6 @@
 import Booking, { BLOCKING_BOOKING_STATUSES } from '../models/Booking.js';
 import Suite from '../models/Suite.js';
+import SuiteNight from '../models/SuiteNight.js';
 import { toCalendarDate } from '../utils/dates.js';
 
 // ============================================
@@ -541,86 +542,80 @@ export const checkMultipleSuitesAvailability = async (req, res) => {
   }
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const isoDay = (d) => d.toISOString().slice(0, 10);
+
 /**
- * @desc    Obtener disponibilidad por mes (calendario)
+ * @desc    Disponibilidad día por día de un mes (todas las suites)
  * @route   GET /api/availability/monthly
  * @access  Public
+ * @query   year, month, guests (opcional), suiteType (opcional)
+ *
+ * La fuente de verdad es SuiteNight (una noche ocupada = un documento), la
+ * misma que usa bookingController para impedir la doble reserva. No se
+ * devuelven IDs de reservas: es un endpoint público.
  */
 export const getMonthlyAvailability = async (req, res) => {
   try {
-    const { year, month, suiteType } = req.query;
-    
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+    const { suiteType } = req.query;
+    const guests = Number.parseInt(req.query.guests, 10);
+
     const startDate = new Date(Date.UTC(year, month - 1, 1));
-    const endDate = new Date(Date.UTC(year, month, 0));
-    
-    
-    // Construir query de suites
+    const nextMonth = new Date(Date.UTC(year, month, 1));
+    const daysInMonth = Math.round((nextMonth - startDate) / DAY_MS);
+
     const suiteQuery = { available: true };
-    if (suiteType) suiteQuery.type = suiteType;
-    
-    const suites = await Suite.find(suiteQuery).select('_id name type');
-    
-    // Obtener todas las reservas del mes
-    const bookings = await Booking.find({
-      suite: { $in: suites.map(s => s._id) },
-      status: { $in: BLOCKING_BOOKING_STATUSES },
-      checkIn: { $lte: endDate },
-      checkOut: { $gte: startDate }
-    });
-    
-    // Crear mapa de disponibilidad por día
-    const calendar = {};
-    const daysInMonth = endDate.getUTCDate();
-    
+    if (suiteType) suiteQuery.type = String(suiteType);
+    if (guests > 0) suiteQuery.maxGuests = { $gte: guests };
+
+    const suites = await Suite.find(suiteQuery).select('_id');
+    const totalSuites = suites.length;
+
+    const occupiedByDate = new Map();
+    if (totalSuites > 0) {
+      const rows = await SuiteNight.aggregate([
+        {
+          $match: {
+            suite: { $in: suites.map((s) => s._id) },
+            date: { $gte: startDate, $lt: nextMonth }
+          }
+        },
+        { $group: { _id: '$date', count: { $sum: 1 } } }
+      ]);
+      rows.forEach((r) => occupiedByDate.set(isoDay(r._id), r.count));
+    }
+
+    const calendar = [];
     for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(Date.UTC(year, month - 1, day));
-      calendar[day] = {
+      const date = isoDay(new Date(Date.UTC(year, month - 1, day)));
+      const occupied = occupiedByDate.get(date) || 0;
+      const availableSuites = Math.max(0, totalSuites - occupied);
+      calendar.push({
         date,
-        totalSuites: suites.length,
-        availableSuites: suites.length,
-        bookings: []
-      };
+        day,
+        totalSuites,
+        availableSuites,
+        soldOut: availableSuites === 0,
+        occupancyRate: totalSuites ? (occupied / totalSuites) * 100 : 0
+      });
     }
-    
-    // Marcar días con reservas
-    for (const booking of bookings) {
-      const bookingStart = new Date(booking.checkIn);
-      const bookingEnd = new Date(booking.checkOut);
-      
-      for (let day = 1; day <= daysInMonth; day++) {
-        const currentDate = new Date(Date.UTC(year, month - 1, day));
-        
-        if (currentDate >= bookingStart && currentDate < bookingEnd) {
-          calendar[day].availableSuites--;
-          calendar[day].bookings.push({
-            suiteId: booking.suite,
-            bookingId: booking._id
-          });
-        }
-      }
-    }
-    
-    // Calcular porcentaje de ocupación
-    for (const day in calendar) {
-      calendar[day].occupancyRate = ((calendar[day].totalSuites - calendar[day].availableSuites) / calendar[day].totalSuites) * 100;
-    }
-    
+
     res.json({
       success: true,
       data: {
         year,
         month,
         daysInMonth,
-        calendar: Object.values(calendar),
+        totalSuites,
+        calendar,
         summary: {
-          totalSuites: suites.length,
-          mostAvailableDay: Object.values(calendar).reduce((max, day) => day.availableSuites > max.availableSuites ? day : max, { availableSuites: -1 }),
-          leastAvailableDay: Object.values(calendar).reduce((min, day) => day.availableSuites < min.availableSuites ? day : min, { availableSuites: Infinity }),
-          averageOccupancy: Object.values(calendar).reduce((sum, day) => sum + day.occupancyRate, 0) / daysInMonth
+          soldOutDays: calendar.filter((d) => d.soldOut).length,
+          averageOccupancy: calendar.reduce((sum, d) => sum + d.occupancyRate, 0) / daysInMonth
         }
       }
     });
-    
   } catch (error) {
     console.error('[MonthlyAvailability Error]:', error);
     res.status(500).json({
@@ -631,18 +626,20 @@ export const getMonthlyAvailability = async (req, res) => {
 };
 
 /**
- * @desc    Obtener calendario de disponibilidad para una suite
+ * @desc    Calendario de disponibilidad de UNA suite en un mes
  * @route   GET /api/availability/calendar
  * @access  Public
  */
 export const getAvailabilityCalendar = async (req, res) => {
   try {
-    const { suiteId, year, month } = req.query;
-    
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+    const { suiteId } = req.query;
+
     const startDate = new Date(Date.UTC(year, month - 1, 1));
-    const endDate = new Date(Date.UTC(year, month, 0));
-    
-    
+    const nextMonth = new Date(Date.UTC(year, month, 1));
+    const daysInMonth = Math.round((nextMonth - startDate) / DAY_MS);
+
     const suite = await Suite.findById(suiteId);
     if (!suite) {
       return res.status(404).json({
@@ -650,55 +647,42 @@ export const getAvailabilityCalendar = async (req, res) => {
         message: 'Suite no encontrada'
       });
     }
-    
-    // Obtener reservas de la suite
-    const bookings = await Booking.find({
+
+    const nights = await SuiteNight.find({
       suite: suiteId,
-      status: { $in: BLOCKING_BOOKING_STATUSES },
-      checkIn: { $lte: endDate },
-      checkOut: { $gte: startDate }
-    });
-    
-    // Crear calendario
+      date: { $gte: startDate, $lt: nextMonth }
+    }).select('date');
+    const occupied = new Set(nights.map((n) => isoDay(n.date)));
+
     const calendar = [];
-    const daysInMonth = endDate.getUTCDate();
-    
     for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(Date.UTC(year, month - 1, day));
-      const isBooked = bookings.some(booking => 
-        currentDate >= booking.checkIn && currentDate < booking.checkOut
-      );
-      
+      const dateObj = new Date(Date.UTC(year, month - 1, day));
+      const date = isoDay(dateObj);
       calendar.push({
-        date: currentDate,
+        date,
         day,
-        available: !isBooked,
-        isWeekend: currentDate.getUTCDay() === 0 || currentDate.getUTCDay() === 6,
-        bookings: isBooked ? bookings.filter(b => currentDate >= b.checkIn && currentDate < b.checkOut) : []
+        available: !occupied.has(date),
+        isWeekend: dateObj.getUTCDay() === 0 || dateObj.getUTCDay() === 6
       });
     }
-    
+
+    const bookedDays = calendar.filter((d) => !d.available).length;
     res.json({
       success: true,
       data: {
-        suite: {
-          id: suite._id,
-          name: suite.name,
-          type: suite.type
-        },
+        suite: { id: suite._id, name: suite.name, type: suite.type },
         year,
         month,
         daysInMonth,
         calendar,
         summary: {
           totalDays: daysInMonth,
-          availableDays: calendar.filter(d => d.available).length,
-          bookedDays: calendar.filter(d => !d.available).length,
-          occupancyRate: (calendar.filter(d => !d.available).length / daysInMonth) * 100
+          availableDays: daysInMonth - bookedDays,
+          bookedDays,
+          occupancyRate: (bookedDays / daysInMonth) * 100
         }
       }
     });
-    
   } catch (error) {
     console.error('[Calendar Error]:', error);
     res.status(500).json({
@@ -715,7 +699,7 @@ export const getAvailabilityCalendar = async (req, res) => {
  */
 export const getPeakDates = async (req, res) => {
   try {
-    const { year = new Date().getFullYear() } = req.query;
+    const year = Number.parseInt(req.query.year, 10) || new Date().getFullYear();
     
     // Definir fechas de temporada alta y pico
     const peakDates = {
