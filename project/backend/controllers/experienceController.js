@@ -76,7 +76,7 @@ const validateQueryParams = (query) => {
   validated.maxDuration = maxDuration ? Math.max(0, parseInt(maxDuration)) : null;
   
   // Categoría
-  const validCategories = ['aventura', 'gastronomía', 'cultural', 'relajación', 'tour'];
+  const validCategories = ['aventura', 'gastronomía', 'cultural', 'relajación', 'tour', 'naturaleza', 'noche'];
   validated.category = validCategories.includes(category) ? category : null;
   
   // Búsqueda

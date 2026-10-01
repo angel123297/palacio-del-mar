@@ -7,6 +7,8 @@ import { formatCOP } from '../utils/format';
 export default function RoomsSection() {
   const [suites, setSuites] = useState(null);
   const [error, setError] = useState(false);
+  const [types, setTypes] = useState([]);
+  const [typeFilter, setTypeFilter] = useState('');
   const { availability, search, startBooking } = useBookingCart();
   const { setAuthModal, isAuthenticated } = useAuth();
 
@@ -25,6 +27,13 @@ export default function RoomsSection() {
     fetchSuites();
   }, [fetchSuites]);
 
+  // Tipos de suite para el filtro (GET /suites/types)
+  useEffect(() => {
+    api.get('/suites/types')
+      .then((res) => setTypes(res.data.data || []))
+      .catch(() => setTypes([]));
+  }, []);
+
   // Si el huésped ya buscó disponibilidad (BookingBar), mostramos precio y
   // disponibilidad reales para esas fechas en vez del precio base genérico.
   const availabilityMap = useMemo(() => {
@@ -34,6 +43,8 @@ export default function RoomsSection() {
     (availability.unavailableSuites || []).forEach((s) => map.set(s._id, { ...s, isAvailable: false }));
     return map;
   }, [availability]);
+
+  const visibleSuites = suites && typeFilter ? suites.filter((s) => s.type === typeFilter) : suites;
 
   const openBooking = (suite) => {
     startBooking(suite);
@@ -81,8 +92,26 @@ export default function RoomsSection() {
             : '18 suites de diseño exclusivo entre murallas coloniales y el mar Caribe'}
         </p>
       </div>
+      {types.length > 1 && (
+        <div className="filter-row" role="group" aria-label="Filtrar por tipo de suite">
+          <button type="button" className={`filter-btn ${typeFilter === '' ? 'is-active' : ''}`} onClick={() => setTypeFilter('')}>
+            Todas
+          </button>
+          {types.map((t) => (
+            <button
+              type="button"
+              key={t.name}
+              className={`filter-btn ${typeFilter === t.name ? 'is-active' : ''}`}
+              title={t.minPrice ? `Desde ${formatCOP(t.minPrice)} por noche` : undefined}
+              onClick={() => setTypeFilter(t.name)}
+            >
+              {t.name} ({t.count})
+            </button>
+          ))}
+        </div>
+      )}
       <div className="rooms-grid">
-        {suites.map((suite) => {
+        {visibleSuites.map((suite) => {
           const av = availabilityMap?.get(suite._id);
           const isUnavailable = av && !av.isAvailable;
           const nightly = av?.pricePerNight ?? suite.seasonalPrice ?? suite.basePrice;

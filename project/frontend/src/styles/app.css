@@ -604,3 +604,31 @@ cat >> frontend/src/styles/app.css <<'EOF'
 .exp-row { display: flex; align-items: center; gap: 14px; padding: 8px 0; border-bottom: 1px solid rgba(201, 169, 110, 0.12); }
 .exp-row > span:first-child { flex: 1; }
 @media (max-width: 760px) { .detail-grid { grid-template-columns: 1fr; } }
+
+/* ===== Filtros del catálogo (suites y experiencias) ===== */
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto 28px;
+  padding: 0 16px;
+}
+.filter-btn {
+  background: transparent;
+  color: var(--cream);
+  border: 1px solid rgba(201, 169, 110, 0.35);
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.filter-btn:hover { border-color: var(--gold); }
+.filter-btn.is-active {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--dark);
+}
