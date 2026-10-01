@@ -105,6 +105,28 @@ const getPaymentInstructions = (booking) => ({
   reference: String(booking._id).slice(-8).toUpperCase()
 });
 
+/**
+ * Recalcula experiencias, descuento y total de una reserva existente con la
+ * MISMA regla que createBooking (5% desde 5 noches, 10% desde 7). Antes,
+ * agregar/quitar una experiencia dejaba el descuento viejo sin tocar y el
+ * total no coincidía con el de una reserva nueva.
+ */
+const recalcExperienceTotals = async (booking) => {
+  const exps = booking.experiences.length
+    ? await Experience.find({ _id: { $in: booking.experiences } })
+    : [];
+  booking.experiencesTotal = exps.reduce((sum, e) => sum + e.price, 0);
+
+  const nights = calculateNights(booking.checkIn, booking.checkOut);
+  const preDiscount = (booking.subtotal || 0) + booking.experiencesTotal;
+  const rate = nights >= 7 ? 0.1 : nights >= 5 ? 0.05 : 0;
+  booking.discount = preDiscount * rate;
+  booking.discountReason = rate > 0
+    ? (nights >= 7 ? 'Descuento por estadía de 7+ noches (10%)' : 'Descuento por estadía de 5+ noches (5%)')
+    : null;
+  booking.totalPrice = preDiscount - booking.discount;
+
+};
 // ============================================
 // MAIN CONTROLLERS
 // ============================================
@@ -811,10 +833,11 @@ export const getAllBookings = async (req, res) => {
 export const getUpcomingBookings = async (req, res) => {
   try {
     const { days = 30 } = req.query;
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + parseInt(days));
-    
+    const daysAhead = Math.min(365, Math.max(1, parseInt(days, 10) || 30));
+    // Fecha de calendario del hotel (no "ahora"): una reserva con check-in
+    // HOY está guardada a medianoche y antes quedaba excluida.
+    const startDate = todayCalendarDate();
+    const endDate = new Date(startDate.getTime() + daysAhead * 24 * 60 * 60 * 1000);    
     const bookings = await Booking.find({
       user: req.user.id,
       status: { $in: BLOCKING_STATUSES },
@@ -831,7 +854,7 @@ export const getUpcomingBookings = async (req, res) => {
       period: {
         start: startDate,
         end: endDate,
-        days: parseInt(days)
+        days: daysAhead
       }
     });
     
@@ -899,8 +922,7 @@ export const addExperienceToBooking = async (req, res) => {
     
     // Agregar experiencia
     booking.experiences.push(experienceId);
-    booking.experiencesTotal = (booking.experiencesTotal || 0) + experience.price;
-    booking.totalPrice = (booking.subtotal || 0) + booking.experiencesTotal - (booking.discount || 0);
+    await recalcExperienceTotals(booking);
     
     await booking.save();
     await booking.populate('experiences');
@@ -969,16 +991,11 @@ export const removeExperienceFromBooking = async (req, res) => {
       });
     }
     
-    // Obtener precio de la experiencia
-    const experience = await Experience.findById(experienceId);
-    
-    // Eliminar experiencia
+    // Eliminar experiencia y recalcular totales
+
     booking.experiences.splice(experienceIndex, 1);
-    if (experience) {
-      booking.experiencesTotal = Math.max(0, (booking.experiencesTotal || 0) - experience.price);
-    }
-    booking.totalPrice = (booking.subtotal || 0) + (booking.experiencesTotal || 0) - (booking.discount || 0);
-    
+    await recalcExperienceTotals(booking);
+
     await booking.save();
     await booking.populate('experiences');
     
