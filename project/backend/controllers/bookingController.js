@@ -920,6 +920,14 @@ export const addExperienceToBooking = async (req, res) => {
       });
     }
     
+    // Máximo de experiencias por reserva (la misma regla que al crearla)
+    if (booking.experiences.length >= 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se pueden agregar más de 5 experiencias a una reserva'
+      });
+    }
+    
     // Agregar experiencia
     booking.experiences.push(experienceId);
     await recalcExperienceTotals(booking);
