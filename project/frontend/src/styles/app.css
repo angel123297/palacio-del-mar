@@ -583,3 +583,24 @@ cat >> frontend/src/styles/app.css <<'EOF'
   .drp-triggers { flex-direction: column; }
   .drp-pop { width: 100%; }
 }
+
+/* ---------- Detalle de reserva y próximas llegadas ---------- */
+.upcoming-strip { margin-bottom: 28px; }
+.upcoming-list { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+.upcoming-card {
+  display: flex; flex-direction: column; gap: 4px; padding: 14px 18px; min-width: 220px;
+  border: 1px solid rgba(201, 169, 110, 0.35); background: rgba(201, 169, 110, 0.06);
+  color: var(--cream); text-decoration: none; font-size: 0.85rem;
+}
+.upcoming-card:hover { border-color: var(--gold); }
+.upcoming-card strong { color: var(--gold-light); font-size: 1rem; }
+.upcoming-when { color: var(--gold); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.detail-card { border: 1px solid rgba(201, 169, 110, 0.2); padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.detail-wide { grid-column: 1 / -1; }
+.price-rows { display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; }
+.price-rows > div { display: flex; justify-content: space-between; gap: 12px; }
+.price-total { border-top: 1px solid rgba(201, 169, 110, 0.3); padding-top: 8px; color: var(--gold-light); font-weight: 600; }
+.exp-row { display: flex; align-items: center; gap: 14px; padding: 8px 0; border-bottom: 1px solid rgba(201, 169, 110, 0.12); }
+.exp-row > span:first-child { flex: 1; }
+@media (max-width: 760px) { .detail-grid { grid-template-columns: 1fr; } }
