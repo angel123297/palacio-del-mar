@@ -42,7 +42,16 @@ const registerSchema = Joi.object({
       'string.min': 'La contraseña debe tener al menos 8 caracteres',
       'string.max': 'La contraseña no puede exceder 100 caracteres',
       'any.required': 'La contraseña es obligatoria'
-    })
+    }),
+phone: Joi.string()
+  .trim()
+  .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/)
+  .required()
+  .messages({
+    'string.pattern.base': 'El teléfono no es válido',
+    'any.required': 'El teléfono es obligatorio',
+    'string.empty': 'El teléfono es obligatorio',
+  }),
 });
 
 const loginSchema = Joi.object({
@@ -63,7 +72,7 @@ const loginSchema = Joi.object({
     .messages({
       'any.required': 'La contraseña es obligatoria',
       'string.empty': 'La contraseña es obligatoria'
-    })
+  })
 });
 
 // ============================================
@@ -121,7 +130,7 @@ export const register = async (req, res) => {
       });
     }
 
-    const { name, email, password } = value;
+    const { name, email, password, phone } = value;
     
     // 2. Verificar si el usuario ya existe
     const existingUser = await User.findOne({ email });
@@ -143,6 +152,7 @@ export const register = async (req, res) => {
       name,
       email,
       password,
+      profile: {phone}, 
       status: 'active',
       createdAt: new Date()
     });
