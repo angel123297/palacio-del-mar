@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import Navbar from '../components/Navbar.jsx';
 import Footer from '../components/Footer.jsx';
+import UpcomingBookings from '../components/UpcomingBookings.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { formatCOP, formatDate } from '../utils/format';
+import { formatCOP, formatCalendarDate } from '../utils/format';
 
 const STATUS_CLASS = {
   pending: 'pill-pending',
@@ -90,8 +91,8 @@ function BookingCard({ booking, onChanged }) {
           <ModifyDatesForm booking={booking} onDone={(changed) => { setEditing(false); if (changed) onChanged(); }} />
         ) : (
           <div className="booking-dates-row">
-            <span><strong>Check-in</strong> {formatDate(booking.checkIn)}</span>
-            <span><strong>Check-out</strong> {formatDate(booking.checkOut)}</span>
+            <span><strong>Check-in</strong> {formatCalendarDate(booking.checkIn)}</span>
+            <span><strong>Check-out</strong> {formatCalendarDate(booking.checkOut)}</span>
             <span><strong>Huéspedes</strong> {booking.guests}</span>
             <span><strong>Total</strong> {formatCOP(booking.totalPrice)}</span>
           </div>
@@ -103,6 +104,7 @@ function BookingCard({ booking, onChanged }) {
 
         {!editing && (
           <div className="booking-card-actions">
+            <Link className="btn-outline" to={`/reservas/${booking._id}`}>Ver detalle</Link>
             {booking.isModifiable && (
               <button className="btn-outline" onClick={() => setEditing(true)} disabled={busy}>Modificar fechas</button>
             )}
@@ -153,6 +155,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        <UpcomingBookings reloadKey={bookings} />
         <div className="dashboard-filters">
           {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map((f) => (
             <button

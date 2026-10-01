@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
+import BookingDetailPage from './pages/BookingDetailPage.jsx';
 import VerifyEmailPage from './pages/VerifyEmailPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
@@ -43,6 +44,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/reservas/:id" element={<ProtectedRoute><BookingDetailPage /></ProtectedRoute>} />
             <Route path="/verificar-email/:token" element={<VerifyEmailPage />} />
             <Route path="/restablecer-contrasena" element={<ResetPasswordPage />} />
             <Route path="*" element={<NotFoundPage />} />
