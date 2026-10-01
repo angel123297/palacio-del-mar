@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Booking from '../models/Booking.js';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import Joi from 'joi';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../utils/email.js';
 
@@ -42,7 +43,16 @@ const registerSchema = Joi.object({
       'string.min': 'La contraseña debe tener al menos 8 caracteres',
       'string.max': 'La contraseña no puede exceder 100 caracteres',
       'any.required': 'La contraseña es obligatoria'
-    })
+    }),
+phone: Joi.string()
+  .trim()
+  .pattern(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/)
+  .required()
+  .messages({
+    'string.pattern.base': 'El teléfono no es válido',
+    'any.required': 'El teléfono es obligatorio',
+    'string.empty': 'El teléfono es obligatorio',
+  }),
 });
 
 const loginSchema = Joi.object({
@@ -63,7 +73,7 @@ const loginSchema = Joi.object({
     .messages({
       'any.required': 'La contraseña es obligatoria',
       'string.empty': 'La contraseña es obligatoria'
-    })
+  })
 });
 
 // ============================================
@@ -87,6 +97,7 @@ const sanitizeUser = (user) => {
     id: user._id,
     name: user.name,
     email: user.email,
+    phone: user.profile?.phone || null,
     role: user.role,
     createdAt: user.createdAt
   };
@@ -121,7 +132,7 @@ export const register = async (req, res) => {
       });
     }
 
-    const { name, email, password } = value;
+    const { name, email, password, phone } = value;
     
     // 2. Verificar si el usuario ya existe
     const existingUser = await User.findOne({ email });
@@ -143,6 +154,7 @@ export const register = async (req, res) => {
       name,
       email,
       password,
+      profile: {phone}, 
       status: 'active',
       createdAt: new Date()
     });
@@ -366,18 +378,34 @@ export const changePassword = async (req, res) => {
     
     const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {
-      return res.status(401).json({
+      // 400 y no 401: el frontend cierra la sesión ante cualquier 401, y
+      // equivocarse al escribir la contraseña actual no debe sacar al
+      // usuario de su cuenta.
+      return res.status(400).json({
         success: false,
         message: 'La contraseña actual es incorrecta'
+      });
+    }
+    
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'La nueva contraseña debe ser diferente a la actual'
       });
     }
     
     user.password = newPassword;
     await user.save();
     
+    // Al cambiar la contraseña, authMiddleware invalida los tokens emitidos
+    // antes del cambio (incluido el de esta sesión). Devolvemos uno nuevo
+    // para que el usuario siga dentro de su cuenta en este dispositivo.
+    const token = generateToken(user._id, user.role);
+    
     res.json({
       success: true,
-      message: 'Contraseña actualizada exitosamente'
+      message: 'Contraseña actualizada exitosamente',
+      token
     });
     
   } catch (error) {
@@ -603,6 +631,9 @@ export const updateProfile = async (req, res) => {
       });
     }
     
+    // Cuentas antiguas pueden no tener el subdocumento "profile"
+    if (!user.profile) user.profile = {};
+    
     // Actualizar campos permitidos
     if (name) user.name = name;
     if (lastName !== undefined) user.lastName = lastName;
@@ -618,14 +649,7 @@ export const updateProfile = async (req, res) => {
     res.json({
       success: true,
       message: 'Perfil actualizado exitosamente',
-      user: {
-        id: user._id,
-        name: user.name,
-        lastName: user.lastName,
-        email: user.email,
-        profile: user.profile,
-        preferences: user.preferences
-      }
+      user: sanitizeUser(user)
     });
     
   } catch (error) {
@@ -649,7 +673,7 @@ export const getProfileStats = async (req, res) => {
       Booking.countDocuments({ user: req.user.id }),
       Booking.countDocuments({ user: req.user.id, status: 'completed' }),
       Booking.aggregate([
-        { $match: { user: req.user.id, status: 'completed' } },
+        { $match: { user: new mongoose.Types.ObjectId(req.user.id), status: 'completed' } },
         { $group: { _id: null, total: { $sum: '$totalPrice' } } }
       ])
     ]);
