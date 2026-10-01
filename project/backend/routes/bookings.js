@@ -84,7 +84,7 @@ const createBookingValidation = [
     .normalizeEmail(),
   
   body('guestPhone')
-    .optional()
+    .optional({ checkFalsy: true })
     .matches(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/)
     .withMessage('Teléfono inválido'),
   
