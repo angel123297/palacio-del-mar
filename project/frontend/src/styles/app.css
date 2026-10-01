@@ -516,3 +516,31 @@ cat >> frontend/src/styles/app.css <<'EOF'
 
 
 #booking-bar { position: static; }
+
+/* ---------- Mi perfil ---------- */
+.dashboard-head-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.profile-stat {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(201, 169, 110, 0.15);
+  border-radius: 4px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.profile-stat strong { font-size: 1.15rem; color: var(--gold-light); }
+.profile-stat span { font-size: 0.7rem; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.08em; }
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.profile-form-title { font-size: 1.1rem; margin-bottom: 4px; }
+.profile-form input:disabled { opacity: 0.6; cursor: not-allowed; }

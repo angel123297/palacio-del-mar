@@ -38,6 +38,7 @@ export default function Navbar() {
               <button className="btn-outline nav-user-btn" onClick={() => navigate('/dashboard')}>
                 {user.name.split(' ')[0]}
               </button>
+              <button className="link-btn" onClick={() => navigate('/perfil')}>Mi perfil</button>
               {isAdmin && (
                 <button className="btn-outline" onClick={() => navigate('/admin')}>Admin</button>
               )}
