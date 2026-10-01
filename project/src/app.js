@@ -4,7 +4,13 @@ import healthRoutes from './routes/health.routes.js';
 import availabilityRoutes from './routes/availability.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import chatRoutes from './routes/chat.routes.js';
+import authRoutes from './routes/auth.routes.js';
+import bookingRoutes from './routes/booking.routes.js';
 
+
+app.use('/api/auth', authRoutes);
+
+app.use('/api/bookings', bookingRoutes);
 
 app.use('/api', catalogRoutes);
 
