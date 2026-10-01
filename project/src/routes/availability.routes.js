@@ -2,7 +2,13 @@ import { Router } from 'express';
 
 import { getCalendar, getSuiteAvailability, getExperienceAvailability } from '../controllers/availability.controller.js';
 
+// Arriba (modifica la línea existente):
 
+import { getCalendar, getSuiteAvailability, getExperienceAvailability, clearAvailabilityCache } from '../controllers/availability.controller.js';
+
+// Abajo (añade esta línea antes del export default router):
+
+router.delete('/cache', clearAvailabilityCache);
 
 const router = Router();
 

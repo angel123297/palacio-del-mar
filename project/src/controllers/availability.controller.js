@@ -83,3 +83,12 @@ export const getExperienceAvailability = async (req, res) => {
     }
 
 };
+// 4. Limpiar caché de disponibilidad
+
+export const clearAvailabilityCache = (req, res) => {
+
+    // Lógica futura para limpiar Redis o memoria local
+
+    res.status(200).json({ message: 'Caché de disponibilidad liberada' });
+
+};
