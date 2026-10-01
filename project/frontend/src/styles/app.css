@@ -494,3 +494,25 @@ input:focus, select:focus, textarea:focus {
   .modal-box { padding: 28px 20px; }
   .bar-chart-row { grid-template-columns: 1fr; gap: 4px; }
 }
+
+cd /mnt/c/users/hdari/Downloads/palacio-del-mar/project
+printf '\n' >> frontend/src/styles/app.css
+cat >> frontend/src/styles/app.css <<'EOF'
+
+/* ===== Menú fijo + barra de reserva pegada debajo (sin hueco) ===== */
+#navbar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+#navbar nav {
+  height: 57px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+@media (max-width: 960px) {
+  #booking-bar { position: static; }
+}
+
+
+#booking-bar { position: static; }
