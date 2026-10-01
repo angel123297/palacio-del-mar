@@ -147,7 +147,10 @@ export default function DashboardPage() {
             <p className="sec-label">Mi cuenta</p>
             <h1 className="sec-title">Hola, {user?.name?.split(' ')[0]}</h1>
           </div>
-          <Link className="btn-outline" to="/">← Volver al sitio</Link>
+          <div className="dashboard-head-actions">
+            <Link className="btn-outline" to="/perfil">Mi perfil</Link>
+            <Link className="btn-outline" to="/">← Volver al sitio</Link>
+          </div>
         </div>
 
         <div className="dashboard-filters">
