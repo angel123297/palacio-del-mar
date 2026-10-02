@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: palacio-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: palacio_db
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    build: ./backend
+    container_name: palacio-backend
+    restart: always
+    environment:
+      PORT: 3000
+      MONGO_URI: mongodb://mongo:27017/palacio_db
+    depends_on:
+      - mongo
+
+  web:
+    build: ./frontend
+    container_name: palacio-web
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:
