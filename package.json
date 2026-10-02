@@ -1,0 +1,10 @@
+{
+  "name": "palacio-del-mar",
+  "version": "1.0.0",
+  "description": "Palacio del Mar - Hotel Boutique Cartagena",
+  "scripts": {
+    "start": "node backend/server.js",
+    "build": "cd frontend && npm install && npm run build",
+    "deploy": "echo 'Listo para Hostinger'"
+  }
+}
