@@ -1,4 +1,6 @@
 import Suite from '../models/Suite.js';
+import Branch from '../models/Branch.js';
+import { resolveBranchId } from '../utils/branches.js';
 
 // ============================================
 // CONFIGURACIÓN
@@ -120,7 +122,8 @@ const validateQueryParams = (query) => {
     available,
     search,
     checkIn,
-    checkOut
+    checkOut,
+    branch
   } = query;
   
   const validated = {};
@@ -159,6 +162,9 @@ const validateQueryParams = (query) => {
   const validTypes = ['Habitación', 'Suite Deluxe', 'Suite Premium', 'Suite Presidencial', 'Suite Exclusiva', 'Penthouse'];
   validated.type = validTypes.includes(type) ? type : null;
   
+  // Sucursal (slug o id; se resuelve en getSuites)
+  validated.branch = branch ? String(branch).slice(0, 60) : null;
+
   // Disponibilidad
   validated.available = available === 'false' ? false : true;
   
@@ -267,6 +273,15 @@ export const getSuites = async (req, res) => {
     
     // 2. Construir query base
     const query = buildQuery(filters);
+
+    // Filtro por sucursal
+    if (filters.branch) {
+      const branchId = await resolveBranchId(filters.branch);
+      if (!branchId) {
+        return res.json({ success: true, data: [], metadata: { pagination: { currentPage: 1, totalPages: 0, totalItems: 0, itemsPerPage: limit, hasNextPage: false, hasPrevPage: false } } });
+      }
+      query.branch = branchId;
+    }
     
     // 3. Verificar caché
     const cacheKey = getCacheKey({ ...filters, page, limit });
@@ -289,6 +304,7 @@ export const getSuites = async (req, res) => {
         .sort({ [sortBy]: sortOrder })
         .skip(skip)
         .limit(limit)
+        .populate('branch', 'name slug zone')
         .lean(),
       Suite.countDocuments(query)
     ]);
@@ -796,7 +812,8 @@ export const createSuite = async (req, res) => {
       features,
       maxGuests,
       totalUnits,
-      order
+      order,
+      branch
     } = req.body;
 
     // Validar campos requeridos según el esquema real de Suite
@@ -817,7 +834,21 @@ export const createSuite = async (req, res) => {
       });
     }
 
+    // Sucursal: la indicada (slug o id) o, si no se indica, la primera activa.
+    let branchId = await resolveBranchId(branch);
+    if (branchId === null) {
+      return res.status(400).json({ success: false, message: 'La sucursal indicada no existe' });
+    }
+    if (!branchId) {
+      const first = await Branch.findOne({ active: true }).sort('order').select('_id').lean();
+      if (!first) {
+        return res.status(400).json({ success: false, message: 'No hay sucursales creadas' });
+      }
+      branchId = first._id;
+    }
+
     const suite = new Suite({
+      branch: branchId,
       name,
       type,
       basePrice,

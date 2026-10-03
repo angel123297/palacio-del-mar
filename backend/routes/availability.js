@@ -51,6 +51,10 @@ const availabilityValidation = [
     .isIn(['Habitación', 'Suite Deluxe', 'Suite Premium', 'Suite Presidencial', 'Suite Exclusiva'])
     .withMessage('Tipo de suite inválido'),
 
+  query('branch')
+    .optional()
+    .matches(/^[a-zA-Z0-9-]{1,60}$/).withMessage('Sucursal inválida'),
+
   query('minPrice')
     .optional()
     .isInt({ min: 0 }).withMessage('El precio mínimo debe ser un número positivo'),
@@ -73,7 +77,11 @@ const monthlyAvailabilityValidation = [
 
   query('month')
     .notEmpty().withMessage('El mes es obligatorio')
-    .isInt({ min: 1, max: 12 }).withMessage('Mes inválido (1-12)')
+    .isInt({ min: 1, max: 12 }).withMessage('Mes inválido (1-12)'),
+
+  query('branch')
+    .optional()
+    .matches(/^[a-zA-Z0-9-]{1,60}$/).withMessage('Sucursal inválida')
 ];
 
 // ============================================

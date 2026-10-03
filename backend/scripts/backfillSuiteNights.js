@@ -17,6 +17,7 @@ import dotenv from 'dotenv';
 import connectDB, { closeConnection } from '../database/db.js';
 import Booking, { BLOCKING_BOOKING_STATUSES } from '../models/Booking.js';
 import SuiteNight, { NightsConflictError } from '../models/SuiteNight.js';
+import Suite from '../models/Suite.js';
 import { eachNight } from '../utils/dates.js';
 
 dotenv.config();
@@ -32,15 +33,31 @@ const run = async () => {
 
   const bookings = await Booking.find({ status: { $in: BLOCKING_BOOKING_STATUSES } })
     .sort('createdAt')
-    .select('suite checkIn checkOut status createdAt');
+    .select('suite checkIn checkOut status createdAt unitSlot');
+  const capacityBySuite = new Map();
+  const capacityOf = async (suiteId) => {
+    const key = String(suiteId);
+    if (!capacityBySuite.has(key)) {
+      const suite = await Suite.findById(suiteId).select('totalUnits units available');
+      capacityBySuite.set(key, suite ? Math.max(1, suite.availableUnitsCount) : 1);
+    }
+    return capacityBySuite.get(key);
+  };
 
   for (const b of bookings) {
-    const held = new Set((await SuiteNight.find({ booking: b._id }).select('date').lean()).map((n) => n.date.getTime()));
+    const heldNights = await SuiteNight.find({ booking: b._id }).select('date slot').lean();
+    const held = new Set(heldNights.map((n) => n.date.getTime()));
     const missing = eachNight(b.checkIn, b.checkOut).filter((d) => !held.has(d.getTime()));
     if (!missing.length) continue;
     if (!apply) { created += missing.length; continue; }
     try {
-      await SuiteNight.acquire(b.suite, b._id, missing);
+      if (heldNights.length) {
+        // ya tiene habitación asignada: se completan las noches en la misma
+        await SuiteNight.acquire(b.suite, b._id, missing, heldNights[0].slot);
+      } else {
+        const { slot } = await SuiteNight.acquireAny(b.suite, b._id, missing, await capacityOf(b.suite));
+        await Booking.updateOne({ _id: b._id }, { $set: { unitSlot: slot } });
+      }
       created += missing.length;
     } catch (err) {
       if (err instanceof NightsConflictError) conflicts.push(String(b._id));

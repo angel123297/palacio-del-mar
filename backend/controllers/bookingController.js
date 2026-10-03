@@ -238,6 +238,7 @@ export const createBooking = async (req, res) => {
     const booking = new Booking({
       user: req.user.id,
       suite: suiteId,
+      branch: suite.branch,
       checkIn: checkInDate,
       checkOut: checkOutDate,
       guests: parseInt(guests),
@@ -261,7 +262,11 @@ export const createBooking = async (req, res) => {
     // 9b. Adquirir las noches de forma atómica (BUG-001). Si otra solicitud
     // concurrente ya las tiene, MongoDB rechaza el insert por clave única.
     try {
-      await SuiteNight.acquire(suiteId, booking._id, eachNight(checkInDate, checkOutDate));
+      // Asigna la primera habitación física libre de ese tipo en la sucursal.
+      const { slot } = await SuiteNight.acquireAny(
+        suiteId, booking._id, eachNight(checkInDate, checkOutDate), suite.availableUnitsCount
+      );
+      booking.unitSlot = slot;
     } catch (err) {
       if (err instanceof NightsConflictError) {
         return conflictResponse(res, 'La suite no está disponible para las fechas seleccionadas');
@@ -569,9 +574,10 @@ export const modifyBookingDates = async (req, res) => {
     // Adquirir atómicamente las noches nuevas que esta reserva aún no tiene
     // (BUG-001). Se consultan los bloqueos reales de la reserva, así también
     // funciona con reservas anteriores a SuiteNight (aún sin bloqueos).
-    const heldTimes = new Set(
-      (await SuiteNight.find({ booking: booking._id }).select('date').lean()).map((n) => n.date.getTime())
-    );
+    const heldNights = await SuiteNight.find({ booking: booking._id }).select('date slot').lean();
+    const heldTimes = new Set(heldNights.map((n) => n.date.getTime()));
+    // Las noches nuevas se piden en LA MISMA habitación física de la reserva.
+    const bookingSlot = heldNights[0]?.slot ?? booking.unitSlot ?? 1;
     const newNightList = eachNight(dateValidation.checkInDate, dateValidation.checkOutDate);
     const nightsToAcquire = newNightList.filter((d) => !heldTimes.has(d.getTime()));
     const newTimes = new Set(newNightList.map((d) => d.getTime()));
@@ -579,7 +585,7 @@ export const modifyBookingDates = async (req, res) => {
     
     let acquiredNights;
     try {
-      acquiredNights = await SuiteNight.acquire(booking.suite, booking._id, nightsToAcquire);
+      acquiredNights = await SuiteNight.acquire(booking.suite, booking._id, nightsToAcquire, bookingSlot);
     } catch (err) {
       if (err instanceof NightsConflictError) {
         return conflictResponse(res, 'La suite no está disponible para las nuevas fechas');

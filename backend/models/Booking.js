@@ -71,6 +71,11 @@ const bookingSchema = new mongoose.Schema({
     required: [true, 'La suite es obligatoria'],
     index: true
   },
+  // Sucursal y habitación física asignada (slot 1..totalUnits de la suite).
+  // Se copian al reservar: la sucursal de una reserva no cambia aunque luego
+  // se edite la suite.
+  branch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', index: true },
+  unitSlot: { type: Number, min: 1, default: 1 },
   
   // Fechas
   checkIn: { 
@@ -406,18 +411,23 @@ bookingSchema.statics.checkSuiteAvailability = async function(suiteId, checkIn, 
   // Solape estándar de intervalos [checkIn, checkOut): A solapa B si
   // A.in < B.out && A.out > B.in. Es una comprobación amistosa (respuesta
   // 409 rápida); la garantía real contra concurrencia es SuiteNight.
+  // Una suite con N habitaciones físicas admite hasta N reservas solapadas.
+  const suite = await mongoose.model('Suite').findById(suiteId).select('totalUnits units available');
+  if (!suite) return false;
+  const capacity = suite.availableUnitsCount;
+
   const query = {
     suite: suiteId,
     status: { $in: BLOCKING_BOOKING_STATUSES },
     checkIn: { $lt: normalizeDate(checkOut) },
     checkOut: { $gt: normalizeDate(checkIn) }
   };
-  
+
   if (excludeBookingId) {
     query._id = { $ne: excludeBookingId };
   }
-  
-  return (await this.countDocuments(query)) === 0;
+
+  return (await this.countDocuments(query)) < capacity;
 };
 
 // ============================================

@@ -8,6 +8,9 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/palaci
 
 import Suite from '../models/Suite.js';
 import Experience from '../models/Experience.js';
+import Branch from '../models/Branch.js';
+import SuiteNight from '../models/SuiteNight.js';
+import { ensureBranches } from './branches.js';
 
 export const suites = [
   { 
@@ -205,18 +208,69 @@ export const experiences = [
  * así puede reutilizarse tanto desde este script de línea de comandos como
  * desde el arranque automático del servidor (ver ../bootstrap.js).
  */
+/**
+ * Qué tipos de habitación tiene cada sucursal: nombre del catálogo base,
+ * cuántas habitaciones físicas hay (units) y el factor de precio de la zona.
+ */
+export const branchOffers = {
+  'centro-historico': {
+    priceFactor: 1.0,
+    rooms: [['Superior Patio', 4], ['Suite Colonial', 3], ['Suite Bahía', 2], ['Suite Presidencial', 1], ['Penthouse Muralla', 1]]
+  },
+  getsemani: {
+    priceFactor: 0.85,
+    rooms: [['Superior Patio', 5], ['Suite Colonial', 3]]
+  },
+  bocagrande: {
+    priceFactor: 1.1,
+    rooms: [['Superior Patio', 6], ['Suite Bahía', 4], ['Suite Presidencial', 2]]
+  },
+  'la-boquilla': {
+    priceFactor: 0.8,
+    rooms: [['Superior Patio', 4], ['Suite Bahía', 3]]
+  }
+};
+
+const roundPrice = (value) => Math.round(value / 10000) * 10000;
+
+/** Arma los documentos de suite de cada sucursal a partir del catálogo base. */
+export const buildBranchSuites = (branchesBySlug) => {
+  const result = [];
+  for (const [branchSlug, offer] of Object.entries(branchOffers)) {
+    const branch = branchesBySlug.get(branchSlug);
+    if (!branch) throw new Error(`Falta la sucursal ${branchSlug}`);
+    offer.rooms.forEach(([name, units]) => {
+      const base = suites.find((s) => s.name === name);
+      if (!base) throw new Error(`El catálogo base no tiene "${name}"`);
+      result.push({
+        ...base,
+        branch: branch._id,
+        slug: `${base.slug}-${branchSlug}`,
+        basePrice: roundPrice(base.basePrice * offer.priceFactor),
+        originalPrice: base.originalPrice ? roundPrice(base.originalPrice * offer.priceFactor) : undefined,
+        totalUnits: units
+      });
+    });
+  }
+  return result;
+};
+
 export const insertSeedData = async ({ clear = true } = {}) => {
   if (clear) {
     await Suite.deleteMany();
     await Experience.deleteMany();
+    await Branch.deleteMany();
+    await SuiteNight.deleteMany(); // las noches de las suites borradas ya no sirven
   }
-  for (const suite of suites) {
+  const branchesBySlug = await ensureBranches();
+  const branchSuites = buildBranchSuites(branchesBySlug);
+  for (const suite of branchSuites) {
     await Suite.create(suite);
   }
   for (const exp of experiences) {
     await Experience.create(exp);
   }
-  return { suites: suites.length, experiences: experiences.length };
+  return { branches: branchesBySlug.size, suites: branchSuites.length, experiences: experiences.length };
 };
 
 /**
@@ -230,7 +284,6 @@ export const insertSeedData = async ({ clear = true } = {}) => {
 const seedDatabase = async () => {
   try {
     console.log('📡 Conectando a MongoDB...');
-    console.log('🔗 URI:', MONGODB_URI);
     
     await mongoose.connect(MONGODB_URI);
     console.log('✅ Conectado a MongoDB');
@@ -240,7 +293,8 @@ const seedDatabase = async () => {
     
     console.log('\n✨ ¡Seed completado exitosamente! ✨');
     console.log(`📊 Resumen:`);
-    console.log(`   - Suites: ${result.suites}`);
+    console.log(`   - Sucursales: ${result.branches}`);
+    console.log(`   - Tipos de habitación: ${result.suites}`);
     console.log(`   - Experiencias: ${result.experiences}`);
     
     process.exit(0);

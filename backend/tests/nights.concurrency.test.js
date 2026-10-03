@@ -51,3 +51,22 @@ test('rangos que se solapan parcialmente no pueden coexistir; adyacentes sí', {
     await mongoose.disconnect();
   }
 });
+
+test('10 solicitudes paralelas por un tipo con 3 habitaciones: ganan exactamente 3, cada una en su slot', { skip: !uri && 'defina TEST_MONGODB_URI' }, async () => {
+  await mongoose.connect(uri);
+  await SuiteNight.init();
+  const suite = new mongoose.Types.ObjectId();
+  const nights = eachNight(toCalendarDate('2030-03-10'), toCalendarDate('2030-03-13'));
+  try {
+    const results = await Promise.allSettled(
+      Array.from({ length: 10 }, () => SuiteNight.acquireAny(suite, new mongoose.Types.ObjectId(), nights, 3))
+    );
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    assert.equal(ok.length, 3);
+    assert.deepEqual(ok.map((r) => r.value.slot).sort(), [1, 2, 3]);
+    assert.equal(await SuiteNight.countDocuments({ suite }), 3 * nights.length, 'sin noches huérfanas');
+  } finally {
+    await SuiteNight.deleteMany({ suite });
+    await mongoose.disconnect();
+  }
+});

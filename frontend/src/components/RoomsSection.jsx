@@ -15,7 +15,8 @@ export default function RoomsSection() {
   const fetchSuites = useCallback(() => {
     setSuites(null);
     setError(false);
-    api.get('/suites', { params: { limit: 20, sortBy: 'order', sortOrder: 'asc' } })
+    api.get('/suites', { // Temporal (Fase 1): una sola sucursal hasta que exista el selector de zona (Fase 3)
+      params: { limit: 20, sortBy: 'order', sortOrder: 'asc', branch: 'centro-historico' } })
       .then((res) => setSuites(res.data.data))
       .catch(() => {
         setSuites([]);
