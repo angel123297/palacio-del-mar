@@ -1,96 +1,75 @@
-Período: 30 de septiembre – 1 de octubre de 2026
+# Palacio del Mar
 
-Este documento detalla las implementaciones recientes en el proyecto, documentando los cambios en la arquitectura del backend, la lógica de negocio y la interfaz de usuario, acompañados de los fragmentos de código estructurales correspondientes.
+Sitio web de un hotel boutique en Cartagena: catálogo de suites y experiencias,
+reservas con calendario de disponibilidad, cuentas de cliente y panel de
+administración.
 
-🔌 Backend y API: Estructura de Endpoints
-Se construyó y conectó la capa de controladores y rutas para gestionar el catálogo, la disponibilidad, la administración, el envío de correos y el monitoreo de los contenedores (Health Checks).
+**Stack:** React + Vite (frontend), Node.js + Express (API), MongoDB, todo
+dentro de Docker Compose.
 
-Implementación representativa (Health Checks y Catálogo):
+## Arrancar (un solo comando)
 
-JavaScript
-// src/controllers/health.controller.js
-export const checkDbHealth = (req, res) => {
-    const state = mongoose.connection.readyState;
-    // 1 indica conexión establecida con MongoDB
-    res.status(state === 1 ? 200 : 503).json({ 
-        database: 'MongoDB', 
-        status: state === 1 ? 'UP' : 'DOWN' 
-    });
-};
+Necesitas [Docker](https://www.docker.com/products/docker-desktop/) instalado.
 
-// src/routes/catalog.routes.js
-import { Router } from 'express';
-import { getSuiteTypes, getFeaturedExperiences } from '../controllers/catalog.controller.js';
+```bash
+docker compose up -d --build
+```
 
-const router = Router();
-router.get('/suites/types', getSuiteTypes);
-router.get('/experiences/featured', getFeaturedExperiences);
-🏨 Lógica de Reservas y Validaciones
-Se ajustaron las reglas de negocio en el backend para hacer las cotizaciones más precisas, requiriendo información vital del usuario y limitando los parámetros de reserva para evitar saturación.
+Cuando termine, abre **http://localhost:8080**.
 
-Lógica estructural de las restricciones aplicadas:
+No hace falta ningún archivo `.env`: todos los valores para correr en local
+están en `docker-compose.yml`. En el primer arranque se cargan solas las suites
+y experiencias de ejemplo y se crea el administrador.
 
-JavaScript
-// Límite de 5 experiencias por reserva existente
-if (booking.experiences.length >= 5) {
-    return res.status(400).json({ 
-        error: "Se ha alcanzado el límite máximo de 5 experiencias por reserva." 
-    });
-}
+| Qué | Valor |
+|---|---|
+| Sitio | http://localhost:8080 |
+| Panel de administración | http://localhost:8080/admin |
+| Correo del administrador | `admin@palaciomar.co` |
+| Contraseña del administrador | `AulaDocker2026Segura` |
 
-// Obligatoriedad del número de teléfono en el registro
-if (!req.body.phone) {
-    return res.status(400).json({ 
-        error: "El número de teléfono es un campo obligatorio para el registro." 
-    });
-}
+> Estas credenciales y la clave JWT de `docker-compose.yml` son **solo para uso
+> local**. No las uses en un servidor real.
 
-// Recálculo dinámico de precios (Concepto)
-const recalculateTotal = (basePrice, experiences, discount) => {
-    const experiencesTotal = experiences.reduce((acc, curr) => acc + curr.price, 0);
-    return (basePrice + experiencesTotal) - discount;
-};
-🖥️ Frontend y Experiencia de Usuario (UI/UX)
-Se integraron los filtros visuales del catálogo, un panel detallado de reservas y próximas llegadas en el dashboard, edición completa del perfil de usuario y mejoras de navegación mediante menús fijos y calendarios reactivos.
+## Comandos útiles
 
-Implementación conceptual del menú estático y peticiones de disponibilidad:
+```bash
+docker compose logs -f backend          # ver la API (aquí salen los correos de
+                                        # verificación y de recuperar contraseña)
+docker compose down                     # apagar (conserva los datos)
+docker compose down -v                  # apagar y BORRAR la base de datos
+docker compose exec backend npm run create-admin   # crear/promover otro administrador
+docker compose exec backend npm run seed           # recargar el catálogo de ejemplo
+                                                   # (borra y vuelve a crear suites y experiencias)
+```
 
-CSS
-/* Barra de reserva y menú de navegación fijos */
-.navbar-sticky, .reservation-bar {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    background-color: var(--background-light);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-JavaScript
-// Consumo del endpoint de calendario para bloquear días agotados
-const fetchSuiteAvailability = async (suiteId) => {
-    try {
-        const response = await fetch(`/api/availability/suite/${suiteId}`);
-        const activeBookings = await response.json();
-        // Mapeo de checkIn y checkOut para bloquear el DatePicker
-        const disabledDates = activeBookings.map(b => ({
-            start: new Date(b.checkIn),
-            end: new Date(b.checkOut)
-        }));
-        return disabledDates;
-    } catch (error) {
-        console.error("Error cargando el calendario", error);
-    }
-};
-⚙️ Configuración y Entorno (.env)
-Se resolvieron conflictos de integración relacionados con las variables de entorno, asegurando que las credenciales locales y de producción permanezcan fuera del control de versiones.
+Los correos no se envían de verdad: en local se imprimen en el log del backend.
+Para enviarlos hay que definir `SMTP_HOST`, `SMTP_USER` y `SMTP_PASS` en el
+bloque `backend` de `docker-compose.yml`.
 
-Actualización del archivo .gitignore:
+## Estructura
 
-Plaintext
-# Archivos de entorno y credenciales
-.env
-.env.local
-.env.development
-.env.production
+```
+docker-compose.yml     arranque completo (mongo + backend + web)
+backend/               API Express
+  controllers/ routes/ models/ middleware/ utils/
+  seed/ scripts/ bootstrap.js   datos de ejemplo y administrador inicial
+  tests/
+frontend/              React (Vite) servido por nginx; /api se reenvía al backend
+```
 
-# Dependencias
-node_modules/
+## Pruebas
+
+```bash
+cd backend
+npm ci
+npm test                                  # pruebas de fechas y precios
+TEST_MONGODB_URI=mongodb://localhost:27017/test npm test   # incluye la prueba de concurrencia
+```
+
+## Desarrollo sin Docker (opcional)
+
+Necesitas Node 20+ y una MongoDB local. Copia `backend/.env.example` a
+`backend/.env` y completa `JWT_SECRET`; luego `npm run dev` en `backend/` y en
+`frontend/` (el frontend corre en http://localhost:5173 y reenvía `/api` al
+puerto 5000).
