@@ -1,12 +1,9 @@
 /**
  * Preparación automática de datos al arrancar el servidor (DEPLOY-002).
  *
- * El enunciado de la actividad exige que el proyecto "se pueda visualizar
- * ya en funcionamiento" con solo `docker compose up`. Antes, el catálogo
- * (suites/experiencias) y el usuario administrador solo se creaban con
- * comandos manuales aparte (`docker compose --profile seed ...` y
- * `--profile create-admin ...`), así que un `docker compose up` a secas
- * dejaba el sitio vacío y sin forma de entrar a /admin.
+ * El proyecto debe poder verse funcionando con solo `docker compose up`:
+ * sin este paso, el catálogo (suites/experiencias) estaría vacío y no habría
+ * ningún usuario para entrar a /admin.
  *
  * Ambas funciones son idempotentes: se llaman en cada arranque del
  * contenedor, pero solo actúan si hace falta (catálogo vacío / sin ningún

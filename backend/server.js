@@ -188,29 +188,11 @@ const setupRoutes = () => {
         availability: '/api/availability',
         chat: '/api/chat',
         health: '/api/health'
-      },
-      documentation: '/api/docs'
+      }
     });
   });
   
   app.use(notFoundHandler);
-};
-
-// ============================================
-// DOCUMENTACIÓN (OPCIONAL)
-// ============================================
-
-const setupDocs = async () => {
-  if (process.env.ENABLE_DOCS === 'true') {
-    try {
-      const swaggerUi = await import('swagger-ui-express');
-      const swaggerDocument = await import('./swagger.json');
-      app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
-      console.log('📚 Documentación API disponible en /api/docs');
-    } catch (error) {
-      console.log('⚠️ Documentación API no disponible');
-    }
-  }
 };
 
 // ============================================
@@ -235,8 +217,6 @@ const startServer = async () => {
     
     console.log('🛣️ Configurando rutas...');
     setupRoutes();
-    
-    await setupDocs();
     
     app.use(errorHandler);
     

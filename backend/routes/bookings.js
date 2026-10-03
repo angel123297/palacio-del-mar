@@ -373,39 +373,4 @@ router.put(
   updatePaymentStatus
 );
 
-// ============================================
-// RUTA DE HEALTH CHECK
-// ============================================
-
-/**
- * @route   GET /api/bookings/health
- * @desc    Verificar estado del servicio de reservas
- * @access  Public
- */
-router.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Bookings service is running',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      user: [
-        'POST /',
-        'GET /',
-        'GET /upcoming',
-        'GET /:id',
-        'PUT /:id/cancel',
-        'PUT /:id/modify-dates',
-        'POST /:id/experiences',
-        'DELETE /:id/experiences/:experienceId',
-        'POST /:id/confirm'
-      ],
-      admin: [
-        'GET /admin/all',
-        'GET /admin/stats',
-        'PUT /admin/:id/payment-status'
-      ]
-    }
-  });
-});
-
 export default router;
