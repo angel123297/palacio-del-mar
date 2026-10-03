@@ -31,6 +31,22 @@ y experiencias de ejemplo y se crea el administrador.
 > Estas credenciales y la clave JWT de `docker-compose.yml` son **solo para uso
 > local**. No las uses en un servidor real.
 
+## Si algo falla: registro de errores
+
+`run.sh` hace lo mismo que `docker compose up -d --build`, pero además guarda los
+logs en la carpeta `logs/` y genera un reporte con los errores ya filtrados:
+
+```bash
+bash run.sh            # levanta todo; guarda el build y genera logs/reporte.txt
+bash run.sh reporte    # genera logs/reporte.txt tras reproducir un error en el sitio
+bash run.sh seguir     # guarda los logs en vivo mientras pruebas (Ctrl+C para parar)
+bash run.sh parar      # apaga los contenedores (conserva los datos)
+```
+
+Comparte `logs/reporte.txt` para pedir ayuda: oculta tokens, JWT y contraseñas.
+Los errores que solo salen en el navegador (consola de F12) no se incluyen.
+En Windows usa Git Bash o WSL. La carpeta `logs/` no se sube a Git.
+
 ## Comandos útiles
 
 ```bash
@@ -51,6 +67,7 @@ bloque `backend` de `docker-compose.yml`.
 
 ```
 docker-compose.yml     arranque completo (mongo + backend + web)
+run.sh                 arranque con registro de logs y reporte de errores
 backend/               API Express
   controllers/ routes/ models/ middleware/ utils/
   seed/ scripts/ bootstrap.js   datos de ejemplo y administrador inicial
