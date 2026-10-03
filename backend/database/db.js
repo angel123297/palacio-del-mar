@@ -8,32 +8,19 @@ dotenv.config();
 // ============================================
 
 const CONNECTION_OPTIONS = {
-  // Timeouts
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
   connectTimeoutMS: 10000,
   heartbeatFrequencyMS: 10000,
   
-  // Retry logic
   retryWrites: true,
   retryReads: true,
   
-  // Pool de conexiones
   maxPoolSize: 10,
   minPoolSize: 2,
   
-  // Forzar IPv4 (evita problemas con IPv6)
   family: 4,
-  
-  // SSL para producción
-  // TLS: activo por defecto en producción (MongoDB Atlas).
-  // Con MongoDB dentro de Docker (sin TLS) se desactiva con MONGODB_TLS=false.
-  ssl: process.env.MONGODB_TLS
-    ? process.env.MONGODB_TLS === 'true'
-    : process.env.NODE_ENV === 'production',
-
-  // ✅ ELIMINADO: debug no es una opción válida de mongoose.connect()
-  // Se configura por separado con mongoose.set('debug', true)
+  ssl: process.env.MONGODB_TLS === 'true'
 };
 
 // ============================================
@@ -50,23 +37,12 @@ const RETRY_DELAY_MS = 5000;
 // ============================================
 
 const validateMongoURI = () => {
-  const uri = process.env.MONGODB_URI;
-  
-  if (!uri) {
-    throw new Error(
-      '❌ MONGODB_URI no está definida en las variables de entorno.\n' +
-      'Por favor, configura MONGODB_URI en tu archivo .env\n' +
-      'Ejemplo: MONGODB_URI=mongodb://localhost:27017/palacio_del_mar'
-    );
-  }
+  // Cadena local por defecto apuntando al contenedor 'mongo' de Docker
+  const uri = process.env.MONGODB_URI || 'mongodb://mongo:27017/palacio_del_mar';
   
   const isValidFormat = uri.startsWith('mongodb://') || uri.startsWith('mongodb+srv://');
   if (!isValidFormat) {
-    throw new Error(
-      '❌ Formato de MONGODB_URI inválido.\n' +
-      'Debe comenzar con mongodb:// o mongodb+srv://\n' +
-      'Ejemplo: mongodb://localhost:27017/palacio_del_mar'
-    );
+    return 'mongodb://mongo:27017/palacio_del_mar';
   }
   
   return uri;
@@ -107,8 +83,6 @@ const handleConnectionError = async (error, uri) => {
 let listenersRegistered = false;
 
 const setupEventListeners = () => {
-  // connectDB() se vuelve a llamar en cada reintento; sin esta guarda se
-  // registraban listeners duplicados y cada evento se imprimía varias veces.
   if (listenersRegistered) return;
   listenersRegistered = true;
 
@@ -140,12 +114,6 @@ const setupEventListeners = () => {
   });
 };
 
-// NOTA: el apagado ordenado (SIGINT/SIGTERM) se gestiona una sola vez en
-// server.js, que cierra primero el servidor HTTP y luego llama a
-// closeConnection(). Tener otro listener aquí con process.exit(0) directo
-// provocaba un apagado duplicado y no esperaba a que el servidor HTTP
-// terminara de responder las peticiones en curso.
-
 // ============================================
 // FUNCIÓN PRINCIPAL DE CONEXIÓN
 // ============================================
@@ -154,9 +122,8 @@ const connectDB = async () => {
   try {
     const uri = validateMongoURI();
     
-    // ✅ Configurar debug por separado, no dentro de las opciones de connect()
     if (process.env.NODE_ENV === 'development') {
-      mongoose.set('debug', false); // Cambiar a true si quieres ver las queries en consola
+      mongoose.set('debug', false);
     }
 
     const options = {
@@ -166,7 +133,7 @@ const connectDB = async () => {
     
     setupEventListeners();
     
-    console.log('🔄 Conectando a MongoDB...');
+    console.log('🔄 Conectando a MongoDB Local...');
     const conn = await mongoose.connect(uri, options);
     
     isConnected = true;
@@ -176,11 +143,6 @@ const connectDB = async () => {
     console.log(`📊 Base de datos: ${conn.connection.name}`);
     console.log(`🌐 Host: ${conn.connection.host}:${conn.connection.port}`);
     console.log(`📦 Modelos cargados: ${Object.keys(conn.models).length}`);
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`\n🔧 Modo Desarrollo`);
-      console.log(`📡 Pool de conexiones: ${CONNECTION_OPTIONS.maxPoolSize}`);
-    }
     
     return conn;
     
@@ -194,15 +156,6 @@ const connectDB = async () => {
       return connectDB();
     }
     
-    console.error('\n💡 Soluciones posibles:');
-    console.error('1. Verifica que MongoDB esté instalado y corriendo:');
-    console.error('   - Windows: net start MongoDB');
-    console.error('   - Mac: brew services start mongodb-community');
-    console.error('   - Linux: sudo systemctl start mongod');
-    console.error('2. Verifica tu cadena de conexión en el archivo .env');
-    console.error('3. Si usas MongoDB Atlas, verifica tu usuario/contraseña');
-    console.error('4. Asegúrate de que no haya firewalls bloqueando el puerto 27017');
-    
     process.exit(1);
   }
 };
@@ -215,10 +168,6 @@ const getDbNameFromUri = (uri) => {
   try {
     const match = uri.match(/\/([^/?]+)(\?|$)/);
     if (match && match[1]) return match[1];
-    
-    const atlasMatch = uri.match(/\.net\/([^?]+)/);
-    if (atlasMatch && atlasMatch[1]) return atlasMatch[1];
-    
     return 'palacio_del_mar';
   } catch {
     return 'palacio_del_mar';
@@ -257,13 +206,8 @@ export const startConnectionMonitoring = () => {
   if (process.env.NODE_ENV === 'production') {
     setInterval(() => {
       const status = getConnectionStatus();
-      
       if (!status.isConnected) {
         console.warn('⚠️ Advertencia: Conexión a MongoDB perdida');
-      }
-      
-      if (process.env.MONITORING_LOG === 'true') {
-        console.log(`📊 MongoDB Status: ${status.readyState} | Pool: ${status.poolSize}`);
       }
     }, 300000);
   }
