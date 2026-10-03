@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { isValidEmail, EMAIL_MAX_LENGTH } from '../utils/validators.js';
 
 // ============================================
 // CONSTANTES
@@ -130,7 +131,10 @@ const ActivityLogSchema = new mongoose.Schema({
   action: {
     type: String,
     required: true,
-    enum: ['login', 'logout', 'password_change', 'profile_update', 'booking_create', 'booking_cancel', 'email_verification']
+    enum: [
+      'login', 'logout', 'password_change', 'profile_update', 'booking_create', 'booking_cancel',
+      'email_verification', 'password_reset', 'status_change', 'user_deleted'
+    ]
   },
   details: mongoose.Schema.Types.Mixed,
   ipAddress: String,
@@ -168,7 +172,8 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
     index: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Por favor, proporciona un email válido']
+    maxlength: [EMAIL_MAX_LENGTH, 'El email no puede exceder 254 caracteres'],
+    validate: { validator: isValidEmail, message: 'Por favor, proporciona un email válido' }
   },
   
   password: { 
@@ -321,7 +326,7 @@ userSchema.pre('save', async function(next) {
     });
     
     if (existingUser) {
-      next(new Error('El email ya está registrado'));
+      return next(new Error('El email ya está registrado'));
     }
   }
   next();
@@ -429,20 +434,27 @@ userSchema.methods.invalidateAllSessions = async function() {
  * Registrar actividad
  */
 userSchema.methods.logActivity = async function(action, details, ipAddress, userAgent) {
-  this.activityLog.push({
-    action,
-    details,
-    ipAddress,
-    userAgent,
-    timestamp: new Date()
-  });
-  
-  // Limitar historial de actividad a 100 registros
-  if (this.activityLog.length > 100) {
-    this.activityLog = this.activityLog.slice(-100);
+  // El historial es auxiliar: si falla NUNCA debe convertir en error una
+  // operación que ya se completó (antes, un fallo aquí devolvía 500 después
+  // de haber cambiado la contraseña, el estado o eliminado al usuario).
+  try {
+    this.activityLog.push({
+      action,
+      details,
+      ipAddress,
+      userAgent,
+      timestamp: new Date()
+    });
+    
+    // Limitar historial de actividad a 100 registros
+    if (this.activityLog.length > 100) {
+      this.activityLog = this.activityLog.slice(-100);
+    }
+    
+    await this.save();
+  } catch (err) {
+    console.error(`[Activity] No se pudo registrar "${action}":`, err.message);
   }
-  
-  await this.save();
 };
 
 /**

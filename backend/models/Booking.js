@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { isValidEmail, EMAIL_MAX_LENGTH } from '../utils/validators.js';
 import SuiteNight from './SuiteNight.js';
 import { toCalendarDate, todayCalendarDate, calculateNights } from '../utils/dates.js';
 
@@ -163,7 +164,8 @@ const bookingSchema = new mongoose.Schema({
     required: [true, 'El email del huésped es obligatorio'],
     lowercase: true,
     trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Email inválido']
+    maxlength: [EMAIL_MAX_LENGTH, 'El email no puede exceder 254 caracteres'],
+    validate: { validator: isValidEmail, message: 'Email inválido' }
   },
   guestPhone: { 
     type: String,
