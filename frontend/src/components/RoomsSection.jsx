@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../api/client';
 import { useBookingCart } from '../context/BookingCartContext.jsx';
+import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP } from '../utils/format';
+import AvailabilityAlternatives from './AvailabilityAlternatives.jsx';
 
 const shortBranch = (name = '') => name.replace(/^Palacio del Mar\s*·\s*/, '');
 
@@ -12,7 +14,8 @@ export default function RoomsSection() {
   const [typeFilter, setTypeFilter] = useState('');
   const [branches, setBranches] = useState([]);
   const [branch, setBranch] = useState(''); // '' = todas las sucursales
-  const { availability, search, startBooking } = useBookingCart();
+  const { availability, search, setSearch, searchAvailability, startBooking } = useBookingCart();
+  const toast = useToast();
 
   const fetchSuites = useCallback(() => {
     setSuites(null);
@@ -55,6 +58,17 @@ export default function RoomsSection() {
   }, [availability]);
 
   const visibleSuites = suites && typeFilter ? suites.filter((s) => s.type === typeFilter) : suites;
+
+  // Elegir unas fechas alternativas: se actualiza la búsqueda y se consulta de nuevo
+  const pickDates = async ({ checkIn, checkOut }) => {
+    const next = { ...search, checkIn, checkOut };
+    setSearch(next);
+    try {
+      await searchAvailability(next);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo consultar esas fechas');
+    }
+  };
 
   const openBooking = (suite) => {
     startBooking(suite);
@@ -138,10 +152,17 @@ export default function RoomsSection() {
           ))}
         </div>
       )}
+      <AvailabilityAlternatives
+        availability={availability}
+        branch={branch}
+        onPickBranch={(slug) => { setBranch(slug); setTypeFilter(''); }}
+        onPickDates={pickDates}
+      />
       <div className="rooms-grid">
         {visibleSuites.map((suite) => {
           const av = availabilityMap?.get(suite._id);
-          const isUnavailable = av && !av.isAvailable;
+          // Con una búsqueda activa, lo que no aparece como disponible no se puede reservar
+          const isUnavailable = availabilityMap ? !av?.isAvailable : false;
           const nightly = av?.pricePerNight ?? suite.seasonalPrice ?? suite.basePrice;
           const totalForStay = av?.totalPrice;
 

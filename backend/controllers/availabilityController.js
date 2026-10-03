@@ -3,6 +3,8 @@ import Suite from '../models/Suite.js';
 import SuiteNight from '../models/SuiteNight.js';
 import { toCalendarDate, eachNight } from '../utils/dates.js';
 import { resolveBranchId } from '../utils/branches.js';
+import Promotion from '../models/Promotion.js';
+import { summarizeBranches, attachPromotions } from '../utils/branchSummary.js';
 
 // ============================================
 // HELPER FUNCTIONS
@@ -171,6 +173,18 @@ export const checkAvailability = async (req, res) => {
       alternativeDates = await findAlternativeDates(checkInDate, checkOutDate, suiteQuery, guestCount);
     }
     
+    // 10b. Resumen por sucursal (libres, "desde $X" y promoción vigente)
+    const branchSummary = summarizeBranches(suitesWithAvailability);
+    if (branchSummary.length) {
+      const promotions = await Promotion.find({
+        branch: { $in: branchSummary.map((b) => b._id) },
+        active: true,
+        startDate: { $lt: checkOutDate }, // alguna noche [checkIn, checkOut) cae en la ventana
+        endDate: { $gte: checkInDate }
+      }).lean();
+      attachPromotions(branchSummary, promotions);
+    }
+
     // 11. Responder con datos estructurados
     res.json({
       success: true,
@@ -182,6 +196,7 @@ export const checkAvailability = async (req, res) => {
         availableSuites,
         unavailableSuites: process.env.NODE_ENV === 'development' ? unavailableSuites : undefined,
         alternativeDates,
+        branchSummary,
         filters: {
           guests: guestCount,
           suiteType: suiteType || null,
@@ -207,42 +222,32 @@ export const checkAvailability = async (req, res) => {
 const findAlternativeDates = async (checkInDate, checkOutDate, suiteQuery, guestCount) => {
   const alternatives = [];
   const nights = calculateNights(checkInDate, checkOutDate);
-  
-  // Buscar ±7 días alrededor de las fechas solicitadas
-  for (let offset = -7; offset <= 7; offset++) {
-    if (offset === 0) continue;
-    
+  const today = normalizeDate(new Date());
+  const suites = await Suite.find(suiteQuery);
+
+  // ±7 días con las MISMAS noches, probando primero las fechas más cercanas
+  // (+1, -1, +2, -2...) en vez de recorrer de -7 a +7.
+  const offsets = [];
+  for (let i = 1; i <= 7; i++) offsets.push(i, -i);
+
+  for (const offset of offsets) {
     const altCheckIn = new Date(checkInDate);
     altCheckIn.setUTCDate(checkInDate.getUTCDate() + offset);
-    
+    if (altCheckIn < today) continue; // no sugerir fechas pasadas
+
     const altCheckOut = new Date(altCheckIn);
     altCheckOut.setUTCDate(altCheckIn.getUTCDate() + nights);
-    
-    // No sugerir fechas pasadas
-    if (altCheckIn < normalizeDate(new Date())) continue;
-    
-    const suites = await Suite.find(suiteQuery);
-    let availableCount = 0;
-    
-    for (const suite of suites) {
-      const { free } = await getFreeUnits(suite, altCheckIn, altCheckOut);
-      if (free > 0) availableCount++;
-    }
-    
+
+    const frees = await Promise.all(suites.map((suite) => getFreeUnits(suite, altCheckIn, altCheckOut)));
+    const availableCount = frees.filter((f) => f.free > 0).length;
+
     if (availableCount > 0) {
-      alternatives.push({
-        checkIn: altCheckIn,
-        checkOut: altCheckOut,
-        nights,
-        availableSuites: availableCount,
-        offset: offset
-      });
+      alternatives.push({ checkIn: altCheckIn, checkOut: altCheckOut, nights, availableSuites: availableCount, offset });
     }
-    
     if (alternatives.length >= 3) break;
   }
-  
-  return alternatives;
+
+  return alternatives.sort((a, b) => a.checkIn - b.checkIn);
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;

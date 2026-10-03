@@ -10,7 +10,9 @@ import Suite from '../models/Suite.js';
 import Experience from '../models/Experience.js';
 import Branch from '../models/Branch.js';
 import SuiteNight from '../models/SuiteNight.js';
+import Promotion from '../models/Promotion.js';
 import { ensureBranches } from './branches.js';
+import { buildSamplePromotions } from './promotions.js';
 
 export const suites = [
   { 
@@ -261,6 +263,7 @@ export const insertSeedData = async ({ clear = true } = {}) => {
     await Experience.deleteMany();
     await Branch.deleteMany();
     await SuiteNight.deleteMany(); // las noches de las suites borradas ya no sirven
+    await Promotion.deleteMany(); // las sucursales se recrean con otros _id: no pueden quedar promociones huérfanas
   }
   const branchesBySlug = await ensureBranches();
   const branchSuites = buildBranchSuites(branchesBySlug);
@@ -270,7 +273,11 @@ export const insertSeedData = async ({ clear = true } = {}) => {
   for (const exp of experiences) {
     await Experience.create(exp);
   }
-  return { branches: branchesBySlug.size, suites: branchSuites.length, experiences: experiences.length };
+  const promos = buildSamplePromotions(branchesBySlug);
+  for (const promo of promos) {
+    await Promotion.create(promo);
+  }
+  return { branches: branchesBySlug.size, suites: branchSuites.length, experiences: experiences.length, promotions: promos.length };
 };
 
 /**
@@ -296,6 +303,7 @@ const seedDatabase = async () => {
     console.log(`   - Sucursales: ${result.branches}`);
     console.log(`   - Tipos de habitación: ${result.suites}`);
     console.log(`   - Experiencias: ${result.experiences}`);
+    console.log(`   - Promociones de ejemplo: ${result.promotions}`);
     
     process.exit(0);
   } catch (error) {

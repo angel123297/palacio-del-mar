@@ -12,12 +12,18 @@
  * siguen disponibles para recargar el catálogo o crear un admin adicional
  * a mano más adelante.
  */
+import bcrypt from 'bcryptjs';
 import Suite from './models/Suite.js';
 import User from './models/User.js';
 import { insertSeedData } from './seed/seedData.js';
 import { isWeakAdminPassword, upsertAdminUser } from './scripts/createAdmin.js';
 
 export const autoSeedIfEmpty = async () => {
+  // AUTO_SEED=false: no cargar habitaciones solas (se cargan a mano con `npm run seed`)
+  if (String(process.env.AUTO_SEED).toLowerCase() === 'false') {
+    console.log('[Bootstrap] AUTO_SEED=false: no se cargan habitaciones automáticamente.');
+    return { seeded: false, reason: 'disabled' };
+  }
   const existing = await Suite.countDocuments();
   if (existing > 0) {
     return { seeded: false };
@@ -52,6 +58,47 @@ export const autoCreateAdminIfMissing = async () => {
   return { created: true };
 };
 
+/**
+ * Administrador de DESARROLLO con credenciales simples (DEV_ADMIN_EMAIL /
+ * DEV_ADMIN_PASSWORD) para revisar el panel en local. Se asegura en cada
+ * arranque y es independiente del admin "real" de arriba.
+ *
+ * La contraseña simple no pasa la validación del modelo (exige mayúscula),
+ * así que se crea con una temporal válida y luego se guarda el hash bcrypt
+ * directamente. Se ignora si NODE_ENV=production.
+ */
+export const ensureDevAdmin = async () => {
+  const email = process.env.DEV_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.DEV_ADMIN_PASSWORD;
+  if (!email || !password) return { created: false, reason: 'not_configured' };
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('[Bootstrap] ⚠️ DEV_ADMIN_* se ignora porque NODE_ENV=production.');
+    return { created: false, reason: 'production' };
+  }
+
+  let user = await User.findOne({ email }).select('+password');
+  const created = !user;
+  if (!user) {
+    user = new User({
+      name: process.env.DEV_ADMIN_NAME || 'Admin Local',
+      email,
+      password: 'Temporal-Dev-1', // válida para el modelo; se reemplaza abajo
+      role: 'admin',
+      status: 'active',
+      emailVerified: true
+    });
+    await user.save();
+  }
+
+  const set = { role: 'admin', status: 'active', emailVerified: true };
+  if (created || !(await bcrypt.compare(password, user.password))) {
+    set.password = await bcrypt.hash(password, 12);
+  }
+  await User.collection.updateOne({ _id: user._id }, { $set: set });
+  console.log(`[Bootstrap] ✅ Admin de desarrollo listo: ${email}${created ? ' (creado)' : ''}`);
+  return { created };
+};
+
 /** Ejecuta ambos pasos; un fallo en uno no debe tumbar el arranque del servidor. */
 export const runStartupBootstrap = async () => {
   try {
@@ -63,5 +110,10 @@ export const runStartupBootstrap = async () => {
     await autoCreateAdminIfMissing();
   } catch (err) {
     console.error('[Bootstrap] ❌ No se pudo crear el administrador automático:', err.message);
+  }
+  try {
+    await ensureDevAdmin();
+  } catch (err) {
+    console.error('[Bootstrap] ❌ No se pudo crear el admin de desarrollo:', err.message);
   }
 };

@@ -14,11 +14,17 @@
 name: palacio-del-mar
 
 services:
-  # --- Base de datos (solo accesible desde la red interna de Docker) ---------
+  # --- Base de datos ---------------------------------------------------------
+  # El puerto 27017 se publica SOLO en localhost para usar MongoDB Compass:
+  #     mongodb://localhost:27017/palacio_db
+  # Mongo no tiene usuario/contraseña: no lo abras a toda la red ni lo uses así
+  # en un servidor real.
   mongo:
     image: mongo:7
     container_name: palacio-mongo
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -51,6 +57,12 @@ services:
       ADMIN_NAME: Administrador
       ADMIN_EMAIL: admin@palaciomar.co
       ADMIN_PASSWORD: AulaDocker2026Segura
+      # Admin de prueba SOLO para desarrollo local (se ignora si NODE_ENV=production)
+      DEV_ADMIN_NAME: Admin Local
+      DEV_ADMIN_EMAIL: admin@gmail.com
+      DEV_ADMIN_PASSWORD: admin123
+      # false = no cargar habitaciones solas; se cargan con `npm run seed`
+      AUTO_SEED: "false"
     depends_on:
       mongo:
         condition: service_healthy
