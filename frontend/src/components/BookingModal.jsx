@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext.jsx';
-import { useBookingCart, todayISO } from '../context/BookingCartContext.jsx';
+import { useBookingCart, todayISO, readDraft, writeDraft, clearDraft } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatDate } from '../utils/format';
 
@@ -9,11 +9,15 @@ const STEPS = ['Fechas', 'Experiencias', 'Datos', 'Confirmación'];
 
 export default function BookingModal() {
   const { bookingSuite, closeBooking, search, experiences, toggleExperience } = useBookingCart();
-  const { user } = useAuth();
+  const { user, isAuthenticated, authModal, setAuthModal } = useAuth();
   const toast = useToast();
 
-  const [step, setStep] = useState(0);
-  const [dates, setDates] = useState({ checkIn: search.checkIn, checkOut: search.checkOut, guests: search.guests });
+  const draft = useRef(readDraft()).current; // borrador de un refresco anterior (si lo hay)
+  const [step, setStep] = useState(draft?.step ?? 0);
+  const [dates, setDates] = useState(draft?.dates ?? { checkIn: search.checkIn, checkOut: search.checkOut, guests: search.guests });
+  const pendingSubmit = useRef(false); // el usuario pulsó "Confirmar" sin sesión
+  const submitRef = useRef(null);
+  const skipReset = useRef(!!draft?.suite);
   const [allExperiences, setAllExperiences] = useState([]);
   const [pricing, setPricing] = useState(null);
   const [pricingLoading, setPricingLoading] = useState(false);
@@ -34,6 +38,32 @@ export default function BookingModal() {
   useEffect(() => {
     setContact((c) => ({ ...c, guestName: c.guestName || user?.name || '', guestEmail: c.guestEmail || user?.email || '', guestPhone: c.guestPhone || user?.phone || '' }));
   }, [user]);
+
+  // Cada vez que se abre una suite nueva se parte de las fechas buscadas
+  // (salvo al restaurar un borrador tras refrescar la página).
+  useEffect(() => {
+    if (!suite) return;
+    if (skipReset.current) { skipReset.current = false; return; }
+    setDates({ checkIn: search.checkIn, checkOut: search.checkOut, guests: search.guests });
+    setStep(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suite?._id]);
+
+  // Guarda el borrador mientras la reserva está abierta y sin confirmar
+  useEffect(() => {
+    if (suite && !result) writeDraft({ suite, dates, step });
+  }, [suite, dates, step, result]);
+
+  // Si pidió confirmar sin sesión, al registrarse/entrar se confirma solo
+  useEffect(() => {
+    if (!pendingSubmit.current) return;
+    if (user) {
+      pendingSubmit.current = false;
+      submitRef.current?.();
+    } else if (!authModal) {
+      pendingSubmit.current = false; // cerró el modal sin entrar: vuelve a la confirmación
+    }
+  }, [user, authModal]);
 
   const experienceIds = useMemo(() => experiences.map((e) => e._id), [experiences]);
 
@@ -95,6 +125,12 @@ if (step >= 1 && suite) {
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
   const submitBooking = async () => {
+    if (!isAuthenticated) {
+      // Recién aquí se pide la cuenta; la selección se conserva en este modal
+      pendingSubmit.current = true;
+      setAuthModal('register');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api.post('/bookings', {
@@ -106,20 +142,31 @@ if (step >= 1 && suite) {
         ...contact
       });
       setResult(res.data.data);
+      clearDraft();
       toast.success('¡Reserva creada! Revisa los próximos pasos.');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'No se pudo crear la reserva. Intenta de nuevo.');
+      toast.error(
+        err.response?.status === 409
+          ? 'Esa habitación acaba de ocuparse para esas fechas. Prueba con otras fechas u otra sucursal.'
+          : err.response?.data?.message || 'No se pudo crear la reserva. Intenta de nuevo.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
+  submitRef.current = submitBooking;
+
   const close = () => {
+    clearDraft();
     setStep(0);
     setResult(null);
     setPricing(null);
     closeBooking();
   };
+
+  // Mientras se muestra el registro/login se oculta este modal (conserva su estado)
+  if (authModal && !user) return null;
 
   return (
     <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
@@ -230,6 +277,9 @@ if (step >= 1 && suite) {
                     <div className="price-total"><span>Total</span><span>{formatCOP(pricing.total)}</span></div>
                   </div>
                 )}
+                {!isAuthenticated && (
+                  <p className="form-hint">Para confirmar necesitamos que crees tu cuenta o inicies sesión. Tu selección se conserva.</p>
+                )}
                 <p className="form-hint">
                   Tu reserva quedará <strong>pendiente de pago</strong>. Te contactaremos por WhatsApp para confirmar
                   el depósito — no se realiza ningún cobro automático.
@@ -242,7 +292,7 @@ if (step >= 1 && suite) {
               {step < STEPS.length - 1 && <button className="btn-primary" onClick={goNext}>Continuar</button>}
               {step === STEPS.length - 1 && (
                 <button className="btn-primary" onClick={submitBooking} disabled={submitting}>
-                  {submitting ? 'Enviando…' : 'Confirmar reserva'}
+                  {submitting ? 'Enviando…' : isAuthenticated ? 'Confirmar reserva' : 'Confirmar y crear cuenta'}
                 </button>
               )}
             </div>

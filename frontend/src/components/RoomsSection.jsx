@@ -1,32 +1,41 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../api/client';
 import { useBookingCart } from '../context/BookingCartContext.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
 import { formatCOP } from '../utils/format';
+
+const shortBranch = (name = '') => name.replace(/^Palacio del Mar\s*·\s*/, '');
 
 export default function RoomsSection() {
   const [suites, setSuites] = useState(null);
   const [error, setError] = useState(false);
   const [types, setTypes] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
+  const [branches, setBranches] = useState([]);
+  const [branch, setBranch] = useState(''); // '' = todas las sucursales
   const { availability, search, startBooking } = useBookingCart();
-  const { setAuthModal, isAuthenticated } = useAuth();
 
   const fetchSuites = useCallback(() => {
     setSuites(null);
     setError(false);
-    api.get('/suites', { // Temporal (Fase 1): una sola sucursal hasta que exista el selector de zona (Fase 3)
-      params: { limit: 20, sortBy: 'order', sortOrder: 'asc', branch: 'centro-historico' } })
+    api.get('/suites', {
+      params: { limit: 50, sortBy: 'order', sortOrder: 'asc', ...(branch ? { branch } : {}) } })
       .then((res) => setSuites(res.data.data))
       .catch(() => {
         setSuites([]);
         setError(true);
       });
-  }, []);
+  }, [branch]);
 
   useEffect(() => {
     fetchSuites();
   }, [fetchSuites]);
+
+  // Sucursales para las pestañas (GET /branches)
+  useEffect(() => {
+    api.get('/branches')
+      .then((res) => setBranches(res.data.data || []))
+      .catch(() => setBranches([]));
+  }, []);
 
   // Tipos de suite para el filtro (GET /suites/types)
   useEffect(() => {
@@ -90,9 +99,27 @@ export default function RoomsSection() {
         <p className="sec-sub">
           {availability
             ? `Disponibilidad para ${availability.nights} noche(s), del ${new Date(availability.checkIn).toLocaleDateString('es-CO')} al ${new Date(availability.checkOut).toLocaleDateString('es-CO')}`
-            : '18 suites de diseño exclusivo entre murallas coloniales y el mar Caribe'}
+            : 'Elige tu zona en Cartagena: murallas coloniales, Getsemaní, Bocagrande o La Boquilla'}
         </p>
       </div>
+      {branches.length > 1 && (
+        <div className="filter-row" role="group" aria-label="Elegir sucursal">
+          <button type="button" className={`filter-btn ${branch === '' ? 'is-active' : ''}`} onClick={() => setBranch('')}>
+            Todas las sucursales
+          </button>
+          {branches.map((b) => (
+            <button
+              type="button"
+              key={b.slug}
+              className={`filter-btn ${branch === b.slug ? 'is-active' : ''}`}
+              title={b.fromPrice ? `Desde ${formatCOP(b.fromPrice)} por noche` : undefined}
+              onClick={() => { setBranch(b.slug); setTypeFilter(''); }}
+            >
+              {shortBranch(b.name)}{b.roomTypes ? ` (${b.roomTypes})` : ''}
+            </button>
+          ))}
+        </div>
+      )}
       {types.length > 1 && (
         <div className="filter-row" role="group" aria-label="Filtrar por tipo de suite">
           <button type="button" className={`filter-btn ${typeFilter === '' ? 'is-active' : ''}`} onClick={() => setTypeFilter('')}>
@@ -126,7 +153,7 @@ export default function RoomsSection() {
                 {isUnavailable && <span className="room-avail badge-few">No disponible</span>}
               </div>
               <div className="room-info">
-                <p className="room-type">{suite.type}</p>
+                <p className="room-type">{suite.type}{suite.branch?.name ? ` · ${shortBranch(suite.branch.name)}` : ''}</p>
                 <h3 className="room-name">{suite.name}</h3>
                 <div className="room-chips">
                   {(suite.amenities || []).slice(0, 3).map((a) => (
@@ -148,13 +175,7 @@ export default function RoomsSection() {
                 <button
                   className="btn-book room-cta"
                   disabled={isUnavailable}
-                  onClick={() => {
-                    if (!isAuthenticated) {
-                      setAuthModal('login');
-                      return;
-                    }
-                    openBooking(suite);
-                  }}
+                  onClick={() => openBooking(suite)}
                 >
                   {isUnavailable ? 'No disponible' : 'Reservar'}
                 </button>
