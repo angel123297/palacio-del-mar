@@ -3,6 +3,19 @@ import api from '../api/client';
 
 const BookingCartContext = createContext(null);
 
+// Borrador de la reserva en curso (sobrevive a un refresco o al registro).
+// sessionStorage: solo vive en esta pestaña y se borra al cerrarla.
+const DRAFT_KEY = 'palacio_booking_draft';
+export const readDraft = () => {
+  try { return JSON.parse(sessionStorage.getItem(DRAFT_KEY)) || null; } catch { return null; }
+};
+export const writeDraft = (draft) => {
+  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch { /* sin storage: se ignora */ }
+};
+export const clearDraft = () => {
+  try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* sin storage: se ignora */ }
+};
+
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const inDaysISO = (days) => {
   const d = new Date();
@@ -33,7 +46,7 @@ export function BookingCartProvider({ children }) {
   const [searching, setSearching] = useState(false);
 
   // Suite que se está reservando en este momento (abre el modal de reserva)
-  const [bookingSuite, setBookingSuite] = useState(null);
+  const [bookingSuite, setBookingSuite] = useState(() => readDraft()?.suite ?? null);
 
   const searchAvailability = useCallback(async (params) => {
     setSearching(true);
