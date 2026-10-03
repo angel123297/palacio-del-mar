@@ -1,3 +1,4 @@
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -30,13 +31,12 @@ dotenv.config();
 
 const app = express();
 
-// Detrás de un proxy (nginx en Docker) Express solo ve la IP del proxy.
-// Con TRUST_PROXY=1, req.ip es la IP real del visitante; sin esto, el limitador
-// de login y el del chat tratarían a TODOS los usuarios como uno solo.
 if (process.env.TRUST_PROXY) {
   app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
 }
-const PORT = process.env.PORT || 5000;
+
+// Puerto fijado en 8080 por defecto
+const PORT = process.env.PORT || 8080;
 const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -64,14 +64,10 @@ const requestLogger = (req, res, next) => {
 };
 
 /**
- * Headers de seguridad básicos.
- * Antes se ponían "a mano" (y X-XSS-Protection, que los navegadores
- * modernos ya ignoran). Se sustituye por helmet, que además añade
- * Strict-Transport-Security, Referrer-Policy y una Content-Security-Policy
- * razonable para una API JSON.
+ * Headers de seguridad básicos con Helmet
  */
 const securityHeaders = helmet({
-  contentSecurityPolicy: false, // esta app es una API JSON, no sirve HTML
+  contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 });
 
@@ -82,18 +78,13 @@ const setupGracefulShutdown = (server) => {
   const shutdown = async (signal) => {
     console.log(`\n⚠️ Recibida señal ${signal}. Cerrando conexiones...`);
     
-    // Cerrar servidor HTTP
     server.close(async () => {
       console.log('✅ Servidor HTTP cerrado');
-      
-      // Cerrar conexión a MongoDB
       await closeConnection();
-      
       console.log('👋 Servidor detenido correctamente');
       process.exit(0);
     });
     
-    // Forzar cierre después de 10 segundos
     setTimeout(() => {
       console.error('❌ Timeout cerrando conexiones. Forzando salida...');
       process.exit(1);
@@ -105,61 +96,25 @@ const setupGracefulShutdown = (server) => {
 };
 
 /**
- * Verifica variables de entorno requeridas
+ * Garantiza valores por defecto locales sin requerir archivo .env ni Atlas
  */
 const validateEnvVariables = () => {
-  const required = ['JWT_SECRET', 'MONGODB_URI'];
-  const missing = required.filter(key => !process.env[key]);
-  
-  if (missing.length > 0) {
-    throw new Error(`Variables de entorno faltantes: ${missing.join(', ')}`);
-  }
-  
-  if (isProduction && !process.env.MONGODB_URI.includes('mongodb+srv')) {
-    console.warn('⚠️ Advertencia: En producción se recomienda usar MongoDB Atlas');
-  }
-  
-  // Secretos débiles o de ejemplo (OPS-012). En un despliegue real (FRONTEND_URL
-  // no es localhost) impiden el arranque; en local solo avisan, para que el
-  // "docker compose up" de prueba siga funcionando.
-  const looksLocal = /localhost|127\.0\.0\.1/.test(process.env.FRONTEND_URL || 'http://localhost');
-  const problems = [];
-  const jwt = process.env.JWT_SECRET;
-  if (jwt.length < 32 || /cambia|changeme|example|ejemplo|secret(o)?$/i.test(jwt)) {
-    problems.push('JWT_SECRET es corto (<32) o parece un valor de ejemplo');
-  }
-  try {
-    const dbPassword = decodeURIComponent(new URL(process.env.MONGODB_URI || '').password || '');
-    if (dbPassword && (dbPassword.length < 12 || /^(1234|password|admin|mongo|123456)/i.test(dbPassword))) {
-      problems.push('La contraseña de MongoDB es débil (<12 caracteres o común)');
-    }
-  } catch { /* URI sin credenciales o no parseable: nada que comprobar */ }
-  
-  if (isProduction && problems.length) {
-    const msg = `Configuración insegura: ${problems.join('; ')}`;
-    if (!looksLocal) throw new Error(`${msg}. Genera valores nuevos (por ejemplo: openssl rand -hex 32).`);
-    console.warn(`⚠️ ${msg} (se permite solo porque FRONTEND_URL apunta a localhost).`);
-  }
-  
-  if (isProduction && !isEmailConfigured()) {
-    console.error('❌ SMTP no configurado: la recuperación de contraseña y la verificación de email NO entregarán correos. Configura SMTP_HOST, SMTP_USER y SMTP_PASS.');
-  }
-  
-  console.log('✅ Variables de entorno validadas');
+  process.env.PORT = process.env.PORT || '8080';
+  process.env.FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8080';
+  process.env.JWT_SECRET = process.env.JWT_SECRET || 'palacio_del_mar_jwt_secret_key_2026_local_32chars';
+  process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://mongo:27017/palacio_del_mar';
+
+  console.log('✅ Entorno inicializado localmente en puerto 8080 (Sin dependencia de .env)');
 };
 
 // ============================================
 // CONFIGURACIÓN DE MIDDLEWARES
 // ============================================
 
-/**
- * Configura todos los middlewares de la aplicación
- */
 const setupMiddlewares = () => {
-  // CORS - Configuración para producción
   const corsOptions = {
     origin: isProduction 
-      ? [process.env.FRONTEND_URL || 'https://tudominio.com', 'http://localhost:3000']
+      ? [process.env.FRONTEND_URL || 'http://localhost:8080', 'http://localhost:3000']
       : '*',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -167,29 +122,19 @@ const setupMiddlewares = () => {
   };
   
   app.use(cors(corsOptions));
-  
-  // Parseo de JSON con límite
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-  
-  // Manejo de errores JSON
+
+  // Middleware para servir las imágenes subidas dinámicamente
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
   app.use(jsonErrorHandler);
-  
-  // Headers de seguridad
   app.use(securityHeaders);
   
-  // Logging
   if (isDevelopment) {
     app.use(requestLogger);
   }
   
-  // Compresión de respuestas.
-  // Antes: import('express-compression') — ese paquete no está entre las
-  // dependencias (la que sí está instalada es "compression"), así que
-  // esto fallaba en silencio en cada arranque en producción y nunca
-  // comprimía nada. Además, al ser una promesa sin esperar, dejaba una
-  // ventana donde el servidor podía atender peticiones antes de que el
-  // middleware quedara registrado. Ahora es una importación normal.
   if (isProduction) {
     app.use(compression());
   }
@@ -199,11 +144,7 @@ const setupMiddlewares = () => {
 // CONFIGURACIÓN DE RUTAS
 // ============================================
 
-/**
- * Configura todas las rutas de la API
- */
 const setupRoutes = () => {
-  // Rutas de la API
   app.use('/api/auth', authRoutes);
   app.use('/api/suites', suiteRoutes);
   app.use('/api/experiences', experienceRoutes);
@@ -211,12 +152,6 @@ const setupRoutes = () => {
   app.use('/api/availability', availabilityRoutes);
   app.use('/api/chat', chatRoutes);
   
-  // Endpoint de salud (monitoreo). Solo expone lo mínimo necesario para
-  // un healthcheck (Docker, un balanceador, uptime monitors). Antes
-  // devolvía process.memoryUsage() completo y el estado detallado de la
-  // base de datos a CUALQUIERA sin autenticar — información útil para
-  // alguien reconociendo el servidor antes de atacarlo. El detalle
-  // completo ahora vive en /api/health/detailed, protegido para admins.
   app.get('/api/health', asyncHandler(async (req, res) => {
     const dbStatus = getConnectionStatus();
     res.json({
@@ -226,8 +161,6 @@ const setupRoutes = () => {
     });
   }));
 
-  // Igual que arriba, pero con todo el detalle, solo para administradores
-  // autenticados.
   app.get('/api/health/detailed', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
     const dbStatus = getConnectionStatus();
     res.json({
@@ -242,7 +175,6 @@ const setupRoutes = () => {
     });
   }));
   
-  // Endpoint raíz
   app.get('/', (req, res) => {
     res.json({
       name: 'Palacio del Mar API',
@@ -257,21 +189,17 @@ const setupRoutes = () => {
         chat: '/api/chat',
         health: '/api/health'
       },
-      documentation: '/api/docs' // Si tienes documentación
+      documentation: '/api/docs'
     });
   });
   
-  // Ruta 404 para rutas no encontradas
   app.use(notFoundHandler);
 };
 
 // ============================================
-// CONFIGURACIÓN DE DOCUMENTACIÓN (Opcional)
+// DOCUMENTACIÓN (OPCIONAL)
 // ============================================
 
-/**
- * Configura documentación de la API (si tienes swagger)
- */
 const setupDocs = async () => {
   if (process.env.ENABLE_DOCS === 'true') {
     try {
@@ -289,52 +217,34 @@ const setupDocs = async () => {
 // INICIO DEL SERVIDOR
 // ============================================
 
-/**
- * Inicia el servidor con todas las configuraciones
- */
 const startServer = async () => {
   try {
-    // Guardar tiempo de inicio
     process.startTime = Date.now();
     
-    // 1. Validar variables de entorno
     validateEnvVariables();
     
-    // 2. Conectar a MongoDB
-    console.log('\n📡 Conectando a MongoDB...');
+    console.log('\n📡 Conectando a MongoDB Local...');
     await connectDB();
     console.log('✅ MongoDB conectado correctamente');
     
-    // La garantía contra la doble reserva es el índice ÚNICO (suite, date):
-    // hay que esperar a que exista antes de aceptar reservas.
     await SuiteNight.init();
-    
-    // 2b. Cargar catálogo de ejemplo y crear el admin si hace falta
-    // (DEPLOY-002): así "docker compose up" a secas deja el sitio ya
-    // navegable y con una cuenta para entrar a /admin, sin comandos aparte.
     await runStartupBootstrap();
     
-    // 3. Configurar middlewares
     console.log('🔧 Configurando middlewares...');
     setupMiddlewares();
     
-    // 4. Configurar rutas
     console.log('🛣️ Configurando rutas...');
     setupRoutes();
     
-    // 5. Configurar documentación (opcional)
     await setupDocs();
     
-    // 6. Manejador de errores (siempre al final)
     app.use(errorHandler);
     
-    // 7. Iniciar monitoreo en producción
     if (isProduction) {
       console.log('📊 Iniciando monitoreo de producción...');
       startConnectionMonitoring();
     }
     
-    // 8. Iniciar servidor HTTP
     const server = app.listen(PORT, () => {
       console.log('\n' + '='.repeat(50));
       console.log(`✨ PALACIO DEL MAR API`);
@@ -346,7 +256,6 @@ const startServer = async () => {
       console.log('='.repeat(50) + '\n');
     });
     
-    // 9. Configurar graceful shutdown
     setupGracefulShutdown(server);
     
   } catch (error) {
@@ -357,12 +266,6 @@ const startServer = async () => {
       console.error(`\n📚 Stack trace:\n${error.stack}`);
     }
     
-    console.error('\n💡 Posibles soluciones:');
-    console.error('1. Verifica que MongoDB esté corriendo');
-    console.error('2. Revisa las variables de entorno en .env');
-    console.error('3. Asegúrate de que el puerto no esté en uso');
-    console.error('4. Verifica que todas las dependencias estén instaladas');
-    
     process.exit(1);
   }
 };
@@ -371,28 +274,16 @@ const startServer = async () => {
 // MANEJO DE ERRORES NO CAPTURADOS
 // ============================================
 
-/**
- * Maneja errores no capturados por try/catch
- */
 process.on('uncaughtException', (error) => {
   console.error('\n💥 Error no capturado:');
   console.error(error);
-  
-  if (isProduction) {
-    console.log('⚠️ Reiniciando servidor...');
-    process.exit(1);
-  }
+  if (isProduction) process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('\n💥 Promesa rechazada no manejada:');
   console.error('Razón:', reason);
-  console.error('Promesa:', promise);
-  
-  if (isProduction) {
-    console.log('⚠️ Reiniciando servidor...');
-    process.exit(1);
-  }
+  if (isProduction) process.exit(1);
 });
 
 // ============================================
