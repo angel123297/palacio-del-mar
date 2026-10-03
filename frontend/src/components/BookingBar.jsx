@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useBookingCart } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import DateRangePicker from './DateRangePicker.jsx';
@@ -7,6 +7,9 @@ export default function BookingBar() {
   const { search, setSearch, searchAvailability, searching } = useBookingCart();
   const toast = useToast();
   const [local, setLocal] = useState(search);
+
+  // Si otra parte de la página cambia la búsqueda (p. ej. fechas alternativas), la barra la refleja
+  useEffect(() => { setLocal(search); }, [search]);
 
   const submit = async (e) => {
     e.preventDefault();

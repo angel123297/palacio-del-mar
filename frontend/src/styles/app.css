@@ -632,3 +632,25 @@ cat >> frontend/src/styles/app.css <<'EOF'
   border-color: var(--gold);
   color: var(--dark);
 }
+
+/* ===== Sin disponibilidad: fechas alternativas y otras sucursales ===== */
+.alt-panel {
+  max-width: 1000px;
+  margin: 0 auto 32px;
+  padding: 20px 24px;
+  border: 1px solid rgba(201, 169, 110, 0.35);
+  background: rgba(201, 169, 110, 0.06);
+  text-align: center;
+}
+.alt-panel h3 { color: var(--gold-light); font-weight: 400; margin-bottom: 12px; }
+.alt-panel .filter-row { margin-bottom: 16px; }
+.alt-branches { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 8px 0 12px; }
+.alt-branch {
+  display: flex; flex-direction: column; gap: 4px; min-width: 200px;
+  background: transparent; color: var(--cream); font: inherit; text-align: left;
+  border: 1px solid rgba(201, 169, 110, 0.35); padding: 12px 16px; cursor: pointer;
+  transition: border-color 0.2s;
+}
+.alt-branch:hover { border-color: var(--gold); }
+.alt-branch span { font-size: 0.8rem; opacity: 0.8; }
+.alt-promo { font-style: normal; font-size: 0.78rem; color: var(--gold); }
