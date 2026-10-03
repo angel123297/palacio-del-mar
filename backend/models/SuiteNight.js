@@ -39,44 +39,52 @@ suiteNightSchema.index({ suite: 1, slot: 1, date: 1 }, { unique: true });
 suiteNightSchema.statics.acquire = async function (suiteId, bookingId, nights, slot = 1) {
   if (!nights.length) return [];
 
-  const results = await Promise.allSettled(
-    nights.map((date) => this.create({ suite: suiteId, slot, booking: bookingId, date }))
-  );
-
+  // Las noches se insertan EN ORDEN y de una en una. La primera noche actúa
+  // como puerta de entrada: quien la gana avanza, el resto falla de inmediato
+  // sin dejar noches sueltas. (Insertarlas todas en paralelo hacía que varias
+  // solicitudes se quedaran con noches distintas, chocaran entre sí y todas
+  // hicieran rollback: nadie ganaba.)
+  const sorted = [...nights].sort((a, b) => a - b);
   const acquired = [];
-  let conflict = false;
-  let otherError = null;
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled') acquired.push(nights[i]);
-    else if (r.reason?.code === 11000) conflict = true;
-    else otherError = r.reason;
-  });
-
-  if (conflict || otherError) {
+  try {
+    for (const date of sorted) {
+      await this.create({ suite: suiteId, slot, booking: bookingId, date });
+      acquired.push(date);
+    }
+    return acquired;
+  } catch (err) {
+    // Rollback solo de lo propio (misma reserva y mismo slot)
     if (acquired.length) {
       await this.deleteMany({ suite: suiteId, slot, booking: bookingId, date: { $in: acquired } });
     }
-    if (otherError) throw otherError;
-    throw new NightsConflictError();
+    if (err?.code === 11000) throw new NightsConflictError();
+    throw err;
   }
-  return acquired;
 };
 
 /**
  * Adquiere las noches en la primera habitación física libre (slot 1..capacity).
  * Devuelve { slot, nights }. Si todas están ocupadas lanza NightsConflictError.
  * Los slots se prueban en orden: es determinista y deja las últimas habitaciones
- * libres para quien las pida después.
+ * libres para quien las pida después. Si todos fallan, reintenta unas rondas
+ * con una espera corta: otra solicitud pudo tener un slot por un instante y
+ * liberarlo en su rollback.
  */
+const ACQUIRE_ROUNDS = 3;
 suiteNightSchema.statics.acquireAny = async function (suiteId, bookingId, nights, capacity = 1) {
   const total = Math.max(1, Math.floor(Number(capacity)) || 1);
-  for (let slot = 1; slot <= total; slot++) {
-    try {
-      const acquired = await this.acquire(suiteId, bookingId, nights, slot);
-      return { slot, nights: acquired };
-    } catch (err) {
-      if (!(err instanceof NightsConflictError)) throw err;
-      // ese slot está ocupado en alguna noche: se prueba el siguiente
+  for (let round = 0; round < ACQUIRE_ROUNDS; round++) {
+    for (let slot = 1; slot <= total; slot++) {
+      try {
+        const acquired = await this.acquire(suiteId, bookingId, nights, slot);
+        return { slot, nights: acquired };
+      } catch (err) {
+        if (!(err instanceof NightsConflictError)) throw err;
+        // ese slot está ocupado en alguna noche: se prueba el siguiente
+      }
+    }
+    if (round < ACQUIRE_ROUNDS - 1) {
+      await new Promise((r) => setTimeout(r, 5 + Math.random() * 25));
     }
   }
   throw new NightsConflictError();
