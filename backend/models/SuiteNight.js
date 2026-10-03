@@ -1,17 +1,19 @@
 import mongoose from 'mongoose';
 
 // ============================================
-// BLOQUEO ATÓMICO DE NOCHES (BUG-001)
+// BLOQUEO ATÓMICO DE NOCHES POR HABITACIÓN FÍSICA
 // ============================================
-// Cada noche ocupada de una suite es un documento con clave ÚNICA
-// (suite, date). Reservar = insertar esos documentos; si otra solicitud ya
-// tiene alguna de las noches, MongoDB rechaza el insert (E11000) y la
-// reserva se rechaza. Funciona en MongoDB standalone (sin réplica ni
-// transacciones), a diferencia de una transacción con findOne + insert.
+// Una Suite es un TIPO de habitación de una sucursal y tiene N habitaciones
+// físicas (totalUnits). Cada habitación física es un "slot" 1..N.
+// Cada noche ocupada de un slot es un documento con clave ÚNICA
+// (suite, slot, date). Reservar = insertar esos documentos; si otra solicitud
+// ya tiene alguna de las noches de ESE slot, MongoDB rechaza el insert
+// (E11000). Para reservar "cualquier habitación libre" se prueba un slot
+// tras otro. Funciona en MongoDB standalone (sin réplica ni transacciones).
 
 export class NightsConflictError extends Error {
-  constructor() {
-    super('La suite no está disponible para las fechas seleccionadas');
+  constructor(message = 'La suite no está disponible para las fechas seleccionadas') {
+    super(message);
     this.name = 'NightsConflictError';
     this.code = 'NIGHTS_CONFLICT';
   }
@@ -20,24 +22,25 @@ export class NightsConflictError extends Error {
 const suiteNightSchema = new mongoose.Schema(
   {
     suite: { type: mongoose.Schema.Types.ObjectId, ref: 'Suite', required: true },
+    slot: { type: Number, required: true, min: 1, default: 1 }, // habitación física (1..totalUnits)
     date: { type: Date, required: true }, // medianoche UTC de la noche
     booking: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: true, index: true }
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
-suiteNightSchema.index({ suite: 1, date: 1 }, { unique: true });
+suiteNightSchema.index({ suite: 1, slot: 1, date: 1 }, { unique: true });
 
 /**
- * Adquiere las noches indicadas para una reserva. Todo o nada: si alguna
+ * Adquiere las noches indicadas en UN slot concreto. Todo o nada: si alguna
  * está tomada, libera las que sí logró insertar y lanza NightsConflictError.
  * Devuelve las fechas adquiridas (para poder revertir después).
  */
-suiteNightSchema.statics.acquire = async function (suiteId, bookingId, nights) {
+suiteNightSchema.statics.acquire = async function (suiteId, bookingId, nights, slot = 1) {
   if (!nights.length) return [];
 
   const results = await Promise.allSettled(
-    nights.map((date) => this.create({ suite: suiteId, booking: bookingId, date }))
+    nights.map((date) => this.create({ suite: suiteId, slot, booking: bookingId, date }))
   );
 
   const acquired = [];
@@ -51,12 +54,45 @@ suiteNightSchema.statics.acquire = async function (suiteId, bookingId, nights) {
 
   if (conflict || otherError) {
     if (acquired.length) {
-      await this.deleteMany({ suite: suiteId, booking: bookingId, date: { $in: acquired } });
+      await this.deleteMany({ suite: suiteId, slot, booking: bookingId, date: { $in: acquired } });
     }
     if (otherError) throw otherError;
     throw new NightsConflictError();
   }
   return acquired;
+};
+
+/**
+ * Adquiere las noches en la primera habitación física libre (slot 1..capacity).
+ * Devuelve { slot, nights }. Si todas están ocupadas lanza NightsConflictError.
+ * Los slots se prueban en orden: es determinista y deja las últimas habitaciones
+ * libres para quien las pida después.
+ */
+suiteNightSchema.statics.acquireAny = async function (suiteId, bookingId, nights, capacity = 1) {
+  const total = Math.max(1, Math.floor(Number(capacity)) || 1);
+  for (let slot = 1; slot <= total; slot++) {
+    try {
+      const acquired = await this.acquire(suiteId, bookingId, nights, slot);
+      return { slot, nights: acquired };
+    } catch (err) {
+      if (!(err instanceof NightsConflictError)) throw err;
+      // ese slot está ocupado en alguna noche: se prueba el siguiente
+    }
+  }
+  throw new NightsConflictError();
+};
+
+/**
+ * Habitaciones físicas libres de una suite en las noches indicadas.
+ * Es una consulta informativa (no reserva nada): la garantía es acquire().
+ */
+suiteNightSchema.statics.freeSlots = async function (suiteId, nights, capacity = 1) {
+  const total = Math.max(0, Math.floor(Number(capacity)) || 0);
+  if (!total || !nights.length) return Array.from({ length: total }, (_, i) => i + 1);
+  const taken = new Set(await this.distinct('slot', { suite: suiteId, date: { $in: nights } }));
+  const free = [];
+  for (let slot = 1; slot <= total; slot++) if (!taken.has(slot)) free.push(slot);
+  return free;
 };
 
 /** Libera todas las noches de una reserva, o solo las fechas indicadas. */

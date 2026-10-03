@@ -86,7 +86,11 @@ const ReviewSchema = new mongoose.Schema({
 // ============================================
 
 const suiteSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true, unique: true, index: true },
+  // Sucursal a la que pertenece este tipo de habitación. El nombre se repite
+  // entre sucursales (ej. "Suite Colonial" en dos zonas), por eso la
+  // unicidad es (branch, name) y no solo name.
+  branch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true, index: true },
+  name: { type: String, required: true, trim: true },
   slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
   type: { type: String, required: true, enum: Object.values(SUITE_TYPES), index: true },
   description: { type: String, required: true },
@@ -158,21 +162,32 @@ const suiteSchema = new mongoose.Schema({
 // slug (campo "required") se generaba en pre('save') nunca llegaba a
 // tiempo para la validación de un documento nuevo: crear una suite
 // siempre fallaba con "slug: Path `slug` is required.".
-suiteSchema.pre('validate', function(next) {
-  if (this.isModified('name') || !this.slug) {
-    this.slug = this.name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
+suiteSchema.pre('validate', async function(next) {
+  try {
+    // El slug se genera solo la primera vez (las URLs no cambian al renombrar)
+    // y lleva el slug de la sucursal para no chocar entre sucursales.
+    if (!this.slug && this.name) {
+      const slugify = (text) => String(text)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      let suffix = '';
+      if (this.branch) {
+        const branch = await mongoose.model('Branch').findById(this.branch).select('slug').lean();
+        if (branch?.slug) suffix = `-${branch.slug}`;
+      }
+      this.slug = `${slugify(this.name)}${suffix}`;
+    }
 
-  if (!this.shortDescription && this.description) {
-    this.shortDescription = this.description.substring(0, 200);
+    if (!this.shortDescription && this.description) {
+      this.shortDescription = this.description.substring(0, 200);
+    }
+    next();
+  } catch (err) {
+    next(err);
   }
-
-  next();
 });
 
 suiteSchema.pre('save', function(next) {
@@ -286,20 +301,23 @@ suiteSchema.methods.calculatePrice = function(checkIn, checkOut, includeFees = t
   return { nightlyPrice, nights, subtotal, fees, total: subtotal + fees, multiplier, pricePerNight: nightlyPrice };
 };
 
+/**
+ * Habitaciones físicas libres en el rango [checkIn, checkOut).
+ * Fuente de verdad: SuiteNight (la misma que impide la doble reserva).
+ */
 suiteSchema.methods.checkAvailability = async function(checkIn, checkOut, quantity = 1) {
-  const Booking = mongoose.model('Booking');
-  
-  const conflictingBookings = await Booking.countDocuments({
-    suite: this._id,
-    status: { $in: ['pending', 'confirmed', 'paid'] },
-    checkIn: { $lt: checkOut },
-    checkOut: { $gt: checkIn }
-  });
-  
-  const availableUnits = this.availableUnitsCount;
-  const remainingUnits = availableUnits - conflictingBookings;
-  
-  return { available: remainingUnits >= quantity, availableUnits: remainingUnits, requestedUnits: quantity, totalUnits: this.totalUnits, conflictingBookings };
+  const SuiteNight = mongoose.model('SuiteNight');
+  const nights = [];
+  for (let d = new Date(checkIn); d < checkOut; d = new Date(d.getTime() + 86400000)) nights.push(d);
+
+  const capacity = this.availableUnitsCount;
+  const free = await SuiteNight.freeSlots(this._id, nights, capacity);
+  return {
+    available: free.length >= quantity,
+    availableUnits: free.length,
+    requestedUnits: quantity,
+    totalUnits: capacity
+  };
 };
 
 suiteSchema.methods.addReview = async function(userId, rating, comment) {
@@ -323,6 +341,7 @@ suiteSchema.statics.getFeatured = function(limit = 4) {
 // type, basePrice, maxGuests, order, available y slug ya declaran su
 // propio "index: true" / "unique: true" en la definición del campo;
 // repetirlos aquí producía el aviso "Duplicate schema index" de Mongoose.
+suiteSchema.index({ branch: 1, name: 1 }, { unique: true });
 suiteSchema.index({ name: 'text', type: 'text', description: 'text' });
 suiteSchema.index({ featured: 1 });
 suiteSchema.index({ available: 1, featured: 1, order: 1 });

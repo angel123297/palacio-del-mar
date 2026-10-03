@@ -6,15 +6,16 @@ import helmet from 'helmet';
 import compression from 'compression';
 import connectDB, { getConnectionStatus, startConnectionMonitoring, closeConnection } from './database/db.js';
 import authRoutes from './routes/auth.js';
+import branchRoutes from './routes/branches.js';
 import suiteRoutes from './routes/suites.js';
 import experienceRoutes from './routes/experiences.js';
 import bookingRoutes from './routes/bookings.js';
 import availabilityRoutes from './routes/availability.js';
 import chatRoutes from './routes/chat.js';
 import { adminMiddleware, authMiddleware } from './middleware/auth.js';
-import SuiteNight from './models/SuiteNight.js';
 import { isEmailConfigured } from './utils/email.js';
 import { runStartupBootstrap } from './bootstrap.js';
+import { runBranchMigration } from './migrations/branches.js';
 import { 
   errorHandler, 
   notFoundHandler, 
@@ -146,6 +147,7 @@ const setupMiddlewares = () => {
 
 const setupRoutes = () => {
   app.use('/api/auth', authRoutes);
+  app.use('/api/branches', branchRoutes);
   app.use('/api/suites', suiteRoutes);
   app.use('/api/experiences', experienceRoutes);
   app.use('/api/bookings', bookingRoutes);
@@ -182,6 +184,7 @@ const setupRoutes = () => {
       status: 'Operational',
       endpoints: {
         auth: '/api/auth',
+        branches: '/api/branches',
         suites: '/api/suites',
         experiences: '/api/experiences',
         bookings: '/api/bookings',
@@ -209,7 +212,7 @@ const startServer = async () => {
     await connectDB();
     console.log('✅ MongoDB conectado correctamente');
     
-    await SuiteNight.init();
+    await runBranchMigration();
     await runStartupBootstrap();
     
     console.log('🔧 Configurando middlewares...');

@@ -1,7 +1,8 @@
-import Booking, { BLOCKING_BOOKING_STATUSES } from '../models/Booking.js';
+import Booking from '../models/Booking.js';
 import Suite from '../models/Suite.js';
 import SuiteNight from '../models/SuiteNight.js';
-import { toCalendarDate } from '../utils/dates.js';
+import { toCalendarDate, eachNight } from '../utils/dates.js';
+import { resolveBranchId } from '../utils/branches.js';
 
 // ============================================
 // HELPER FUNCTIONS
@@ -48,44 +49,13 @@ const validateDates = (checkIn, checkOut) => {
 };
 
 /**
- * Verifica si una suite está disponible para el rango de fechas
+ * Habitaciones físicas libres de una suite en [checkIn, checkOut).
+ * Fuente de verdad: SuiteNight (la misma que impide la doble reserva).
  */
-const isSuiteAvailable = async (suiteId, checkInDate, checkOutDate, excludeBookingId = null) => {
-  const query = {
-    suite: suiteId,
-    status: { $in: BLOCKING_BOOKING_STATUSES },
-    $or: [
-      // Nueva reserva comienza dentro de una reserva existente
-      { checkIn: { $lt: checkOutDate, $gte: checkInDate } },
-      // Nueva reserva termina dentro de una reserva existente
-      { checkOut: { $gt: checkInDate, $lte: checkOutDate } },
-      // Nueva reserva engloba una reserva existente
-      { checkIn: { $lte: checkInDate }, checkOut: { $gte: checkOutDate } }
-    ]
-  };
-  
-  // Si estamos editando una reserva, excluirla de la verificación
-  if (excludeBookingId) {
-    query._id = { $ne: excludeBookingId };
-  }
-  
-  const conflictingBooking = await Booking.findOne(query);
-  return !conflictingBooking;
-};
-
-/**
- * Obtiene el número de reservas para una suite en un rango de fechas
- */
-const getBookingCountForSuite = async (suiteId, checkInDate, checkOutDate) => {
-  return await Booking.countDocuments({
-    suite: suiteId,
-    status: { $in: BLOCKING_BOOKING_STATUSES },
-    $or: [
-      { checkIn: { $lt: checkOutDate, $gte: checkInDate } },
-      { checkOut: { $gt: checkInDate, $lte: checkOutDate } },
-      { checkIn: { $lte: checkInDate }, checkOut: { $gte: checkOutDate } }
-    ]
-  });
+const getFreeUnits = async (suite, checkInDate, checkOutDate) => {
+  const capacity = suite.availableUnitsCount;
+  const free = await SuiteNight.freeSlots(suite._id, eachNight(checkInDate, checkOutDate), capacity);
+  return { free: free.length, capacity };
 };
 
 // ============================================
@@ -104,7 +74,7 @@ const getBookingCountForSuite = async (suiteId, checkInDate, checkOutDate) => {
 export const checkAvailability = async (req, res) => {
   try {
     // 1. Extraer y validar parámetros
-    let { checkIn, checkOut, guests, suiteType } = req.query;
+    let { checkIn, checkOut, guests, suiteType, branch } = req.query;
     
     // Validar que las fechas existen
     if (!checkIn || !checkOut) {
@@ -154,25 +124,26 @@ export const checkAvailability = async (req, res) => {
     if (guestCount) {
       suiteQuery.maxGuests = { $gte: guestCount };
     }
+
+    // Filtrar por sucursal (slug o id)
+    const branchId = await resolveBranchId(branch);
+    if (branchId === null) {
+      return res.status(404).json({ success: false, message: 'Sucursal no encontrada' });
+    }
+    if (branchId) suiteQuery.branch = branchId;
     
     // 6. Obtener todas las suites que cumplen los filtros básicos
-    const allSuites = await Suite.find(suiteQuery).sort('order');
+    const allSuites = await Suite.find(suiteQuery).sort('order').populate('branch', 'name slug zone');
     
     // 7. Verificar disponibilidad de cada suite
     const availabilityPromises = allSuites.map(async (suite) => {
-      const bookingCount = await getBookingCountForSuite(suite._id, checkInDate, checkOutDate);
-      const isAvailable = bookingCount === 0;
-      
-      // Asumiendo que cada suite tiene 1 unidad (ajustar según tu modelo)
-      const availableUnits = isAvailable ? 1 : 0;
-      const totalUnits = suite.totalUnits || 1;
+      const { free, capacity } = await getFreeUnits(suite, checkInDate, checkOutDate);
       
       return {
         ...suite.toObject(),
-        isAvailable,
-        availableUnits,
-        totalUnits,
-        bookingCount,
+        isAvailable: free > 0,
+        availableUnits: free,
+        totalUnits: capacity,
         pricePerNight: suite.basePrice,
         totalPrice: suite.basePrice * nights
       };
@@ -213,7 +184,8 @@ export const checkAvailability = async (req, res) => {
         alternativeDates,
         filters: {
           guests: guestCount,
-          suiteType: suiteType || null
+          suiteType: suiteType || null,
+          branch: branch || null
         }
       }
     });
@@ -253,8 +225,8 @@ const findAlternativeDates = async (checkInDate, checkOutDate, suiteQuery, guest
     let availableCount = 0;
     
     for (const suite of suites) {
-      const isAvail = await isSuiteAvailable(suite._id, altCheckIn, altCheckOut);
-      if (isAvail) availableCount++;
+      const { free } = await getFreeUnits(suite, altCheckIn, altCheckOut);
+      if (free > 0) availableCount++;
     }
     
     if (availableCount > 0) {
@@ -301,8 +273,15 @@ export const getMonthlyAvailability = async (req, res) => {
     if (suiteType) suiteQuery.type = String(suiteType);
     if (guests > 0) suiteQuery.maxGuests = { $gte: guests };
 
-    const suites = await Suite.find(suiteQuery).select('_id');
-    const totalSuites = suites.length;
+    const branchId = await resolveBranchId(req.query.branch);
+    if (branchId === null) {
+      return res.status(404).json({ success: false, message: 'Sucursal no encontrada' });
+    }
+    if (branchId) suiteQuery.branch = branchId;
+
+    // Se cuentan habitaciones físicas, no tipos de suite.
+    const suites = await Suite.find(suiteQuery).select('_id totalUnits units available');
+    const totalSuites = suites.reduce((sum, s) => sum + s.availableUnitsCount, 0);
 
     const occupiedByDate = new Map();
     if (totalSuites > 0) {
