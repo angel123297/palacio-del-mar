@@ -183,16 +183,4 @@ router.put(
 );
 router.delete('/admin/users/:id', authMiddleware, adminMiddleware, deleteUser);
 
-// ============================================
-// RUTA DE PRUEBA
-// ============================================
-
-router.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Auth service is running',
-    timestamp: new Date().toISOString()
-  });
-});
-
 export default router;

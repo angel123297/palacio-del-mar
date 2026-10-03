@@ -222,7 +222,7 @@ export const insertSeedData = async ({ clear = true } = {}) => {
 /**
  * Punto de entrada cuando se ejecuta como script:
  *   npm run seed
- *   docker compose --profile seed run --rm seed
+ *   docker compose exec backend npm run seed
  * Conecta, siembra y sale del proceso. Útil para volver a cargar el
  * catálogo de ejemplo a mano; el arranque normal del servidor ya siembra
  * automáticamente si la base de datos está vacía (ver bootstrap.js).

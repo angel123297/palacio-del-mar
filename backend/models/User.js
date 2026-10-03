@@ -8,9 +8,7 @@ import crypto from 'crypto';
 
 const USER_ROLES = {
   USER: 'user',
-  ADMIN: 'admin',
-  MODERATOR: 'moderator',
-  STAFF: 'staff'
+  ADMIN: 'admin'
 };
 
 const USER_STATUS = {
@@ -18,20 +16,6 @@ const USER_STATUS = {
   INACTIVE: 'inactive',
   SUSPENDED: 'suspended',
   PENDING_VERIFICATION: 'pending_verification'
-};
-
-const STATUS_LABELS = {
-  [USER_STATUS.ACTIVE]: 'Activo',
-  [USER_STATUS.INACTIVE]: 'Inactivo',
-  [USER_STATUS.SUSPENDED]: 'Suspendido',
-  [USER_STATUS.PENDING_VERIFICATION]: 'Pendiente de verificación'
-};
-
-const ROLE_LABELS = {
-  [USER_ROLES.USER]: 'Usuario',
-  [USER_ROLES.ADMIN]: 'Administrador',
-  [USER_ROLES.MODERATOR]: 'Moderador',
-  [USER_ROLES.STAFF]: 'Personal'
 };
 
 // ============================================
@@ -89,24 +73,6 @@ const ProfileSchema = new mongoose.Schema({
     newsletter: { type: Boolean, default: false },
     promotions: { type: Boolean, default: true },
     emailNotifications: { type: Boolean, default: true }
-  }
-});
-
-/**
- * Historial de cambios de contraseña
- */
-const PasswordHistorySchema = new mongoose.Schema({
-  password: {
-    type: String,
-    required: true
-  },
-  changedAt: {
-    type: Date,
-    default: Date.now
-  },
-  changedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
   }
 });
 
@@ -229,11 +195,6 @@ const userSchema = new mongoose.Schema({
     index: true
   },
   
-  permissions: [{
-    type: String,
-    enum: ['manage_users', 'manage_bookings', 'manage_suites', 'manage_experiences', 'view_reports', 'manage_content']
-  }],
-  
   // Estado
   status: {
     type: String,
@@ -262,29 +223,15 @@ const userSchema = new mongoose.Schema({
   profile: ProfileSchema,
   
   // Seguridad
-  passwordHistory: [PasswordHistorySchema],
-  
   lastPasswordChange: {
     type: Date,
     default: Date.now
   },
   
-  refreshTokens: [{
-    type: String,
-    select: false
-  }],
-  
   activeSessions: [SessionSchema],
   
   // Tokens de recuperación
   recoveryTokens: [RecoveryTokenSchema],
-  
-  // Intentos de login
-  loginAttempts: {
-    count: { type: Number, default: 0 },
-    lastAttempt: { type: Date },
-    lockUntil: { type: Date }
-  },
   
   // Actividad
   lastLogin: {
@@ -294,11 +241,6 @@ const userSchema = new mongoose.Schema({
   
   lastLoginIP: {
     type: String
-  },
-  
-  lastLoginLocation: {
-    city: String,
-    country: String
   },
   
   activityLog: [ActivityLogSchema],
@@ -312,17 +254,6 @@ const userSchema = new mongoose.Schema({
       sms: { type: Boolean, default: false },
       push: { type: Boolean, default: true }
     }
-  },
-  
-  // Metadatos
-  lastActive: {
-    type: Date,
-    default: Date.now
-  },
-  
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
   },
   
   createdAt: { 
@@ -362,26 +293,6 @@ userSchema.pre('save', async function(next) {
     const salt = await bcrypt.genSalt(12);
     const hashedPassword = await bcrypt.hash(this.password, salt);
     
-    // Guardar contraseña anterior en historial (siempre el HASH, nunca en texto plano)
-    if (this.passwordHistory && this.passwordHistory.length > 0) {
-      this.passwordHistory.push({
-        password: hashedPassword,
-        changedAt: new Date(),
-        changedBy: this._id
-      });
-      
-      // Limitar historial a 5 contraseñas
-      if (this.passwordHistory.length > 5) {
-        this.passwordHistory = this.passwordHistory.slice(-5);
-      }
-    } else if (this.passwordHistory) {
-      this.passwordHistory = [{
-        password: hashedPassword,
-        changedAt: new Date(),
-        changedBy: this._id
-      }];
-    }
-    
     this.password = hashedPassword;
     this.lastPasswordChange = new Date();
     next();
@@ -417,70 +328,6 @@ userSchema.pre('save', async function(next) {
 });
 
 // ============================================
-// VIRTUALS
-// ============================================
-
-/**
- * Nombre completo
- */
-userSchema.virtual('fullName').get(function() {
-  if (this.lastName) {
-    return `${this.name} ${this.lastName}`;
-  }
-  return this.name;
-});
-
-/**
- * Estado formateado
- */
-userSchema.virtual('statusLabel').get(function() {
-  return STATUS_LABELS[this.status] || this.status;
-});
-
-/**
- * Rol formateado
- */
-userSchema.virtual('roleLabel').get(function() {
-  return ROLE_LABELS[this.role] || this.role;
-});
-
-/**
- * Está bloqueado
- */
-userSchema.virtual('isLocked').get(function() {
-  return this.loginAttempts.lockUntil && this.loginAttempts.lockUntil > Date.now();
-});
-
-/**
- * Tiempo restante de bloqueo (minutos)
- */
-userSchema.virtual('lockTimeRemaining').get(function() {
-  if (this.isLocked) {
-    return Math.ceil((this.loginAttempts.lockUntil - Date.now()) / 60000);
-  }
-  return 0;
-});
-
-/**
- * Está activo
- */
-userSchema.virtual('isActive').get(function() {
-  return this.status === USER_STATUS.ACTIVE && !this.deletedAt;
-});
-
-/**
- * Avatar URL por defecto
- */
-userSchema.virtual('avatarUrl').get(function() {
-  if (this.profile?.avatar) {
-    return this.profile.avatar;
-  }
-  // Avatar por defecto usando initials
-  const initials = this.name.substring(0, 2).toUpperCase();
-  return `https://ui-avatars.com/api/?name=${initials}&background=C9A96E&color=fff&size=128`;
-});
-
-// ============================================
 // INSTANCE METHODS
 // ============================================
 
@@ -490,51 +337,6 @@ userSchema.virtual('avatarUrl').get(function() {
 userSchema.methods.comparePassword = async function(candidatePassword) {
   if (!candidatePassword || !this.password) return false;
   return await bcrypt.compare(candidatePassword, this.password);
-};
-
-/**
- * Verificar si la contraseña ha sido usada antes
- */
-userSchema.methods.isPasswordReused = async function(newPassword) {
-  if (!this.passwordHistory || this.passwordHistory.length === 0) {
-    return false;
-  }
-  
-  for (const history of this.passwordHistory) {
-    const isMatch = await bcrypt.compare(newPassword, history.password);
-    if (isMatch) return true;
-  }
-  
-  return false;
-};
-
-/**
- * Registrar intento de login fallido
- */
-userSchema.methods.recordLoginAttempt = async function() {
-  const MAX_ATTEMPTS = 5;
-  const LOCK_TIME = 15 * 60 * 1000; // 15 minutos
-  
-  this.loginAttempts.count += 1;
-  this.loginAttempts.lastAttempt = new Date();
-  
-  if (this.loginAttempts.count >= MAX_ATTEMPTS) {
-    this.loginAttempts.lockUntil = Date.now() + LOCK_TIME;
-  }
-  
-  await this.save();
-};
-
-/**
- * Resetear intentos de login
- */
-userSchema.methods.resetLoginAttempts = async function() {
-  this.loginAttempts = {
-    count: 0,
-    lastAttempt: null,
-    lockUntil: null
-  };
-  await this.save();
 };
 
 /**
@@ -616,40 +418,6 @@ userSchema.methods.usePasswordResetToken = async function(token) {
 };
 
 /**
- * Registrar sesión activa
- */
-userSchema.methods.addSession = async function(token, refreshToken, userAgent, ipAddress, expiresIn = 7 * 24 * 60 * 60 * 1000) {
-  this.activeSessions.push({
-    token,
-    refreshToken,
-    userAgent,
-    ipAddress,
-    expiresAt: Date.now() + expiresIn,
-    lastActivity: Date.now()
-  });
-  
-  // Limitar a 10 sesiones activas
-  if (this.activeSessions.length > 10) {
-    // Eliminar sesiones expiradas primero
-    this.activeSessions = this.activeSessions.filter(session => session.expiresAt > Date.now());
-    // Si aún hay más de 10, eliminar las más antiguas
-    if (this.activeSessions.length > 10) {
-      this.activeSessions = this.activeSessions.slice(-10);
-    }
-  }
-  
-  await this.save();
-};
-
-/**
- * Invalidar sesión
- */
-userSchema.methods.invalidateSession = async function(token) {
-  this.activeSessions = this.activeSessions.filter(session => session.token !== token);
-  await this.save();
-};
-
-/**
  * Invalidar todas las sesiones
  */
 userSchema.methods.invalidateAllSessions = async function() {
@@ -687,102 +455,6 @@ userSchema.methods.softDelete = async function() {
   await this.save();
 };
 
-/**
- * Restaurar usuario
- */
-userSchema.methods.restore = async function() {
-  if (!this.deletedAt) {
-    throw new Error('El usuario no está eliminado');
-  }
-  
-  // Restaurar email original (esto requeriría guardar el email original)
-  this.deletedAt = null;
-  this.status = USER_STATUS.ACTIVE;
-  await this.save();
-};
-
-// ============================================
-// STATIC METHODS
-// ============================================
-
-/**
- * Buscar usuario por email incluyendo contraseña
- */
-userSchema.statics.findByEmailWithPassword = function(email) {
-  return this.findOne({ email, deletedAt: null }).select('+password');
-};
-
-/**
- * Buscar usuario activo por email
- */
-userSchema.statics.findActiveByEmail = function(email) {
-  return this.findOne({ 
-    email, 
-    status: USER_STATUS.ACTIVE, 
-    deletedAt: null 
-  });
-};
-
-/**
- * Obtener estadísticas de usuarios
- */
-userSchema.statics.getStats = async function() {
-  const stats = await this.aggregate([
-    { $match: { deletedAt: null } },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: 1 },
-        active: { $sum: { $cond: [{ $eq: ['$status', USER_STATUS.ACTIVE] }, 1, 0] } },
-        inactive: { $sum: { $cond: [{ $eq: ['$status', USER_STATUS.INACTIVE] }, 1, 0] } },
-        suspended: { $sum: { $cond: [{ $eq: ['$status', USER_STATUS.SUSPENDED] }, 1, 0] } },
-        pending: { $sum: { $cond: [{ $eq: ['$status', USER_STATUS.PENDING_VERIFICATION] }, 1, 0] } }
-      }
-    }
-  ]);
-  
-  const byRole = await this.aggregate([
-    { $match: { deletedAt: null } },
-    {
-      $group: {
-        _id: '$role',
-        count: { $sum: 1 }
-      }
-    }
-  ]);
-  
-  return {
-    general: stats[0] || { total: 0, active: 0, inactive: 0, suspended: 0, pending: 0 },
-    byRole: byRole.reduce((acc, curr) => {
-      acc[curr._id] = curr.count;
-      return acc;
-    }, {})
-  };
-};
-
-/**
- * Buscar usuarios por rango de fechas
- */
-userSchema.statics.findByDateRange = function(startDate, endDate) {
-  return this.find({
-    createdAt: { $gte: startDate, $lte: endDate },
-    deletedAt: null
-  }).sort('-createdAt');
-};
-
-/**
- * Buscar usuarios recientemente activos
- */
-userSchema.statics.findRecentlyActive = function(days = 7) {
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - days);
-  
-  return this.find({
-    lastActive: { $gte: cutoffDate },
-    deletedAt: null
-  }).sort('-lastActive').limit(50);
-};
-
 // ============================================
 // ÍNDICES
 // ============================================
@@ -812,4 +484,4 @@ userSchema.index({ role: 1, status: 1 });
 const User = mongoose.model('User', userSchema);
 
 export default User;
-export { USER_ROLES, USER_STATUS, STATUS_LABELS, ROLE_LABELS };
+export { USER_ROLES, USER_STATUS };

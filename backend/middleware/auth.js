@@ -352,43 +352,6 @@ export const authMiddleware = async (req, res, next) => {
 };
 
 /**
- * @desc    Middleware de autenticación opcional (no requiere token)
- * @param   {Object} req - Request object
- * @param   {Object} res - Response object
- * @param   {Function} next - Next middleware
- */
-export const optionalAuthMiddleware = async (req, res, next) => {
-  try {
-    const authHeader = req.header('Authorization');
-    let token = null;
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    }
-    
-    if (token && !isTokenBlacklisted(token)) {
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.id).select('-password');
-        if (user && user.status === 'active') {
-          req.user = {
-            id: decoded.id,
-            role: user.role
-          };
-          req.userData = user;
-        }
-      } catch (error) {
-        // Token inválido, ignorar
-      }
-    }
-    
-    next();
-  } catch (error) {
-    next();
-  }
-};
-
-/**
  * @desc    Middleware de autorización de administrador
  * @param   {Object} req - Request object
  * @param   {Object} res - Response object
@@ -439,43 +402,6 @@ export const adminMiddleware = (req, res, next) => {
 };
 
 /**
- * @desc    Middleware para verificar permisos específicos
- * @param   {string[]} allowedRoles - Lista de roles permitidos
- * @returns {Function}
- */
-export const roleMiddleware = (allowedRoles) => {
-  return (req, res, next) => {
-    const clientIp = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Autenticación requerida',
-        code: 'AUTH_REQUIRED'
-      });
-    }
-    
-    if (!allowedRoles.includes(req.user.role)) {
-      securityLog('ROLE_DENIED', {
-        ip: clientIp,
-        userId: req.user.id,
-        role: req.user.role,
-        allowedRoles,
-        path: req.path
-      });
-      
-      return res.status(403).json({
-        success: false,
-        message: `Acceso denegado. Se requieren los siguientes roles: ${allowedRoles.join(', ')}`,
-        code: 'INSUFFICIENT_PERMISSIONS'
-      });
-    }
-    
-    next();
-  };
-};
-
-/**
  * @desc    Middleware de rate limiting para login
  * @param   {Object} req - Request object
  * @param   {Object} res - Response object
@@ -513,10 +439,3 @@ export const loginRateLimiter = (req, res, next) => {
   
   next();
 };
-
-// ============================================
-// EXPORTAR FUNCIONES ADICIONALES
-// ============================================
-
-export const getTokenBlacklistSize = () => tokenBlacklist.size;
-export const getLoginAttemptsSize = () => loginAttempts.size;

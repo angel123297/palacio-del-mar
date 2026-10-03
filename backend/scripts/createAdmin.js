@@ -3,16 +3,13 @@
  *
  * Antes de este script no había NINGUNA forma de crear un admin: el
  * registro público (/api/auth/register) siempre crea usuarios con
- * role: 'guest', y no existía ningún endpoint ni script para promover a
+ * role: 'user', y no existía ningún endpoint ni script para promover a
  * alguien a administrador. Sin este script, el panel de administración
  * era inalcanzable incluso para el dueño del hotel.
  *
- * Uso:
- *   npm run create-admin
- *   (lee ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD del .env)
- *
- * Con Docker Compose:
- *   docker compose --profile create-admin run --rm create-admin
+ * Uso (lee ADMIN_NAME, ADMIN_EMAIL y ADMIN_PASSWORD del entorno):
+ *   Con Docker Compose:  docker compose exec backend npm run create-admin
+ *   Sin Docker:          npm run create-admin   (con un backend/.env)
  */
 import dotenv from 'dotenv';
 import connectDB, { closeConnection } from '../database/db.js';
@@ -64,9 +61,8 @@ export const upsertAdminUser = async ({ name = 'Administrador', email, password 
 
 /**
  * Punto de entrada cuando se ejecuta como script:
- *   npm run create-admin
- *   docker compose --profile create-admin run --rm create-admin
- * (lee ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD del .env). El arranque
+ *   docker compose exec backend npm run create-admin
+ * (lee ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD del entorno). El arranque
  * normal del servidor ya crea el primer administrador automáticamente si
  * no existe ninguno (ver bootstrap.js); este script sirve para crear uno
  * adicional o promover a un usuario existente más adelante.
