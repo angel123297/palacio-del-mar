@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useBookingCart, todayISO, readDraft, writeDraft, clearDraft } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatDate } from '../utils/format';
+import { contactFromUser, contactAfterUserChange, userKey } from '../utils/contact.js';
 
 const STEPS = ['Fechas', 'Experiencias', 'Datos', 'Confirmación'];
 
@@ -22,7 +23,7 @@ export default function BookingModal() {
   const [pricing, setPricing] = useState(null);
   const [pricingLoading, setPricingLoading] = useState(false);
   const [pricingError, setPricingError] = useState('');
-  const [contact, setContact] = useState({ guestName: user?.name || '', guestEmail: user?.email || '', guestPhone: user?.phone || '', specialRequests: '' });
+  const [contact, setContact] = useState(() => contactFromUser(user));
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -35,8 +36,21 @@ export default function BookingModal() {
       .catch(() => setAllExperiences([]));
   }, [suite]);
 
+  // Este modal está siempre montado: su estado sobrevive a un cierre de sesión.
+  // Al cambiar la sesión se limpian los datos del usuario anterior (ver utils/contact.js).
+  const userKeyRef = useRef(userKey(user));
   useEffect(() => {
-    setContact((c) => ({ ...c, guestName: c.guestName || user?.name || '', guestEmail: c.guestEmail || user?.email || '', guestPhone: c.guestPhone || user?.phone || '' }));
+    const prev = userKeyRef.current;
+    const next = userKey(user);
+    if (prev === next) return;
+    userKeyRef.current = next;
+    setContact((c) => contactAfterUserChange(prev, user, c));
+    if (prev !== null) {
+      // salió o cambió de usuario: nada de su reserva queda a la vista
+      setResult(null);
+      setPricing(null);
+      clearDraft();
+    }
   }, [user]);
 
   // Cada vez que se abre una suite nueva se parte de las fechas buscadas
