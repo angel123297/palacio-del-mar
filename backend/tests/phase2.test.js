@@ -6,6 +6,7 @@ import Promotion from '../models/Promotion.js';
 import { branches } from '../seed/branches.js';
 import { buildSamplePromotions } from '../seed/promotions.js';
 import { summarizeBranches, attachPromotions } from '../utils/branchSummary.js';
+import User from '../models/User.js';
 import { autoSeedIfEmpty, ensureDevAdmin } from '../bootstrap.js';
 
 const oid = () => new mongoose.Types.ObjectId();
@@ -77,4 +78,11 @@ test('el admin de desarrollo se ignora en producción y sin configurar', async (
   delete process.env.DEV_ADMIN_EMAIL;
   assert.equal((await ensureDevAdmin()).reason, 'not_configured');
   Object.assign(process.env, saved);
+});
+
+test('los teléfonos de ejemplo de los admins pasan la validación de perfil del modelo', () => {
+  for (const phone of ['3001234567', '3009876543']) {
+    const err = new User({ name: 'Admin', email: 'a@b.co', password: 'Valida-Pass-1', profile: { phone } }).validateSync();
+    assert.equal(err?.errors?.['profile.phone'], undefined, phone);
+  }
 });

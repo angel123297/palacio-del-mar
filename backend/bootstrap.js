@@ -99,6 +99,31 @@ export const ensureDevAdmin = async () => {
   return { created };
 };
 
+/**
+ * Los clientes que se registran en la web tienen teléfono (profile.phone) y el
+ * formulario de reserva y el perfil lo usan. Los administradores se crean por
+ * otro camino y no lo traían, así que al usar el sitio de clientes tenían que
+ * escribirlo siempre. Aquí se completa SOLO si falta (nunca pisa uno ya guardado).
+ */
+export const ensureAdminPhones = async () => {
+  const pairs = [
+    [process.env.ADMIN_EMAIL, process.env.ADMIN_PHONE],
+    [process.env.DEV_ADMIN_EMAIL, process.env.DEV_ADMIN_PHONE]
+  ];
+  let updated = 0;
+  for (const [rawEmail, phone] of pairs) {
+    const email = rawEmail?.trim().toLowerCase();
+    if (!email || !phone) continue;
+    const res = await User.collection.updateOne(
+      { email, role: 'admin', $or: [{ 'profile.phone': { $exists: false } }, { 'profile.phone': null }, { 'profile.phone': '' }] },
+      { $set: { 'profile.phone': String(phone).trim() } }
+    );
+    updated += res.modifiedCount;
+  }
+  if (updated) console.log(`[Bootstrap] Teléfono completado en ${updated} administrador(es).`);
+  return { updated };
+};
+
 /** Ejecuta ambos pasos; un fallo en uno no debe tumbar el arranque del servidor. */
 export const runStartupBootstrap = async () => {
   try {
@@ -115,5 +140,10 @@ export const runStartupBootstrap = async () => {
     await ensureDevAdmin();
   } catch (err) {
     console.error('[Bootstrap] ❌ No se pudo crear el admin de desarrollo:', err.message);
+  }
+  try {
+    await ensureAdminPhones();
+  } catch (err) {
+    console.error('[Bootstrap] ❌ No se pudo completar el perfil de los administradores:', err.message);
   }
 };
