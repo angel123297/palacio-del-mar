@@ -69,6 +69,8 @@ services:
       # Reservas pendientes: minutos que se retiene la habitación y máximo por usuario
       HOLD_MINUTES: "30"
       MAX_PENDING_BOOKINGS: "3"
+      # Pagos SIMULADOS: siempre aprueban. No se permite con NODE_ENV=production.
+      PAYMENTS_MODE: "simulated"
     depends_on:
       mongo:
         condition: service_healthy

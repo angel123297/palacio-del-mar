@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useBookingCart, todayISO, readDraft, writeDraft, clearDraft } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatDate } from '../utils/format';
-import HoldNotice from './HoldNotice.jsx';
+import usePaymentConfig from '../hooks/usePaymentConfig.js';
+import { policyText } from '../utils/checkout.js';
 import { contactFromUser, contactAfterUserChange, userKey } from '../utils/contact.js';
 
 const STEPS = ['Fechas', 'Experiencias', 'Datos', 'Confirmación'];
@@ -14,6 +16,8 @@ const SEASON_NAMES = { low: 'temporada baja', mid: 'temporada media', high: 'tem
 export default function BookingModal() {
   const { bookingSuite, closeBooking, search, experiences, toggleExperience } = useBookingCart();
   const { user, isAuthenticated, authModal, setAuthModal } = useAuth();
+  const navigate = useNavigate();
+  const paymentConfig = usePaymentConfig();
   const toast = useToast();
 
   const draft = useRef(readDraft()).current; // borrador de un refresco anterior (si lo hay)
@@ -28,7 +32,6 @@ export default function BookingModal() {
   const [pricingError, setPricingError] = useState('');
   const [contact, setContact] = useState(() => contactFromUser(user));
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState(null);
 
   const suite = bookingSuite;
 
@@ -50,7 +53,6 @@ export default function BookingModal() {
     setContact((c) => contactAfterUserChange(prev, user, c));
     if (prev !== null) {
       // salió o cambió de usuario: nada de su reserva queda a la vista
-      setResult(null);
       setPricing(null);
       clearDraft();
     }
@@ -68,8 +70,8 @@ export default function BookingModal() {
 
   // Guarda el borrador mientras la reserva está abierta y sin confirmar
   useEffect(() => {
-    if (suite && !result) writeDraft({ suite, dates, step });
-  }, [suite, dates, step, result]);
+    if (suite) writeDraft({ suite, dates, step });
+  }, [suite, dates, step]);
 
   // Si pidió confirmar sin sesión, al registrarse/entrar se confirma solo
   useEffect(() => {
@@ -158,9 +160,10 @@ if (step >= 1 && suite) {
         experiences: experienceIds,
         ...contact
       });
-      setResult(res.data.data);
-      clearDraft();
-      toast.success(res.data.data.existing ? 'Ya tenías esta reserva pendiente: no se creó otra.' : '¡Reserva creada! Revisa los próximos pasos.');
+      const bookingId = res.data.data.booking._id;
+      closeAndReset();
+      toast.success(res.data.data.existing ? 'Ya tenías esta reserva pendiente: continúa con el pago.' : 'Te guardamos la habitación. Completa el pago.');
+      navigate(`/pagar/${bookingId}`);
     } catch (err) {
       toast.error(
         err.response?.status === 409
@@ -174,13 +177,13 @@ if (step >= 1 && suite) {
 
   submitRef.current = submitBooking;
 
-  const close = () => {
+  const closeAndReset = () => {
     clearDraft();
     setStep(0);
-    setResult(null);
     setPricing(null);
     closeBooking();
   };
+  const close = closeAndReset;
 
   // Mientras se muestra el registro/login se oculta este modal (conserva su estado)
   if (authModal && !user) return null;
@@ -190,32 +193,6 @@ if (step >= 1 && suite) {
       <div className="modal-box modal-wide booking-modal">
         <button className="modal-close" onClick={close} aria-label="Cerrar">×</button>
 
-        {result ? (
-          <div className="booking-confirmation">
-            <p className="modal-eyebrow">Reserva #{String(result.booking._id).slice(-8).toUpperCase()}</p>
-            <h2 className="modal-title">¡Gracias, {contact.guestName.split(' ')[0]}!</h2>
-            <p className="modal-copy">Tu reserva en <strong>{suite.name}</strong> quedó registrada.</p>
-            <div className="confirm-summary">
-              <div><span>Check-in</span><strong>{formatDate(result.booking.checkIn)}</strong></div>
-              <div><span>Check-out</span><strong>{formatDate(result.booking.checkOut)}</strong></div>
-              <div><span>Total</span><strong>{formatCOP(result.booking.totalPrice)}</strong></div>
-              <div><span>Estado del pago</span><strong className="pill-pending">Pendiente</strong></div>
-            </div>
-            <HoldNotice booking={result.booking} />
-            <div className="payment-box">
-              <p>{result.payment.message}</p>
-              <a
-                className="wa-btn"
-                target="_blank"
-                rel="noreferrer"
-                href={`https://wa.me/${result.payment.whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, quiero confirmar el pago de mi reserva #${result.payment.reference} en Palacio del Mar.`)}`}
-              >
-                Escribir por WhatsApp
-              </a>
-            </div>
-            <button className="btn-outline btn-block" onClick={close}>Cerrar</button>
-          </div>
-        ) : (
           <>
             <div className="booking-steps">
               {STEPS.map((label, i) => (
@@ -304,9 +281,11 @@ if (step >= 1 && suite) {
                   <p className="form-hint">Para confirmar necesitamos que crees tu cuenta o inicies sesión. Tu selección se conserva.</p>
                 )}
                 <p className="form-hint">
-                  Tu reserva quedará <strong>pendiente de pago</strong>. Te contactaremos por WhatsApp para confirmar
-                  el depósito — no se realiza ningún cobro automático.
+                  Al continuar te guardamos la habitación mientras pagas en el siguiente paso. No se cobra nada hasta que pagues.
                 </p>
+                {paymentConfig?.cancellationPolicy && (
+                  <p className="form-hint">{policyText(paymentConfig.cancellationPolicy)}</p>
+                )}
               </div>
             )}
 
@@ -315,12 +294,11 @@ if (step >= 1 && suite) {
               {step < STEPS.length - 1 && <button className="btn-primary" onClick={goNext}>Continuar</button>}
               {step === STEPS.length - 1 && (
                 <button className="btn-primary" onClick={submitBooking} disabled={submitting}>
-                  {submitting ? 'Enviando…' : isAuthenticated ? 'Confirmar reserva' : 'Confirmar y crear cuenta'}
+                  {submitting ? 'Enviando…' : isAuthenticated ? 'Continuar al pago' : 'Continuar y crear cuenta'}
                 </button>
               )}
             </div>
           </>
-        )}
       </div>
     </div>
   );

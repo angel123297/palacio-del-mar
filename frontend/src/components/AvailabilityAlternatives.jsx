@@ -85,7 +85,7 @@ export default function AvailabilityAlternatives({ availability, branch, onPickB
             ))}
           </div>
           {others.some((b) => b.promotion) && (
-            <p className="form-hint">Promociones de ejemplo (datos de prueba): el precio mostrado ya las incluye cuando te ahorran más que el descuento por estadía larga.</p>
+            <p className="form-hint">El precio mostrado ya incluye la promoción cuando te ahorra más que el descuento por estadía larga.</p>
           )}
         </>
       )}

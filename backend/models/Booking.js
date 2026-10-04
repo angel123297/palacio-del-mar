@@ -214,7 +214,7 @@ const bookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'cash', null],
+    enum: ['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'cash', 'card', 'pse', 'nequi', null],
     default: null
   },
   paidAt: { type: Date },

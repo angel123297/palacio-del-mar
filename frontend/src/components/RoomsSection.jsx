@@ -184,8 +184,8 @@ export default function RoomsSection() {
                   <span className="chip">Hasta {suite.maxGuests} huéspedes</span>
                 </div>
                 <div className="room-price">
-                  {suite.originalPrice > suite.basePrice && (
-                    <span className="price-old">{formatCOP(suite.originalPrice)}</span>
+                  {av?.priceBreakdown?.discount > 0 && availability?.nights > 0 && (
+                    <span className="price-old">{formatCOP(Math.round(av.priceBreakdown.lodging / availability.nights))}</span>
                   )}
                   <strong>{formatCOP(nightly)}</strong>
                   <span> / noche</span>
