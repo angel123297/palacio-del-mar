@@ -193,6 +193,9 @@ export default function RoomsSection() {
                 {totalForStay && (
                   <p className="form-hint">Total por {availability.nights} noches: {formatCOP(totalForStay)}</p>
                 )}
+                {av?.priceBreakdown?.discount > 0 && (
+                  <p className="form-hint">{av.priceBreakdown.discountReason} · ahorras {formatCOP(av.priceBreakdown.discount)}</p>
+                )}
                 <button
                   className="btn-book room-cta"
                   disabled={isUnavailable}

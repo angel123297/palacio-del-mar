@@ -6,7 +6,8 @@ import { calculateCancellation, getCollectedAmount } from '../utils/pricing.js';
 const BLOCKING_STATUSES = [BOOKING_STATUS.PENDING, BOOKING_STATUS.CONFIRMED];
 import Suite from '../models/Suite.js';
 import Experience from '../models/Experience.js';
-import { getSeason, calculateSeasonalPrice } from './suiteController.js';
+import { quoteSuiteStay } from '../services/pricingService.js';
+import { totalsFromNights, computeTotals } from '../utils/pricing.js';
 import { sendBookingConfirmationEmail } from '../utils/email.js';
 
 // ============================================
@@ -55,38 +56,20 @@ const conflictResponse = (res, message) =>
   res.status(409).json({ success: false, message });
 
 /**
- * Calcula el precio total de la reserva, aplicando el mismo recargo por
- * temporada que usa /api/suites/calculate-price (para que el precio que
- * se le mostró al huésped durante la búsqueda coincida con el que se le
- * cobra), más el 10%/5% de descuento por estadías largas.
- * Devuelve un desglose completo, no solo el total.
+ * Cotiza la reserva con la ÚNICA lógica de precios (utils/pricing.js):
+ * recargo por temporada noche a noche, promoción de la sucursal o descuento
+ * por estadía larga (el que más ahorre) y experiencias. Devuelve también el
+ * desglose por noche que se guarda en la reserva.
  */
-const calculateTotalPrice = async (suiteId, checkInDate, nights, experienceIds) => {
-  const suite = await Suite.findById(suiteId);
-  if (!suite) throw new Error('Suite no encontrada');
-
-  const season = getSeason(checkInDate);
-  const nightlyPrice = calculateSeasonalPrice(suite.basePrice, season);
-  const subtotal = nightlyPrice * nights;
-
-  let experiencesTotal = 0;
-  if (experienceIds && experienceIds.length > 0) {
-    const experiences = await Experience.find({ _id: { $in: experienceIds } });
-    experiencesTotal = experiences.reduce((sum, exp) => sum + exp.price, 0);
-  }
-
-  const preDiscountTotal = subtotal + experiencesTotal;
-  let discount = 0;
-  if (nights >= 7) discount = preDiscountTotal * 0.1;
-  else if (nights >= 5) discount = preDiscountTotal * 0.05;
-
+const calculateTotalPrice = async (suite, checkInDate, checkOutDate, experienceIds) => {
+  const quote = await quoteSuiteStay({ suite, checkIn: checkInDate, checkOut: checkOutDate, experienceIds });
   return {
-    season,
-    nightlyPrice,
-    subtotal,
-    experiencesTotal,
-    discount,
-    totalPrice: preDiscountTotal - discount
+    subtotal: quote.lodging,
+    experiencesTotal: quote.experiencesTotal,
+    discount: quote.discount,
+    discountReason: quote.discountReason,
+    totalPrice: quote.total,
+    pricing: { discountType: quote.discountType, nights: quote.nights }
   };
 };
 
@@ -107,9 +90,9 @@ const getPaymentInstructions = (booking) => ({
 
 /**
  * Recalcula experiencias, descuento y total de una reserva existente con la
- * MISMA regla que createBooking (5% desde 5 noches, 10% desde 7). Antes,
- * agregar/quitar una experiencia dejaba el descuento viejo sin tocar y el
- * total no coincidía con el de una reserva nueva.
+ * MISMA regla que al crear (utils/pricing.js), usando el desglose por noche
+ * que se guardó al reservar. Las reservas anteriores al desglose se
+ * recalculan sobre su subtotal sin promoción.
  */
 const recalcExperienceTotals = async (booking) => {
   const exps = booking.experiences.length
@@ -117,15 +100,19 @@ const recalcExperienceTotals = async (booking) => {
     : [];
   booking.experiencesTotal = exps.reduce((sum, e) => sum + e.price, 0);
 
-  const nights = calculateNights(booking.checkIn, booking.checkOut);
-  const preDiscount = (booking.subtotal || 0) + booking.experiencesTotal;
-  const rate = nights >= 7 ? 0.1 : nights >= 5 ? 0.05 : 0;
-  booking.discount = preDiscount * rate;
-  booking.discountReason = rate > 0
-    ? (nights >= 7 ? 'Descuento por estadía de 7+ noches (10%)' : 'Descuento por estadía de 5+ noches (5%)')
-    : null;
-  booking.totalPrice = preDiscount - booking.discount;
+  const stored = booking.pricing?.nights;
+  const totals = stored?.length
+    ? totalsFromNights(stored, booking.experiencesTotal)
+    : computeTotals({
+        lodging: booking.subtotal || 0,
+        nightsCount: calculateNights(booking.checkIn, booking.checkOut),
+        experiencesTotal: booking.experiencesTotal
+      });
 
+  booking.discount = totals.discount;
+  booking.discountReason = totals.discountReason;
+  if (booking.pricing) booking.pricing.discountType = totals.discountType;
+  booking.totalPrice = totals.total;
 };
 // ============================================
 // MAIN CONTROLLERS
@@ -206,7 +193,7 @@ export const createBooking = async (req, res) => {
         });
       }
       
-      const experienceObjects = await Experience.find({ _id: { $in: experiences } });
+      const experienceObjects = await Experience.find({ _id: { $in: experiences }, available: true });
       if (experienceObjects.length !== experiences.length) {
         return res.status(400).json({
           success: false,
@@ -216,7 +203,7 @@ export const createBooking = async (req, res) => {
     }
     
     // 7. Calcular precio total (con temporada y descuentos por estadía larga)
-    const pricing = await calculateTotalPrice(suiteId, checkInDate, nights, experiences);
+    const pricing = await calculateTotalPrice(suite, checkInDate, checkOutDate, experiences);
     
     // 8. Validar datos de contacto.
     // req.user solo trae { id, role }; los datos de contacto del usuario
@@ -246,9 +233,8 @@ export const createBooking = async (req, res) => {
       subtotal: pricing.subtotal,
       experiencesTotal: pricing.experiencesTotal,
       discount: pricing.discount,
-      discountReason: pricing.discount > 0
-        ? (nights >= 7 ? 'Descuento por estadía de 7+ noches (10%)' : 'Descuento por estadía de 5+ noches (5%)')
-        : null,
+      discountReason: pricing.discountReason,
+      pricing: pricing.pricing,
       totalPrice: pricing.totalPrice,
       guestName: finalGuestName,
       guestEmail: finalGuestEmail,
@@ -558,7 +544,7 @@ export const modifyBookingDates = async (req, res) => {
     const pricing = await calculateTotalPrice(
       booking.suite,
       dateValidation.checkInDate,
-      newNights,
+      dateValidation.checkOutDate,
       booking.experiences
     );
 
@@ -598,6 +584,8 @@ export const modifyBookingDates = async (req, res) => {
     booking.subtotal = pricing.subtotal;
     booking.experiencesTotal = pricing.experiencesTotal;
     booking.discount = pricing.discount;
+    booking.discountReason = pricing.discountReason;
+    booking.pricing = pricing.pricing;
     booking.totalPrice = pricing.totalPrice;
     booking.modifiedAt = new Date();
     booking.modificationHistory = booking.modificationHistory || [];

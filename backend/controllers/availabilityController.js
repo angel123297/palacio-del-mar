@@ -3,6 +3,8 @@ import Suite from '../models/Suite.js';
 import SuiteNight from '../models/SuiteNight.js';
 import { toCalendarDate, eachNight } from '../utils/dates.js';
 import { resolveBranchId } from '../utils/branches.js';
+import { getSeasonCalendar } from '../utils/seasons.js';
+import { loadPromotions, quoteSuiteStay } from '../services/pricingService.js';
 import Promotion from '../models/Promotion.js';
 import { summarizeBranches, attachPromotions } from '../utils/branchSummary.js';
 
@@ -137,17 +139,28 @@ export const checkAvailability = async (req, res) => {
     // 6. Obtener todas las suites que cumplen los filtros básicos
     const allSuites = await Suite.find(suiteQuery).sort('order').populate('branch', 'name slug zone');
     
-    // 7. Verificar disponibilidad de cada suite
+    // 7. Verificar disponibilidad y cotizar cada suite (mismo cálculo que la reserva)
+    const branchIds = [...new Set(allSuites.map((s) => String(s.branch?._id || s.branch)))];
+    const promotions = await loadPromotions(branchIds, checkInDate, checkOutDate);
     const availabilityPromises = allSuites.map(async (suite) => {
       const { free, capacity } = await getFreeUnits(suite, checkInDate, checkOutDate);
+      const quote = await quoteSuiteStay({
+        suite, checkIn: checkInDate, checkOut: checkOutDate, promotions
+      });
       
       return {
         ...suite.toObject(),
         isAvailable: free > 0,
         availableUnits: free,
         totalUnits: capacity,
-        pricePerNight: suite.basePrice,
-        totalPrice: suite.basePrice * nights
+        pricePerNight: Math.round(quote.total / nights),
+        totalPrice: quote.total,
+        priceBreakdown: {
+          lodging: quote.lodging,
+          discount: quote.discount,
+          discountType: quote.discountType,
+          discountReason: quote.discountReason
+        }
       };
     });
     
@@ -176,12 +189,7 @@ export const checkAvailability = async (req, res) => {
     // 10b. Resumen por sucursal (libres, "desde $X" y promoción vigente)
     const branchSummary = summarizeBranches(suitesWithAvailability);
     if (branchSummary.length) {
-      const promotions = await Promotion.find({
-        branch: { $in: branchSummary.map((b) => b._id) },
-        active: true,
-        startDate: { $lt: checkOutDate }, // alguna noche [checkIn, checkOut) cae en la ventana
-        endDate: { $gte: checkInDate }
-      }).lean();
+      // las mismas promociones con las que se cotizó cada suite
       attachPromotions(branchSummary, promotions);
     }
 
@@ -349,28 +357,8 @@ export const getPeakDates = async (req, res) => {
   try {
     const year = Number.parseInt(req.query.year, 10) || new Date().getFullYear();
     
-    // Definir fechas de temporada alta y pico
-    const peakDates = {
-      highSeason: [
-        { name: 'Vacaciones de mitad de año', start: `${year}-06-15`, end: `${year}-07-15` },
-        { name: 'Pre-navidad', start: `${year}-12-15`, end: `${year}-12-20` }
-      ],
-      peakSeason: [
-        { name: 'Navidad y Año Nuevo', start: `${year}-12-21`, end: `${year + 1}-01-10` },
-        { name: 'Semana Santa', start: `${year}-03-24`, end: `${year}-04-08` }
-      ],
-      holidays: [
-        { name: 'Año Nuevo', date: `${year}-01-01` },
-        { name: 'Día de los Reyes Magos', date: `${year}-01-06` },
-        { name: 'Día de San José', date: `${year}-03-19` },
-        { name: 'Día del Trabajo', date: `${year}-05-01` },
-        { name: 'Día de la Independencia', date: `${year}-07-20` },
-        { name: 'Día de la Raza', date: `${year}-10-12` },
-        { name: 'Día de Todos los Santos', date: `${year}-11-01` },
-        { name: 'Día de la Inmaculada Concepción', date: `${year}-12-08` },
-        { name: 'Navidad', date: `${year}-12-25` }
-      ]
-    };
+    // Misma tabla de temporadas que usa el cobro (utils/seasons.js)
+    const peakDates = getSeasonCalendar(year);
     
     res.json({
       success: true,
