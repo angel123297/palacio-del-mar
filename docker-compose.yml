@@ -57,10 +57,13 @@ services:
       ADMIN_NAME: Administrador
       ADMIN_EMAIL: admin@palaciomar.co
       ADMIN_PASSWORD: AulaDocker2026Segura
+      # Teléfono de ejemplo para que el admin pueda usar el sitio de clientes (cámbialo en Perfil)
+      ADMIN_PHONE: "3001234567"
       # Admin de prueba SOLO para desarrollo local (se ignora si NODE_ENV=production)
       DEV_ADMIN_NAME: Admin Local
       DEV_ADMIN_EMAIL: admin@gmail.com
       DEV_ADMIN_PASSWORD: admin123
+      DEV_ADMIN_PHONE: "3009876543"
       # false = no cargar habitaciones solas; se cargan con `npm run seed`
       AUTO_SEED: "false"
     depends_on:
