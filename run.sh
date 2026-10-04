@@ -123,7 +123,12 @@ reporte() {
     echo "=== ÚLTIMAS 60 LÍNEAS POR SERVICIO ==="
     for svc in $SERVICIOS; do
       echo "--- $svc ---"
-      tail -n 60 "$LOG_DIR/$svc.log"
+      if [ "$svc" = "mongo" ]; then
+        # MongoDB registra cada conexión (NETWORK/ACCESS) y tapa lo importante
+        grep -vE '"c":"(NETWORK|ACCESS)"' "$LOG_DIR/$svc.log" | tail -n 60
+      else
+        tail -n 60 "$LOG_DIR/$svc.log"
+      fi
       echo
     done
     echo "=== NOTA ==="
