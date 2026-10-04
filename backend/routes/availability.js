@@ -3,6 +3,7 @@ import { query } from 'express-validator';
 import {
   checkAvailability,
   getMonthlyAvailability,
+  getMonthlyPromotions,
   getPeakDates,
   getAvailabilityStats
 } from '../controllers/availabilityController.js';
@@ -138,6 +139,15 @@ router.get(
   validateRequest,
   withCache(60),
   getMonthlyAvailability
+);
+
+// Descuentos vigentes en un mes (calendario)
+router.get(
+  '/promotions',
+  monthlyAvailabilityValidation,
+  validateRequest,
+  withCache(60),
+  getMonthlyPromotions
 );
 
 router.get(

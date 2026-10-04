@@ -453,3 +453,56 @@ export const getAvailabilityStats = async (req, res) => {
     });
   }
 };
+
+
+/**
+ * @desc    Descuentos (promociones activas) que cubren algún día de un mes
+ * @route   GET /api/availability/promotions
+ * @access  Public
+ * @query   year, month, branch (opcional: slug o id de sucursal)
+ *
+ * Son informativas: se muestran en el calendario pero no cambian el precio.
+ */
+export const getMonthlyPromotions = async (req, res) => {
+  try {
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+    const startDate = new Date(Date.UTC(year, month - 1, 1));
+    const nextMonth = new Date(Date.UTC(year, month, 1));
+
+    const query = { active: true, startDate: { $lt: nextMonth }, endDate: { $gte: startDate } };
+
+    const branchId = await resolveBranchId(req.query.branch);
+    if (branchId === null) {
+      return res.status(404).json({ success: false, message: 'Sucursal no encontrada' });
+    }
+    if (branchId) query.branch = branchId;
+
+    const promotions = await Promotion.find(query)
+      .populate('branch', 'name slug zone')
+      .sort({ startDate: 1 })
+      .lean();
+
+    res.json({
+      success: true,
+      data: {
+        year,
+        month,
+        promotions: promotions.map((p) => ({
+          id: String(p._id),
+          title: p.title,
+          discountPercent: p.discountPercent,
+          startDate: isoDay(p.startDate),
+          endDate: isoDay(p.endDate),
+          branch: p.branch ? { name: p.branch.name, slug: p.branch.slug, zone: p.branch.zone } : null
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('[MonthlyPromotions Error]:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener los descuentos del mes'
+    });
+  }
+};
