@@ -60,3 +60,36 @@ crea otra; 10 intentos de reservar por usuario cada 10 min.
    guardarlos en base de datos.
 2. Reservas con dinero ya recibido (`paymentStatus` pagado/parcial) **nunca** vencen
    solas; si quedan sin confirmar, alguien debe resolverlas a mano.
+
+## Paso 3 · Centro de pago simulado (hecho en `usuario`)
+
+El pago por WhatsApp se reemplazó por un centro de pago en el sitio (`/pagar/:id`).
+Hoy es una **simulación que siempre aprueba** (`PAYMENTS_MODE=simulated`): no recibe ni
+guarda datos de tarjeta, y el backend **se niega a arrancar** con ese modo si
+`NODE_ENV=production`. Al aprobar, la reserva pasa a `confirmed` / `paymentStatus: paid`
+(de forma atómica y solo si sigue vigente), se quita la retención y se envía el comprobante.
+Cada intento queda en la colección `payments` (estados `processing`, `approved`, `declined`,
+`void`, `refunded`) con clave de idempotencia: un doble clic nunca cobra dos veces.
+
+### Pendiente para el ADMIN
+1. **Pestaña de pagos**: listar la colección `payments` (reserva, importe, método, estado,
+   comprobante `PM-AAAAMMDD-XXXXXX`, proveedor). Para una reserva ya existe
+   `GET /api/payments/booking/:id` (dueño o admin); falta un listado global.
+2. En el detalle de reserva mostrar `paymentMethod` (`card` | `pse` | `nequi`),
+   `transactionId` y `paidAt`.
+3. **Reembolsos**: al cancelar una reserva pagada, `refundStatus` queda `pending`; cuando el
+   admin lo ejecute, el `Payment` aprobado debe pasar a `refunded` (hoy no se actualiza).
+4. El botón manual "marcar como pagada" no crea un `Payment`; decidir si debe hacerlo
+   (para que los ingresos y el listado de pagos coincidan).
+5. `AdminPage` aún edita `originalPrice` de la suite; el sitio de usuario **ya no lo usa**
+   (mostraba un precio "antes" fijo). Decidir si se elimina el campo.
+
+### Pendiente para el ANFITRIÓN
+1. Decidir cuándo pasar a una **pasarela real** (Wompi, Mercado Pago, PayU). Basta con
+   un proveedor nuevo en `backend/services/payments/` con la misma función `charge()`,
+   webhooks y una conciliación de pagos que queden en `processing`.
+2. La **política de cancelación** (gratis hasta 7 días antes; después se retiene 10 %) vive en
+   una sola constante (`CANCELLATION_POLICY` en `backend/utils/pricing.js`) y el sitio la
+   muestra en el modal y en el pago. Si el anfitrión debe poder cambiarla, hay que moverla
+   a una colección editable.
+3. Métodos de pago visibles (hoy tarjeta, PSE y Nequi): lista en `services/payments/index.js`.

@@ -2,6 +2,7 @@
 // retenía las noches para siempre.
 import Booking from '../models/Booking.js';
 import SuiteNight from '../models/SuiteNight.js';
+import '../models/Suite.js'; // este servicio hace populate('suite'): registra el modelo aunque se use aislado
 import { sendBookingExpiredEmail } from '../utils/email.js';
 import { expirySweepSeconds } from '../utils/bookingRules.js';
 

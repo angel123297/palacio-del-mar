@@ -937,3 +937,29 @@ input:focus, select:focus, textarea:focus {
 .admin-form-grid .field-label { display: flex; flex-direction: column; gap: 6px; }
 .admin-actions-cell { display: flex; flex-wrap: wrap; gap: 6px 14px; min-width: 150px; max-width: 210px; white-space: normal; }
 .admin-actions-cell .link-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ===== Centro de pago ===== */
+.sim-banner {
+  margin: 0 0 20px; padding: 10px 14px; border: 1px solid rgba(224, 169, 106, 0.6);
+  background: rgba(224, 169, 106, 0.1); color: var(--gold-light); font-size: 0.88rem;
+}
+.checkout-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+.checkout-main { display: flex; flex-direction: column; gap: 16px; }
+.checkout-card { border: 1px solid rgba(201, 169, 110, 0.2); padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+.checkout-card h3 { font-weight: 500; color: var(--gold-light); }
+.checkout-summary { position: sticky; top: 90px; }
+.price-lines { display: flex; flex-direction: column; gap: 8px; }
+.price-lines > div { display: flex; justify-content: space-between; gap: 12px; font-size: 0.92rem; }
+.method-list { display: flex; flex-direction: column; gap: 10px; }
+.method-option {
+  display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; cursor: pointer;
+  border: 1px solid rgba(201, 169, 110, 0.25); transition: border-color 0.2s;
+}
+.method-option:hover, .method-option.is-selected { border-color: var(--gold); }
+.method-option span { display: flex; flex-direction: column; gap: 2px; }
+.method-option small { opacity: 0.7; font-size: 0.78rem; }
+.receipt { max-width: 640px; }
+@media (max-width: 900px) {
+  .checkout-grid { grid-template-columns: 1fr; }
+  .checkout-summary { position: static; }
+}

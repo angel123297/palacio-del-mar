@@ -7,6 +7,9 @@ import { getSeason, calculateSeasonalPrice } from './seasons.js';
 // Sin dependencias, para poder probarlo aislado. El reembolso se calcula
 // sobre lo EFECTIVAMENTE COBRADO, nunca sobre el precio de la reserva.
 
+/** Política de cancelación (única fuente; el sitio la lee de /api/payments/config). */
+export const CANCELLATION_POLICY = { freeDays: 7, feePercent: 10 };
+
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /**
@@ -35,7 +38,9 @@ export const getCollectedAmount = (booking) => {
 export const calculateCancellation = (booking, daysUntilCheckIn) => {
   const collected = getCollectedAmount(booking);
   const policyFee =
-    daysUntilCheckIn >= 0 && daysUntilCheckIn < 7 ? round2((booking.totalPrice || 0) * 0.1) : 0;
+    daysUntilCheckIn >= 0 && daysUntilCheckIn < CANCELLATION_POLICY.freeDays
+      ? round2((booking.totalPrice || 0) * (CANCELLATION_POLICY.feePercent / 100))
+      : 0;
   const cancellationFee = Math.min(policyFee, collected);
   const refundAmount = Math.max(0, round2(collected - cancellationFee));
 

@@ -13,6 +13,8 @@ import bookingRoutes from './routes/bookings.js';
 import availabilityRoutes from './routes/availability.js';
 import chatRoutes from './routes/chat.js';
 import adminRoutes from './routes/admin.js';
+import paymentRoutes from './routes/payments.js';
+import { assertPaymentsConfig } from './services/payments/index.js';
 import { adminMiddleware, authMiddleware } from './middleware/auth.js';
 import { isEmailConfigured } from './utils/email.js';
 import { runStartupBootstrap } from './bootstrap.js';
@@ -158,6 +160,7 @@ const setupRoutes = () => {
   app.use('/api/availability', availabilityRoutes);
   app.use('/api/chat', chatRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/payments', paymentRoutes);
   
   app.get('/api/health', asyncHandler(async (req, res) => {
     const dbStatus = getConnectionStatus();
@@ -225,6 +228,9 @@ const startServer = async () => {
     console.log('🔧 Configurando middlewares...');
     setupMiddlewares();
     
+    // Falla al arrancar si los pagos están mal configurados (p. ej. simulados en producción)
+    console.log(`💳 Pagos: modo ${assertPaymentsConfig()}`);
+
     console.log('🛣️ Configurando rutas...');
     setupRoutes();
     
