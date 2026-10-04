@@ -125,7 +125,7 @@ reporte() {
       echo "--- $svc ---"
       if [ "$svc" = "mongo" ]; then
         # MongoDB registra cada conexión (NETWORK/ACCESS) y tapa lo importante
-        grep -vE '"c":"(NETWORK|ACCESS)"' "$LOG_DIR/$svc.log" | tail -n 60
+        grep -vE '"c":"(NETWORK|ACCESS|WTCHKPT)"' "$LOG_DIR/$svc.log" | tail -n 60
       else
         tail -n 60 "$LOG_DIR/$svc.log"
       fi
