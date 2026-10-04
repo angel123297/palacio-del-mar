@@ -16,6 +16,14 @@ import {
 } from '../controllers/bookingController.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
 import { validateRequest } from '../middleware/validate.js';
+import { createRateLimiter } from '../middleware/rateLimit.js';
+
+// Crear reservas: 10 por usuario cada 10 minutos (evita ráfagas y bots)
+const createBookingLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  message: 'Has intentado reservar demasiadas veces. Espera unos minutos.'
+});
 
 const router = express.Router();
 
@@ -157,7 +165,7 @@ const getBookingsValidation = [
   
   query('status')
     .optional()
-    .isIn(['pending', 'confirmed', 'cancelled', 'completed', 'no_show'])
+    .isIn(['pending', 'confirmed', 'cancelled', 'completed', 'no_show', 'expired'])
     .withMessage('Estado inválido'),
   
   query('startDate')
@@ -197,7 +205,7 @@ const addExperienceValidation = [
  * @body    {string} guestPhone - Teléfono (opcional)
  * @body    {string} specialRequests - Solicitudes especiales (opcional)
  */
-router.post('/', authMiddleware, createBookingValidation, validateRequest, createBooking);
+router.post('/', authMiddleware, createBookingLimiter, createBookingValidation, validateRequest, createBooking);
 
 /**
  * @route   GET /api/bookings

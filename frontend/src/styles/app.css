@@ -911,3 +911,8 @@ input:focus, select:focus, textarea:focus {
 .drp-legend { flex-wrap: wrap; gap: 8px 16px; }
 .dot-promo { background: var(--soul); box-shadow: 0 0 6px rgba(154, 217, 207, 0.9); }
 .dot-holiday { background: var(--ember); box-shadow: 0 0 6px rgba(224, 169, 106, 0.85); }
+
+.hold-notice { margin: 0.75rem 0; padding: 0.6rem 0.9rem; border-radius: 10px; font-size: 0.9rem; background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.35); }
+.hold-notice strong { font-variant-numeric: tabular-nums; }
+.hold-urgent { background: rgba(224, 122, 107, 0.14); border-color: rgba(224, 122, 107, 0.45); }
+.hold-expired { background: rgba(224, 122, 107, 0.14); border-color: rgba(224, 122, 107, 0.45); color: #e07a6b; }

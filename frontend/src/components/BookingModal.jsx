@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useBookingCart, todayISO, readDraft, writeDraft, clearDraft } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatDate } from '../utils/format';
+import HoldNotice from './HoldNotice.jsx';
 import { contactFromUser, contactAfterUserChange, userKey } from '../utils/contact.js';
 
 const STEPS = ['Fechas', 'Experiencias', 'Datos', 'Confirmación'];
@@ -159,7 +160,7 @@ if (step >= 1 && suite) {
       });
       setResult(res.data.data);
       clearDraft();
-      toast.success('¡Reserva creada! Revisa los próximos pasos.');
+      toast.success(res.data.data.existing ? 'Ya tenías esta reserva pendiente: no se creó otra.' : '¡Reserva creada! Revisa los próximos pasos.');
     } catch (err) {
       toast.error(
         err.response?.status === 409
@@ -200,6 +201,7 @@ if (step >= 1 && suite) {
               <div><span>Total</span><strong>{formatCOP(result.booking.totalPrice)}</strong></div>
               <div><span>Estado del pago</span><strong className="pill-pending">Pendiente</strong></div>
             </div>
+            <HoldNotice booking={result.booking} />
             <div className="payment-box">
               <p>{result.payment.message}</p>
               <a

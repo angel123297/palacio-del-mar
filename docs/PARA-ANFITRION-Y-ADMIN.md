@@ -38,3 +38,25 @@ se aplica el que más ahorra. El desglose por noche se guarda en `booking.pricin
 - Semana Santa se calcula cada año (Domingo de Ramos → Domingo de Resurrección).
 - Junio y diciembre "medios" (antes la regla de junio no podía cumplirse): 1–14 de junio
   y 1–14 de diciembre.
+
+## Paso 2 · Retención y límites (hecho en `usuario`)
+
+Una reserva `pending` guarda las noches 30 min (`HOLD_MINUTES`). Si no se paga, pasa
+sola a `expired` (barrido cada 60 s), libera las noches y avisa por correo. Máximo 3
+pendientes vigentes por usuario (`MAX_PENDING_BOOKINGS`); repetir la misma reserva no
+crea otra; 10 intentos de reservar por usuario cada 10 min.
+
+### Pendiente para el ADMIN
+1. `AdminPage` debe conocer el estado `expired` (filtro "Vencidas" y etiqueta); hoy su
+   selector de estados ni siquiera incluye `no_show` correctamente (usa `no-show`).
+2. **No** debe poder "confirmar" ni marcar pagada una reserva `expired`: el sistema la
+   rechaza (estado terminal). Si el huésped pagó tarde por fuera, hay que crear una
+   reserva nueva y reembolsar; decidir el procedimiento.
+3. Las métricas de ingresos y ocupación deben excluir `expired` y `cancelled`.
+
+### Pendiente para el ANFITRIÓN
+1. Decidir los valores finales: minutos de retención (30), máximo de pendientes (3).
+   Se cambian en `docker-compose.yml`; si deben editarse desde un panel, hay que
+   guardarlos en base de datos.
+2. Reservas con dinero ya recibido (`paymentStatus` pagado/parcial) **nunca** vencen
+   solas; si quedan sin confirmar, alguien debe resolverlas a mano.
