@@ -916,3 +916,24 @@ input:focus, select:focus, textarea:focus {
 .hold-notice strong { font-variant-numeric: tabular-nums; }
 .hold-urgent { background: rgba(224, 122, 107, 0.14); border-color: rgba(224, 122, 107, 0.45); }
 .hold-expired { background: rgba(224, 122, 107, 0.14); border-color: rgba(224, 122, 107, 0.45); color: #e07a6b; }
+
+/* ===== Admin: desglose de precio por noche ===== */
+.price-detail { margin-top: 6px; font-size: 0.8rem; }
+.price-detail summary { cursor: pointer; color: var(--gold-light); }
+.price-detail ul { margin: 6px 0 0; padding-left: 16px; line-height: 1.6; opacity: 0.85; }
+.admin-table select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ===== Admin · reservas y promociones (estilo extranet de Booking.com) ===== */
+.admin-views { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-count {
+  display: inline-block; min-width: 20px; margin-left: 8px; padding: 1px 6px; border-radius: 10px;
+  background: rgba(201, 169, 110, 0.25); font-size: 0.72rem; text-align: center;
+}
+.filter-chip.active .chip-count { background: rgba(0, 0, 0, 0.25); }
+.admin-search { align-items: center; flex-wrap: wrap; }
+.admin-search input { flex: 1; min-width: 240px; }
+.admin-pager { display: flex; gap: 18px; align-items: center; justify-content: center; }
+.promo-warning { color: var(--gold-light); opacity: 0.9; margin-top: 8px; }
+.admin-form-grid .field-label { display: flex; flex-direction: column; gap: 6px; }
+.admin-actions-cell { display: flex; flex-wrap: wrap; gap: 6px 14px; min-width: 150px; max-width: 210px; white-space: normal; }
+.admin-actions-cell .link-btn:disabled { opacity: 0.35; cursor: not-allowed; }

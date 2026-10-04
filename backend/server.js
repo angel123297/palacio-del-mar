@@ -12,6 +12,7 @@ import experienceRoutes from './routes/experiences.js';
 import bookingRoutes from './routes/bookings.js';
 import availabilityRoutes from './routes/availability.js';
 import chatRoutes from './routes/chat.js';
+import adminRoutes from './routes/admin.js';
 import { adminMiddleware, authMiddleware } from './middleware/auth.js';
 import { isEmailConfigured } from './utils/email.js';
 import { runStartupBootstrap } from './bootstrap.js';
@@ -156,6 +157,7 @@ const setupRoutes = () => {
   app.use('/api/bookings', bookingRoutes);
   app.use('/api/availability', availabilityRoutes);
   app.use('/api/chat', chatRoutes);
+  app.use('/api/admin', adminRoutes);
   
   app.get('/api/health', asyncHandler(async (req, res) => {
     const dbStatus = getConnectionStatus();
