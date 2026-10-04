@@ -542,39 +542,157 @@ input:focus, select:focus, textarea:focus {
 .profile-form-title { font-size: 1.1rem; margin-bottom: 4px; }
 .profile-form input:disabled { opacity: 0.6; cursor: not-allowed; }
 
-/* ---------- Selector de fechas con disponibilidad ---------- */
+/* ---------- Selector de fechas · menú estilo "Hollow Knight" con la paleta dorada del sitio ---------- */
 .drp { position: relative; display: flex; flex: 2; }
 .drp-triggers { display: flex; flex: 1; }
 .drp-triggers .bf { flex: 1; }
+
+/* Llegada / Salida: como entradas de un menú (rombo al pasar el cursor o al estar activa) */
 .drp-trigger {
+  position: relative;
   background: transparent; border: none; color: var(--cream); cursor: pointer;
-  font-family: 'Cormorant Garamond', serif; font-size: 1rem; text-align: left; width: 100%; padding: 0;
+  font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; letter-spacing: 0.04em;
+  text-align: left; width: 100%; padding: 0;
+  transition: color 0.25s, text-shadow 0.25s, padding-left 0.25s;
 }
+.drp-trigger::before {
+  content: ''; position: absolute; left: 0; top: 50%; width: 5px; height: 5px;
+  border: 1px solid var(--gold); background: var(--gold);
+  transform: translateY(-50%) rotate(45deg) scale(0);
+  transition: transform 0.25s; box-shadow: 0 0 8px rgba(201, 169, 110, 0.8);
+}
+.drp-trigger:hover, .drp-trigger.is-active { color: var(--gold-light); text-shadow: 0 0 12px rgba(232, 213, 163, 0.45); padding-left: 14px; }
+.drp-trigger:hover::before, .drp-trigger.is-active::before { transform: translateY(-50%) rotate(45deg) scale(1); }
+
+/* Panel: negro cálido, esquinas ornamentales y rombo de luz arriba */
 .drp-pop {
-  position: absolute; top: 100%; left: 0; z-index: 300; width: 320px; margin-top: 6px;
-  background: var(--warm2); border: 1px solid rgba(201, 169, 110, 0.4);
-  box-shadow: 0 14px 40px #000000b0; padding: 16px;
+  position: absolute; top: 100%; left: 0; z-index: 300; width: 348px; margin-top: 10px;
+  padding: 26px 22px 18px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(201, 169, 110, 0.12), transparent 62%),
+    linear-gradient(180deg, #15110b, #0a0805);
+  border: 1px solid rgba(201, 169, 110, 0.28);
+  box-shadow: 0 26px 60px #000000d9, 0 0 0 1px #000, inset 0 0 60px rgba(0, 0, 0, 0.65);
+  animation: drp-in 0.28s ease-out both;
 }
+.drp-pop::before {
+  content: ''; position: absolute; inset: 6px; pointer-events: none;
+  --c: rgba(232, 213, 163, 0.75);
+  background:
+    linear-gradient(var(--c), var(--c)) top left / 16px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top left / 1px 16px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 16px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 1px 16px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 16px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 1px 16px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 16px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 1px 16px no-repeat;
+}
+.drp-pop::after {
+  content: ''; position: absolute; top: -5px; left: 50%; width: 8px; height: 8px; margin-left: -4px;
+  background: var(--gold); transform: rotate(45deg); box-shadow: 0 0 12px rgba(201, 169, 110, 0.9);
+}
+@keyframes drp-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+/* Título del mes y flechas */
 .drp-head { display: flex; align-items: center; justify-content: space-between; color: var(--gold-light); }
-.drp-nav { background: none; border: 1px solid rgba(201, 169, 110, 0.3); color: var(--gold); width: 30px; height: 30px; cursor: pointer; font-size: 1.1rem; }
-.drp-nav:disabled { opacity: 0.25; cursor: default; }
-.drp-hint { font-size: 0.7rem; opacity: 0.7; margin: 8px 0; text-align: center; }
-.drp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
-.drp-wd { font-size: 0.6rem; text-align: center; color: var(--gold); padding: 4px 0; }
-.drp-day {
-  background: transparent; border: 1px solid transparent; color: var(--cream); cursor: pointer;
-  aspect-ratio: 1; font-size: 0.8rem; font-family: Jost, sans-serif;
+.drp-head strong {
+  font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 1.3rem;
+  letter-spacing: 0.22em; text-transform: uppercase; text-shadow: 0 0 14px rgba(232, 213, 163, 0.35);
 }
-.drp-day:hover:not(:disabled) { border-color: var(--gold); }
-.drp-day:disabled { opacity: 0.25; cursor: not-allowed; }
-.drp-day.is-full { text-decoration: line-through; color: #c0392b; opacity: 0.6; }
-.drp-day.is-peak { box-shadow: inset 0 -3px 0 var(--gold); }
-.drp-day.is-range { background: rgba(201, 169, 110, 0.18); }
-.drp-day.is-sel { background: var(--gold); color: var(--dark); font-weight: 600; opacity: 1; }
-.drp-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 0.65rem; opacity: 0.75; }
-.drp-dot { display: inline-block; width: 8px; height: 8px; margin-right: 5px; }
-.dot-full { background: #c0392b; }
-.dot-peak { background: var(--gold); }
+.drp-nav {
+  display: flex; align-items: center; justify-content: center; width: 40px; height: 28px;
+  background: none; border: none; color: var(--gold); cursor: pointer;
+  transition: color 0.2s, filter 0.2s, transform 0.2s;
+}
+.drp-arrow { width: 28px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+.drp-arrow circle { fill: currentColor; stroke: none; }
+.drp-arrow.is-next { transform: scaleX(-1); }
+.drp-nav:hover:not(:disabled) { color: var(--gold-light); filter: drop-shadow(0 0 6px rgba(232, 213, 163, 0.85)); }
+.drp-head .drp-nav:first-child:hover:not(:disabled) { transform: translateX(-3px); }
+.drp-head .drp-nav:last-child:hover:not(:disabled) { transform: translateX(3px); }
+.drp-nav:disabled { opacity: 0.2; cursor: default; }
+
+/* Divisor con rombo al centro, que se desvanece en los extremos */
+.drp-divider { position: relative; height: 9px; margin: 10px 0 4px; }
+.drp-divider::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 169, 110, 0.7) 22%, rgba(201, 169, 110, 0.7) 78%, transparent);
+}
+.drp-divider span {
+  position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px;
+  background: #0a0805; border: 1px solid var(--gold); transform: rotate(45deg);
+  box-shadow: 0 0 8px rgba(201, 169, 110, 0.55);
+}
+.drp-hint {
+  font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 0.95rem; letter-spacing: 0.06em;
+  color: var(--cream); opacity: 0.75; text-align: center; margin: 6px 0 12px;
+}
+
+/* Días: solo números; el rombo de luz aparece al pasar el cursor y al elegir */
+.drp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; }
+.drp-wd {
+  font-size: 0.58rem; letter-spacing: 0.24em; text-transform: uppercase; text-align: center;
+  color: var(--gold); opacity: 0.8; padding: 2px 0 8px;
+}
+.drp-day {
+  position: relative; isolation: isolate;
+  background: transparent; border: none; color: rgba(245, 240, 232, 0.84); cursor: pointer;
+  aspect-ratio: 1; font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 500;
+  transition: color 0.2s, text-shadow 0.2s;
+}
+.drp-day::before {
+  content: ''; position: absolute; inset: 20%; z-index: -1; border: 1px solid transparent;
+  transform: rotate(45deg) scale(0.6); opacity: 0;
+  transition: transform 0.22s ease, opacity 0.22s ease, border-color 0.22s;
+}
+.drp-day:hover:not(:disabled) { color: var(--gold-light); text-shadow: 0 0 10px rgba(232, 213, 163, 0.85); }
+.drp-day:hover:not(:disabled)::before { opacity: 1; transform: rotate(45deg) scale(1); border-color: rgba(201, 169, 110, 0.55); }
+.drp-day:disabled { opacity: 0.22; cursor: not-allowed; }
+
+/* Temporada alta: un punto de luz bajo el número. Agotado: apagado y tachado fino */
+.drp-day.is-peak { background: radial-gradient(circle at 50% 86%, var(--gold) 0 1.6px, transparent 2.6px); }
+.drp-day.is-full { color: rgba(232, 160, 150, 0.6); text-decoration: line-through; text-decoration-color: rgba(192, 57, 43, 0.9); text-decoration-thickness: 1px; opacity: 0.7; }
+.drp-day.is-full:disabled { opacity: 0.3; }
+.drp-day.is-sel.is-peak { background: none; }
+
+/* Rango: "pasillo" iluminado entre la llegada y la salida */
+.drp-day.is-range { color: var(--gold-light); }
+.drp-day.is-range::after, .drp-day.is-start::after, .drp-day.is-end::after {
+  content: ''; position: absolute; top: 22%; bottom: 22%; z-index: -2;
+  background: rgba(201, 169, 110, 0.1);
+  border-top: 1px solid rgba(201, 169, 110, 0.28); border-bottom: 1px solid rgba(201, 169, 110, 0.28);
+}
+.drp-day.is-range::after { left: 0; right: 0; }
+.drp-day.is-start::after { left: 50%; right: 0; }
+.drp-day.is-end::after { left: 0; right: 50%; }
+
+/* Llegada y salida: rombo dorado que respira */
+.drp-day.is-sel { color: var(--gold-light); font-weight: 600; text-shadow: 0 0 12px rgba(232, 213, 163, 0.9); opacity: 1; }
+.drp-day.is-sel::before {
+  opacity: 1; transform: rotate(45deg) scale(1); border-color: var(--gold); background: rgba(201, 169, 110, 0.16);
+  box-shadow: 0 0 14px rgba(201, 169, 110, 0.55), inset 0 0 8px rgba(201, 169, 110, 0.3);
+  animation: drp-pulse 2.8s ease-in-out infinite;
+}
+@keyframes drp-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(201, 169, 110, 0.4), inset 0 0 6px rgba(201, 169, 110, 0.25); }
+  50% { box-shadow: 0 0 20px rgba(201, 169, 110, 0.75), inset 0 0 10px rgba(201, 169, 110, 0.4); }
+}
+
+/* Leyenda */
+.drp-legend {
+  display: flex; justify-content: center; gap: 22px; margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid rgba(201, 169, 110, 0.15);
+  font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.8;
+}
+.drp-dot { display: inline-block; width: 6px; height: 6px; margin-right: 7px; transform: rotate(45deg); vertical-align: middle; }
+.dot-full { background: transparent; border: 1px solid rgba(192, 57, 43, 0.9); }
+.dot-peak { background: var(--gold); box-shadow: 0 0 6px rgba(201, 169, 110, 0.8); }
+
+@media (prefers-reduced-motion: reduce) {
+  .drp-pop, .drp-day.is-sel::before { animation: none; }
+  .drp-day, .drp-day::before, .drp-trigger, .drp-trigger::before, .drp-nav { transition: none; }
+}
 @media (max-width: 960px) {
   .drp { flex-direction: column; }
   .drp-triggers { flex-direction: column; }
@@ -651,3 +769,175 @@ input:focus, select:focus, textarea:focus {
 .alt-branch:hover { border-color: var(--gold); }
 .alt-branch span { font-size: 0.8rem; opacity: 0.8; }
 .alt-promo { font-style: normal; font-size: 0.78rem; color: var(--gold); }
+/* ===== Selector de fechas v2 · interfaz estilo Hollow Knight (sobrescribe los estilos anteriores) ===== */
+.drp-pop {
+  width: 360px; margin-top: 18px; padding: 36px 24px 20px;
+  background:
+    radial-gradient(circle at 12% 30%, rgba(232, 213, 163, 0.45) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 86% 22%, rgba(232, 213, 163, 0.35) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 70% 78%, rgba(232, 213, 163, 0.3) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 24% 88%, rgba(232, 213, 163, 0.35) 0 1px, transparent 1.6px),
+    radial-gradient(ellipse 85% 55% at 50% 0%, rgba(232, 213, 163, 0.16), transparent 70%),
+    radial-gradient(ellipse 90% 40% at 50% 100%, rgba(201, 169, 110, 0.08), transparent 70%),
+    linear-gradient(180deg, #16120b, #080604);
+  border: 1px solid rgba(201, 169, 110, 0.4);
+  box-shadow: 0 30px 70px #000000e6, 0 0 0 1px #000, 0 0 40px rgba(201, 169, 110, 0.08), inset 0 0 70px rgba(0, 0, 0, 0.75);
+  animation: drp-open 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.drp-pop::before {
+  inset: 7px; --c: rgba(244, 236, 216, 0.85);
+  border: 1px solid rgba(201, 169, 110, 0.14);
+  background:
+    linear-gradient(var(--c), var(--c)) top left / 20px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top left / 1px 20px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 20px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 1px 20px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 20px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 1px 20px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 20px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 1px 20px no-repeat;
+}
+.drp-pop::after { content: none; }
+@keyframes drp-open { from { opacity: 0; transform: translateY(-10px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* Corona ornamental sobre el marco */
+.drp-crown {
+  position: absolute; top: -12px; left: 50%; width: 220px; height: 24px; margin-left: -110px;
+  overflow: visible; pointer-events: none;
+  filter: drop-shadow(0 0 6px rgba(232, 213, 163, 0.6));
+  animation: drp-glow 3.6s ease-in-out infinite;
+}
+@keyframes drp-glow {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(232, 213, 163, 0.4)); }
+  50% { filter: drop-shadow(0 0 10px rgba(232, 213, 163, 0.9)); }
+}
+
+/* Título: mayúsculas clásicas tipo Trajan */
+.drp-head strong {
+  font-family: 'Cinzel', 'Cormorant Garamond', serif; font-weight: 500; font-size: 0.95rem;
+  letter-spacing: 0.2em; color: #f4ecd8; text-shadow: 0 0 16px rgba(232, 213, 163, 0.5);
+}
+.drp-nav { width: 36px; }
+
+/* Divisor ornamental: rombo con punto central y dos rombos pequeños */
+.drp-divider { height: 11px; margin: 12px 0 6px; }
+.drp-divider span {
+  width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-color: var(--gold-light);
+  background: radial-gradient(circle, #f4ecd8 0 1.2px, #0a0805 1.9px);
+  box-shadow: 0 0 10px rgba(232, 213, 163, 0.65);
+}
+.drp-divider i {
+  position: absolute; top: 50%; width: 4px; height: 4px; margin-top: -2px;
+  background: var(--gold); transform: rotate(45deg); box-shadow: 0 0 6px rgba(201, 169, 110, 0.7);
+}
+.drp-divider i:nth-of-type(1) { left: calc(50% - 26px); }
+.drp-divider i:nth-of-type(2) { left: calc(50% + 22px); }
+
+.drp-hint::before, .drp-hint::after {
+  content: ''; display: inline-block; width: 4px; height: 4px; margin: 0 10px; vertical-align: middle;
+  background: var(--gold); transform: rotate(45deg); opacity: 0.8;
+}
+
+/* Días y encabezados con la misma tipografía */
+.drp-wd { font-family: 'Cinzel', 'Cormorant Garamond', serif; font-size: 0.6rem; letter-spacing: 0.18em; padding-bottom: 10px; }
+.drp-day { font-family: 'Cinzel', 'Cormorant Garamond', serif; font-size: 0.92rem; font-weight: 500; }
+.drp-day:hover:not(:disabled)::before { border-color: rgba(244, 236, 216, 0.7); }
+.drp-day.is-sel { color: #fff8e6; }
+.drp-day.is-sel::before {
+  border-color: var(--gold-light);
+  background: radial-gradient(circle, rgba(244, 236, 216, 0.3), rgba(201, 169, 110, 0.12));
+}
+.drp-day.is-range::after, .drp-day.is-start::after, .drp-day.is-end::after {
+  background: linear-gradient(180deg, transparent, rgba(201, 169, 110, 0.13), transparent);
+  border-top-color: rgba(232, 213, 163, 0.35); border-bottom-color: rgba(232, 213, 163, 0.35);
+}
+
+/* Al cambiar de mes, la página se "pasa" con un fundido suave */
+.drp-grid { animation: drp-page 0.32s ease-out both; }
+@keyframes drp-page { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.drp-legend { font-family: 'Cinzel', 'Cormorant Garamond', serif; font-size: 0.55rem; letter-spacing: 0.18em; }
+
+@media (max-width: 960px) { .drp-pop { width: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .drp-pop, .drp-grid, .drp-crown { animation: none; }
+}
+/* ===== Calendario v3 · descuentos, festivos y lista "En este mes" ===== */
+.drp-pop { --soul: #9ad9cf; --ember: #e0a96a; }
+
+/* Marcas sobre cada día: rombo celeste = descuento, rombo ámbar = festivo */
+.drp-mark {
+  position: absolute; top: 15%; width: 5px; height: 5px; transform: rotate(45deg); pointer-events: none;
+}
+.drp-mark.mk-promo { right: 17%; background: var(--soul); box-shadow: 0 0 7px rgba(154, 217, 207, 0.95); }
+.drp-mark.mk-holiday { left: 17%; background: var(--ember); box-shadow: 0 0 7px rgba(224, 169, 106, 0.9); }
+.drp-day.is-full .drp-mark { opacity: 0.35; }
+
+/* Lista de descuentos y eventos del mes */
+.drp-info { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(201, 169, 110, 0.15); }
+.drp-info-title {
+  font-family: 'Cinzel', 'Cormorant Garamond', serif; font-size: 0.62rem; letter-spacing: 0.26em;
+  text-transform: uppercase; text-align: center; color: var(--gold); margin-bottom: 8px;
+}
+.drp-info-list {
+  list-style: none; max-height: 138px; overflow-y: auto; padding-right: 6px;
+  scrollbar-width: thin; scrollbar-color: rgba(201, 169, 110, 0.5) transparent;
+}
+.drp-info-list::-webkit-scrollbar { width: 4px; }
+.drp-info-list::-webkit-scrollbar-thumb { background: rgba(201, 169, 110, 0.5); }
+.drp-info-item {
+  display: grid; grid-template-columns: 10px 1fr auto auto; align-items: center; gap: 4px 10px;
+  padding: 7px 4px; border-bottom: 1px solid rgba(201, 169, 110, 0.08);
+}
+.drp-info-item:last-child { border-bottom: none; }
+.drp-info-mark { width: 5px; height: 5px; transform: rotate(45deg); background: var(--gold); }
+.drp-info-item.is-promo .drp-info-mark { background: var(--soul); box-shadow: 0 0 7px rgba(154, 217, 207, 0.9); }
+.drp-info-item.is-holiday .drp-info-mark { background: var(--ember); box-shadow: 0 0 7px rgba(224, 169, 106, 0.85); }
+.drp-info-name {
+  font-family: 'Cormorant Garamond', serif; font-size: 1rem; line-height: 1.15; color: #f4ecd8;
+}
+.drp-info-name small {
+  display: block; font-family: 'Jost', sans-serif; font-size: 0.56rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--gold); opacity: 0.8; margin-top: 2px;
+}
+.drp-info-when { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 0.88rem; opacity: 0.7; white-space: nowrap; }
+.drp-info-badge {
+  font-family: 'Cinzel', 'Cormorant Garamond', serif; font-weight: 600; font-size: 0.72rem; letter-spacing: 0.06em;
+  color: var(--soul); padding: 2px 7px; border: 1px solid rgba(154, 217, 207, 0.55);
+  text-shadow: 0 0 8px rgba(154, 217, 207, 0.7); box-shadow: 0 0 10px rgba(154, 217, 207, 0.18);
+}
+
+/* Leyenda ampliada */
+.drp-legend { flex-wrap: wrap; gap: 8px 16px; }
+.dot-promo { background: var(--soul); box-shadow: 0 0 6px rgba(154, 217, 207, 0.9); }
+.dot-holiday { background: var(--ember); box-shadow: 0 0 6px rgba(224, 169, 106, 0.85); }
+
+/* ===== Música de fondo · botón para silenciar (estilo Hollow Knight) ===== */
+.music-toggle {
+  position: fixed; left: 22px; bottom: 22px; z-index: 400; width: 46px; height: 46px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer; color: var(--gold-light);
+  animation: music-in 0.5s ease-out both;
+}
+.music-frame {
+  position: absolute; inset: 7px; transform: rotate(45deg);
+  background: radial-gradient(circle, rgba(232, 213, 163, 0.14), #0a0805 75%);
+  border: 1px solid var(--gold);
+  box-shadow: 0 0 14px rgba(201, 169, 110, 0.45), inset 0 0 8px rgba(0, 0, 0, 0.8);
+  transition: box-shadow 0.25s, border-color 0.25s;
+}
+.music-toggle:hover .music-frame { border-color: var(--gold-light); box-shadow: 0 0 22px rgba(232, 213, 163, 0.75), inset 0 0 8px rgba(0, 0, 0, 0.8); }
+.music-icon { position: relative; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.music-icon .bar { transform-box: fill-box; transform-origin: center; }
+.music-toggle.is-on .bar { animation: music-eq 1.1s ease-in-out infinite; }
+.music-toggle.is-on .b2 { animation-delay: -0.35s; }
+.music-toggle.is-on .b3 { animation-delay: -0.7s; }
+.music-toggle.is-on .b4 { animation-delay: -0.15s; }
+.music-toggle.is-off { color: var(--gold); opacity: 0.7; }
+.music-toggle.is-off .music-frame { box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8); }
+.music-icon .slash { stroke: #e07a6b; }
+@keyframes music-eq { 0%, 100% { transform: scaleY(0.45); } 50% { transform: scaleY(1.35); } }
+@keyframes music-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .music-toggle, .music-toggle.is-on .bar { animation: none; }
+}

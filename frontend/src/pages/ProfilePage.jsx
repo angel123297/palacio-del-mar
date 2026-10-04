@@ -6,6 +6,7 @@ import Footer from '../components/Footer.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatDate } from '../utils/format';
+import useAmbientMusic from '../audio/useAmbientMusic.js';
 
 const NAME_RE = /^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/;
 const PHONE_RE = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/;
@@ -151,6 +152,7 @@ function ChangePasswordForm() {
 }
 
 export default function ProfilePage() {
+  useAmbientMusic(true); // suena mientras estas en tu perfil
   return (
     <div className="dashboard-page">
       <Navbar />
