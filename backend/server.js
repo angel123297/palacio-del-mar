@@ -16,6 +16,8 @@ import { adminMiddleware, authMiddleware } from './middleware/auth.js';
 import { isEmailConfigured } from './utils/email.js';
 import { runStartupBootstrap } from './bootstrap.js';
 import { runBranchMigration } from './migrations/branches.js';
+import { runHoldMigration } from './migrations/holds.js';
+import { startBookingExpiry, stopBookingExpiry } from './services/bookingExpiry.js';
 import { 
   errorHandler, 
   notFoundHandler, 
@@ -79,6 +81,7 @@ const setupGracefulShutdown = (server) => {
   const shutdown = async (signal) => {
     console.log(`\n⚠️ Recibida señal ${signal}. Cerrando conexiones...`);
     
+    stopBookingExpiry();
     server.close(async () => {
       console.log('✅ Servidor HTTP cerrado');
       await closeConnection();
@@ -213,7 +216,9 @@ const startServer = async () => {
     console.log('✅ MongoDB conectado correctamente');
     
     await runBranchMigration();
+    await runHoldMigration();
     await runStartupBootstrap();
+    startBookingExpiry();
     
     console.log('🔧 Configurando middlewares...');
     setupMiddlewares();

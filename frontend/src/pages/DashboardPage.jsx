@@ -1,3 +1,4 @@
+import HoldNotice from '../components/HoldNotice.jsx';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
@@ -12,6 +13,7 @@ const STATUS_CLASS = {
   pending: 'pill-pending',
   confirmed: 'pill-ok',
   cancelled: 'pill-cancelled',
+  expired: 'pill-cancelled',
   completed: 'pill-ok',
   'no-show': 'pill-cancelled'
 };
@@ -87,6 +89,8 @@ function BookingCard({ booking, onChanged }) {
           </div>
         </div>
 
+        <HoldNotice booking={booking} />
+
         {editing ? (
           <ModifyDatesForm booking={booking} onDone={(changed) => { setEditing(false); if (changed) onChanged(); }} />
         ) : (
@@ -157,13 +161,13 @@ export default function DashboardPage() {
 
         <UpcomingBookings reloadKey={bookings} />
         <div className="dashboard-filters">
-          {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map((f) => (
+          {['all', 'pending', 'confirmed', 'completed', 'cancelled', 'expired'].map((f) => (
             <button
               key={f}
               className={`filter-chip ${filter === f ? 'active' : ''}`}
               onClick={() => setFilter(f)}
             >
-              {{ all: 'Todas', pending: 'Pendientes', confirmed: 'Confirmadas', completed: 'Completadas', cancelled: 'Canceladas' }[f]}
+              {{ all: 'Todas', pending: 'Pendientes', confirmed: 'Confirmadas', completed: 'Completadas', cancelled: 'Canceladas', expired: 'Vencidas' }[f]}
             </button>
           ))}
         </div>

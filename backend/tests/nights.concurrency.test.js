@@ -70,3 +70,41 @@ test('10 solicitudes paralelas por un tipo con 3 habitaciones: ganan exactamente
     await mongoose.disconnect();
   }
 });
+
+test('vencimiento real: la reserva pendiente vencida pasa a expired y libera sus noches', { skip: !uri && 'defina TEST_MONGODB_URI' }, async () => {
+  const { default: Booking } = await import('../models/Booking.js');
+  const { expireStaleBookings } = await import('../services/bookingExpiry.js');
+  await mongoose.connect(uri);
+  await SuiteNight.init();
+  const suite = new mongoose.Types.ObjectId();
+  const vencida = new mongoose.Types.ObjectId();
+  const vigente = new mongoose.Types.ObjectId();
+  const pagada = new mongoose.Types.ObjectId();
+  const ahora = new Date();
+  const base = { user: new mongoose.Types.ObjectId(), suite, status: 'pending', paymentStatus: 'pending' };
+  const noches = (y) => eachNight(toCalendarDate(`${y}-08-01`), toCalendarDate(`${y}-08-03`));
+  try {
+    await Booking.collection.insertMany([
+      { _id: vencida, ...base, holdExpiresAt: new Date(ahora - 60000) },
+      { _id: vigente, ...base, holdExpiresAt: new Date(ahora.getTime() + 600000) },
+      { _id: pagada, ...base, paymentStatus: 'paid', holdExpiresAt: new Date(ahora - 60000) }
+    ]);
+    await SuiteNight.acquire(suite, vencida, noches(2031), 1);
+    await SuiteNight.acquire(suite, vigente, noches(2032), 1);
+    await SuiteNight.acquire(suite, pagada, noches(2033), 1);
+
+    assert.equal(await expireStaleBookings(ahora), 1);
+    assert.equal((await Booking.collection.findOne({ _id: vencida })).status, 'expired');
+    assert.equal((await Booking.collection.findOne({ _id: vigente })).status, 'pending');
+    assert.equal((await Booking.collection.findOne({ _id: pagada })).status, 'pending', 'con dinero recibido no vence');
+    assert.equal(await SuiteNight.countDocuments({ booking: vencida }), 0, 'noches liberadas');
+    assert.equal(await SuiteNight.countDocuments({ booking: vigente }), 2);
+    assert.equal(await expireStaleBookings(ahora), 0, 'idempotente');
+    // las noches liberadas se pueden volver a reservar
+    await SuiteNight.acquire(suite, new mongoose.Types.ObjectId(), noches(2031), 1);
+  } finally {
+    await Booking.collection.deleteMany({ _id: { $in: [vencida, vigente, pagada] } });
+    await SuiteNight.deleteMany({ suite });
+    await mongoose.disconnect();
+  }
+});

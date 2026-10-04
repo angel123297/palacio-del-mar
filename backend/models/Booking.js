@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { isValidEmail, EMAIL_MAX_LENGTH } from '../utils/validators.js';
 import SuiteNight from './SuiteNight.js';
+import { holdDeadline } from '../utils/bookingRules.js';
 import { toCalendarDate, todayCalendarDate, calculateNights } from '../utils/dates.js';
 
 // ============================================
@@ -12,7 +13,8 @@ const BOOKING_STATUS = {
   CONFIRMED: 'confirmed',
   CANCELLED: 'cancelled',
   COMPLETED: 'completed',
-  NO_SHOW: 'no_show'
+  NO_SHOW: 'no_show',
+  EXPIRED: 'expired' // no se pagó a tiempo: libera las noches
 };
 
 const PAYMENT_STATUS = {
@@ -24,11 +26,12 @@ const PAYMENT_STATUS = {
 };
 
 const STATUS_TRANSITIONS = {
-  [BOOKING_STATUS.PENDING]: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.CANCELLED],
+  [BOOKING_STATUS.PENDING]: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.CANCELLED, BOOKING_STATUS.EXPIRED],
   [BOOKING_STATUS.CONFIRMED]: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CANCELLED, BOOKING_STATUS.NO_SHOW],
   [BOOKING_STATUS.CANCELLED]: [],
   [BOOKING_STATUS.COMPLETED]: [],
-  [BOOKING_STATUS.NO_SHOW]: []
+  [BOOKING_STATUS.NO_SHOW]: [],
+  [BOOKING_STATUS.EXPIRED]: []
 };
 
 // Única fuente de verdad de los estados que BLOQUEAN noches (BUG-005).
@@ -155,6 +158,12 @@ const bookingSchema = new mongoose.Schema({
     required: [true, 'El precio total es obligatorio'],
     min: [0, 'El precio total no puede ser negativo']
   },
+  
+  // Retención: mientras la reserva está pendiente, las noches se guardan hasta
+  // esta hora; si no se paga, el barrendero (services/bookingExpiry.js) la
+  // pasa a "expired" y libera las noches.
+  holdExpiresAt: { type: Date, index: true },
+  expiredAt: { type: Date },
   
   // Estados
   status: { 
@@ -293,6 +302,20 @@ bookingSchema.pre('save', function(next) {
 /**
  * Actualizar subtotal antes de guardar (si no se calculó)
  */
+bookingSchema.pre('save', function(next) {
+  // Una reserva pendiente nueva nace con retención; al salir de "pendiente"
+  // (confirmada, cancelada...) ya no hay nada que vencer. "expired" conserva
+  // la hora como registro.
+  if (this.isNew && this.status === BOOKING_STATUS.PENDING && !this.holdExpiresAt) {
+    this.holdExpiresAt = holdDeadline();
+  }
+  if (!this.isNew && this.isModified('status') &&
+      ![BOOKING_STATUS.PENDING, BOOKING_STATUS.EXPIRED].includes(this.status)) {
+    this.holdExpiresAt = undefined;
+  }
+  next();
+});
+
 bookingSchema.pre('save', async function(next) {
   if (this.isModified('subtotal') || this.isModified('experiencesTotal')) {
     this.totalPrice = (this.subtotal || 0) + (this.experiencesTotal || 0) - (this.discount || 0);
@@ -372,7 +395,8 @@ bookingSchema.virtual('statusLabel').get(function() {
     [BOOKING_STATUS.CONFIRMED]: 'Confirmada',
     [BOOKING_STATUS.CANCELLED]: 'Cancelada',
     [BOOKING_STATUS.COMPLETED]: 'Completada',
-    [BOOKING_STATUS.NO_SHOW]: 'No se presentó'
+    [BOOKING_STATUS.NO_SHOW]: 'No se presentó',
+    [BOOKING_STATUS.EXPIRED]: 'Vencida'
   };
   return labels[this.status] || this.status;
 });
@@ -460,6 +484,8 @@ bookingSchema.index({ bookingDate: -1 });
 // Índices adicionales para consultas comunes
 bookingSchema.index({ guestEmail: 1 });
 bookingSchema.index({ status: 1, checkIn: 1 });
+bookingSchema.index({ status: 1, holdExpiresAt: 1 }); // barrendero de vencidas
+bookingSchema.index({ user: 1, status: 1, suite: 1, checkIn: 1 }); // reserva repetida
 bookingSchema.index({ user: 1, status: 1, checkOut: 1 });
 bookingSchema.index({ 'cancellationDetails.cancelledBy': 1 });
 

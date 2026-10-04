@@ -66,6 +66,9 @@ services:
       DEV_ADMIN_PHONE: "3009876543"
       # false = no cargar habitaciones solas; se cargan con `npm run seed`
       AUTO_SEED: "false"
+      # Reservas pendientes: minutos que se retiene la habitación y máximo por usuario
+      HOLD_MINUTES: "30"
+      MAX_PENDING_BOOKINGS: "3"
     depends_on:
       mongo:
         condition: service_healthy

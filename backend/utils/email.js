@@ -139,4 +139,13 @@ export const sendBookingConfirmationEmail = async (booking, guestEmail, guestNam
   });
 };
 
-export default { sendVerificationEmail, sendPasswordResetEmail, sendBookingConfirmationEmail, isEmailConfigured, escapeHtml };
+export const sendBookingExpiredEmail = async (booking, guestEmail, guestName) =>
+  sendMail({
+    to: guestEmail,
+    subject: `Tu reserva #${String(booking._id).slice(-6).toUpperCase()} venció · Palacio del Mar`,
+    html: `<p>Hola ${escapeHtml(guestName)},</p>
+      <p>Tu reserva no se pagó a tiempo y la habitación volvió a estar disponible.</p>
+      <p>Si todavía quieres hospedarte, puedes volver a reservar desde el sitio; no se te cobró nada.</p>`
+  });
+
+export default { sendBookingExpiredEmail, sendVerificationEmail, sendPasswordResetEmail, sendBookingConfirmationEmail, isEmailConfigured, escapeHtml };

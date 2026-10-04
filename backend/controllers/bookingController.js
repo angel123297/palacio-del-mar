@@ -6,6 +6,7 @@ import { calculateCancellation, getCollectedAmount } from '../utils/pricing.js';
 const BLOCKING_STATUSES = [BOOKING_STATUS.PENDING, BOOKING_STATUS.CONFIRMED];
 import Suite from '../models/Suite.js';
 import Experience from '../models/Experience.js';
+import { maxPendingPerUser } from '../utils/bookingRules.js';
 import { quoteSuiteStay } from '../services/pricingService.js';
 import { totalsFromNights, computeTotals } from '../utils/pricing.js';
 import { sendBookingConfirmationEmail } from '../utils/email.js';
@@ -51,6 +52,24 @@ const validateDates = (checkIn, checkOut) => {
  */
 const isSuiteAvailable = (suiteId, checkInDate, checkOutDate, excludeBookingId = null) =>
   Booking.checkSuiteAvailability(suiteId, checkInDate, checkOutDate, excludeBookingId);
+
+/** Reserva pendiente vigente del mismo usuario para la misma suite y fechas. */
+const findOwnPendingDuplicate = (userId, suiteId, checkInDate, checkOutDate) =>
+  Booking.findOne({
+    user: userId,
+    suite: suiteId,
+    checkIn: checkInDate,
+    checkOut: checkOutDate,
+    status: 'pending',
+    $or: [{ holdExpiresAt: { $gt: new Date() } }, { holdExpiresAt: null }]
+  }).populate('suite experiences');
+
+const existingBookingResponse = (res, booking) =>
+  res.status(200).json({
+    success: true,
+    message: 'Ya tenías esta reserva pendiente: te mostramos la misma, no se creó otra.',
+    data: { booking, payment: getPaymentInstructions(booking), existing: true }
+  });
 
 const conflictResponse = (res, message) =>
   res.status(409).json({ success: false, message });
@@ -174,6 +193,25 @@ export const createBooking = async (req, res) => {
       });
     }
     
+    // 4b. Doble clic / reintento: la misma reserva pendiente no se duplica
+    const duplicate = await findOwnPendingDuplicate(req.user.id, suiteId, checkInDate, checkOutDate);
+    if (duplicate) return existingBookingResponse(res, duplicate);
+
+    // 4c. Límite de reservas pendientes por usuario (no acaparar habitaciones)
+    const maxPending = maxPendingPerUser();
+    const pendingCount = await Booking.countDocuments({
+      user: req.user.id,
+      status: 'pending',
+      $or: [{ holdExpiresAt: { $gt: new Date() } }, { holdExpiresAt: null }]
+    });
+    if (pendingCount >= maxPending) {
+      return res.status(429).json({
+        success: false,
+        code: 'TOO_MANY_PENDING',
+        message: `Ya tienes ${pendingCount} reservas pendientes de pago (máximo ${maxPending}). Págalas o cancélalas antes de reservar otra.`
+      });
+    }
+
     // 5. Verificar disponibilidad
     const isAvailable = await isSuiteAvailable(suiteId, checkInDate, checkOutDate);
     if (!isAvailable) {
@@ -255,6 +293,9 @@ export const createBooking = async (req, res) => {
       booking.unitSlot = slot;
     } catch (err) {
       if (err instanceof NightsConflictError) {
+        // Dos envíos simultáneos de la misma reserva: el segundo recibe la primera
+        const twin = await findOwnPendingDuplicate(req.user.id, suiteId, checkInDate, checkOutDate);
+        if (twin) return existingBookingResponse(res, twin);
         return conflictResponse(res, 'La suite no está disponible para las fechas seleccionadas');
       }
       throw err;

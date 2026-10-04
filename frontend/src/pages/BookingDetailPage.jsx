@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import api from '../api/client';
 import Navbar from '../components/Navbar.jsx';
 import Footer from '../components/Footer.jsx';
+import HoldNotice from '../components/HoldNotice.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatCalendarDate } from '../utils/format';
 
@@ -10,6 +11,7 @@ const STATUS_CLASS = {
   pending: 'pill-pending',
   confirmed: 'pill-ok',
   cancelled: 'pill-cancelled',
+  expired: 'pill-cancelled',
   completed: 'pill-ok',
   'no-show': 'pill-cancelled'
 };
@@ -99,6 +101,7 @@ export default function BookingDetailPage() {
                   </span>
                 </div>
               </div>
+              <HoldNotice booking={booking} />
               <div className="booking-dates-row">
                 <span><strong>Check-in</strong> {formatCalendarDate(booking.checkIn)}</span>
                 <span><strong>Check-out</strong> {formatCalendarDate(booking.checkOut)}</span>
