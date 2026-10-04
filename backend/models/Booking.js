@@ -136,6 +136,20 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  // Desglose guardado al cotizar: lo prometido al huésped no cambia aunque
+  // luego cambien las temporadas o las promociones.
+  pricing: {
+    discountType: { type: String, enum: ['promotion', 'long_stay', null], default: null },
+    nights: [{
+      _id: false,
+      date: { type: Date, required: true },
+      season: { type: String, enum: ['low', 'mid', 'high', 'peak'] },
+      price: { type: Number, min: 0, required: true },
+      promoPercent: { type: Number, min: 0, max: 100, default: 0 },
+      promotionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Promotion' },
+      promotionTitle: String
+    }]
+  },
   totalPrice: { 
     type: Number, 
     required: [true, 'El precio total es obligatorio'],

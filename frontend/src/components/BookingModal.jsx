@@ -8,6 +8,8 @@ import { contactFromUser, contactAfterUserChange, userKey } from '../utils/conta
 
 const STEPS = ['Fechas', 'Experiencias', 'Datos', 'Confirmación'];
 
+const SEASON_NAMES = { low: 'temporada baja', mid: 'temporada media', high: 'temporada alta', peak: 'temporada pico' };
+
 export default function BookingModal() {
   const { bookingSuite, closeBooking, search, experiences, toggleExperience } = useBookingCart();
   const { user, isAuthenticated, authModal, setAuthModal } = useAuth();
@@ -281,7 +283,12 @@ if (step >= 1 && suite) {
                 {pricingError && <p className="form-error">{pricingError}</p>}
                 {pricing && (
                   <div className="price-breakdown">
-                    <div><span>{formatCOP(pricing.nightlyPrice)} × {pricing.dates.nights} noches</span><span>{formatCOP(pricing.subtotal)}</span></div>
+                    {(pricing.lines?.length ? pricing.lines : [{ unitPrice: pricing.nightlyPrice, nights: pricing.dates.nights, amount: pricing.subtotal }]).map((l, i) => (
+                      <div key={i}>
+                        <span>{formatCOP(l.unitPrice)} × {l.nights} {l.nights === 1 ? 'noche' : 'noches'}{l.season ? ` · ${SEASON_NAMES[l.season]}` : ''}</span>
+                        <span>{formatCOP(l.amount)}</span>
+                      </div>
+                    ))}
                     {pricing.experiencesTotal > 0 && (
                       <div><span>Experiencias</span><span>{formatCOP(pricing.experiencesTotal)}</span></div>
                     )}

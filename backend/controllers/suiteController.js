@@ -1,5 +1,8 @@
 import Suite from '../models/Suite.js';
 import Branch from '../models/Branch.js';
+import { getSeason, calculateSeasonalPrice, SEASON_MULTIPLIERS } from '../utils/seasons.js';
+import { quoteSuiteStay } from '../services/pricingService.js';
+import { toCalendarDate } from '../utils/dates.js';
 import { resolveBranchId } from '../utils/branches.js';
 
 // ============================================
@@ -15,25 +18,6 @@ const CACHE_TTL = 300; // 5 minutos en caché
 let cache = new Map();
 
 // Mapeo de temporadas y sus multiplicadores de precio
-const SEASON_MULTIPLIERS = {
-  low: 1.0,      // Temporada baja
-  mid: 1.15,     // Temporada media
-  high: 1.3,     // Temporada alta
-  peak: 1.5      // Temporada pico (Navidad, Semana Santa)
-};
-
-// Fechas de temporadas (formato: MM-DD)
-const SEASON_DATES = {
-  high: [
-    { start: '06-15', end: '07-15' },  // Vacaciones de mitad de año
-    { start: '12-15', end: '12-20' }   // Pre-navidad
-  ],
-  peak: [
-    { start: '12-21', end: '01-10' },  // Navidad y Año Nuevo
-    { start: '03-24', end: '04-08' }   // Semana Santa (aproximado)
-  ]
-};
-
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -63,43 +47,6 @@ const escapeRegex = (str) => {
  */
 const isValidObjectId = (id) => {
   return /^[0-9a-fA-F]{24}$/.test(id);
-};
-
-/**
- * Determina la temporada basada en una fecha
- */
-export const getSeason = (date) => {
-  const monthDay = date.toISOString().slice(5, 10); // Formato "MM-DD"
-  
-  // Verificar temporada pico
-  for (const season of SEASON_DATES.peak) {
-    if (monthDay >= season.start && monthDay <= season.end) {
-      return 'peak';
-    }
-  }
-  
-  // Verificar temporada alta
-  for (const season of SEASON_DATES.high) {
-    if (monthDay >= season.start && monthDay <= season.end) {
-      return 'high';
-    }
-  }
-  
-  // Verificar temporada media (Junio y Diciembre fuera de fechas pico)
-  const month = parseInt(monthDay.slice(0, 2));
-  if ((month === 6 && monthDay > '07-15') || (month === 12 && monthDay < '12-15')) {
-    return 'mid';
-  }
-  
-  return 'low';
-};
-
-/**
- * Calcula el precio según temporada
- */
-export const calculateSeasonalPrice = (basePrice, season) => {
-  const multiplier = SEASON_MULTIPLIERS[season] || 1.0;
-  return Math.round(basePrice * multiplier);
 };
 
 /**
@@ -295,7 +242,7 @@ export const getSuites = async (req, res) => {
     
     // 4. Determinar temporada para precios dinámicos
     const referenceDate = checkIn || new Date();
-    const season = getSeason(referenceDate);
+    const season = getSeason(toCalendarDate(referenceDate));
     const priceMultiplier = SEASON_MULTIPLIERS[season];
     
     // 5. Ejecutar consultas en paralelo
@@ -434,7 +381,7 @@ export const getSuiteById = async (req, res) => {
     
     // Determinar temporada y precios
     const referenceDate = checkIn ? new Date(checkIn) : new Date();
-    const season = getSeason(referenceDate);
+    const season = getSeason(toCalendarDate(referenceDate));
     const seasonalPrice = calculateSeasonalPrice(suite.basePrice, season);
     const seasonalOriginalPrice = suite.originalPrice 
       ? calculateSeasonalPrice(suite.originalPrice, season)
@@ -699,6 +646,9 @@ export const calculatePrice = async (req, res) => {
       });
     }
     
+    if (!isValidObjectId(String(suiteId))) {
+      return res.status(400).json({ success: false, message: 'ID de suite inválido' });
+    }
     const suite = await Suite.findById(suiteId);
     if (!suite) {
       return res.status(404).json({
@@ -707,9 +657,14 @@ export const calculatePrice = async (req, res) => {
       });
     }
     
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-    const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+    let checkInDate, checkOutDate;
+    try {
+      checkInDate = toCalendarDate(checkIn);
+      checkOutDate = toCalendarDate(checkOut);
+    } catch {
+      return res.status(400).json({ success: false, message: 'Fechas inválidas (use AAAA-MM-DD)' });
+    }
+    const nights = Math.round((checkOutDate - checkInDate) / 86400000);
     
     if (nights <= 0) {
       return res.status(400).json({
@@ -717,36 +672,21 @@ export const calculatePrice = async (req, res) => {
         message: 'La fecha de check-out debe ser posterior al check-in'
       });
     }
-    
-    // Precio base con temporada
-    const season = getSeason(checkInDate);
-    const nightlyPrice = calculateSeasonalPrice(suite.basePrice, season);
-    let subtotal = nightlyPrice * nights;
-    
-    let experiencesTotal = 0;
-    let experiences = [];
-    
-    // Incluir experiencias si se solicitaron
-    if (includeExperiences && experienceIds && experienceIds.length > 0) {
-      const Experience = (await import('../models/Experience.js')).default;
-      experiences = await Experience.find({ _id: { $in: experienceIds }, available: true });
-      experiencesTotal = experiences.reduce((sum, exp) => sum + exp.price, 0);
+    if (nights > 90) {
+      return res.status(400).json({
+        success: false,
+        message: 'La estadía no puede exceder 90 noches'
+      });
     }
     
-    const total = subtotal + experiencesTotal;
-    
-    // Descuentos por estadía larga
-    let discount = 0;
-    let discountReason = null;
-    if (nights >= 7) {
-      discount = total * 0.1; // 10% descuento
-      discountReason = 'Descuento por estadía de 7+ noches (10%)';
-    } else if (nights >= 5) {
-      discount = total * 0.05; // 5% descuento
-      discountReason = 'Descuento por estadía de 5+ noches (5%)';
-    }
-    
-    const finalTotal = total - discount;
+    // Misma cotización que usa la reserva (utils/pricing.js)
+    const quote = await quoteSuiteStay({
+      suite,
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
+      experienceIds: includeExperiences && Array.isArray(experienceIds) ? experienceIds : [],
+      onlyAvailable: true
+    });
     
     res.json({
       success: true,
@@ -761,19 +701,21 @@ export const calculatePrice = async (req, res) => {
           checkOut: checkOutDate,
           nights
         },
-        season,
-        nightlyPrice,
-        subtotal,
-        experiences: experiences.map(e => ({
+        season: quote.season,
+        nightlyPrice: quote.nightlyAverage,
+        subtotal: quote.lodging,
+        lines: quote.lines,
+        experiences: quote.experiences.map(e => ({
           id: e._id,
           name: e.name,
           price: e.price
         })),
-        experiencesTotal,
-        discount,
-        discountReason: discount > 0 ? discountReason : null,
-        total: finalTotal,
-        pricePerNight: Math.round(finalTotal / nights)
+        experiencesTotal: quote.experiencesTotal,
+        discount: quote.discount,
+        discountType: quote.discountType,
+        discountReason: quote.discountReason,
+        total: quote.total,
+        pricePerNight: Math.round(quote.total / nights)
       }
     });
     
