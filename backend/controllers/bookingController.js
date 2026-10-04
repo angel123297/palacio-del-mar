@@ -68,7 +68,7 @@ const existingBookingResponse = (res, booking) =>
   res.status(200).json({
     success: true,
     message: 'Ya tenías esta reserva pendiente: te mostramos la misma, no se creó otra.',
-    data: { booking, payment: getPaymentInstructions(booking), existing: true }
+    data: { booking, payment: getPaymentInfo(booking), existing: true }
   });
 
 const conflictResponse = (res, message) =>
@@ -93,17 +93,14 @@ const calculateTotalPrice = async (suite, checkInDate, checkOutDate, experienceI
 };
 
 /**
- * Instrucciones de pago manual. El proyecto no tiene credenciales de
- * ninguna pasarela de pago (Wompi, PayU, Mercado Pago...) configuradas;
- * en vez de devolver un enlace inventado a una ruta que no existe
- * (`/api/payments/initiate/:id`, que antes daba 404 siempre), se informa
- * al huésped cómo se confirma el pago hoy: transferencia + WhatsApp, y un
- * administrador marca la reserva como pagada desde el panel.
+ * Cómo pagar una reserva pendiente: el huésped sigue en el sitio, en el centro
+ * de pago (/pagar/:id). Hoy el cobro es SIMULADO (ver services/payments).
  */
-const getPaymentInstructions = (booking) => ({
-  method: 'manual',
-  message: 'Tu reserva quedó registrada como pendiente de pago. Nuestro equipo te contactará por WhatsApp con los datos para la transferencia o el enlace de pago.',
-  whatsapp: process.env.HOTEL_WHATSAPP || '+57 300 000 0000',
+const getPaymentInfo = (booking) => ({
+  required: true,
+  amount: booking.totalPrice,
+  holdExpiresAt: booking.holdExpiresAt || null,
+  checkoutUrl: `/pagar/${booking._id}`,
   reference: String(booking._id).slice(-8).toUpperCase()
 });
 
@@ -321,7 +318,7 @@ export const createBooking = async (req, res) => {
       message: 'Reserva creada exitosamente',
       data: {
         booking,
-        payment: getPaymentInstructions(booking)
+        payment: getPaymentInfo(booking)
       }
     });
     
