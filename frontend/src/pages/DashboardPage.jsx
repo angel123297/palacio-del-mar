@@ -108,6 +108,9 @@ function BookingCard({ booking, onChanged }) {
 
         {!editing && (
           <div className="booking-card-actions">
+            {booking.status === 'pending' && booking.paymentStatus !== 'paid' && (
+              <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora</Link>
+            )}
             <Link className="btn-outline" to={`/reservas/${booking._id}`}>Ver detalle</Link>
             {booking.isModifiable && (
               <button className="btn-outline" onClick={() => setEditing(true)} disabled={busy}>Modificar fechas</button>

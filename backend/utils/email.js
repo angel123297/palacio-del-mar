@@ -121,21 +121,49 @@ export const sendPasswordResetEmail = async (email, name, token) => {
   });
 };
 
-export const sendBookingConfirmationEmail = async (booking, guestEmail, guestName) => {
+const money = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
+const day = (d) => new Date(d).toLocaleDateString('es-CO', { timeZone: 'UTC' });
+
+/**
+ * Correo de la reserva. Si ya está pagada: comprobante. Si está pendiente:
+ * aviso con el enlace para pagar y la hora límite (la habitación se retiene).
+ */
+export const sendBookingConfirmationEmail = async (booking, guestEmail, guestName, payment = null) => {
   const nights = booking.nights || Math.ceil((new Date(booking.checkOut) - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24));
+  const ref = String(booking._id).slice(-6).toUpperCase();
+  const summary = `<ul>
+        <li><strong>Suite:</strong> ${escapeHtml(booking.suite?.name)}</li>
+        <li><strong>Check-in:</strong> ${day(booking.checkIn)}</li>
+        <li><strong>Check-out:</strong> ${day(booking.checkOut)}</li>
+        <li><strong>Noches:</strong> ${nights}</li>
+        <li><strong>Total:</strong> ${money(booking.totalPrice)}</li>
+      </ul>`;
+
+  if (booking.paymentStatus === 'paid') {
+    const receipt = payment?.receiptNumber ? `<li><strong>Comprobante:</strong> ${escapeHtml(payment.receiptNumber)}</li>` : '';
+    return sendMail({
+      to: guestEmail,
+      subject: `Pago aprobado · Reserva #${ref} · Palacio del Mar`,
+      html: `<p>Hola ${escapeHtml(guestName)},</p>
+      <p>Tu pago fue aprobado y tu reserva está <strong>confirmada</strong>.</p>
+      ${summary}
+      <ul>${receipt}<li><strong>Pagado:</strong> ${money(booking.amountPaid || booking.totalPrice)}</li></ul>
+      <p>Te esperamos.</p>`
+    });
+  }
+
+  const link = safeUrl(`${FRONTEND_URL}/pagar/${booking._id}`);
+  const until = booking.holdExpiresAt
+    ? new Date(booking.holdExpiresAt).toLocaleTimeString('es-CO', { timeZone: process.env.HOTEL_TIMEZONE || 'America/Bogota', hour: '2-digit', minute: '2-digit' })
+    : null;
   return sendMail({
     to: guestEmail,
-    subject: `Reserva recibida #${String(booking._id).slice(-6).toUpperCase()} · Palacio del Mar`,
+    subject: `Reserva pendiente de pago #${ref} · Palacio del Mar`,
     html: `<p>Hola ${escapeHtml(guestName)},</p>
-      <p>Hemos recibido tu solicitud de reserva en Palacio del Mar.</p>
-      <ul>
-        <li><strong>Suite:</strong> ${escapeHtml(booking.suite?.name)}</li>
-        <li><strong>Check-in:</strong> ${new Date(booking.checkIn).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</li>
-        <li><strong>Check-out:</strong> ${new Date(booking.checkOut).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</li>
-        <li><strong>Noches:</strong> ${nights}</li>
-        <li><strong>Total:</strong> ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(booking.totalPrice)}</li>
-      </ul>
-      <p>Tu reserva quedará <strong>pendiente de pago</strong> hasta que confirmemos el depósito. Te contactaremos por WhatsApp con las instrucciones.</p>`
+      <p>Te guardamos la habitación mientras completas el pago.</p>
+      ${summary}
+      <p>${until ? `Tienes hasta las <strong>${until}</strong>` : 'Tienes poco tiempo'} para pagar; después la reserva vence y la habitación se libera.</p>
+      ${link ? `<p><a href="${link}">Pagar mi reserva</a></p>` : ''}`
   });
 };
 

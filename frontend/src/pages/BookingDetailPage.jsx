@@ -102,6 +102,11 @@ export default function BookingDetailPage() {
                 </div>
               </div>
               <HoldNotice booking={booking} />
+              {booking.status === 'pending' && booking.paymentStatus !== 'paid' && (
+                <div className="booking-card-actions">
+                  <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora</Link>
+                </div>
+              )}
               <div className="booking-dates-row">
                 <span><strong>Check-in</strong> {formatCalendarDate(booking.checkIn)}</span>
                 <span><strong>Check-out</strong> {formatCalendarDate(booking.checkOut)}</span>
