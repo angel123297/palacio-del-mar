@@ -3,7 +3,6 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { BookingCartProvider } from './context/BookingCartContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import AuthModals from './components/AuthModals.jsx';
-import MusicToggle from './components/MusicToggle.jsx';
 import HomePage from './pages/HomePage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
@@ -51,7 +50,6 @@ export default function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
           <AuthModals />
-          <MusicToggle />
         </BookingCartProvider>
       </AuthProvider>
     </ToastProvider>

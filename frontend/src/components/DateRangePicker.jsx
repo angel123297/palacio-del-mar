@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../api/client';
-import useAmbientMusic from '../audio/useAmbientMusic.js';
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -53,7 +52,6 @@ export default function DateRangePicker({ checkIn, checkOut, guests, onChange })
   const [promoMonths, setPromoMonths] = useState({}); // { 'YYYY-M': [promoción, ...] }
   const [loading, setLoading] = useState(false);
   const wrapRef = useRef(null);
-  useAmbientMusic(open); // suena mientras el calendario esta abierto
 
   // Cerrar al hacer clic fuera o con Escape
   useEffect(() => {
