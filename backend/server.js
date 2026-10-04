@@ -54,6 +54,10 @@ const isDevelopment = process.env.NODE_ENV === 'development';
  */
 const requestLogger = (req, res, next) => {
   const startTime = Date.now();
+  // El router recorta req.url al terminar (aparecía "GET /upcoming"); se
+  // guarda la ruta completa. El health check (cada 10 s) no se registra.
+  const fullUrl = req.originalUrl || req.url;
+  if (fullUrl.startsWith('/api/health') && req.method === 'GET') return next();
   
   res.on('finish', () => {
     const duration = Date.now() - startTime;
@@ -61,7 +65,7 @@ const requestLogger = (req, res, next) => {
     const statusColor = status >= 500 ? '\x1b[31m' : status >= 400 ? '\x1b[33m' : '\x1b[32m';
     
     console.log(
-      `${statusColor}[${status}]\x1b[0m ${req.method} ${req.url} - ${duration}ms`
+      `${statusColor}[${status}]\x1b[0m ${req.method} ${fullUrl} - ${duration}ms`
     );
   });
   
