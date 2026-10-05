@@ -1011,3 +1011,21 @@ input:focus, select:focus, textarea:focus {
   .gallery-main { aspect-ratio: 4 / 3; }
 }
 .location-map .branch-map { height: 100%; margin: 0; border-radius: 0; }
+
+/* ===== Comprobante ===== */
+.receipt-page { min-height: 100vh; padding: 24px; background: var(--dark); }
+.receipt-actions { max-width: 720px; margin: 0 auto 16px; display: flex; justify-content: space-between; gap: 12px; }
+.receipt { max-width: 720px; margin: 0 auto; padding: 36px; background: #fff; color: #1a1a1a; border-radius: 4px; }
+.receipt h1 { margin: 0; font-size: 1.6rem; }
+.receipt header { border-bottom: 2px solid #c9a96e; padding-bottom: 12px; margin-bottom: 18px; }
+.receipt h2 { font-size: 1.1rem; margin: 0 0 12px; }
+.receipt table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+.receipt th { text-align: left; width: 38%; padding: 6px 0; color: #555; font-weight: 600; vertical-align: top; }
+.receipt td { padding: 6px 0; text-align: right; }
+.receipt-total th, .receipt-total td { font-size: 1.15rem; font-weight: 700; color: #1a1a1a; border-top: 1px solid #ccc; }
+.receipt-note { font-size: 0.8rem; color: #777; }
+@media print {
+  .no-print { display: none !important; }
+  .receipt-page { background: #fff; padding: 0; }
+  .receipt { box-shadow: none; padding: 0; }
+}
