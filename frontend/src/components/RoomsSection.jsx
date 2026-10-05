@@ -12,9 +12,7 @@ export default function RoomsSection() {
   const [error, setError] = useState(false);
   const [types, setTypes] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
-  const [branches, setBranches] = useState([]);
-  const [branch, setBranch] = useState(''); // '' = todas las sucursales
-  const { availability, search, setSearch, searchAvailability, startBooking } = useBookingCart();
+  const { availability, search, setSearch, searchAvailability, startBooking, branch, setBranch, branches } = useBookingCart();
   const toast = useToast();
 
   const fetchSuites = useCallback(() => {
@@ -32,13 +30,6 @@ export default function RoomsSection() {
   useEffect(() => {
     fetchSuites();
   }, [fetchSuites]);
-
-  // Sucursales para las pestañas (GET /branches)
-  useEffect(() => {
-    api.get('/branches')
-      .then((res) => setBranches(res.data.data || []))
-      .catch(() => setBranches([]));
-  }, []);
 
   // Tipos de suite para el filtro (GET /suites/types)
   useEffect(() => {

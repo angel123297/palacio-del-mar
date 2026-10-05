@@ -82,3 +82,22 @@ test('pago real: si el barrido la venció primero, no se puede pagar', opts, asy
     await mongoose.disconnect();
   }
 });
+
+test('pago real: dos envíos simultáneos con claves DISTINTAS dejan un solo pago activo', opts, async () => {
+  const { Booking, Payment, service } = await setup();
+  const { _id, user } = await insertPending(Booking, 10 * 60000);
+  try {
+    const results = await Promise.allSettled(
+      ['clave-distinta-0001', 'clave-distinta-0002', 'clave-distinta-0003'].map((k) =>
+        service.pay({ bookingId: _id, userId: user, method: 'card', idempotencyKey: k }))
+    );
+    const active = await Payment.countDocuments({ booking: _id, active: true });
+    assert.equal(active, 1, 'solo un pago activo');
+    assert.equal(await Payment.countDocuments({ booking: _id, status: 'approved' }), 1);
+    assert.ok(results.some((r) => r.status === 'fulfilled'));
+  } finally {
+    await Booking.collection.deleteOne({ _id });
+    await Payment.deleteMany({ booking: _id });
+    await mongoose.disconnect();
+  }
+});
