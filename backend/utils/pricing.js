@@ -175,3 +175,13 @@ export const groupNights = (nights) => {
   }
   return lines;
 };
+
+/** Resumen público de una cotización (lo que muestra el detalle de la habitación). */
+export const summarizeQuote = (quote, lines) => ({
+  nights: quote.nights.length,
+  lines,
+  lodging: quote.lodging,
+  discount: quote.discount,
+  discountReason: quote.discountReason,
+  totalPrice: quote.total
+});

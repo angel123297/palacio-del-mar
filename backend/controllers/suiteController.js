@@ -3,6 +3,7 @@ import Branch from '../models/Branch.js';
 import SuiteNight from '../models/SuiteNight.js';
 import { getSeason, calculateSeasonalPrice, SEASON_MULTIPLIERS } from '../utils/seasons.js';
 import { quoteSuiteStay } from '../services/pricingService.js';
+import { summarizeQuote } from '../utils/pricing.js';
 import { toCalendarDate } from '../utils/dates.js';
 import { resolveBranchId } from '../utils/branches.js';
 
@@ -389,16 +390,7 @@ export const getSuiteById = async (req, res) => {
     const co = checkOut ? toCalendarDate(checkOut) : null;
     if (ci && co && co > ci && Math.round((co - ci) / 86400000) <= 90) {
       const q = await quoteSuiteStay({ suite, checkIn: ci, checkOut: co });
-      quote = {
-        checkIn: ci,
-        checkOut: co,
-        nights: q.nights.length,
-        lines: q.lines,
-        lodging: q.subtotal,
-        discount: q.discount,
-        discountReason: q.discountReason,
-        totalPrice: q.totalPrice
-      };
+      quote = { checkIn: ci, checkOut: co, ...summarizeQuote(q, q.lines) };
       const free = await SuiteNight.freeSlots(suite._id, q.nights.map((n) => n.date), suite.totalUnits);
       unitsLeft = free.length;
     }
