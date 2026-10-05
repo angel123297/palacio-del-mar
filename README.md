@@ -151,7 +151,7 @@ frontend/src/    pages/ components/ (CheckoutPage, HoldNotice, admin/...) utils/
 
 ## 8. Ramas y cómo trabajar
 
-- `main`: estable. `usuario`: huésped (pasos 1 a 3 hechos). `administrador`: panel de admin.
+- `main`: estable. `usuario`: huésped (pasos 1 a 5 hechos; el 6 está en curso en `paso-6-wip`). `administrador`: panel de admin.
 - Antes de empezar: `git fetch && git pull` de tu rama; otros suben cambios a diario.
 - Antes de subir: tests del backend y `npx vite build` en el frontend, sin errores ni advertencias.
 
