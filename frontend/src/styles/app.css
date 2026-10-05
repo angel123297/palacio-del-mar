@@ -917,6 +917,27 @@ input:focus, select:focus, textarea:focus {
 .hold-urgent { background: rgba(224, 122, 107, 0.14); border-color: rgba(224, 122, 107, 0.45); }
 .hold-expired { background: rgba(224, 122, 107, 0.14); border-color: rgba(224, 122, 107, 0.45); color: #e07a6b; }
 
+/* ===== Admin: desglose de precio por noche ===== */
+.price-detail { margin-top: 6px; font-size: 0.8rem; }
+.price-detail summary { cursor: pointer; color: var(--gold-light); }
+.price-detail ul { margin: 6px 0 0; padding-left: 16px; line-height: 1.6; opacity: 0.85; }
+.admin-table select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ===== Admin · reservas y promociones (estilo extranet de Booking.com) ===== */
+.admin-views { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-count {
+  display: inline-block; min-width: 20px; margin-left: 8px; padding: 1px 6px; border-radius: 10px;
+  background: rgba(201, 169, 110, 0.25); font-size: 0.72rem; text-align: center;
+}
+.filter-chip.active .chip-count { background: rgba(0, 0, 0, 0.25); }
+.admin-search { align-items: center; flex-wrap: wrap; }
+.admin-search input { flex: 1; min-width: 240px; }
+.admin-pager { display: flex; gap: 18px; align-items: center; justify-content: center; }
+.promo-warning { color: var(--gold-light); opacity: 0.9; margin-top: 8px; }
+.admin-form-grid .field-label { display: flex; flex-direction: column; gap: 6px; }
+.admin-actions-cell { display: flex; flex-wrap: wrap; gap: 6px 14px; min-width: 150px; max-width: 210px; white-space: normal; }
+.admin-actions-cell .link-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
 /* ===== Centro de pago ===== */
 .sim-banner {
   margin: 0 0 20px; padding: 10px 14px; border: 1px solid rgba(224, 169, 106, 0.6);
@@ -943,6 +964,160 @@ input:focus, select:focus, textarea:focus {
   .checkout-summary { position: static; }
 }
 
+/* ===== Experiencias: Carrusel con navegación y tarjetas corregidas ===== */
+.exp-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  padding: 0 36px;
+}
+.exp-slider-wrapper {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+.exp-grid {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  padding: 8px 4px 16px;
+  width: 100%;
+}
+.exp-grid::-webkit-scrollbar {
+  display: none;
+}
+.exp-card {
+  flex: 0 0 280px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(201, 169, 110, 0.15);
+  padding: 0 0 20px;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.exp-card:hover {
+  border-color: var(--gold);
+  transform: translateY(-4px);
+  background: rgba(201, 169, 110, 0.04);
+}
+.exp-img-wrap {
+  position: relative;
+  height: 160px;
+  width: 100%;
+  overflow: hidden;
+}
+.exp-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.85);
+  transition: transform 0.4s ease;
+}
+.exp-card:hover .exp-img-wrap img {
+  transform: scale(1.05);
+  filter: brightness(0.95);
+}
+.exp-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(46, 117, 99, 0.9);
+  color: #fff;
+  font-size: 0.65rem;
+  padding: 3px 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: 'Jost', sans-serif;
+}
+.exp-content {
+  padding: 16px 18px 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.exp-icon {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+  display: block;
+}
+.exp-card h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--cream);
+  margin-bottom: 6px;
+}
+.exp-card p {
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: #f5f0e875;
+  flex: 1;
+  margin-bottom: 14px;
+}
+.exp-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  border-top: 1px solid rgba(201, 169, 110, 0.1);
+  padding-top: 12px;
+}
+.exp-price {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem;
+  color: var(--gold-light);
+}
+.exp-btn {
+  width: 100%;
+  padding: 10px;
+  background: none;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  font-family: 'Jost', sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.exp-btn:hover {
+  background: var(--gold);
+  color: var(--dark);
+}
+.exp-btn.exp-btn-added {
+  background: var(--gold);
+  color: var(--dark);
+  border-color: var(--gold);
+}
+.exp-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: rgba(18, 18, 18, 0.9);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.4rem;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+.exp-nav-btn:hover {
+  background: var(--gold);
+  color: var(--dark);
+}
+.exp-nav-prev { left: -6px; }
+.exp-nav-next { right: -6px; }
 /* ===== Detalle de habitación ===== */
 .suite-detail { padding-top: 120px; }
 .crumbs { font-size: 0.85rem; color: rgba(245, 240, 232, 0.6); margin-bottom: 16px; }

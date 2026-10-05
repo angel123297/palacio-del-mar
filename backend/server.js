@@ -12,6 +12,7 @@ import experienceRoutes from './routes/experiences.js';
 import bookingRoutes from './routes/bookings.js';
 import availabilityRoutes from './routes/availability.js';
 import chatRoutes from './routes/chat.js';
+import adminRoutes from './routes/admin.js';
 import paymentRoutes from './routes/payments.js';
 import { assertPaymentsConfig } from './services/payments/index.js';
 import { adminMiddleware, authMiddleware } from './middleware/auth.js';
@@ -162,6 +163,7 @@ const setupRoutes = () => {
   app.use('/api/bookings', bookingRoutes);
   app.use('/api/availability', availabilityRoutes);
   app.use('/api/chat', chatRoutes);
+  app.use('/api/admin', adminRoutes);
   app.use('/api/payments', paymentRoutes);
   
   app.get('/api/health', asyncHandler(async (req, res) => {

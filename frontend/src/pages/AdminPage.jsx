@@ -4,12 +4,15 @@ import Navbar from '../components/Navbar.jsx';
 import Footer from '../components/Footer.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatDate } from '../utils/format';
+import BookingsPanel from '../components/admin/BookingsPanel.jsx';
+import PromotionsPanel from '../components/admin/PromotionsPanel.jsx';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'suites', label: 'Suites' },
   { id: 'experiences', label: 'Experiencias' },
   { id: 'bookings', label: 'Reservas' },
+  { id: 'promotions', label: 'Promociones' },
   { id: 'users', label: 'Usuarios' }
 ];
 
@@ -22,7 +25,9 @@ const BOOKING_STATUS_LABELS = {
   pending: 'Pendientes',
   confirmed: 'Confirmadas',
   cancelled: 'Canceladas',
-  completed: 'Completadas'
+  completed: 'Completadas',
+  no_show: 'No se presentaron',
+  expired: 'Vencidas'
 };
 
 function StatCard({ label, value }) {
@@ -123,7 +128,7 @@ function DashboardAdmin() {
   return (
     <div className="admin-tab">
       <div className="stat-grid">
-        <StatCard label="Ingresos totales" value={formatCOP(bGeneral.totalRevenue)} />
+        <StatCard label="Ingresos cobrados (neto)" value={formatCOP(bGeneral.totalRevenue)} />
         <StatCard label="Reservas totales" value={bGeneral.totalBookings} />
         <StatCard label="Valor promedio por reserva" value={formatCOP(bGeneral.avgBookingValue)} />
         <StatCard label="Ocupación actual" value={`${aGeneral.occupancyRate.toFixed(0)}%`} />
@@ -394,76 +399,6 @@ function ExperiencesAdmin() {
 // ============================================
 // RESERVAS
 // ============================================
-function BookingsAdmin() {
-  const [bookings, setBookings] = useState(null);
-  const [status, setStatus] = useState('');
-  const toast = useToast();
-
-  const load = () => {
-    api.get('/bookings/admin/all', { params: status ? { status } : {} })
-      .then((res) => setBookings(res.data.data.bookings))
-      .catch(() => toast.error('No se pudieron cargar las reservas'));
-  };
-  useEffect(load, [status]);
-
-  const updatePayment = async (id, paymentStatus) => {
-    try {
-      const body = { paymentStatus };
-      if (paymentStatus === 'partial') {
-        // Un pago parcial necesita el importe cobrado hasta ahora
-        const raw = window.prompt('Importe cobrado hasta ahora (menor que el total):');
-        const amount = Number(raw);
-        if (!raw || !Number.isFinite(amount) || amount <= 0) {
-          toast.error('Importe inválido');
-          return;
-        }
-        body.amount = amount;
-      }
-      await api.put(`/bookings/admin/${id}/payment-status`, body);
-      toast.success('Estado de pago actualizado');
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'No se pudo actualizar');
-    }
-  };
-
-  return (
-    <div className="admin-tab">
-      <div className="admin-filters">
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">Todos los estados</option>
-          {['pending', 'confirmed', 'completed', 'cancelled', 'no-show'].map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
-      <div className="admin-table-wrap">
-        {bookings === null && <div className="spinner" />}
-        {bookings && (
-          <table className="admin-table">
-            <thead><tr><th>Huésped</th><th>Suite</th><th>Fechas</th><th>Total</th><th>Estado</th><th>Pago</th></tr></thead>
-            <tbody>
-              {bookings.map((b) => (
-                <tr key={b._id}>
-                  <td>{b.guestName}<br /><span className="form-hint">{b.guestEmail}</span></td>
-                  <td>{b.suite?.name}</td>
-                  <td>{formatDate(b.checkIn)} → {formatDate(b.checkOut)}</td>
-                  <td>{formatCOP(b.totalPrice)}</td>
-                  <td><span className="pill pill-pending">{b.statusLabel || b.status}</span></td>
-                  <td>
-                    <select value={b.paymentStatus} onChange={(e) => updatePayment(b._id, e.target.value)}>
-                      {['pending', 'partial', 'paid', 'failed', 'refunded'].map((p) => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {bookings && bookings.length === 0 && <p className="form-hint">No hay reservas para este filtro.</p>}
-      </div>
-    </div>
-  );
-}
-
 // ============================================
 // USUARIOS
 // ============================================
@@ -553,7 +488,8 @@ export default function AdminPage() {
         {tab === 'dashboard' && <DashboardAdmin />}
         {tab === 'suites' && <SuitesAdmin />}
         {tab === 'experiences' && <ExperiencesAdmin />}
-        {tab === 'bookings' && <BookingsAdmin />}
+        {tab === 'bookings' && <BookingsPanel />}
+        {tab === 'promotions' && <PromotionsPanel />}
         {tab === 'users' && <UsersAdmin />}
       </div>
       <Footer />

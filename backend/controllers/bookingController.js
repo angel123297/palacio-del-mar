@@ -1131,6 +1131,20 @@ export const sendBookingConfirmation = async (req, res) => {
  */
 export const getBookingStats = async (req, res) => {
   try {
+    // Ingresos reales: lo cobrado menos lo reembolsado (una reserva cancelada o vencida
+    // sin dinero recibido no suma; una cancelada con penalización retenida sí)
+    const INACTIVE = ['cancelled', 'expired'];
+    const COLLECTED = {
+      $subtract: [
+        { $cond: [
+          { $gt: [{ $ifNull: ['$amountPaid', 0] }, 0] },
+          '$amountPaid',
+          { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$totalPrice', 0] }
+        ] },
+        { $ifNull: ['$amountRefunded', 0] }
+      ]
+    };
+    
     const { startDate, endDate } = req.query;
     
     const match = {};
@@ -1149,12 +1163,13 @@ export const getBookingStats = async (req, res) => {
           $group: {
             _id: null,
             totalBookings: { $sum: 1 },
-            totalRevenue: { $sum: '$totalPrice' },
-            avgBookingValue: { $avg: '$totalPrice' },
+            totalRevenue: { $sum: COLLECTED },
+            avgBookingValue: { $avg: { $cond: [{ $in: ['$status', INACTIVE] }, null, '$totalPrice'] } },
             pendingBookings: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
             confirmedBookings: { $sum: { $cond: [{ $eq: ['$status', 'confirmed'] }, 1, 0] } },
             cancelledBookings: { $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] } },
-            completedBookings: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } }
+            completedBookings: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+            expiredBookings: { $sum: { $cond: [{ $eq: ['$status', 'expired'] }, 1, 0] } }
           }
         }
       ]),
@@ -1165,8 +1180,8 @@ export const getBookingStats = async (req, res) => {
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-            count: { $sum: 1 },
-            revenue: { $sum: '$totalPrice' }
+            count: { $sum: { $cond: [{ $in: ['$status', INACTIVE] }, 0, 1] } },
+            revenue: { $sum: COLLECTED }
           }
         },
         { $sort: { _id: 1 } }
@@ -1178,8 +1193,8 @@ export const getBookingStats = async (req, res) => {
         {
           $group: {
             _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-            count: { $sum: 1 },
-            revenue: { $sum: '$totalPrice' }
+            count: { $sum: { $cond: [{ $in: ['$status', INACTIVE] }, 0, 1] } },
+            revenue: { $sum: COLLECTED }
           }
         },
         { $sort: { '_id.year': 1, '_id.month': 1 } }
@@ -1191,8 +1206,8 @@ export const getBookingStats = async (req, res) => {
         {
           $group: {
             _id: '$suite',
-            count: { $sum: 1 },
-            revenue: { $sum: '$totalPrice' }
+            count: { $sum: { $cond: [{ $in: ['$status', INACTIVE] }, 0, 1] } },
+            revenue: { $sum: COLLECTED }
           }
         },
         { $sort: { count: -1 } },
@@ -1206,7 +1221,7 @@ export const getBookingStats = async (req, res) => {
           $group: {
             _id: '$status',
             count: { $sum: 1 },
-            revenue: { $sum: '$totalPrice' }
+            revenue: { $sum: COLLECTED }
           }
         }
       ])
@@ -1236,7 +1251,8 @@ export const getBookingStats = async (req, res) => {
           pendingBookings: 0,
           confirmedBookings: 0,
           cancelledBookings: 0,
-          completedBookings: 0
+          completedBookings: 0,
+          expiredBookings: 0
         },
         dailyStats,
         monthlyStats,
