@@ -208,6 +208,16 @@ const userSchema = new mongoose.Schema({
     index: true
   },
   
+  // Habitaciones guardadas como favoritas
+  favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Suite' }],
+
+  // Aceptación de Términos y Política de datos (Ley 1581 de 2012)
+  consent: {
+    termsAcceptedAt: Date,
+    privacyAcceptedAt: Date,
+    version: String
+  },
+
   // Verificación de email
   emailVerified: {
     type: Boolean,

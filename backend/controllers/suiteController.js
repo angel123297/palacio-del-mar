@@ -407,9 +407,9 @@ export const getSuiteById = async (req, res) => {
       .limit(3)
       .select('name type basePrice size mainImage maxGuests');
 
-    // Datos públicos: sin los ids de usuarios de las reseñas
+    // Datos públicos: sin las reseñas embebidas (traen ids de usuarios)
     const data = suite.toObject();
-    data.reviews = (data.reviews || []).map((r) => ({ rating: r.rating, comment: r.comment, date: r.date }));
+    delete data.reviews; // las reseñas públicas salen de GET /api/reviews/suite/:id
 
     res.json({
       success: true,

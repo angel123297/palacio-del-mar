@@ -15,3 +15,10 @@ export const maxPendingPerUser = () => intFromEnv('MAX_PENDING_BOOKINGS', 3, { m
 export const expirySweepSeconds = () => intFromEnv('EXPIRY_SWEEP_SECONDS', 60, { min: 5, max: 3600 });
 
 export const holdDeadline = (from = new Date()) => new Date(from.getTime() + holdMinutes() * 60000);
+
+/**
+ * Exigir correo verificado para reservar. Apagado por defecto en local (los correos no
+ * se envían: el enlace sale en los logs); en un servidor real se activa con
+ * REQUIRE_EMAIL_VERIFICATION=true.
+ */
+export const requireVerifiedEmail = (env = process.env) => String(env.REQUIRE_EMAIL_VERIFICATION || '').toLowerCase() === 'true';

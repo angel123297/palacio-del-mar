@@ -6,7 +6,8 @@ import { calculateCancellation, getCollectedAmount } from '../utils/pricing.js';
 const BLOCKING_STATUSES = [BOOKING_STATUS.PENDING, BOOKING_STATUS.CONFIRMED];
 import Suite from '../models/Suite.js';
 import Experience from '../models/Experience.js';
-import { maxPendingPerUser } from '../utils/bookingRules.js';
+import { maxPendingPerUser, requireVerifiedEmail } from '../utils/bookingRules.js';
+import User from '../models/User.js';
 import { quoteSuiteStay } from '../services/pricingService.js';
 import { totalsFromNights, computeTotals } from '../utils/pricing.js';
 import Payment from '../models/Payment.js';
@@ -175,6 +176,18 @@ export const createBooking = async (req, res) => {
       });
     }
     
+    // 1b. Correo verificado (si la instalación lo exige)
+    if (requireVerifiedEmail()) {
+      const owner = await User.findById(req.user.id).select('emailVerified');
+      if (!owner?.emailVerified) {
+        return res.status(403).json({
+          success: false,
+          code: 'EMAIL_NOT_VERIFIED',
+          message: 'Verifica tu correo para reservar. Te enviamos un enlace al registrarte; puedes pedir otro desde tu perfil.'
+        });
+      }
+    }
+
     // 2. Validar fechas
     const dateValidation = validateDates(checkIn, checkOut);
     if (!dateValidation.isValid) {

@@ -3,6 +3,7 @@ import Booking from '../models/Booking.js';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import Joi from 'joi';
+import { LEGAL_VERSION } from '../utils/legal.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../utils/email.js';
 
 // ============================================
@@ -10,6 +11,12 @@ import { sendPasswordResetEmail, sendVerificationEmail } from '../utils/email.js
 // ============================================
 
 const registerSchema = Joi.object({
+  acceptTerms: Joi.boolean().valid(true).required().messages({
+    'any.only': 'Debes aceptar los Términos y la Política de datos personales para crear la cuenta',
+    'any.required': 'Debes aceptar los Términos y la Política de datos personales para crear la cuenta',
+    'boolean.base': 'Debes aceptar los Términos y la Política de datos personales para crear la cuenta'
+  }),
+
   name: Joi.string()
     .min(2)
     .max(100)
@@ -155,6 +162,7 @@ export const register = async (req, res) => {
       email,
       password,
       profile: {phone}, 
+      consent: { termsAcceptedAt: new Date(), privacyAcceptedAt: new Date(), version: LEGAL_VERSION },
       status: 'active',
       createdAt: new Date()
     });
