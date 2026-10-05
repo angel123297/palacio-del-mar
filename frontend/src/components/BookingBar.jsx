@@ -4,7 +4,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import DateRangePicker from './DateRangePicker.jsx';
 
 export default function BookingBar() {
-  const { search, setSearch, searchAvailability, searching } = useBookingCart();
+  const { search, setSearch, searchAvailability, searching, branch, setBranch, branches } = useBookingCart();
   const toast = useToast();
   const [local, setLocal] = useState(search);
 
@@ -40,8 +40,20 @@ export default function BookingBar() {
           checkIn={local.checkIn}
           checkOut={local.checkOut}
           guests={local.guests}
+          branch={branch}
           onChange={({ checkIn, checkOut }) => setLocal({ ...local, checkIn, checkOut })}
         />
+        {branches.length > 1 && (
+          <div className="bf">
+            <label className="bf-label" htmlFor="bf-branch">Sucursal</label>
+            <select id="bf-branch" value={branch} onChange={(e) => setBranch(e.target.value)}>
+              <option value="">Todas las sucursales</option>
+              {branches.map((b) => (
+                <option key={b.slug} value={b.slug}>{b.name.replace(/^Palacio del Mar\s*·\s*/, '')}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="bf">
           <label className="bf-label">Huéspedes</label>
           <select

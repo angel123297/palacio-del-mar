@@ -17,12 +17,22 @@ const paymentSchema = new mongoose.Schema(
     idempotencyKey: { type: String, required: true },
     receiptNumber: { type: String },
     failureReason: { type: String },
-    approvedAt: { type: Date }
+    approvedAt: { type: Date },
+    refundedAmount: { type: Number, min: 0 },
+    refundedAt: { type: Date },
+    // true mientras el pago está en proceso o aprobado. El índice único parcial de
+    // abajo permite UN solo pago activo por reserva aunque lleguen dos peticiones
+    // con claves de idempotencia distintas (con una pasarela real serían dos cobros).
+    active: { type: Boolean }
   },
   { timestamps: true }
 );
 
 paymentSchema.index({ booking: 1, idempotencyKey: 1 }, { unique: true });
+paymentSchema.index(
+  { booking: 1 },
+  { unique: true, partialFilterExpression: { active: true }, name: 'one_active_payment_per_booking' }
+);
 paymentSchema.index({ receiptNumber: 1 }, { unique: true, sparse: true });
 
 export default mongoose.models.Payment || mongoose.model('Payment', paymentSchema);
