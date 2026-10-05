@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import api from '../api/client';
 import { useBookingCart } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -18,6 +18,7 @@ export default function ExperiencesSection() {
   const [featuredIds, setFeaturedIds] = useState(new Set());
   const { experiences, toggleExperience } = useBookingCart();
   const toast = useToast();
+  const sliderRef = useRef(null);
 
   useEffect(() => {
     api.get('/experiences', { params: { limit: 12 } })
@@ -25,7 +26,6 @@ export default function ExperiencesSection() {
       .catch(() => setList(FALLBACK_EXPERIENCES));
   }, []);
 
-  // Categorías (GET /experiences/categories) y destacadas (GET /experiences/featured)
   useEffect(() => {
     api.get('/experiences/categories')
       .then((res) => setCategories(res.data.data || []))
@@ -43,9 +43,15 @@ export default function ExperiencesSection() {
     );
   };
 
+  const scrollSlider = (direction) => {
+    if (sliderRef.current) {
+      const scrollAmount = direction === 'left' ? -320 : 320;
+      sliderRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   if (!list) return null;
 
-  // Las destacadas van primero; el filtro de categoría se aplica sobre la lista ya cargada
   const ordered = [...list].sort((a, b) => Number(featuredIds.has(b._id)) - Number(featuredIds.has(a._id)));
   const visible = catFilter ? ordered.filter((e) => e.category === catFilter) : ordered;
   const label = (c) => c.charAt(0).toUpperCase() + c.slice(1);
@@ -73,31 +79,45 @@ export default function ExperiencesSection() {
           ))}
         </div>
       )}
-      <div className="exp-grid">
-        {visible.map((exp) => {
-          const added = experiences.some((e) => e._id === exp._id);
-          return (
-            <div className="exp-card" key={exp._id}>
-              <div className="room-img-wrap">
-                <img src={exp.mainImage} alt={exp.name} loading="lazy" />
-                {featuredIds.has(exp._id) && <span className="room-avail badge-ok">Destacada</span>}
-              </div>
-              <span className="exp-icon">{exp.icon}</span>
-              <h3>{exp.name}</h3>
-              <p>{exp.shortDescription}</p>
-              <div className="exp-price-row">
-                <span className="exp-price">{formatCOP(exp.price)}</span>
-                <span className="chip">{exp.durationHours}h</span>
-              </div>
-              <button className={`exp-btn ${added ? 'exp-btn-added' : ''}`} onClick={() => handleToggle(exp)}>
-                {added ? '✓ Agregada' : 'Agregar'}
-              </button>
-            </div>
-          );
-        })}
+      
+      <div className="exp-container">
+        <button type="button" className="exp-nav-btn exp-nav-prev" onClick={() => scrollSlider('left')} aria-label="Anterior">
+          ‹
+        </button>
+        <div className="exp-slider-wrapper">
+          <div className="exp-grid" ref={sliderRef}>
+            {visible.map((exp) => {
+              const added = experiences.some((e) => e._id === exp._id);
+              return (
+                <div className="exp-card" key={exp._id}>
+                  <div className="exp-img-wrap">
+                    <img src={exp.mainImage} alt={exp.name} loading="lazy" />
+                    {featuredIds.has(exp._id) && <span className="exp-badge">Destacada</span>}
+                  </div>
+                  <div className="exp-content">
+                    <span className="exp-icon">{exp.icon}</span>
+                    <h3>{exp.name}</h3>
+                    <p>{exp.shortDescription}</p>
+                    <div className="exp-price-row">
+                      <span className="exp-price">{formatCOP(exp.price)}</span>
+                      <span className="chip">{exp.durationHours}h</span>
+                    </div>
+                    <button className={`exp-btn ${added ? 'exp-btn-added' : ''}`} onClick={() => handleToggle(exp)}>
+                      {added ? '✓ Agregada' : 'Agregar'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <button type="button" className="exp-nav-btn exp-nav-next" onClick={() => scrollSlider('right')} aria-label="Siguiente">
+          ›
+        </button>
       </div>
+
       {experiences.length > 0 && (
-        <p className="sec-sub" style={{ textAlign: 'center' }}>
+        <p className="sec-sub" style={{ textAlign: 'center', marginTop: '24px' }}>
           Tienes {experiences.length} experiencia(s) seleccionadas — se agregan automáticamente cuando reserves una suite.
         </p>
       )}
