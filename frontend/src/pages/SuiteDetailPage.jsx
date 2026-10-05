@@ -156,10 +156,28 @@ export default function SuiteDetailPage() {
 
             <label className="field-label" htmlFor="d-in">Llegada</label>
             <input id="d-in" type="date" min={todayISO()} value={dates.checkIn}
-              onChange={(e) => setDates({ ...dates, checkIn: e.target.value })} />
+              onChange={(e) => {
+                const val = e.target.value;
+                const today = todayISO();
+                const newIn = val && val < today ? today : (val || today);
+                const addOne = (iso) => {
+                  const [y, m, d] = iso.split('-').map(Number);
+                  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+                };
+                const newOut = dates.checkOut <= newIn ? addOne(newIn) : dates.checkOut;
+                setDates({ ...dates, checkIn: newIn, checkOut: newOut });
+              }} />
             <label className="field-label" htmlFor="d-out">Salida</label>
             <input id="d-out" type="date" min={dates.checkIn} value={dates.checkOut}
-              onChange={(e) => setDates({ ...dates, checkOut: e.target.value })} />
+              onChange={(e) => {
+                const val = e.target.value;
+                const addOne = (iso) => {
+                  const [y, m, d] = iso.split('-').map(Number);
+                  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+                };
+                const newOut = val && val <= dates.checkIn ? addOne(dates.checkIn) : (val || addOne(dates.checkIn));
+                setDates({ ...dates, checkOut: newOut });
+              }} />
             <div className="detail-guests">
               <div>
                 <label className="field-label" htmlFor="d-ad">Adultos</label>
