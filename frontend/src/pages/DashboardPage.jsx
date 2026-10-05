@@ -97,7 +97,7 @@ function BookingCard({ booking, onChanged }) {
           <div className="booking-dates-row">
             <span><strong>Check-in</strong> {formatCalendarDate(booking.checkIn)}</span>
             <span><strong>Check-out</strong> {formatCalendarDate(booking.checkOut)}</span>
-            <span><strong>Huéspedes</strong> {booking.guests}</span>
+            <span><strong>Huéspedes</strong> {booking.guests}{booking.children > 0 ? ` (${booking.children} ${booking.children === 1 ? 'niño' : 'niños'})` : ''}</span>
             <span><strong>Total</strong> {formatCOP(booking.totalPrice)}</span>
           </div>
         )}

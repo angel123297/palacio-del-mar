@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useBookingCart } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -166,7 +167,7 @@ export default function RoomsSection() {
               </div>
               <div className="room-info">
                 <p className="room-type">{suite.type}{suite.branch?.name ? ` · ${shortBranch(suite.branch.name)}` : ''}</p>
-                <h3 className="room-name">{suite.name}</h3>
+                <h3 className="room-name"><Link to={`/habitaciones/${suite._id}`}>{suite.name}</Link></h3>
                 <div className="room-chips">
                   {(suite.amenities || []).slice(0, 3).map((a) => (
                     <span className="chip" key={a}>{a}</span>
@@ -187,6 +188,7 @@ export default function RoomsSection() {
                 {av?.priceBreakdown?.discount > 0 && (
                   <p className="form-hint">{av.priceBreakdown.discountReason} · ahorras {formatCOP(av.priceBreakdown.discount)}</p>
                 )}
+                <Link className="room-detail-link" to={`/habitaciones/${suite._id}`}>Ver detalles</Link>
                 <button
                   className="btn-book room-cta"
                   disabled={isUnavailable}

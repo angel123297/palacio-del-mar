@@ -942,3 +942,71 @@ input:focus, select:focus, textarea:focus {
   .checkout-grid { grid-template-columns: 1fr; }
   .checkout-summary { position: static; }
 }
+
+/* ===== Detalle de habitación ===== */
+.suite-detail { padding-top: 120px; }
+.crumbs { font-size: 0.85rem; color: rgba(245, 240, 232, 0.6); margin-bottom: 16px; }
+.crumbs a { color: var(--gold-light); text-decoration: none; }
+.room-name a { color: inherit; text-decoration: none; }
+.room-name a:hover { color: var(--gold-light); }
+.room-detail-link { display: inline-block; margin: 6px 0 10px; color: var(--gold-light); font-size: 0.9rem; }
+
+.gallery-main {
+  position: relative; display: block; width: 100%; padding: 0; border: 0; cursor: zoom-in;
+  background: var(--warm2); border-radius: 6px; overflow: hidden; aspect-ratio: 16 / 7;
+}
+.gallery-main img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gallery-count {
+  position: absolute; right: 12px; bottom: 12px; padding: 4px 10px; border-radius: 999px;
+  background: rgba(13, 13, 11, 0.7); color: var(--cream); font-size: 0.8rem;
+}
+.gallery-thumbs { display: flex; gap: 8px; margin-top: 8px; overflow-x: auto; padding-bottom: 4px; }
+.gallery-thumb {
+  flex: 0 0 96px; height: 64px; padding: 0; border: 2px solid transparent; border-radius: 4px;
+  overflow: hidden; cursor: pointer; background: var(--warm2); opacity: 0.7;
+}
+.gallery-thumb.is-active { border-color: var(--gold); opacity: 1; }
+.gallery-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gallery-empty { padding: 60px 0; text-align: center; color: rgba(245, 240, 232, 0.5); background: var(--warm2); border-radius: 6px; }
+
+.lightbox {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.92);
+}
+.lightbox img { max-width: 92vw; max-height: 88vh; object-fit: contain; }
+.lightbox-close, .lightbox-nav {
+  position: absolute; background: none; border: 0; color: var(--cream); cursor: pointer; font-size: 2.4rem; line-height: 1; padding: 12px;
+}
+.lightbox-close { top: 12px; right: 16px; }
+.lightbox-nav.prev { left: 12px; top: 50%; transform: translateY(-50%); }
+.lightbox-nav.next { right: 12px; top: 50%; transform: translateY(-50%); }
+
+.detail-cols { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 32px; margin-top: 28px; align-items: start; }
+.detail-desc { margin: 16px 0; line-height: 1.7; color: rgba(245, 240, 232, 0.85); }
+.detail-h { margin: 28px 0 10px; font-size: 1.2rem; color: var(--gold-light); }
+.detail-list { columns: 2; padding-left: 18px; margin: 0; line-height: 1.8; }
+.branch-map { height: 320px; border-radius: 6px; overflow: hidden; margin: 10px 0; background: var(--warm2); }
+.poi-list { list-style: none; padding: 0; margin: 8px 0; }
+.poi-list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(201, 169, 110, 0.15); }
+.detail-book {
+  position: sticky; top: 96px; padding: 20px; border: 1px solid rgba(201, 169, 110, 0.25);
+  border-radius: 8px; background: rgba(255, 255, 255, 0.03);
+}
+.detail-book input, .detail-book select { width: 100%; }
+.detail-price strong { font-size: 1.6rem; color: var(--gold-light); }
+.detail-guests { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.detail-quote { margin: 14px 0 6px; border-top: 1px solid rgba(201, 169, 110, 0.2); padding-top: 10px; font-size: 0.9rem; }
+.quote-line { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.quote-discount { color: var(--green); }
+.quote-total { font-weight: 700; font-size: 1.05rem; border-top: 1px solid rgba(201, 169, 110, 0.2); margin-top: 6px; padding-top: 8px; }
+.related-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.related-card { color: inherit; text-decoration: none; border: 1px solid rgba(201, 169, 110, 0.2); border-radius: 6px; overflow: hidden; }
+.related-card img { width: 100%; height: 130px; object-fit: cover; display: block; }
+.related-card div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; font-size: 0.9rem; }
+
+@media (max-width: 860px) {
+  .detail-cols { grid-template-columns: 1fr; }
+  .detail-book { position: static; }
+  .detail-list { columns: 1; }
+  .gallery-main { aspect-ratio: 4 / 3; }
+}

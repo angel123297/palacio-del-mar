@@ -27,7 +27,8 @@ export function BookingCartProvider({ children }) {
   const [search, setSearch] = useState({
     checkIn: inDaysISO(7),
     checkOut: inDaysISO(10),
-    guests: 2
+    guests: 2,
+    children: 0 // de `guests`, cuántos son niños
   });
 
   // Sucursal elegida ('' = todas). La comparten el buscador (calendario), la

@@ -46,8 +46,11 @@ Para enviarlos de verdad define `SMTP_HOST`, `SMTP_USER` y `SMTP_PASS` en el blo
 
 1. Entra sin cuenta, elige fechas y huéspedes y ve las **4 sucursales** con "desde $X",
    cupo real y promociones. Si sus fechas no tienen cupo, el sitio sugiere las mismas
-   noches en fechas cercanas y otras sucursales.
-2. Elige habitación, agrega experiencias y pulsa confirmar. Solo en ese momento se le
+   noches en fechas cercanas y otras sucursales. El calendario del buscador muestra
+   los días agotados, la temporada y los descuentos de la sucursal elegida.
+2. Abre el **detalle de la habitación** (`/habitaciones/:id`): galería, mapa de la
+   sucursal (MapLibre + OpenStreetMap, necesita internet), qué incluye, precio exacto por
+   noche según las fechas y adultos/niños. Elige habitación, agrega experiencias y pulsa confirmar. Solo en ese momento se le
    pide registrarse o iniciar sesión (su selección se conserva).
 3. La reserva queda **pendiente** y la habitación se **retiene 30 minutos**.
 4. Paga en `/pagar/:reserva` (tarjeta, PSE o Nequi — *simulado*). Al aprobarse pasa a
@@ -85,8 +88,14 @@ Para enviarlos de verdad define `SMTP_HOST`, `SMTP_USER` y `SMTP_PASS` en el blo
 **Pagos (simulados)**
 - `PAYMENTS_MODE=simulated`: siempre aprueba y **no se permite con `NODE_ENV=production`**
   (el backend no arranca). Los datos de tarjeta **nunca** se piden ni se envían.
-- Cada intento lleva clave de idempotencia (un doble clic no cobra dos veces) y la
-  reserva se confirma con una actualización atómica solo si sigue pendiente y vigente.
+- Cada intento lleva clave de idempotencia (un doble clic no cobra dos veces); además
+  solo puede haber **un pago activo por reserva** (índice único parcial), así que dos
+  pestañas con claves distintas tampoco cobran dos veces.
+- La reserva se confirma con una actualización atómica solo si sigue pendiente, vigente
+  y con el **mismo total** que se cobró; si el total cambió mientras se pagaba, no se
+  confirma y se avisa.
+- Al cancelar una reserva pagada el reembolso simulado se completa al instante y el
+  pago queda `refunded`.
 - Para una pasarela real se agrega un proveedor con la misma forma `{ name, charge }`
   en `backend/services/payments/`.
 
@@ -148,12 +157,12 @@ frontend/src/    pages/ components/ (CheckoutPage, HoldNotice, admin/...) utils/
 
 ## 9. Lo que falta (resumen; el detalle está en el feedback del equipo)
 
-- **Huésped:** coherencia por sucursal (calendario con sucursal, textos "18 suites",
-  banner de promociones con datos reales), detalle de habitación con mapa (MapLibre),
-  filtros, adultos/niños/habitaciones, reseñas, favoritos, comprobante en PDF y `.ics`,
+- **Huésped:** coherencia por sucursal (textos "18 suites", banner de promociones con
+  datos reales), filtros de habitaciones, reservar **varias habitaciones** en una sola
+  reserva, reseñas, favoritos, comprobante en PDF y `.ics`,
   verificación de email obligatoria, términos y datos personales (Ley 1581).
 - **Pagos:** pagar la diferencia al cambiar fechas o agregar experiencias a una reserva
-  ya pagada; marcar el pago como reembolsado al cancelar.
+  ya pagada.
 - **Anfitrión y admin:** rol de anfitrión, métricas de ocupación reales, pestaña de pagos.
 - **Seguridad (rama aparte):** secretos fuera del repositorio, CORS y modo producción,
   límite general de peticiones, chat de IA público, autenticación de MongoDB, volumen para imágenes.

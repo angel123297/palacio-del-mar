@@ -111,7 +111,7 @@ export default function BookingDetailPage() {
                 <span><strong>Check-in</strong> {formatCalendarDate(booking.checkIn)}</span>
                 <span><strong>Check-out</strong> {formatCalendarDate(booking.checkOut)}</span>
                 <span><strong>Noches</strong> {booking.nights}</span>
-                <span><strong>Huéspedes</strong> {booking.guests}</span>
+                <span><strong>Huéspedes</strong> {booking.guests}{booking.children > 0 ? ` (${booking.children} ${booking.children === 1 ? 'niño' : 'niños'})` : ''}</span>
               </div>
               <div className="booking-dates-row">
                 <span><strong>A nombre de</strong> {booking.guestName || '—'}</span>
