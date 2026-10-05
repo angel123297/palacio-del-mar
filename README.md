@@ -28,16 +28,16 @@ Abre **http://localhost:8080**.
 > El `seed` **borra** sucursales, suites, experiencias, noches ocupadas y promociones
 > y las vuelve a crear (no borra reservas ni usuarios).
 
-| Qué | Valor |
+| Qué | Dónde |
 |---|---|
 | Sitio | http://localhost:8080 |
 | Panel de administración | http://localhost:8080/admin |
-| Admin 1 | `admin@palaciomar.co` / `AulaDocker2026Segura` |
-| Admin 2 (solo desarrollo) | `admin@gmail.com` / `admin123` |
+| Cuenta de administrador | definida en `docker-compose.yml` (variables `ADMIN_*` y `DEV_ADMIN_*`); también `docker compose exec backend npm run create-admin` |
 | MongoDB (Compass) | `mongodb://localhost:27017/palacio_db` (sin usuario; solo desde tu PC) |
 
-> Estas credenciales y la clave JWT del `docker-compose.yml` son **solo para uso local**.
-> `admin@gmail.com` se ignora con `NODE_ENV=production`. No publiques esto en un servidor real.
+> Las credenciales de desarrollo y la clave JWT viven solo en `docker-compose.yml` y son
+> **solo para uso local**: no se repiten en este README ni se usan en un servidor real.
+> `DEV_ADMIN_*` se ignora con `NODE_ENV=production`.
 
 Los correos no se envían: en local se imprimen en `docker compose logs backend`.
 Para enviarlos de verdad define `SMTP_HOST`, `SMTP_USER` y `SMTP_PASS` en el bloque `backend`.
