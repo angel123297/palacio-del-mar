@@ -15,6 +15,7 @@
 import bcrypt from 'bcryptjs';
 import Suite from './models/Suite.js';
 import User from './models/User.js';
+import Branch from './models/Branch.js';
 import { insertSeedData } from './seed/seedData.js';
 import { isWeakAdminPassword, upsertAdminUser } from './scripts/createAdmin.js';
 
@@ -124,6 +125,54 @@ export const ensureAdminPhones = async () => {
   return { updated };
 };
 
+/**
+ * Crea automáticamente un usuario anfitrión (host) con acceso a todas las sucursales si no existe.
+ */
+export const autoCreateHostIfMissing = async () => {
+  const email = process.env.HOST_EMAIL || 'anfitrion@palaciomar.co';
+  const password = process.env.HOST_PASSWORD || 'AulaDocker2026Segura';
+  const name = process.env.HOST_NAME || 'Anfitrión General';
+
+  const branches = await Branch.find().select('_id');
+  const branchIds = branches.map((b) => b._id);
+
+  let user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+  if (user && user.role === 'host') {
+    // Asegurar que tenga las ramas actualizadas y la contraseña correcta
+    user.branches = branchIds;
+    user.status = 'active';
+    user.emailVerified = true;
+    user.password = password;
+    await user.save();
+    return { created: false, updated: true };
+  }
+
+  if (user) {
+    // Si ya existe con otro rol, promover o actualizar
+    user.role = 'host';
+    user.branches = branchIds;
+    user.status = 'active';
+    user.emailVerified = true;
+    user.password = password;
+    await user.save();
+    return { created: false, updated: true };
+  }
+
+  const hostUser = new User({
+    name,
+    email: email.toLowerCase(),
+    password,
+    role: 'host',
+    branches: branchIds,
+    status: 'active',
+    emailVerified: true
+  });
+
+  await hostUser.save();
+  console.log(`[Bootstrap] ✅ Anfitrión creado automáticamente: ${email} con acceso a ${branchIds.length} sucursales.`);
+  return { created: true };
+};
+
 /** Ejecuta ambos pasos; un fallo en uno no debe tumbar el arranque del servidor. */
 export const runStartupBootstrap = async () => {
   try {
@@ -135,6 +184,11 @@ export const runStartupBootstrap = async () => {
     await autoCreateAdminIfMissing();
   } catch (err) {
     console.error('[Bootstrap] ❌ No se pudo crear el administrador automático:', err.message);
+  }
+  try {
+    await autoCreateHostIfMissing();
+  } catch (err) {
+    console.error('[Bootstrap] ❌ No se pudo crear el anfitrión automático:', err.message);
   }
   try {
     await ensureDevAdmin();
