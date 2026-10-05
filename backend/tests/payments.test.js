@@ -20,7 +20,7 @@ const harness = ({ booking, claim = true, provider } = {}) => {
   const calls = { charges: [], updates: [], notified: [] };
   const store = [];
   const Booking = {
-    findById: async () => booking,
+    findById: async () => ({ ...booking }), // copia: simula una lectura nueva de la base
     findOneAndUpdate: async (filter, update) => {
       calls.updates.push({ filter, update });
       return claim ? { ...booking, ...update.$set, populate: async () => {} } : null;
@@ -29,10 +29,13 @@ const harness = ({ booking, claim = true, provider } = {}) => {
   const Payment = {
     findOne: async (q) =>
       store.find((p) => String(p.booking) === String(q.booking) &&
-        (q.idempotencyKey ? p.idempotencyKey === q.idempotencyKey : q.status ? p.status === q.status : true)) || null,
+        (q.idempotencyKey ? p.idempotencyKey === q.idempotencyKey : q.status ? p.status === q.status : q.active ? p.active === true : true)) || null,
     create: async (doc) => {
       if (store.some((p) => String(p.booking) === String(doc.booking) && p.idempotencyKey === doc.idempotencyKey)) {
         const e = new Error('duplicado'); e.code = 11000; throw e;
+      }
+      if (doc.active && store.some((p) => String(p.booking) === String(doc.booking) && p.active === true)) {
+        const e = new Error('ya hay un pago activo'); e.code = 11000; throw e;
       }
       const p = { _id: oid(), ...doc, save: async () => {} };
       store.push(p);
@@ -161,4 +164,38 @@ test('la política de cancelación sale de una sola constante', () => {
   assert.deepEqual(CANCELLATION_POLICY, { freeDays: 7, feePercent: 10 });
   assert.equal(calculateCancellation(booking, CANCELLATION_POLICY.freeDays).cancellationFee, 0);
   assert.equal(calculateCancellation(booking, CANCELLATION_POLICY.freeDays - 1).cancellationFee, 100000);
+});
+
+test('dos intentos con claves DISTINTAS: el segundo no cobra (un solo pago activo por reserva)', async () => {
+  const b = makeBooking();
+  const { service, calls, store } = harness({ booking: b });
+  // un primer intento quedó "en proceso" (otra pestaña, otro dispositivo)
+  store.push({ _id: oid(), booking: b._id, idempotencyKey: 'otra-clave-0001', status: 'processing', active: true });
+  await assert.rejects(() => pay(service, b), (e) => e instanceof PaymentError && e.code === 'PAYMENT_IN_PROGRESS');
+  assert.equal(calls.charges.length, 0, 'no se cobró');
+});
+
+test('un pago rechazado libera el cupo: se puede reintentar', async () => {
+  const b = makeBooking();
+  const decline = { name: 'simulated', charge: async () => ({ status: 'declined', message: 'no' }) };
+  const { service, store } = harness({ booking: b, provider: decline });
+  await assert.rejects(() => pay(service, b), (e) => e.code === 'DECLINED');
+  assert.notEqual(store[0].active, true);
+});
+
+test('si el total cambió mientras se pagaba: no se confirma y se avisa del nuevo total', async () => {
+  const b = makeBooking();
+  const mutating = { name: 'simulated', charge: async (a) => { b.totalPrice = 900000; return simulatedProvider.charge(a); } };
+  const { service, calls, store } = harness({ booking: b, claim: false, provider: mutating });
+  await assert.rejects(() => pay(service, b), (e) => e.code === 'PRICE_CHANGED');
+  assert.equal(store[0].status, 'void');
+  assert.equal(store[0].active, undefined);
+  assert.equal(calls.updates.length, 1);
+});
+
+test('la confirmación atómica exige el mismo total que se cobró', async () => {
+  const b = makeBooking();
+  const { service, calls } = harness({ booking: b });
+  await pay(service, b);
+  assert.equal(calls.updates[0].filter.totalPrice, 500000);
 });

@@ -9,6 +9,7 @@ import Experience from '../models/Experience.js';
 import { maxPendingPerUser } from '../utils/bookingRules.js';
 import { quoteSuiteStay } from '../services/pricingService.js';
 import { totalsFromNights, computeTotals } from '../utils/pricing.js';
+import Payment from '../models/Payment.js';
 import { sendBookingConfirmationEmail } from '../utils/email.js';
 
 // ============================================
@@ -96,6 +97,18 @@ const calculateTotalPrice = async (suite, checkInDate, checkOutDate, experienceI
  * Cómo pagar una reserva pendiente: el huésped sigue en el sitio, en el centro
  * de pago (/pagar/:id). Hoy el cobro es SIMULADO (ver services/payments).
  */
+// Marca el/los pago(s) aprobados de la reserva como reembolsados (no rompe la operación si falla)
+const markPaymentsRefunded = async (bookingId, amount) => {
+  try {
+    await Payment.updateMany(
+      { booking: bookingId, status: 'approved' },
+      { $set: { status: 'refunded', refundedAmount: amount, refundedAt: new Date() }, $unset: { active: 1 } }
+    );
+  } catch (err) {
+    console.error('[Reembolso] No se pudo marcar el pago como reembolsado:', err.message);
+  }
+};
+
 const getPaymentInfo = (booking) => ({
   required: true,
   amount: booking.totalPrice,
@@ -146,6 +159,7 @@ export const createBooking = async (req, res) => {
       checkIn,
       checkOut,
       guests,
+      children,
       experiences,
       guestName,
       guestEmail,
@@ -264,6 +278,7 @@ export const createBooking = async (req, res) => {
       checkIn: checkInDate,
       checkOut: checkOutDate,
       guests: parseInt(guests),
+      children: parseInt(children) || 0,
       experiences: experiences || [],
       subtotal: pricing.subtotal,
       experiencesTotal: pricing.experiencesTotal,
@@ -490,7 +505,15 @@ export const cancelBooking = async (req, res) => {
       cancelledBy: req.user.id
     };
     
+    // Pagos simulados: el reembolso se completa al instante y el Payment queda
+    // `refunded`. Con una pasarela real aquí se pediría el reembolso al proveedor.
+    if (refundAmount > 0) {
+      booking.amountRefunded = (booking.amountRefunded || 0) + refundAmount;
+      booking.cancellationDetails.refundStatus = 'completed';
+    }
+    
     await booking.save(); // el hook post-save libera las noches (SuiteNight)
+    if (refundAmount > 0) await markPaymentsRefunded(booking._id, refundAmount);
     
     res.json({
       success: true,
@@ -499,11 +522,9 @@ export const cancelBooking = async (req, res) => {
         booking,
         refundAmount,
         cancellationFee,
-        // No hay pasarela de pagos: el reembolso queda PENDIENTE hasta que
-        // un administrador lo ejecute y lo registre (payment-status: refunded).
-        refundStatus,
+        refundStatus: booking.cancellationDetails.refundStatus,
         refundNote: refundAmount > 0
-          ? 'El reembolso es una estimación y se procesará manualmente; recibirás confirmación.'
+          ? 'Reembolso simulado registrado al instante.'
           : 'No hay importes cobrados por reembolsar.'
       }
     });
@@ -722,6 +743,7 @@ export const updatePaymentStatus = async (req, res) => {
       return conflictResponse(res, 'No se puede registrar un cobro en una reserva cancelada');
     }
     
+    let refundedNow = 0;
     switch (paymentStatus) {
       case PAYMENT_STATUS.PAID:
         booking.amountPaid = booking.totalPrice;
@@ -747,6 +769,7 @@ export const updatePaymentStatus = async (req, res) => {
         if (!booking.amountPaid) booking.amountPaid = refundable;
         booking.amountRefunded = (booking.amountRefunded || 0) + refunded;
         if (booking.status === BOOKING_STATUS.CANCELLED) booking.cancellationDetails.refundStatus = 'completed';
+        refundedNow = refunded;
         break;
       }
       default:
@@ -765,6 +788,7 @@ export const updatePaymentStatus = async (req, res) => {
     }
     
     await booking.save();
+    if (refundedNow > 0) await markPaymentsRefunded(booking._id, refundedNow);
     
     res.json({
       success: true,

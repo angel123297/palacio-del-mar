@@ -63,6 +63,7 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
         method,
         provider: provider.name,
         status: 'processing',
+        active: true,
         idempotencyKey
       });
     } catch (err) {
@@ -70,6 +71,10 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
         // Otra petición con la misma clave ganó la carrera
         const winner = await Payment.findOne({ booking: booking._id, idempotencyKey });
         if (winner) return { payment: winner, booking, replay: true };
+        // Otro intento (clave distinta) ya está cobrando esta reserva
+        const active = await Payment.findOne({ booking: booking._id, active: true });
+        if (active?.status === 'approved') return { payment: active, booking, replay: true };
+        throw new PaymentError(409, 'Ya hay un pago en proceso para esta reserva. Espera unos segundos.', 'PAYMENT_IN_PROGRESS');
       }
       throw err;
     }
@@ -83,6 +88,7 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
 
     if (result.status !== 'approved') {
       payment.status = 'declined';
+      payment.active = undefined; // libera el cupo para reintentar
       payment.failureReason = result.message || 'Pago rechazado';
       await payment.save();
       throw new PaymentError(402, payment.failureReason, 'DECLINED');
@@ -98,6 +104,7 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
         user: userId,
         status: 'pending',
         paymentStatus: { $in: ['pending', 'failed'] },
+        totalPrice: booking.totalPrice, // si el total cambió mientras se pagaba, no se confirma
         $or: [{ holdExpiresAt: { $gt: paidAt } }, { holdExpiresAt: { $exists: false } }, { holdExpiresAt: null }]
       },
       {
@@ -116,8 +123,13 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
 
     if (!confirmed) {
       payment.status = 'void';
+      payment.active = undefined;
       payment.failureReason = 'La reserva venció o cambió mientras se pagaba';
       await payment.save();
+      const fresh = await Booking.findById(booking._id);
+      if (fresh && fresh.status === 'pending' && fresh.totalPrice !== booking.totalPrice) {
+        throw new PaymentError(409, 'El total de la reserva cambió mientras pagabas. No se cobró; revisa el nuevo total y paga de nuevo.', 'PRICE_CHANGED');
+      }
       throw new PaymentError(409, 'La reserva venció mientras pagabas. No se confirmó ni se cobró.', 'HOLD_EXPIRED');
     }
 

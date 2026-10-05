@@ -4,6 +4,8 @@ import api from '../api/client';
 import Navbar from '../components/Navbar.jsx';
 import Footer from '../components/Footer.jsx';
 import HoldNotice from '../components/HoldNotice.jsx';
+import { useBookingCart } from '../context/BookingCartContext.jsx';
+import { downloadIcs } from '../utils/calendar.js';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatCalendarDate } from '../utils/format';
 
@@ -20,6 +22,7 @@ const MAX_EXPERIENCES = 5;
 export default function BookingDetailPage() {
   const { id } = useParams();
   const toast = useToast();
+  const { branches } = useBookingCart();
   const [booking, setBooking] = useState(null);
   const [catalog, setCatalog] = useState([]);
   const [error, setError] = useState('');
@@ -107,11 +110,19 @@ export default function BookingDetailPage() {
                   <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora</Link>
                 </div>
               )}
+              {['confirmed', 'completed'].includes(booking.status) && (
+                <div className="booking-card-actions">
+                  <button className="btn-outline" onClick={() => downloadIcs(booking, branches.find((b) => b._id === (booking.branch?._id || booking.branch)))}>
+                    Agregar a mi calendario (.ics)
+                  </button>
+                  <Link className="btn-outline" to={`/reservas/${booking._id}/comprobante`}>Comprobante (PDF)</Link>
+                </div>
+              )}
               <div className="booking-dates-row">
                 <span><strong>Check-in</strong> {formatCalendarDate(booking.checkIn)}</span>
                 <span><strong>Check-out</strong> {formatCalendarDate(booking.checkOut)}</span>
                 <span><strong>Noches</strong> {booking.nights}</span>
-                <span><strong>Huéspedes</strong> {booking.guests}</span>
+                <span><strong>Huéspedes</strong> {booking.guests}{booking.children > 0 ? ` (${booking.children} ${booking.children === 1 ? 'niño' : 'niños'})` : ''}</span>
               </div>
               <div className="booking-dates-row">
                 <span><strong>A nombre de</strong> {booking.guestName || '—'}</span>

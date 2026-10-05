@@ -93,3 +93,18 @@ Cada intento queda en la colección `payments` (estados `processing`, `approved`
    muestra en el modal y en el pago. Si el anfitrión debe poder cambiarla, hay que moverla
    a una colección editable.
 3. Métodos de pago visibles (hoy tarjeta, PSE y Nequi): lista en `services/payments/index.js`.
+
+## Pasos 4 y 5 (coherencia por sucursal y detalle de habitación)
+
+Lo que el lado del huésped ahora usa y que alguien del admin debe poder mantener:
+
+- **Promociones:** el banner de arriba del sitio y el calendario salen de las promociones
+  activas (`/api/availability/promotions`). Sin promociones vigentes el banner no se muestra.
+  El admin debe poder crear, pausar y terminar promociones (ya existe en la rama `administrador`).
+- **Sucursales (CRUD):** el mapa, la dirección, los horarios de check-in/out y los puntos de
+  interés del detalle salen del modelo `Branch`. Hoy solo se editan por el seed; falta una
+  pantalla de admin para editar coordenadas, textos y `highlights`.
+- **Fotos de habitaciones:** la galería usa `mainImage` + `images[]` de cada suite. Falta
+  subir imágenes desde el admin (hoy son URLs; `multer` está a medias y no hay volumen en Docker).
+- **Habitaciones libres por noche:** el detalle muestra "quedan N" con `SuiteNight`. El anfitrión
+  necesitará poder **bloquear** una habitación física (mantenimiento) creando noches sin reserva.

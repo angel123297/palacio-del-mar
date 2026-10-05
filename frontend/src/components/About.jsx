@@ -16,15 +16,15 @@ export default function About() {
         <p className="sec-label">Nuestra historia</p>
         <h2 className="sec-title">Un palacio colonial, reinventado</h2>
         <p>
-          Palacio del Mar ocupa una casona del siglo XVII en el corazón amurallado de
+          Palacio del Mar nació en una casona del siglo XVII en el corazón amurallado de
           Cartagena de Indias. Restauramos cada patio, cada balcón de madera y cada
-          baldosín original para convertirlos en un refugio íntimo de 18 suites, donde
-          la historia colonial convive con el confort contemporáneo.
+          baldosín original, y hoy cuidamos cuatro sucursales — Centro Histórico, Getsemaní,
+          Bocagrande y La Boquilla — donde la historia colonial convive con el confort contemporáneo.
         </p>
         <div className="about-features">
           <div className="feat">
-            <strong>18</strong>
-            <span>suites de diseño exclusivo</span>
+            <strong>4</strong>
+            <span>sucursales en Cartagena</span>
           </div>
           <div className="feat">
             <strong>1</strong>

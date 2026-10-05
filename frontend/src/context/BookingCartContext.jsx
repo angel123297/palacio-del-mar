@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/client';
 
 const BookingCartContext = createContext(null);
@@ -27,8 +27,19 @@ export function BookingCartProvider({ children }) {
   const [search, setSearch] = useState({
     checkIn: inDaysISO(7),
     checkOut: inDaysISO(10),
-    guests: 2
+    guests: 2,
+    children: 0 // de `guests`, cuántos son niños
   });
+
+  // Sucursal elegida ('' = todas). La comparten el buscador (calendario), la
+  // lista de suites y las alternativas, para que todo hable de la misma sucursal.
+  const [branch, setBranch] = useState('');
+  const [branches, setBranches] = useState([]);
+  useEffect(() => {
+    api.get('/branches')
+      .then((res) => setBranches(res.data.data || []))
+      .catch(() => setBranches([]));
+  }, []);
 
   // Experiencias que el huésped fue agregando mientras navega el sitio,
   // antes incluso de elegir una suite. En la versión anterior, el botón
@@ -90,6 +101,9 @@ export function BookingCartProvider({ children }) {
   const value = {
     search,
     setSearch,
+    branch,
+    setBranch,
+    branches,
     nights,
     experiences,
     addExperience,

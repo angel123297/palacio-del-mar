@@ -35,7 +35,7 @@ const shortRange = (a, b) => (a === b ? shortDate(a) : `${shortDate(a)} – ${sh
  * (GET /availability/promotions).
  * El servidor sigue siendo quien valida la reserva: esto solo orienta al huésped.
  */
-export default function DateRangePicker({ checkIn, checkOut, guests, onChange }) {
+export default function DateRangePicker({ checkIn, checkOut, guests, branch = '', onChange }) {
   const today = useMemo(localToday, []);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState(() => {
@@ -66,15 +66,15 @@ export default function DateRangePicker({ checkIn, checkOut, guests, onChange })
     };
   }, [open]);
 
-  // Los datos dependen del nº de huéspedes (suites con capacidad suficiente)
-  useEffect(() => { setSoldOut({}); setLoaded({}); }, [guests]);
+  // Los datos dependen del nº de huéspedes (suites con capacidad suficiente) y de la sucursal
+  useEffect(() => { setSoldOut({}); setLoaded({}); setPromoMonths({}); }, [guests, branch]);
 
   const loadMonth = useCallback(async (year, month) => {
-    const key = `${guests}:${year}-${month}`;
+    const key = `${guests}:${branch}:${year}-${month}`;
     if (loaded[key]) return;
     setLoading(true);
     try {
-      const res = await api.get('/availability/monthly', { params: { year, month, guests } });
+      const res = await api.get('/availability/monthly', { params: { year, month, guests, ...(branch ? { branch } : {}) } });
       const days = res.data?.data?.calendar || [];
       setSoldOut((prev) => {
         const next = { ...prev };
@@ -87,7 +87,7 @@ export default function DateRangePicker({ checkIn, checkOut, guests, onChange })
     } finally {
       setLoading(false);
     }
-  }, [guests, loaded]);
+  }, [guests, branch, loaded]);
 
   const loadPeak = useCallback(async (year) => {
     if (peakYears[year]) return;
@@ -107,10 +107,10 @@ export default function DateRangePicker({ checkIn, checkOut, guests, onChange })
     if (promoMonths[key]) return;
     setPromoMonths((p) => ({ ...p, [key]: [] }));
     try {
-      const res = await api.get('/availability/promotions', { params: { year, month } });
+      const res = await api.get('/availability/promotions', { params: { year, month, ...(branch ? { branch } : {}) } });
       setPromoMonths((p) => ({ ...p, [key]: res.data?.data?.promotions || [] }));
     } catch { /* informativo: si falla, simplemente no se muestran descuentos */ }
-  }, [promoMonths]);
+  }, [branch, promoMonths]);
 
   useEffect(() => {
     if (!open) return;
@@ -135,7 +135,7 @@ export default function DateRangePicker({ checkIn, checkOut, guests, onChange })
       }
     });
     return map;
-  }, [promoMonths]);
+  }, [branch, promoMonths]);
 
   const holidayByDay = useMemo(() => {
     const map = {};
