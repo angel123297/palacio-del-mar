@@ -98,7 +98,7 @@ const calculateTotalPrice = async (suite, checkInDate, checkOutDate, experienceI
  * de pago (/pagar/:id). Hoy el cobro es SIMULADO (ver services/payments).
  */
 // Marca el/los pago(s) aprobados de la reserva como reembolsados (no rompe la operación si falla)
-const markPaymentsRefunded = async (bookingId, amount) => {
+export const markPaymentsRefunded = async (bookingId, amount) => {
   try {
     await Payment.updateMany(
       { booking: bookingId, status: 'approved' },
@@ -850,7 +850,7 @@ export const getAllBookings = async (req, res) => {
     // Estadísticas
     const stats = {
       totalBookings: total,
-      totalRevenue: bookings.reduce((sum, b) => sum + b.totalPrice, 0),
+      totalRevenue: bookings.reduce((sum, b) => sum + getCollectedAmount(b), 0),
       pendingPayments: bookings.filter(b => b.paymentStatus === 'pending').length,
       confirmedBookings: bookings.filter(b => b.status === 'confirmed').length
     };

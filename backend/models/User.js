@@ -9,7 +9,8 @@ import { isValidEmail, EMAIL_MAX_LENGTH } from '../utils/validators.js';
 
 const USER_ROLES = {
   USER: 'user',
-  ADMIN: 'admin'
+  ADMIN: 'admin',
+  HOST: 'host'
 };
 
 const USER_STATUS = {
@@ -199,6 +200,12 @@ const userSchema = new mongoose.Schema({
     default: USER_ROLES.USER,
     index: true
   },
+  
+  branches: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Branch',
+    index: true
+  }],
   
   // Estado
   status: {

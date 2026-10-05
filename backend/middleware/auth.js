@@ -402,6 +402,28 @@ export const adminMiddleware = (req, res, next) => {
 };
 
 /**
+ * @desc    Middleware de autorización de anfitrión o administrador
+ */
+export const hostOrAdminMiddleware = (req, res, next) => {
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Autenticación requerida para acceder a esta ruta',
+      code: 'AUTH_REQUIRED'
+    });
+  }
+  if (req.user.role !== 'admin' && req.user.role !== 'host') {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado. Se requieren permisos de anfitrión o administrador.',
+      code: 'INSUFFICIENT_PERMISSIONS'
+    });
+  }
+  next();
+};
+
+/**
  * @desc    Middleware de rate limiting para login
  * @param   {Object} req - Request object
  * @param   {Object} res - Response object

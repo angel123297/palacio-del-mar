@@ -24,12 +24,48 @@ const suiteNightSchema = new mongoose.Schema(
     suite: { type: mongoose.Schema.Types.ObjectId, ref: 'Suite', required: true },
     slot: { type: Number, required: true, min: 1, default: 1 }, // habitación física (1..totalUnits)
     date: { type: Date, required: true }, // medianoche UTC de la noche
-    booking: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: true, index: true }
+    booking: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: false, default: null, index: true },
+    reason: { type: String, default: null, trim: true } // p. ej. 'maintenance'
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
 suiteNightSchema.index({ suite: 1, slot: 1, date: 1 }, { unique: true });
+
+/**
+ * Bloquea noches por mantenimiento en un slot físico (sin reserva asociada).
+ */
+suiteNightSchema.statics.blockSlot = async function (suiteId, slot, nights, reason = 'maintenance') {
+  if (!nights.length) return [];
+  const sorted = [...nights].sort((a, b) => a - b);
+  const blocked = [];
+  try {
+    for (const date of sorted) {
+      await this.create({ suite: suiteId, slot, booking: null, reason, date });
+      blocked.push(date);
+    }
+    return blocked;
+  } catch (err) {
+    if (blocked.length) {
+      await this.deleteMany({ suite: suiteId, slot, booking: null, date: { $in: blocked } });
+    }
+    if (err?.code === 11000) throw new NightsConflictError('La habitación física ya está ocupada o bloqueada en esas fechas');
+    throw err;
+  }
+};
+
+/**
+ * Libera bloqueos por mantenimiento en un slot físico.
+ */
+suiteNightSchema.statics.unblockSlot = async function (suiteId, slot, nights) {
+  if (!nights.length) return;
+  await this.deleteMany({
+    suite: suiteId,
+    slot,
+    booking: null,
+    date: { $in: nights }
+  });
+};
 
 /**
  * Adquiere las noches indicadas en UN slot concreto. Todo o nada: si alguna
