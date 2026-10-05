@@ -112,3 +112,23 @@ test('el hook de email duplicado rechaza el guardado con un solo next()', async 
     User.findOne = originalFindOne;
   }
 });
+
+test('una suite con campos parciales (populate) se serializa sin error', async () => {
+  const { default: Suite } = await import('../models/Suite.js');
+  const mongoose = (await import('mongoose')).default;
+  // Es lo que devuelve populate('suite', 'name type mainImage'): `beds` no existe
+  const parcial = Suite.hydrate(
+    { _id: new mongoose.Types.ObjectId(), name: 'Suite', type: 'Habitación', mainImage: 'x' },
+    { name: 1, type: 1, mainImage: 1 }
+  );
+  assert.doesNotThrow(() => JSON.stringify(parcial.toJSON()));
+  assert.equal(parcial.toJSON().bedDescription, '');
+});
+
+test('Booking: niños entre 0 y 10 (por defecto 0)', async () => {
+  const { default: Booking } = await import('../models/Booking.js');
+  assert.equal(new Booking({}).children, 0);
+  const err = new Booking({ children: 11 }).validateSync();
+  assert.ok(err.errors.children, 'más de 10 niños se rechaza');
+  assert.ok(!new Booking({ children: 2 }).validateSync()?.errors?.children);
+});

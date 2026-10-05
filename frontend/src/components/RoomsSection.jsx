@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useBookingCart } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -12,9 +13,9 @@ export default function RoomsSection() {
   const [error, setError] = useState(false);
   const [types, setTypes] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
-  const [branches, setBranches] = useState([]);
-  const [branch, setBranch] = useState(''); // '' = todas las sucursales
-  const { availability, search, setSearch, searchAvailability, startBooking } = useBookingCart();
+  const [maxPrice, setMaxPrice] = useState(0); // 0 = sin tope
+  const [extras, setExtras] = useState([]);    // 'hasBalcony' | 'hasTerrace' | 'hasJacuzzi' | 'ocean'
+  const { availability, search, setSearch, searchAvailability, startBooking, branch, setBranch, branches } = useBookingCart();
   const toast = useToast();
 
   const fetchSuites = useCallback(() => {
@@ -33,13 +34,6 @@ export default function RoomsSection() {
     fetchSuites();
   }, [fetchSuites]);
 
-  // Sucursales para las pestañas (GET /branches)
-  useEffect(() => {
-    api.get('/branches')
-      .then((res) => setBranches(res.data.data || []))
-      .catch(() => setBranches([]));
-  }, []);
-
   // Tipos de suite para el filtro (GET /suites/types)
   useEffect(() => {
     api.get('/suites/types')
@@ -57,7 +51,14 @@ export default function RoomsSection() {
     return map;
   }, [availability]);
 
-  const visibleSuites = suites && typeFilter ? suites.filter((s) => s.type === typeFilter) : suites;
+  const matchesExtra = (suite, key) =>
+    key === 'ocean' ? ['ocean', 'partial_ocean'].includes(suite.view) : !!suite[key];
+  const visibleSuites = suites && suites.filter((s) =>
+    (!typeFilter || s.type === typeFilter) &&
+    (!maxPrice || s.basePrice <= maxPrice) &&
+    extras.every((k) => matchesExtra(s, k)));
+  const toggleExtra = (k) => setExtras((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
+  const hasFilters = !!typeFilter || !!maxPrice || extras.length > 0;
 
   // Elegir unas fechas alternativas: se actualiza la búsqueda y se consulta de nuevo
   const pickDates = async ({ checkIn, checkOut }) => {
@@ -152,6 +153,23 @@ export default function RoomsSection() {
           ))}
         </div>
       )}
+      <div className="filter-row" role="group" aria-label="Más filtros">
+        <select aria-label="Precio máximo por noche" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))}>
+          <option value={0}>Cualquier precio</option>
+          {[400000, 600000, 800000, 1200000, 2000000].map((n) => (
+            <option key={n} value={n}>Hasta {formatCOP(n)}</option>
+          ))}
+        </select>
+        {[['hasBalcony', 'Balcón'], ['hasTerrace', 'Terraza'], ['hasJacuzzi', 'Jacuzzi'], ['ocean', 'Vista al mar']].map(([k, label]) => (
+          <button type="button" key={k} className={`filter-btn ${extras.includes(k) ? 'is-active' : ''}`}
+            aria-pressed={extras.includes(k)} onClick={() => toggleExtra(k)}>{label}</button>
+        ))}
+        {hasFilters && (
+          <button type="button" className="filter-btn" onClick={() => { setTypeFilter(''); setMaxPrice(0); setExtras([]); }}>
+            Limpiar filtros
+          </button>
+        )}
+      </div>
       <AvailabilityAlternatives
         availability={availability}
         branch={branch}
@@ -159,6 +177,7 @@ export default function RoomsSection() {
         onPickDates={pickDates}
       />
       <div className="rooms-grid">
+        {visibleSuites.length === 0 && <p className="muted">Ninguna habitación cumple esos filtros. Prueba quitar alguno.</p>}
         {visibleSuites.map((suite) => {
           const av = availabilityMap?.get(suite._id);
           // Con una búsqueda activa, lo que no aparece como disponible no se puede reservar
@@ -175,7 +194,7 @@ export default function RoomsSection() {
               </div>
               <div className="room-info">
                 <p className="room-type">{suite.type}{suite.branch?.name ? ` · ${shortBranch(suite.branch.name)}` : ''}</p>
-                <h3 className="room-name">{suite.name}</h3>
+                <h3 className="room-name"><Link to={`/habitaciones/${suite._id}`}>{suite.name}</Link></h3>
                 <div className="room-chips">
                   {(suite.amenities || []).slice(0, 3).map((a) => (
                     <span className="chip" key={a}>{a}</span>
@@ -190,12 +209,16 @@ export default function RoomsSection() {
                   <strong>{formatCOP(nightly)}</strong>
                   <span> / noche</span>
                 </div>
+                {av?.isAvailable && av.availableUnits > 0 && av.availableUnits <= 3 && (
+                  <p className="form-hint">¡Quedan {av.availableUnits} {av.availableUnits === 1 ? 'habitación' : 'habitaciones'} para tus fechas!</p>
+                )}
                 {totalForStay && (
                   <p className="form-hint">Total por {availability.nights} noches: {formatCOP(totalForStay)}</p>
                 )}
                 {av?.priceBreakdown?.discount > 0 && (
                   <p className="form-hint">{av.priceBreakdown.discountReason} · ahorras {formatCOP(av.priceBreakdown.discount)}</p>
                 )}
+                <Link className="room-detail-link" to={`/habitaciones/${suite._id}`}>Ver detalles</Link>
                 <button
                   className="btn-book room-cta"
                   disabled={isUnavailable}

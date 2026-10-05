@@ -1,7 +1,9 @@
 import Suite from '../models/Suite.js';
 import Branch from '../models/Branch.js';
+import SuiteNight from '../models/SuiteNight.js';
 import { getSeason, calculateSeasonalPrice, SEASON_MULTIPLIERS } from '../utils/seasons.js';
 import { quoteSuiteStay } from '../services/pricingService.js';
+import { summarizeQuote } from '../utils/pricing.js';
 import { toCalendarDate } from '../utils/dates.js';
 import { resolveBranchId } from '../utils/branches.js';
 
@@ -369,62 +371,62 @@ export const getSuiteById = async (req, res) => {
       });
     }
     
-    // Obtener suite
-    const suite = await Suite.findById(id);
-    
+    // Obtener suite (con su sucursal: dirección, mapa y puntos de interés)
+    const suite = await Suite.findById(id)
+      .populate('branch', 'name slug zone tagline address location highlights checkInTime checkOutTime phone');
+
     if (!suite) {
       return res.status(404).json({
         success: false,
         message: 'Suite no encontrada'
       });
     }
-    
-    // Determinar temporada y precios
-    const referenceDate = checkIn ? new Date(checkIn) : new Date();
-    const season = getSeason(toCalendarDate(referenceDate));
+
+    // Precio: si hay fechas válidas, la MISMA cotización que se cobra (temporadas por
+    // noche, promoción o estadía larga); si no, el precio de la temporada de hoy.
+    let quote = null;
+    let unitsLeft = null;
+    const ci = checkIn ? toCalendarDate(checkIn) : null;
+    const co = checkOut ? toCalendarDate(checkOut) : null;
+    if (ci && co && co > ci && Math.round((co - ci) / 86400000) <= 90) {
+      const q = await quoteSuiteStay({ suite, checkIn: ci, checkOut: co });
+      quote = { checkIn: ci, checkOut: co, ...summarizeQuote(q, q.lines) };
+      const free = await SuiteNight.freeSlots(suite._id, q.nights.map((n) => n.date), suite.totalUnits);
+      unitsLeft = free.length;
+    }
+
+    const season = getSeason(toCalendarDate(ci || new Date()));
     const seasonalPrice = calculateSeasonalPrice(suite.basePrice, season);
-    const seasonalOriginalPrice = suite.originalPrice 
+    const seasonalOriginalPrice = suite.originalPrice
       ? calculateSeasonalPrice(suite.originalPrice, season)
       : null;
-    
-    // Calcular noches y precio total si hay fechas
-    let nights = null;
-    let totalPrice = null;
-    if (checkIn && checkOut) {
-      const checkInDate = new Date(checkIn);
-      const checkOutDate = new Date(checkOut);
-      nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
-      totalPrice = seasonalPrice * nights;
-    }
-    
-    // Obtener suites relacionadas (mismo tipo o rango de precio similar)
-    const relatedSuites = await Suite.find({
-      _id: { $ne: id },
-      available: true,
-      $or: [
-        { type: suite.type },
-        { price: { $gte: suite.basePrice * 0.7, $lte: suite.basePrice * 1.3 } }
-      ]
-    })
-    .limit(3)
-    .select('name type price size image maxGuests');
-    
+
+    // Otras habitaciones de la MISMA sucursal
+    const relatedSuites = await Suite.find({ _id: { $ne: id }, available: true, branch: suite.branch?._id })
+      .sort({ order: 1 })
+      .limit(3)
+      .select('name type basePrice size mainImage maxGuests');
+
+    // Datos públicos: sin los ids de usuarios de las reseñas
+    const data = suite.toObject();
+    data.reviews = (data.reviews || []).map((r) => ({ rating: r.rating, comment: r.comment, date: r.date }));
+
     res.json({
       success: true,
       data: {
-        ...suite.toObject(),
+        ...data,
         seasonalPrice,
         seasonalOriginalPrice,
         season,
         priceMultiplier: SEASON_MULTIPLIERS[season],
-        nights,
-        totalPrice,
-        priceNote: season === 'peak' ? 'Temporada alta - precios especiales' : 
+        quote,
+        unitsLeft,
+        priceNote: season === 'peak' ? 'Temporada pico - precios especiales' :
                   (season === 'high' ? 'Temporada alta' : 'Precio regular')
       },
       related: relatedSuites
     });
-    
+
   } catch (error) {
     console.error('[GetSuiteById Error]:', error);
     res.status(500).json({

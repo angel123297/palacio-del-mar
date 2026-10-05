@@ -257,7 +257,9 @@ suiteSchema.virtual('viewLabel').get(function() {
 });
 
 suiteSchema.virtual('bedDescription').get(function() {
-  return this.beds.map(bed => {
+  // Con populate('suite', 'name type mainImage') `beds` no se carga: sin esta
+  // guarda, serializar la reserva a JSON lanzaba TypeError y /upcoming daba 500.
+  return (this.beds || []).map(bed => {
     const typeLabel = BED_TYPE_LABELS[bed.type] || bed.type;
     const quantity = bed.quantity > 1 ? `${bed.quantity} ` : '';
     return `${quantity}${typeLabel}`;
