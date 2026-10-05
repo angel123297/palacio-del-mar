@@ -25,7 +25,7 @@ export default function Navbar() {
     <header id="navbar">
       <nav className="main-nav">
         <Link to="/" className="logo">
-          <img src="/logo.jpg" alt="Palacio del Mar Logo" style={{ height: '40px', width: 'auto' }} />
+          <img src="/logo.png" alt="Palacio del Mar" style={{ height: '40px', width: 'auto' }} />
         </Link>
         <div className="nav-links">
           {NAV_LINKS.map((l) => (
