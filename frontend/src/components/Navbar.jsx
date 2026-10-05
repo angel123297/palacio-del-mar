@@ -24,7 +24,9 @@ export default function Navbar() {
   return (
     <header id="navbar">
       <nav className="main-nav">
-        <Link to="/" className="logo">Palacio del Mar</Link>
+        <Link to="/" className="logo">
+          <img src="/logo.jpg" alt="Palacio del Mar Logo" style={{ height: '40px', width: 'auto' }} />
+        </Link>
         <div className="nav-links">
           {NAV_LINKS.map((l) => (
             <button key={l.href} className="nav-link-btn" onClick={() => scrollTo(l.href)}>
