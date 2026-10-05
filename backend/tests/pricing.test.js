@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { easterSunday, holyWeek, getSeason, getSeasonCalendar, calculateSeasonalPrice } from '../utils/seasons.js';
-import { quoteStay, computeTotals, totalsFromNights, longStayPercent, groupNights } from '../utils/pricing.js';
+import { quoteStay, computeTotals, totalsFromNights, longStayPercent, groupNights, summarizeQuote } from '../utils/pricing.js';
 import { toCalendarDate } from '../utils/dates.js';
 
 const d = (s) => toCalendarDate(s);
@@ -137,4 +137,13 @@ test('totales siempre enteros y nunca negativos', () => {
   });
   assert.ok(Number.isInteger(q.total) && Number.isInteger(q.discount));
   assert.ok(q.total >= 0);
+});
+
+test('resumen del detalle de habitación: total, descuento y líneas coherentes con la cotización', () => {
+  const q = quoteStay({ basePrice: 1000000, checkIn: toCalendarDate('2027-03-01'), checkOut: toCalendarDate('2027-03-08') });
+  const r = summarizeQuote(q, groupNights(q.nights));
+  assert.equal(r.nights, 7);
+  assert.equal(r.totalPrice, q.total);
+  assert.ok(r.totalPrice > 0 && r.totalPrice < r.lodging, 'estadía larga descuenta');
+  assert.equal(r.lines.reduce((s, l) => s + l.amount, 0), r.lodging);
 });

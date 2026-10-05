@@ -16,10 +16,10 @@ export default function Hero() {
         }}
       />
       <div className="hero-content">
-        <p className="hero-eyebrow">Cartagena de Indias · Centro Histórico</p>
+        <p className="hero-eyebrow">Cartagena de Indias · 4 sucursales</p>
         <h1 className="hero-title">Palacio del Mar</h1>
         <p className="hero-sub">
-          18 suites de diseño exclusivo entre murallas coloniales y el mar Caribe.
+          Suites de diseño exclusivo entre murallas coloniales, Getsemaní y el mar Caribe.
         </p>
         <div className="hero-ratings">
           <div className="hr-item">

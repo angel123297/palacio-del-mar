@@ -1,34 +1,51 @@
-const ITEMS = [
-  { icon: '✈️', text: '15 min desde el Aeropuerto Rafael Núñez' },
-  { icon: '🚶', text: '2 min caminando desde la Plaza de Bolívar' },
-  { icon: '🏰', text: 'A pasos de la Catedral y los mejores restaurantes' }
-];
+import { lazy, Suspense } from 'react';
+import { useBookingCart } from '../context/BookingCartContext.jsx';
 
+const BranchMap = lazy(() => import('./BranchMap.jsx'));
+const shortBranch = (name = '') => name.replace(/^Palacio del Mar\s*·\s*/, '');
+const POI_ICONS = { historia: '🏛️', playa: '🏖️', gastronomia: '🍽️', 'vida-nocturna': '🌙', cultura: '🎭', compras: '🛍️', naturaleza: '🌴' };
+
+/** Ubicación de la sucursal elegida (la misma del buscador y de las habitaciones). */
 export default function LocationSection() {
+  const { branches, branch, setBranch } = useBookingCart();
+  const current = branches.find((b) => b.slug === branch) || branches[0];
+
+  if (!current) return null;
+
   return (
     <section id="location">
       <div className="location-content">
         <p className="sec-label">Ubicación</p>
-        <h2 className="sec-title">En el corazón de Cartagena</h2>
-        <p>
-          A pasos de la Plaza de Bolívar, la Catedral y los mejores restaurantes del centro
-          histórico. El mundo colonial a tu alcance.
-        </p>
+        <h2 className="sec-title">{shortBranch(current.name)}</h2>
+        {branches.length > 1 && (
+          <div className="filter-row" role="group" aria-label="Elegir sucursal">
+            {branches.map((b) => (
+              <button
+                type="button"
+                key={b.slug}
+                className={`filter-btn ${b.slug === current.slug ? 'is-active' : ''}`}
+                onClick={() => setBranch(b.slug)}
+              >
+                {shortBranch(b.name)}
+              </button>
+            ))}
+          </div>
+        )}
+        <p>{current.description}</p>
+        <p className="form-hint">{current.address} · {current.zone}</p>
         <div className="location-items">
-          {ITEMS.map((i) => (
-            <div className="loc-item" key={i.text}>
-              <span className="loc-icon">{i.icon}</span>
-              <span>{i.text}</span>
+          {(current.highlights || []).slice(0, 4).map((p) => (
+            <div className="loc-item" key={p.name}>
+              <span className="loc-icon">{POI_ICONS[p.type] || '📍'}</span>
+              <span>{p.name} · {p.walkMinutes} min a pie</span>
             </div>
           ))}
         </div>
       </div>
       <div className="location-map">
-        <iframe
-          title="Ubicación de Palacio del Mar"
-          src="https://www.openstreetmap.org/export/embed.html?bbox=-75.5540%2C10.4210%2C-75.5470%2C10.4270&layer=mapnik&marker=10.4236%2C-75.5510"
-          loading="lazy"
-        />
+        <Suspense fallback={<div className="spinner" />}>
+          <BranchMap branch={current} />
+        </Suspense>
       </div>
     </section>
   );
