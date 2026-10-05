@@ -124,3 +124,11 @@ test('una suite con campos parciales (populate) se serializa sin error', async (
   assert.doesNotThrow(() => JSON.stringify(parcial.toJSON()));
   assert.equal(parcial.toJSON().bedDescription, '');
 });
+
+test('Booking: niños entre 0 y 10 (por defecto 0)', async () => {
+  const { default: Booking } = await import('../models/Booking.js');
+  assert.equal(new Booking({}).children, 0);
+  const err = new Booking({ children: 11 }).validateSync();
+  assert.ok(err.errors.children, 'más de 10 niños se rechaza');
+  assert.ok(!new Booking({ children: 2 }).validateSync()?.errors?.children);
+});

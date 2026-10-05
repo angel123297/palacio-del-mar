@@ -22,7 +22,7 @@ export default function BookingModal() {
 
   const draft = useRef(readDraft()).current; // borrador de un refresco anterior (si lo hay)
   const [step, setStep] = useState(draft?.step ?? 0);
-  const [dates, setDates] = useState(draft?.dates ?? { checkIn: search.checkIn, checkOut: search.checkOut, guests: search.guests });
+  const [dates, setDates] = useState(draft?.dates ?? { checkIn: search.checkIn, checkOut: search.checkOut, guests: search.guests, children: search.children || 0 });
   const pendingSubmit = useRef(false); // el usuario pulsó "Confirmar" sin sesión
   const submitRef = useRef(null);
   const skipReset = useRef(!!draft?.suite);
@@ -63,7 +63,7 @@ export default function BookingModal() {
   useEffect(() => {
     if (!suite) return;
     if (skipReset.current) { skipReset.current = false; return; }
-    setDates({ checkIn: search.checkIn, checkOut: search.checkOut, guests: search.guests });
+    setDates({ checkIn: search.checkIn, checkOut: search.checkOut, guests: search.guests, children: search.children || 0 });
     setStep(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suite?._id]);
@@ -157,6 +157,7 @@ if (step >= 1 && suite) {
         checkIn: dates.checkIn,
         checkOut: dates.checkOut,
         guests: dates.guests,
+        children: dates.children || 0,
         experiences: experienceIds,
         ...contact
       });
@@ -213,9 +214,24 @@ if (step >= 1 && suite) {
                 <label className="field-label">Salida</label>
                 <input type="date" min={dates.checkIn} value={dates.checkOut}
                   onChange={(e) => setDates({ ...dates, checkOut: e.target.value })} />
-                <label className="field-label">Huéspedes (máx. {suite.maxGuests})</label>
-                <select value={dates.guests} onChange={(e) => setDates({ ...dates, guests: Number(e.target.value) })}>
+                <label className="field-label">Adultos</label>
+                <select
+                  value={Math.max(1, dates.guests - (dates.children || 0))}
+                  onChange={(e) => setDates({ ...dates, guests: Number(e.target.value) + (dates.children || 0) })}
+                >
                   {Array.from({ length: suite.maxGuests }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <label className="field-label">Niños (máx. {suite.maxGuests} huéspedes en total)</label>
+                <select
+                  value={dates.children || 0}
+                  onChange={(e) => {
+                    const kids = Number(e.target.value);
+                    setDates({ ...dates, children: kids, guests: Math.max(1, dates.guests - (dates.children || 0)) + kids });
+                  }}
+                >
+                  {Array.from({ length: Math.max(1, suite.maxGuests) }, (_, i) => i).map((n) => (
                     <option key={n} value={n}>{n}</option>
                   ))}
                 </select>

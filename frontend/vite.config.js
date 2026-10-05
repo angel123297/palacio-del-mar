@@ -18,6 +18,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false
+    sourcemap: false,
+    // MapLibre pesa ~1 MB, pero se descarga solo al abrir el detalle de una habitación (import dinámico)
+    chunkSizeWarningLimit: 1200
   }
 });

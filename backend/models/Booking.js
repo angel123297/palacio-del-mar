@@ -113,6 +113,9 @@ const bookingSchema = new mongoose.Schema({
     max: [20, 'Máximo 20 huéspedes']
   },
   
+  // De `guests` (total), cuántos son niños. Adultos = guests - children (mínimo 1).
+  children: { type: Number, default: 0, min: [0, 'Niños inválido'], max: [10, 'Máximo 10 niños'] },
+  
   // Experiencias
   experiences: [{ 
     type: mongoose.Schema.Types.ObjectId, 

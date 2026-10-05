@@ -71,6 +71,16 @@ const createBookingValidation = [
     .notEmpty().withMessage('El número de huéspedes es obligatorio')
     .isInt({ min: 1, max: 20 }).withMessage('El número de huéspedes debe estar entre 1 y 20'),
   
+  body('children')
+    .optional()
+    .isInt({ min: 0, max: 10 }).withMessage('El número de niños debe estar entre 0 y 10')
+    .custom((value, { req }) => {
+      if (Number(value) >= Number(req.body.guests)) {
+        throw new Error('Debe haber al menos un adulto en la reserva');
+      }
+      return true;
+    }),
+  
   body('experiences')
     .optional()
     .isArray().withMessage('Experiencias debe ser un array')
