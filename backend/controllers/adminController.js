@@ -4,6 +4,7 @@ import Promotion from '../models/Promotion.js';
 import Branch from '../models/Branch.js';
 import { todayCalendarDate } from '../utils/dates.js';
 import { getCollectedAmount } from '../utils/pricing.js';
+import { markPaymentsRefunded } from './bookingController.js';
 import {
   BOOKING_VIEWS,
   bookingViewFilter,
@@ -122,13 +123,23 @@ export const updateBookingStatus = async (req, res) => {
         reason: String(req.body.reason || '').trim() || 'Cancelada por el hotel',
         cancellationFee: 0,
         refundAmount,
-        refundStatus: refundAmount > 0 ? 'pending' : 'none',
+        refundStatus: refundAmount > 0 ? 'completed' : 'none',
         cancelledBy: req.user.id
       };
+      if (refundAmount > 0) {
+        booking.amountRefunded = (booking.amountRefunded || 0) + refundAmount;
+      }
     }
 
     booking.status = next;
     await booking.save();
+
+    if (next === BOOKING_STATUS.CANCELLED) {
+      const refundAmount = booking.cancellationDetails?.refundAmount || 0;
+      if (refundAmount > 0) {
+        await markPaymentsRefunded(booking._id, refundAmount);
+      }
+    }
 
     res.json({ success: true, message: 'Estado de la reserva actualizado', data: { booking } });
   } catch (error) {
