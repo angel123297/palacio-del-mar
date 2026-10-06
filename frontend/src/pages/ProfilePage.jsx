@@ -6,6 +6,8 @@ import Footer from '../components/Footer.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatDate } from '../utils/format';
+import { Geo } from '../components/admin/HollowIcons.jsx';
+import '../styles/hk-user.css';
 
 const NAME_RE = /^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/;
 const PHONE_RE = /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/;
@@ -39,7 +41,7 @@ function ProfileStats() {
         <span>Estancias completadas</span>
       </div>
       <div className="profile-stat">
-        <strong>{formatCOP(stats.totalSpent)}</strong>
+        <strong><Geo />{formatCOP(stats.totalSpent)}</strong>
         <span>Total en estancias completadas</span>
       </div>
     </div>
@@ -152,7 +154,7 @@ function ChangePasswordForm() {
 
 export default function ProfilePage() {
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page hk-user">
       <Navbar />
       <div className="dashboard-shell">
         <div className="dashboard-head">

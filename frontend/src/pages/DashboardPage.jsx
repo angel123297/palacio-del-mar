@@ -8,6 +8,7 @@ import UpcomingBookings from '../components/UpcomingBookings.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatCalendarDate } from '../utils/format';
+import '../styles/hk-user.css';
 
 const STATUS_CLASS = {
   pending: 'pill-pending',
@@ -145,7 +146,7 @@ export default function DashboardPage() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page hk-user">
       <Navbar />
       <div className="dashboard-shell">
         <div className="dashboard-head">
