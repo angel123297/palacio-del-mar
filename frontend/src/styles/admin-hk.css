@@ -1,0 +1,437 @@
+/* ==========================================================================
+   PANEL DE ADMINISTRACIÓN · tema "Hallownest" (inspirado en Hollow Knight)
+   Todo está dentro de .hk-admin: no cambia el aspecto del resto del sitio.
+   Ornamentos y iconos son SVG/CSS propios, sin arte original del juego.
+   Tipografías (ya cargadas en index.html): Cinzel ≈ Trajan, Cormorant ≈ Perpetua.
+   ========================================================================== */
+.hk-admin {
+  /* Recolorea todo el sitio dentro del panel: de dorado cálido a blanco-azul "alma" */
+  --gold: #c9a96e;
+  --gold-light: #e8d5a3;
+  --cream: #f5f0e8;
+  --dark: #0d0d0b;
+  --warm: #2a1f14;
+  --warm2: #1a1208;
+  --hk-soul: #e8d5a3;
+  --hk-dim: #a8977a;
+  --hk-line: rgba(201, 169, 110, 0.2);
+  --hk-line-strong: rgba(232, 213, 163, 0.55);
+  --hk-glow: 201, 169, 110;
+  --hk-flourish: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='18' viewBox='0 0 320 18'><defs><linearGradient id='g' gradientUnits='userSpaceOnUse' x1='0' y1='0' x2='320' y2='0'><stop offset='0' stop-color='%23e8d5a3' stop-opacity='0'/><stop offset='.5' stop-color='%23e8d5a3' stop-opacity='.95'/><stop offset='1' stop-color='%23e8d5a3' stop-opacity='0'/></linearGradient></defs><path d='M6 9H146M174 9H314' stroke='url(%23g)' stroke-width='1'/><path d='M160 1.5L167.5 9 160 16.5 152.5 9z' fill='none' stroke='%23e8d5a3' stroke-width='1.2'/><path d='M160 5.5L163.5 9 160 12.5 156.5 9z' fill='%23e8d5a3'/><circle cx='146' cy='9' r='1.4' fill='%23e8d5a3'/><circle cx='174' cy='9' r='1.4' fill='%23e8d5a3'/></svg>");
+  --hk-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='14' viewBox='0 0 22 14'><path d='M0 7h10' stroke='%23e8d5a3' stroke-width='1' opacity='.7'/><path d='M14 1.5L20.5 7 14 12.5 7.5 7z' fill='none' stroke='%23e8d5a3' stroke-width='1.2'/><path d='M14 5l2 2-2 2-2-2z' fill='%23e8d5a3'/></svg>");
+  position: relative;
+  isolation: isolate;
+  color: var(--cream);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.06rem;
+  font-weight: 500;
+  background:
+    linear-gradient(180deg, #0d0d0b 0%, #1a1208 55%, #0d0d0b 100%);
+}
+.hk-admin ::selection { background: rgba(232, 213, 163, 0.3); }
+/* --- Ambiente: ceniza que sube + niebla + viñeta --- */
+.hk-admin::before,
+.hk-admin::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.hk-admin::before {
+  background-image:
+    radial-gradient(1.6px 1.6px at 20px 30px, rgba(232, 213, 163, 0.55), transparent 60%),
+    radial-gradient(1px 1px at 90px 120px, rgba(232, 213, 163, 0.4), transparent 60%),
+    radial-gradient(2px 2px at 160px 70px, rgba(232, 213, 163, 0.3), transparent 60%),
+    radial-gradient(1px 1px at 230px 190px, rgba(232, 213, 163, 0.45), transparent 60%);
+  background-size: 260px 260px, 330px 330px, 410px 410px, 300px 300px;
+  animation: hk-ash 110s linear infinite;
+}
+.hk-admin::after {
+  background:
+    radial-gradient(ellipse 70% 45% at 50% -8%, rgba(201, 169, 110, 0.2), transparent 70%),
+    radial-gradient(ellipse 55% 40% at 15% 98%, rgba(70, 50, 28, 0.22), transparent 70%),
+    radial-gradient(ellipse 50% 38% at 88% 88%, rgba(70, 50, 28, 0.16), transparent 70%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.8) 100%);
+  animation: hk-fog 26s ease-in-out infinite alternate;
+}
+@keyframes hk-ash {
+  from { background-position: 0 0, 0 0, 0 0, 0 0; }
+  to   { background-position: 260px -1040px, -330px -1320px, 410px -1230px, -300px -1200px; }
+}
+@keyframes hk-fog { from { opacity: 0.72; } to { opacity: 1; } }
+.hk-admin .dashboard-shell,
+.hk-admin footer { position: relative; z-index: 1; }
+/* --- Barra superior y pie --- */
+.hk-admin nav {
+  background: rgba(13, 13, 11, 0.9);
+  border-bottom: 1px solid var(--hk-line);
+}
+.hk-admin .logo {
+  font-family: 'Cinzel', serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--hk-soul);
+  text-shadow: 0 0 14px rgba(var(--hk-glow), 0.45);
+}
+.hk-admin footer { background: rgba(8, 8, 6, 0.92); border-top: 1px solid var(--hk-line); }
+/* --- Cabecera: título centrado con adorno --- */
+.hk-admin .dashboard-head {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  padding-bottom: 34px;
+  margin-bottom: 26px;
+}
+.hk-admin .dashboard-head::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 320px;
+  max-width: 80%;
+  height: 18px;
+  transform: translateX(-50%);
+  background: var(--hk-flourish) center / contain no-repeat;
+}
+.hk-admin .sec-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.5em;
+  color: var(--hk-dim);
+  margin-bottom: 12px;
+}
+.hk-admin .sec-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 500;
+  font-size: clamp(1.5rem, 3.4vw, 2.5rem);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--hk-soul);
+  text-shadow: 0 0 22px rgba(var(--hk-glow), 0.5), 0 0 2px rgba(255, 255, 255, 0.6);
+}
+/* --- Menú de pestañas, como el menú principal del juego --- */
+.hk-admin .admin-tabs { justify-content: center; gap: 6px 36px; margin-bottom: 38px; }
+.hk-admin .admin-tabs .filter-chip {
+  position: relative;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 10px 4px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.76rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--hk-dim);
+  transition: color 0.25s, text-shadow 0.25s;
+}
+.hk-admin .admin-tabs .filter-chip:hover { color: var(--hk-soul); }
+.hk-admin .admin-tabs .filter-chip.active {
+  background: none;
+  color: #fff;
+  text-shadow: 0 0 14px rgba(232, 213, 163, 0.95), 0 0 3px #fff;
+}
+.hk-admin .admin-tabs .filter-chip::before,
+.hk-admin .admin-tabs .filter-chip::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 14px;
+  margin-top: -7px;
+  background: var(--hk-arrow) center / contain no-repeat;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+}
+.hk-admin .admin-tabs .filter-chip::before { right: 100%; transform: translateX(10px); }
+.hk-admin .admin-tabs .filter-chip::after  { left: 100%;  transform: translateX(-10px) scaleX(-1); }
+.hk-admin .admin-tabs .filter-chip.active::before { opacity: 1; transform: translateX(0); }
+.hk-admin .admin-tabs .filter-chip.active::after  { opacity: 1; transform: translateX(0) scaleX(-1); }
+/* Sub-vistas (p. ej. en Reservas): más discretas que el menú principal */
+.hk-admin .admin-views .filter-chip {
+  background: rgba(26, 18, 8, 0.6);
+  border: 1px solid var(--hk-line);
+  border-radius: 0;
+  padding: 8px 14px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.64rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--hk-dim);
+  transition: all 0.25s;
+}
+.hk-admin .admin-views .filter-chip:hover { color: var(--hk-soul); border-color: var(--hk-line-strong); }
+.hk-admin .admin-views .filter-chip.active {
+  background: rgba(232, 213, 163, 0.12);
+  border-color: var(--hk-line-strong);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(var(--hk-glow), 0.25), inset 0 0 12px rgba(var(--hk-glow), 0.1);
+}
+.hk-admin .chip-count {
+  background: rgba(232, 213, 163, 0.12);
+  border-radius: 0;
+  font-family: 'Cinzel', serif;
+  font-size: 0.58rem;
+  padding: 1px 6px;
+  margin-left: 8px;
+  color: var(--hk-soul);
+}
+.hk-admin .filter-chip.active .chip-count { background: rgba(232, 213, 163, 0.2); }
+/* --- Marcos de paneles con esquinas ornamentadas --- */
+.hk-admin .admin-form,
+.hk-admin .stat-card,
+.hk-admin .booking-card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(42, 31, 20, 0.8), rgba(20, 14, 7, 0.85));
+  border: 1px solid var(--hk-line);
+  border-radius: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(232, 213, 163, 0.07),
+    inset 0 0 40px rgba(0, 0, 0, 0.35),
+    0 12px 40px rgba(0, 0, 0, 0.55);
+}
+.hk-admin .admin-form::before,
+.hk-admin .stat-card::before,
+.hk-admin .admin-form::after,
+.hk-admin .stat-card::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  border: 0 solid var(--hk-soul);
+  filter: drop-shadow(0 0 4px rgba(var(--hk-glow), 0.7));
+}
+.hk-admin .admin-form::before,
+.hk-admin .stat-card::before { top: -1px; left: -1px; border-top-width: 1px; border-left-width: 1px; }
+.hk-admin .admin-form::after,
+.hk-admin .stat-card::after { bottom: -1px; right: -1px; border-bottom-width: 1px; border-right-width: 1px; }
+.hk-admin .admin-form h3 {
+  font-family: 'Cinzel', serif;
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--hk-soul);
+  margin-bottom: 8px;
+}
+.hk-admin .admin-form h3::after {
+  content: '';
+  display: block;
+  height: 1px;
+  margin-top: 10px;
+  background: linear-gradient(90deg, rgba(232, 213, 163, 0.55), transparent 80%);
+}
+/* --- Tarjetas de estadísticas (como el HUD del juego) --- */
+.hk-admin .stat-card { align-items: center; text-align: center; padding: 22px 18px; gap: 10px; }
+.hk-admin .stat-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.24em;
+  color: var(--hk-dim);
+  opacity: 1;
+}
+.hk-admin .stat-value {
+  font-family: 'Cinzel', serif;
+  font-weight: 500;
+  font-size: 1.55rem;
+  color: var(--hk-soul);
+  text-shadow: 0 0 18px rgba(var(--hk-glow), 0.55);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.hk-admin .hk-geo { width: 0.8em; height: 0.8em; color: #e8d5a3; filter: drop-shadow(0 0 5px rgba(var(--hk-glow), 0.8)); }
+.hk-admin .hk-masks { display: flex; gap: 5px; justify-content: center; margin-top: 2px; }
+.hk-admin .hk-mask { width: 20px; height: 23px; }
+.hk-admin .hk-mask.is-full { fill: #fff4d6; filter: drop-shadow(0 0 5px rgba(232, 213, 163, 0.9)); }
+.hk-admin .hk-mask.is-empty { fill: rgba(201, 169, 110, 0.14); }
+/* --- Gráficas de barras: barra de luz con punta de diamante --- */
+.hk-admin .bar-chart-row { font-size: 1rem; }
+.hk-admin .bar-chart-label { color: var(--cream); }
+.hk-admin .bar-chart-track {
+  height: 6px;
+  border-radius: 0;
+  overflow: visible;
+  background: rgba(201, 169, 110, 0.1);
+  border: 1px solid var(--hk-line);
+  margin-right: 6px;
+}
+.hk-admin .bar-chart-fill {
+  position: relative;
+  border-radius: 0;
+  background: linear-gradient(90deg, rgba(150, 115, 60, 0.4), #f5e6bd);
+  box-shadow: 0 0 10px rgba(var(--hk-glow), 0.55);
+}
+.hk-admin .bar-chart-fill::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  transform: rotate(45deg);
+  background: #fff4d6;
+  box-shadow: 0 0 9px #d9bd7e;
+}
+.hk-admin .bar-chart-value {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--hk-soul);
+  opacity: 1;
+}
+/* --- Tablas --- */
+.hk-admin .admin-table { font-size: 1.02rem; }
+.hk-admin .admin-table th {
+  font-family: 'Cinzel', serif;
+  font-weight: 500;
+  font-size: 0.6rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--hk-dim);
+  border-bottom: 1px solid var(--hk-line-strong);
+}
+.hk-admin .admin-table td { border-bottom: 1px solid rgba(201, 169, 110, 0.1); }
+.hk-admin .admin-table tbody tr { transition: background 0.2s; }
+.hk-admin .admin-table tbody tr:hover {
+  background: linear-gradient(90deg, transparent, rgba(232, 213, 163, 0.06), transparent);
+}
+/* --- Etiquetas de estado --- */
+.hk-admin .pill {
+  border-radius: 0;
+  border: 1px solid currentColor;
+  background: transparent;
+  font-family: 'Cinzel', serif;
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  padding: 3px 9px;
+}
+.hk-admin .pill-ok { color: #7fc98f; background: rgba(127, 201, 143, 0.07); text-shadow: 0 0 8px rgba(127, 201, 143, 0.5); }
+.hk-admin .pill-pending { color: #dcbc72; background: rgba(217, 182, 106, 0.07); }
+.hk-admin .pill-cancelled { color: #d68282; background: rgba(208, 122, 122, 0.07); }
+/* --- Formularios --- */
+.hk-admin .field-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.58rem;
+  letter-spacing: 0.22em;
+  color: var(--hk-dim);
+}
+.hk-admin input,
+.hk-admin select,
+.hk-admin textarea {
+  background: rgba(10, 9, 7, 0.75);
+  border: 1px solid rgba(201, 169, 110, 0.24);
+  border-radius: 0;
+  color: var(--cream);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  padding: 10px 14px;
+}
+.hk-admin input:focus,
+.hk-admin select:focus,
+.hk-admin textarea:focus {
+  border-color: var(--hk-soul);
+  box-shadow: 0 0 0 1px rgba(232, 213, 163, 0.3), 0 0 16px rgba(var(--hk-glow), 0.28);
+}
+.hk-admin ::placeholder { color: rgba(168, 151, 122, 0.75); font-style: italic; }
+.hk-admin select option { background: #1a1208; color: #f5f0e8; }
+.hk-admin input[type='checkbox'],
+.hk-admin input[type='radio'] { accent-color: #d9bd7e; }
+/* --- Botones --- */
+.hk-admin .btn-primary,
+.hk-admin .btn-outline {
+  position: relative;
+  background: rgba(232, 213, 163, 0.07);
+  color: var(--hk-soul);
+  border: 1px solid var(--hk-line-strong);
+  border-radius: 0;
+  font-family: 'Cinzel', serif;
+  font-weight: 500;
+  font-size: 0.64rem;
+  letter-spacing: 0.28em;
+  padding: 12px 28px;
+  transition: all 0.25s;
+}
+.hk-admin .btn-outline { background: transparent; }
+.hk-admin .btn-primary:hover:not(:disabled),
+.hk-admin .btn-outline:hover:not(:disabled) {
+  background: rgba(232, 213, 163, 0.15);
+  color: #fff;
+  border-color: var(--hk-soul);
+  transform: none;
+  box-shadow: 0 0 22px rgba(var(--hk-glow), 0.35), inset 0 0 14px rgba(var(--hk-glow), 0.12);
+}
+.hk-admin .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.hk-admin .link-btn {
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #d9c28f;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s;
+}
+.hk-admin .link-btn:hover:not(:disabled) {
+  color: #fff;
+  text-shadow: 0 0 10px rgba(232, 213, 163, 0.8);
+  border-bottom-color: rgba(232, 213, 163, 0.5);
+}
+.hk-admin .link-btn.danger { color: #d68282; }
+.hk-admin .link-btn.danger:hover:not(:disabled) { color: #f0a0a0; text-shadow: 0 0 10px rgba(230, 120, 120, 0.7); border-bottom-color: rgba(230, 140, 140, 0.5); }
+/* --- Detalles varios --- */
+.hk-admin .muted,
+.hk-admin .form-hint { color: var(--hk-dim); opacity: 1; }
+.hk-admin .price-detail summary { color: var(--hk-soul); }
+.hk-admin .admin-pager { font-family: 'Cinzel', serif; font-size: 0.64rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--hk-dim); }
+.hk-admin .form-error {
+  background: rgba(208, 122, 122, 0.08);
+  border: 1px solid rgba(208, 122, 122, 0.4);
+  border-radius: 0;
+  color: #e6a0a0;
+}
+/* Cargando: un orbe de "alma" que palpita */
+.hk-admin .spinner {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #fff, #d9bd7e 45%, rgba(201, 169, 110, 0) 72%);
+  box-shadow: 0 0 24px rgba(var(--hk-glow), 0.8);
+  animation: hk-pulse 1.8s ease-in-out infinite;
+}
+@keyframes hk-pulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+/* --- Ajustes de maquetación --- */
+.hk-admin .dashboard-shell { max-width: 1240px; padding-top: 84px; }
+.hk-admin .stat-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+/* La celda de acciones estaba en display:flex y rompía la fila de la tabla */
+.hk-admin td.admin-row-actions { display: table-cell; white-space: nowrap; }
+.hk-admin td.admin-row-actions .link-btn { margin-right: 14px; }
+.hk-admin td.admin-row-actions .link-btn:last-child { margin-right: 0; }
+/* Selectores con flecha propia en lugar de la del navegador */
+.hk-admin select,
+.hk-admin .admin-table select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23d9c28f' stroke-width='1.2'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+@media (max-width: 720px) {
+  .hk-admin .admin-tabs { gap: 4px 20px; }
+  .hk-admin .admin-tabs .filter-chip::before,
+  .hk-admin .admin-tabs .filter-chip::after { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hk-admin::before, .hk-admin::after, .hk-admin .spinner { animation: none; }
+}

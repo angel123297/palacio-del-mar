@@ -6,6 +6,9 @@ import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatDate } from '../utils/format';
 import BookingsPanel from '../components/admin/BookingsPanel.jsx';
 import PromotionsPanel from '../components/admin/PromotionsPanel.jsx';
+import { Geo, Masks } from '../components/admin/HollowIcons.jsx';
+
+import '../styles/admin-hk.css';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -30,14 +33,25 @@ const BOOKING_STATUS_LABELS = {
   expired: 'Vencidas'
 };
 
-function StatCard({ label, value }) {
+
+function StatCard({ label, value, icon, masks }) {
+
   return (
+
     <div className="stat-card">
+
       <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
+
+      <span className="stat-value">{icon === 'geo' && <Geo />}{value}</span>
+
+      {masks !== undefined && <Masks percent={masks} />}
+
     </div>
+
   );
+
 }
+
 
 function BarList({ rows, emptyMessage }) {
   if (!rows.length) {
@@ -128,10 +142,10 @@ function DashboardAdmin() {
   return (
     <div className="admin-tab">
       <div className="stat-grid">
-        <StatCard label="Ingresos cobrados (neto)" value={formatCOP(bGeneral.totalRevenue)} />
+        <StatCard label="Ingresos cobrados (neto)" value={formatCOP(bGeneral.totalRevenue)} icon="geo" />
         <StatCard label="Reservas totales" value={bGeneral.totalBookings} />
-        <StatCard label="Valor promedio por reserva" value={formatCOP(bGeneral.avgBookingValue)} />
-        <StatCard label="Ocupación actual" value={`${aGeneral.occupancyRate.toFixed(0)}%`} />
+        <StatCard label="Valor promedio por reserva" value={formatCOP(bGeneral.avgBookingValue)} icon="geo" />
+        <StatCard label="Ocupación actual" value={`${aGeneral.occupancyRate.toFixed(0)}%`} masks={aGeneral.occupancyRate} />
         <StatCard label="Suites en catálogo" value={suiteStats.total} />
         <StatCard label="Experiencias en catálogo" value={experienceStats.total} />
       </div>
@@ -469,7 +483,7 @@ export default function AdminPage() {
   const [tab, setTab] = useState('dashboard');
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page hk-admin">
       <Navbar />
       <div className="dashboard-shell">
         <div className="dashboard-head">
