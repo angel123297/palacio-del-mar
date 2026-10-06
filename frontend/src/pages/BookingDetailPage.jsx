@@ -105,9 +105,9 @@ export default function BookingDetailPage() {
                 </div>
               </div>
               <HoldNotice booking={booking} />
-              {booking.status === 'pending' && booking.paymentStatus !== 'paid' && (
+              {booking.paymentStatus !== 'paid' && (
                 <div className="booking-card-actions">
-                  <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora</Link>
+                  <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora / Completar saldo</Link>
                 </div>
               )}
               {['confirmed', 'completed'].includes(booking.status) && (

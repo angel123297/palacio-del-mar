@@ -28,8 +28,8 @@ function ModifyDatesForm({ booking, onDone }) {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.put(`/bookings/${booking._id}/modify-dates`, { newCheckIn, newCheckOut });
-      toast.success('Fechas actualizadas');
+      const res = await api.put(`/bookings/${booking._id}/modify-dates`, { newCheckIn, newCheckOut });
+      toast.success(res.data?.message || 'Fechas actualizadas');
       onDone(true);
     } catch (err) {
       toast.error(err.response?.data?.message || 'No se pudieron modificar las fechas');
@@ -39,6 +39,9 @@ function ModifyDatesForm({ booking, onDone }) {
 
   return (
     <form className="inline-edit-form" onSubmit={submit}>
+      <p className="form-hint" style={{ gridColumn: '1 / -1', margin: '0 0 4px 0' }}>
+        Nota: Los días adicionales o de mayor tarifa se recalcularán e incluirán en tu saldo. Podrás gestionar pagos pendientes en tu panel.
+      </p>
       <input type="date" value={newCheckIn} onChange={(e) => setNewCheckIn(e.target.value)} required />
       <input type="date" value={newCheckOut} min={newCheckIn} onChange={(e) => setNewCheckOut(e.target.value)} required />
       <button className="btn-primary" type="submit" disabled={busy}>{busy ? 'Guardando…' : 'Guardar'}</button>
@@ -108,7 +111,7 @@ function BookingCard({ booking, onChanged }) {
 
         {!editing && (
           <div className="booking-card-actions">
-            {booking.status === 'pending' && booking.paymentStatus !== 'paid' && (
+            {booking.paymentStatus !== 'paid' && (
               <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora</Link>
             )}
             <Link className="btn-outline" to={`/reservas/${booking._id}`}>Ver detalle</Link>

@@ -615,6 +615,13 @@ export const modifyBookingDates = async (req, res) => {
     const oldCheckOut = booking.checkOut;
     const oldTotalPrice = booking.totalPrice;
     const priceDifference = pricing.totalPrice - oldTotalPrice;
+    
+    const oldNights = calculateNights(oldCheckIn, oldCheckOut);
+    const addedNights = Math.max(0, newNights - oldNights);
+    let extraChargeExpiresAt = null;
+    if (addedNights > 0) {
+      extraChargeExpiresAt = new Date(dateValidation.checkInDate.getTime() - 24 * 60 * 60 * 1000);
+    }
 
     // Adquirir atómicamente las noches nuevas que esta reserva aún no tiene
     // (BUG-001). Se consultan los bloqueos reales de la reserva, así también
@@ -646,6 +653,9 @@ export const modifyBookingDates = async (req, res) => {
     booking.discountReason = pricing.discountReason;
     booking.pricing = pricing.pricing;
     booking.totalPrice = pricing.totalPrice;
+    if (addedNights > 0 && priceDifference > 0) {
+      booking.paymentStatus = PAYMENT_STATUS.PARTIAL;
+    }
     booking.modifiedAt = new Date();
     booking.modificationHistory = booking.modificationHistory || [];
     booking.modificationHistory.push({
@@ -657,6 +667,8 @@ export const modifyBookingDates = async (req, res) => {
       newCheckOut: dateValidation.checkOutDate,
       newTotalPrice: pricing.totalPrice,
       priceDifference,
+      addedNights,
+      extraChargeExpiresAt,
       modifiedBy: req.user.id
     });
     
@@ -673,12 +685,18 @@ export const modifyBookingDates = async (req, res) => {
         console.error('[ModifyBookingDates] No se liberaron noches antiguas:', e.message));
     }
     
+    const successMessage = addedNights > 0
+      ? `Se ha generado una factura por los ${addedNights} día(s) agregado(s), la cual vence el ${extraChargeExpiresAt.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}.`
+      : 'Fechas de reserva modificadas exitosamente (mismo número de días).';
+
     res.json({
       success: true,
-      message: 'Fechas de reserva modificadas exitosamente',
+      message: successMessage,
       data: {
         booking,
         priceDifference,
+        addedNights,
+        extraChargeExpiresAt,
         needsPayment: priceDifference > 0,
         refundAmount: priceDifference < 0 ? Math.abs(priceDifference) : 0
       }

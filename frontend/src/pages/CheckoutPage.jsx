@@ -62,7 +62,10 @@ export default function CheckoutPage() {
   const methods = config?.methods?.length ? config.methods : FALLBACK_METHODS;
   const lines = groupNights(booking?.pricing?.nights);
   const isPaid = booking && (booking.paymentStatus === 'paid' || !!receipt);
-  const isPayable = booking && booking.status === 'pending' && booking.paymentStatus !== 'paid' && !receipt;
+  const isPayable = booking && booking.paymentStatus !== 'paid' && !receipt && (booking.status === 'pending' || (booking.status === 'confirmed' && booking.paymentStatus === 'partial'));
+
+  const alreadyPaid = booking?.paymentStatus === 'partial' ? (booking?.amountPaid || 0) : 0;
+  const remainingBalance = Math.max(0, (booking?.totalPrice || 0) - alreadyPaid);
 
   return (
     <div className="dashboard-page checkout-page">
@@ -184,6 +187,14 @@ export default function CheckoutPage() {
                   <div className="price-discount"><span>{booking.discountReason || 'Descuento'}</span><span>-{formatCOP(booking.discount)}</span></div>
                 )}
                 <div className="price-total"><span>Total</span><span>{formatCOP(booking.totalPrice)}</span></div>
+                {alreadyPaid > 0 && (
+                  <>
+                    <div><span>Ya pagado</span><span>-{formatCOP(alreadyPaid)}</span></div>
+                    <div className="price-total" style={{ borderTop: '1px dashed var(--gold)', marginTop: '8px', paddingTop: '8px' }}>
+                      <span>Saldo pendiente (días extras)</span><span>{formatCOP(remainingBalance)}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {failure && (
@@ -194,7 +205,7 @@ export default function CheckoutPage() {
               )}
 
               <button className="btn-primary btn-block" onClick={pay} disabled={paying}>
-                {paying ? 'Procesando…' : `Pagar ${formatCOP(booking.totalPrice)}`}
+                {paying ? 'Procesando…' : `Pagar ${formatCOP(remainingBalance)}`}
               </button>
               <p className="form-hint">Al pagar confirmas que leíste la política de cancelación.</p>
             </aside>

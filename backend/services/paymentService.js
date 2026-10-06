@@ -46,11 +46,17 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
     if (booking.status === 'expired') {
       throw new PaymentError(409, 'Esta reserva venció porque no se pagó a tiempo. Vuelve a reservar.', 'HOLD_EXPIRED');
     }
-    if (booking.status !== 'pending') {
+    if (booking.status !== 'pending' && !(booking.status === 'confirmed' && booking.paymentStatus === 'partial')) {
       throw new PaymentError(409, 'Esta reserva ya no se puede pagar', 'NOT_PAYABLE');
     }
-    if (booking.holdExpiresAt && new Date(booking.holdExpiresAt) <= now()) {
+    if (booking.status === 'pending' && booking.holdExpiresAt && new Date(booking.holdExpiresAt) <= now()) {
       throw new PaymentError(409, 'El tiempo para pagar terminó. Vuelve a reservar.', 'HOLD_EXPIRED');
+    }
+
+    const alreadyPaid = booking.paymentStatus === 'partial' ? (booking.amountPaid || 0) : 0;
+    const chargeAmount = Math.max(0, booking.totalPrice - alreadyPaid);
+    if (chargeAmount <= 0) {
+      throw new PaymentError(409, 'Esta reserva ya está pagada', 'ALREADY_PAID');
     }
 
     let payment;
@@ -58,7 +64,7 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
       payment = await Payment.create({
         booking: booking._id,
         user: userId,
-        amount: booking.totalPrice,
+        amount: chargeAmount,
         currency: CURRENCY,
         method,
         provider: provider.name,
@@ -80,7 +86,7 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
     }
 
     const result = await provider.charge({
-      amount: booking.totalPrice,
+      amount: chargeAmount,
       method,
       bookingId: String(booking._id),
       idempotencyKey
@@ -98,12 +104,16 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
     // si el barrido de vencimiento o un admin llegó primero, no se confirma.
     // (Con una pasarela real, aquí habría que reembolsar el cobro.)
     const paidAt = now();
+    const isPartial = booking.status === 'confirmed' && booking.paymentStatus === 'partial';
+    const queryStatus = isPartial ? { $in: ['pending', 'confirmed'] } : 'pending';
+    const queryPaymentStatus = isPartial ? { $in: ['pending', 'failed', 'partial'] } : { $in: ['pending', 'failed'] };
+
     const confirmed = await Booking.findOneAndUpdate(
       {
         _id: booking._id,
         user: userId,
-        status: 'pending',
-        paymentStatus: { $in: ['pending', 'failed'] },
+        status: queryStatus,
+        paymentStatus: queryPaymentStatus,
         totalPrice: booking.totalPrice, // si el total cambió mientras se pagaba, no se confirma
         $or: [{ holdExpiresAt: { $gt: paidAt } }, { holdExpiresAt: { $exists: false } }, { holdExpiresAt: null }]
       },
