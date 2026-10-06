@@ -150,6 +150,56 @@ function ChangePasswordForm() {
   );
 }
 
+function PaymentHistory() {
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/payments/history')
+      .then((res) => {
+        setPayments(res.data.data || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return null;
+  if (payments.length === 0) return null;
+
+  return (
+    <section className="admin-form profile-form" style={{ gridColumn: '1 / -1' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <h2 className="profile-form-title" style={{ margin: 0 }}>Historial de pagos y facturas</h2>
+        <button className="btn-outline no-print" onClick={() => window.print()}>Descargar PDF / Imprimir</button>
+      </div>
+      <div className="table-responsive" style={{ marginTop: '12px' }}>
+        <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', padding: '8px' }}>Comprobante</th>
+              <th style={{ textAlign: 'left', padding: '8px' }}>Reserva</th>
+              <th style={{ textAlign: 'left', padding: '8px' }}>Método</th>
+              <th style={{ textAlign: 'right', padding: '8px' }}>Monto</th>
+              <th style={{ textAlign: 'center', padding: '8px' }}>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            {payments.map((p) => (
+              <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: '8px' }}><strong>{p.receiptNumber || '—'}</strong></td>
+                <td style={{ padding: '8px' }}>{p.booking?.reference ? `#${p.booking.reference}` : '—'}</td>
+                <td style={{ padding: '8px', textTransform: 'uppercase' }}>{p.method} {p.simulated ? '(Simulado)' : ''}</td>
+                <td style={{ padding: '8px', textAlign: 'right' }}>{formatCOP(p.amount)}</td>
+                <td style={{ padding: '8px', textAlign: 'center' }}>{formatDate(p.approvedAt || p.createdAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function ProfilePage() {
   return (
     <div className="dashboard-page">
@@ -168,6 +218,7 @@ export default function ProfilePage() {
         <div className="profile-grid">
           <PersonalDataForm />
           <ChangePasswordForm />
+          <PaymentHistory />
         </div>
       </div>
       <Footer />

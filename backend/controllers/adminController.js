@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import Booking, { BOOKING_STATUS, STATUS_TRANSITIONS } from '../models/Booking.js';
+import Booking, { BOOKING_STATUS, PAYMENT_STATUS, STATUS_TRANSITIONS } from '../models/Booking.js';
 import Promotion from '../models/Promotion.js';
 import Branch from '../models/Branch.js';
 import { todayCalendarDate } from '../utils/dates.js';
@@ -128,6 +128,9 @@ export const updateBookingStatus = async (req, res) => {
       };
       if (refundAmount > 0) {
         booking.amountRefunded = (booking.amountRefunded || 0) + refundAmount;
+      }
+      if (booking.paymentStatus === PAYMENT_STATUS.PAID || booking.paymentStatus === PAYMENT_STATUS.PARTIAL || (booking.amountPaid && booking.amountPaid > 0)) {
+        booking.paymentStatus = PAYMENT_STATUS.REFUNDED;
       }
     }
 

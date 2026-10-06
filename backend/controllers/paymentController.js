@@ -90,3 +90,27 @@ export const listBookingPayments = async (req, res) => {
     res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
+
+/** GET /api/payments/history: historial de pagos del usuario autenticado. */
+export const getUserPaymentHistory = async (req, res) => {
+  try {
+    const payments = await Payment.find({ user: req.user.id, status: 'approved' })
+      .populate('booking', 'checkIn checkOut suite totalPrice')
+      .sort({ approvedAt: -1, createdAt: -1 });
+    res.json({
+      success: true,
+      data: payments.map((p) => ({
+        ...publicPayment(p),
+        booking: p.booking ? {
+          _id: p.booking._id,
+          reference: String(p.booking._id).slice(-8).toUpperCase(),
+          checkIn: p.booking.checkIn,
+          checkOut: p.booking.checkOut
+        } : null
+      }))
+    });
+  } catch (err) {
+    console.error('[GetUserPaymentHistory Error]:', err);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+};

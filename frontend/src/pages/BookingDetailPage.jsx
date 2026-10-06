@@ -102,10 +102,13 @@ export default function BookingDetailPage() {
                   <span className={`pill ${booking.paymentStatus === 'paid' ? 'pill-ok' : 'pill-pending'}`}>
                     {booking.paymentStatusLabel || booking.paymentStatus}
                   </span>
+                  {!['cancelled', 'expired', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid' && (
+                    <span className="pill pill-pending" style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}>⚠️ Pago pendiente</span>
+                  )}
                 </div>
               </div>
               <HoldNotice booking={booking} />
-              {booking.paymentStatus !== 'paid' && (
+              {!['cancelled', 'expired', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid' && (
                 <div className="booking-card-actions">
                   <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora / Completar saldo</Link>
                 </div>

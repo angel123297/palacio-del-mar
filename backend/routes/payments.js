@@ -3,7 +3,7 @@ import { body, param } from 'express-validator';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateRequest } from '../middleware/validate.js';
 import { createRateLimiter } from '../middleware/rateLimit.js';
-import { checkout, getPaymentConfig, listBookingPayments } from '../controllers/paymentController.js';
+import { checkout, getPaymentConfig, listBookingPayments, getUserPaymentHistory } from '../controllers/paymentController.js';
 
 const router = express.Router();
 
@@ -15,6 +15,7 @@ const checkoutLimiter = createRateLimiter({
 });
 
 router.get('/config', getPaymentConfig);
+router.get('/history', authMiddleware, getUserPaymentHistory);
 
 router.post(
   '/checkout',
