@@ -193,6 +193,15 @@ test('si el total cambió mientras se pagaba: no se confirma y se avisa del nuev
   assert.equal(calls.updates.length, 1);
 });
 
+test('excepción en provider.charge marca el pago como declined y libera el cupo', async () => {
+  const b = makeBooking();
+  const failing = { name: 'simulated', charge: async () => { throw new Error('Timeout de red'); } };
+  const { service, store } = harness({ booking: b, provider: failing });
+  await assert.rejects(() => pay(service, b), (e) => e.status === 502 && e.code === 'GATEWAY_ERROR');
+  assert.equal(store[0].status, 'declined');
+  assert.equal(store[0].active, undefined);
+});
+
 test('la confirmación atómica exige el mismo total que se cobró', async () => {
   const b = makeBooking();
   const { service, calls } = harness({ booking: b });

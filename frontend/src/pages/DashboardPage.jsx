@@ -89,6 +89,9 @@ function BookingCard({ booking, onChanged }) {
             <span className={`pill ${booking.paymentStatus === 'paid' ? 'pill-ok' : 'pill-pending'}`}>
               {booking.paymentStatusLabel || booking.paymentStatus}
             </span>
+            {!['cancelled', 'expired', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid' && (
+              <span className="pill pill-pending" style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}>⚠️ Pago pendiente</span>
+            )}
           </div>
         </div>
 
@@ -111,7 +114,7 @@ function BookingCard({ booking, onChanged }) {
 
         {!editing && (
           <div className="booking-card-actions">
-            {booking.paymentStatus !== 'paid' && (
+            {!['cancelled', 'expired', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid' && (
               <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora</Link>
             )}
             <Link className="btn-outline" to={`/reservas/${booking._id}`}>Ver detalle</Link>

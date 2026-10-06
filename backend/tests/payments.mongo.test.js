@@ -92,7 +92,7 @@ test('pago real: dos envíos simultáneos con claves DISTINTAS dejan un solo pag
         service.pay({ bookingId: _id, userId: user, method: 'card', idempotencyKey: k }))
     );
     const active = await Payment.countDocuments({ booking: _id, active: true });
-    assert.equal(active, 1, 'solo un pago activo');
+    assert.equal(active, 0, 'ningún pago activo una vez aprobado');
     assert.equal(await Payment.countDocuments({ booking: _id, status: 'approved' }), 1);
     assert.ok(results.some((r) => r.status === 'fulfilled'));
   } finally {

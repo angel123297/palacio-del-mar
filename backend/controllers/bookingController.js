@@ -511,6 +511,10 @@ export const cancelBooking = async (req, res) => {
       booking.amountRefunded = (booking.amountRefunded || 0) + refundAmount;
       booking.cancellationDetails.refundStatus = 'completed';
     }
+
+    if (booking.paymentStatus === PAYMENT_STATUS.PAID || booking.paymentStatus === PAYMENT_STATUS.PARTIAL || (booking.amountPaid && booking.amountPaid > 0)) {
+      booking.paymentStatus = PAYMENT_STATUS.REFUNDED;
+    }
     
     await booking.save(); // el hook post-save libera las noches (SuiteNight)
     if (refundAmount > 0) await markPaymentsRefunded(booking._id, refundAmount);
@@ -653,8 +657,18 @@ export const modifyBookingDates = async (req, res) => {
     booking.discountReason = pricing.discountReason;
     booking.pricing = pricing.pricing;
     booking.totalPrice = pricing.totalPrice;
-    if (addedNights > 0 && priceDifference > 0) {
+    let refundAmount = 0;
+    if (priceDifference > 0) {
       booking.paymentStatus = PAYMENT_STATUS.PARTIAL;
+    } else if (priceDifference < 0 && (booking.paymentStatus === PAYMENT_STATUS.PAID || booking.paymentStatus === PAYMENT_STATUS.PARTIAL)) {
+      refundAmount = Math.abs(priceDifference);
+      booking.amountRefunded = (booking.amountRefunded || 0) + refundAmount;
+      if (booking.amountPaid && booking.amountPaid > booking.totalPrice) {
+        booking.amountPaid = booking.totalPrice;
+      }
+      if (booking.amountPaid && booking.amountPaid <= booking.amountRefunded) {
+        booking.paymentStatus = PAYMENT_STATUS.REFUNDED;
+      }
     }
     booking.modifiedAt = new Date();
     booking.modificationHistory = booking.modificationHistory || [];
@@ -678,6 +692,10 @@ export const modifyBookingDates = async (req, res) => {
       // Revertir solo lo adquirido en esta operación
       await SuiteNight.release(booking._id, acquiredNights).catch(() => {});
       throw err;
+    }
+    if (refundAmount > 0) {
+      await markPaymentsRefunded(booking._id, refundAmount).catch((e) =>
+        console.error('[ModifyBookingDates] No se marcaron pagos como reembolsados:', e.message));
     }
     // Guardado OK: liberar las noches que ya no se usan
     if (nightsToRelease.length) {

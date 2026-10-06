@@ -53,7 +53,18 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
       throw new PaymentError(409, 'El tiempo para pagar terminó. Vuelve a reservar.', 'HOLD_EXPIRED');
     }
 
-    const alreadyPaid = booking.paymentStatus === 'partial' ? (booking.amountPaid || 0) : 0;
+    let alreadyPaid = 0;
+    if (booking.paymentStatus === 'partial') {
+      if (booking.amountPaid > 0) {
+        alreadyPaid = booking.amountPaid;
+      } else {
+        const approvedPayments = await Payment.find({ booking: booking._id, status: 'approved' });
+        alreadyPaid = approvedPayments.reduce((sum, p) => sum + p.amount, 0);
+        if (alreadyPaid === 0 && booking.modificationHistory?.length) {
+          alreadyPaid = booking.modificationHistory[booking.modificationHistory.length - 1].oldTotalPrice || 0;
+        }
+      }
+    }
     const chargeAmount = Math.max(0, booking.totalPrice - alreadyPaid);
     if (chargeAmount <= 0) {
       throw new PaymentError(409, 'Esta reserva ya está pagada', 'ALREADY_PAID');
@@ -85,12 +96,21 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
       throw err;
     }
 
-    const result = await provider.charge({
-      amount: chargeAmount,
-      method,
-      bookingId: String(booking._id),
-      idempotencyKey
-    });
+    let result;
+    try {
+      result = await provider.charge({
+        amount: chargeAmount,
+        method,
+        bookingId: String(booking._id),
+        idempotencyKey
+      });
+    } catch (err) {
+      payment.status = 'declined';
+      payment.active = undefined; // libera el cupo para reintentar
+      payment.failureReason = err.message || 'Error de comunicación con la pasarela de pagos';
+      await payment.save().catch(() => {});
+      throw new PaymentError(502, payment.failureReason, 'GATEWAY_ERROR');
+    }
 
     if (result.status !== 'approved') {
       payment.status = 'declined';
@@ -104,19 +124,20 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
     // si el barrido de vencimiento o un admin llegó primero, no se confirma.
     // (Con una pasarela real, aquí habría que reembolsar el cobro.)
     const paidAt = now();
-    const isPartial = booking.status === 'confirmed' && booking.paymentStatus === 'partial';
-    const queryStatus = isPartial ? { $in: ['pending', 'confirmed'] } : 'pending';
-    const queryPaymentStatus = isPartial ? { $in: ['pending', 'failed', 'partial'] } : { $in: ['pending', 'failed'] };
+    const isPartial = booking.paymentStatus === 'partial';
+    const updateFilter = {
+      _id: booking._id,
+      user: userId,
+      paymentStatus: { $ne: 'paid' },
+      status: isPartial ? { $in: ['pending', 'confirmed'] } : 'pending',
+      ...(isPartial ? {} : { totalPrice: booking.totalPrice })
+    };
+    if (!isPartial) {
+      updateFilter.$or = [{ holdExpiresAt: { $gt: paidAt } }, { holdExpiresAt: { $exists: false } }, { holdExpiresAt: null }];
+    }
 
     const confirmed = await Booking.findOneAndUpdate(
-      {
-        _id: booking._id,
-        user: userId,
-        status: queryStatus,
-        paymentStatus: queryPaymentStatus,
-        totalPrice: booking.totalPrice, // si el total cambió mientras se pagaba, no se confirma
-        $or: [{ holdExpiresAt: { $gt: paidAt } }, { holdExpiresAt: { $exists: false } }, { holdExpiresAt: null }]
-      },
+      updateFilter,
       {
         $set: {
           status: 'confirmed',
@@ -147,6 +168,7 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
     payment.providerRef = result.providerRef;
     payment.approvedAt = paidAt;
     payment.receiptNumber = receiptFor(payment, paidAt);
+    payment.active = undefined;
     await payment.save();
 
     Promise.resolve(notify({ booking: confirmed, payment })).catch((err) =>
