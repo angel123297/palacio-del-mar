@@ -1,0 +1,179 @@
+import nodemailer from 'nodemailer';
+
+// ============================================
+// ENVÍO DE EMAILS (OPCIONAL)
+// ============================================
+// El proyecto no venía con ningún proveedor de correo: los emails de
+// confirmación, verificación y recuperación de contraseña solo se
+// simulaban con console.log (y en el caso del token de recuperación,
+// además se registraba en los logs de producción, un riesgo de
+// seguridad real).
+//
+// Este módulo envía correos de verdad SOLO si hay credenciales SMTP en
+// las variables de entorno (SMTP_HOST, SMTP_USER, SMTP_PASS). Si no las
+// hay, no falla: en desarrollo deja constancia en consola para poder
+// probar el flujo completo, y en producción no imprime nada sensible.
+
+let transporter = null;
+let loggedMissingConfig = false;
+
+const isConfigured = () =>
+  !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+
+/** ¿Hay SMTP configurado? (para arranque, health y flujos que lo requieren) */
+export const isEmailConfigured = isConfigured;
+
+/**
+ * Escapa datos dinámicos antes de interpolarlos en HTML (SEC-009).
+ */
+export const escapeHtml = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/** Solo permite enlaces http(s); cualquier otra cosa se descarta. */
+const safeUrl = (url) => {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : '#';
+  } catch {
+    return '#';
+  }
+};
+
+const getTransporter = () => {
+  if (!isConfigured()) return null;
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: Number(process.env.SMTP_PORT) === 465,
+      // Sin estos límites, un SMTP caído dejaba la petición colgada varios
+      // minutos y nginx respondía 504.
+      connectionTimeout: 10000, // conectar al servidor
+      greetingTimeout: 10000,   // esperar el saludo SMTP
+      socketTimeout: 20000,     // inactividad del socket
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+  }
+  return transporter;
+};
+
+const FROM = process.env.SMTP_FROM || '"Palacio del Mar" <reservas@palaciomar.co>';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8080';
+
+/**
+ * Envía un correo. Si no hay SMTP configurado, no hace nada (salvo un
+ * aviso discreto una sola vez en consola, solo en desarrollo).
+ */
+const sendMail = async ({ to, subject, html, text }) => {
+  const t = getTransporter();
+
+  if (!t) {
+    if (process.env.NODE_ENV === 'development') {
+      // Buzón de pruebas local (BUG-008): en desarrollo el correo se imprime
+      // en la consola del servidor en vez de exponer tokens en respuestas HTTP.
+      if (!loggedMissingConfig) {
+        loggedMissingConfig = true;
+        console.log('[Email] SMTP no configurado: en desarrollo los correos se imprimen aquí en consola.');
+      }
+      console.log(`[Email:dev] Para: ${to}\n  Asunto: ${subject}\n  ${text || ''}`);
+    } else {
+      // Fallo operativo visible también en producción (BUG-007). Sin datos sensibles.
+      console.error(`[Email] SMTP no configurado: NO se envió el correo "${subject}".`);
+    }
+    return { sent: false, reason: 'SMTP no configurado' };
+  }
+
+  await t.sendMail({ from: FROM, to, subject, html, text });
+  return { sent: true };
+};
+
+export const sendVerificationEmail = async (email, name, token) => {
+  const link = safeUrl(`${FRONTEND_URL}/verificar-email/${encodeURIComponent(token)}`);
+  return sendMail({
+    to: email,
+    subject: 'Verifica tu email · Palacio del Mar',
+    text: `Verifica tu email: ${link}`,
+    html: `<p>Hola ${escapeHtml(name)},</p>
+      <p>Gracias por registrarte en Palacio del Mar. Confirma tu email haciendo clic en el siguiente enlace:</p>
+      <p><a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>
+      <p>Este enlace vence en 24 horas.</p>`
+  });
+};
+
+export const sendPasswordResetEmail = async (email, name, token) => {
+  const link = safeUrl(`${FRONTEND_URL}/restablecer-contrasena?token=${encodeURIComponent(token)}`);
+  return sendMail({
+    to: email,
+    subject: 'Recupera tu contraseña · Palacio del Mar',
+    text: `Restablece tu contraseña: ${link}`,
+    html: `<p>Hola ${escapeHtml(name)},</p>
+      <p>Recibimos una solicitud para restablecer tu contraseña. Si fuiste tú, haz clic aquí:</p>
+      <p><a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>
+      <p>Este enlace vence en 1 hora. Si no solicitaste esto, ignora este correo.</p>`
+  });
+};
+
+const money = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
+const day = (d) => new Date(d).toLocaleDateString('es-CO', { timeZone: 'UTC' });
+
+/**
+ * Correo de la reserva. Si ya está pagada: comprobante. Si está pendiente:
+ * aviso con el enlace para pagar y la hora límite (la habitación se retiene).
+ */
+export const sendBookingConfirmationEmail = async (booking, guestEmail, guestName, payment = null) => {
+  const nights = booking.nights || Math.ceil((new Date(booking.checkOut) - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24));
+  const ref = String(booking._id).slice(-6).toUpperCase();
+  const summary = `<ul>
+        <li><strong>Suite:</strong> ${escapeHtml(booking.suite?.name)}</li>
+        <li><strong>Check-in:</strong> ${day(booking.checkIn)}</li>
+        <li><strong>Check-out:</strong> ${day(booking.checkOut)}</li>
+        <li><strong>Noches:</strong> ${nights}</li>
+        <li><strong>Total:</strong> ${money(booking.totalPrice)}</li>
+      </ul>`;
+
+  if (booking.paymentStatus === 'paid') {
+    const receipt = payment?.receiptNumber ? `<li><strong>Comprobante:</strong> ${escapeHtml(payment.receiptNumber)}</li>` : '';
+    return sendMail({
+      to: guestEmail,
+      subject: `Pago aprobado · Reserva #${ref} · Palacio del Mar`,
+      html: `<p>Hola ${escapeHtml(guestName)},</p>
+      <p>Tu pago fue aprobado y tu reserva está <strong>confirmada</strong>.</p>
+      ${summary}
+      <ul>${receipt}<li><strong>Pagado:</strong> ${money(booking.amountPaid || booking.totalPrice)}</li></ul>
+      <p>Te esperamos.</p>`
+    });
+  }
+
+  const link = safeUrl(`${FRONTEND_URL}/pagar/${booking._id}`);
+  const until = booking.holdExpiresAt
+    ? new Date(booking.holdExpiresAt).toLocaleTimeString('es-CO', { timeZone: process.env.HOTEL_TIMEZONE || 'America/Bogota', hour: '2-digit', minute: '2-digit' })
+    : null;
+  return sendMail({
+    to: guestEmail,
+    subject: `Reserva pendiente de pago #${ref} · Palacio del Mar`,
+    html: `<p>Hola ${escapeHtml(guestName)},</p>
+      <p>Te guardamos la habitación mientras completas el pago.</p>
+      ${summary}
+      <p>${until ? `Tienes hasta las <strong>${until}</strong>` : 'Tienes poco tiempo'} para pagar; después la reserva vence y la habitación se libera.</p>
+      ${link ? `<p><a href="${link}">Pagar mi reserva</a></p>` : ''}`
+  });
+};
+
+export const sendBookingExpiredEmail = async (booking, guestEmail, guestName) =>
+  sendMail({
+    to: guestEmail,
+    subject: `Tu reserva #${String(booking._id).slice(-6).toUpperCase()} venció · Palacio del Mar`,
+    html: `<p>Hola ${escapeHtml(guestName)},</p>
+      <p>Tu reserva no se pagó a tiempo y la habitación volvió a estar disponible.</p>
+      <p>Si todavía quieres hospedarte, puedes volver a reservar desde el sitio; no se te cobró nada.</p>`
+  });
+
+export default { sendBookingExpiredEmail, sendVerificationEmail, sendPasswordResetEmail, sendBookingConfirmationEmail, isEmailConfigured, escapeHtml };

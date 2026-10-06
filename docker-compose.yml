@@ -1,0 +1,97 @@
+# ============================================================================
+# Palacio del Mar - arranque LOCAL con un solo comando
+#
+#     docker compose up -d --build
+#
+# Después abre http://localhost:8080
+#
+# No necesita ningún archivo .env: todo lo necesario está definido aquí.
+# Si borras o no tienes .env, nada cambia.
+#
+# IMPORTANTE: los valores de este archivo (clave JWT, contraseña del admin)
+# son SOLO para uso local en tu computador. No los uses en un servidor real.
+# ============================================================================
+name: palacio-del-mar
+
+services:
+  # --- Base de datos ---------------------------------------------------------
+  # El puerto 27017 se publica SOLO en localhost para usar MongoDB Compass:
+  #     mongodb://localhost:27017/palacio_db
+  # Mongo no tiene usuario/contraseña: no lo abras a toda la red ni lo uses así
+  # en un servidor real.
+  mongo:
+    image: mongo:7
+    container_name: palacio-mongo
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- API (Express) ---------------------------------------------------------
+  backend:
+    build: ./backend
+    container_name: palacio-backend
+    restart: unless-stopped
+    environment:
+      # "development": los correos (verificación, recuperar contraseña) se
+      # imprimen en `docker compose logs backend` en vez de necesitar SMTP.
+      NODE_ENV: development
+      # Debe coincidir con EXPOSE del Dockerfile y con el proxy de nginx.conf
+      PORT: "5000"
+      MONGODB_URI: mongodb://mongo:27017/palacio_db
+      MONGODB_TLS: "false"
+      JWT_SECRET: 1cebc720b94ea82fec10c9b23952448c3e90f4b38aa3ac92b03d24e79c8bd9ff
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL: http://localhost:8080
+      # Detrás de nginx: así el límite de intentos de login ve la IP real
+      TRUST_PROXY: "1"
+      # Cuenta de administrador que se crea sola en el primer arranque
+      # (ver backend/bootstrap.js). Cámbiala desde el panel si quieres.
+      ADMIN_NAME: Administrador
+      ADMIN_EMAIL: admin@palaciomar.co
+      ADMIN_PASSWORD: AulaDocker2026Segura
+      # Teléfono de ejemplo para que el admin pueda usar el sitio de clientes (cámbialo en Perfil)
+      ADMIN_PHONE: "3001234567"
+      # Admin de prueba SOLO para desarrollo local (se ignora si NODE_ENV=production)
+      DEV_ADMIN_NAME: Admin Local
+      DEV_ADMIN_EMAIL: admin@gmail.com
+      DEV_ADMIN_PASSWORD: admin123
+      DEV_ADMIN_PHONE: "3009876543"
+      # false = no cargar habitaciones solas; se cargan con `npm run seed`
+      AUTO_SEED: "false"
+      # Reservas pendientes: minutos que se retiene la habitación y máximo por usuario
+      HOLD_MINUTES: "30"
+      MAX_PENDING_BOOKINGS: "3"
+      # Pagos SIMULADOS: siempre aprueban. No se permite con NODE_ENV=production.
+      PAYMENTS_MODE: "simulated"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # --- Frontend (React compilado, servido por nginx) -------------------------
+  web:
+    build: ./frontend
+    container_name: palacio-web
+    restart: unless-stopped
+    ports:
+      # Solo visible desde este computador (localhost), no desde la red.
+      - "127.0.0.1:8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
