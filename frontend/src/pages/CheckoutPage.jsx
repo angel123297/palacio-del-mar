@@ -7,7 +7,7 @@ import HoldNotice from '../components/HoldNotice.jsx';
 import usePaymentConfig from '../hooks/usePaymentConfig.js';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatCalendarDate } from '../utils/format';
-import { groupNights, SEASON_NAMES, policyText, METHOD_NOTES, newIdempotencyKey } from '../utils/checkout.js';
+import { groupNights, SEASON_NAMES, policyText, METHOD_NOTES, newIdempotencyKey, paymentBalance, netPaid } from '../utils/checkout.js';
 
 const FALLBACK_METHODS = [
   { id: 'card', label: 'Tarjeta de crédito o débito' },
@@ -64,8 +64,8 @@ export default function CheckoutPage() {
   const isPaid = booking && (booking.paymentStatus === 'paid' || !!receipt);
   const isPayable = booking && booking.paymentStatus !== 'paid' && !receipt && (booking.status === 'pending' || (booking.status === 'confirmed' && booking.paymentStatus === 'partial'));
 
-  const alreadyPaid = booking?.paymentStatus === 'partial' ? (booking?.amountPaid || 0) : 0;
-  const remainingBalance = Math.max(0, (booking?.totalPrice || 0) - alreadyPaid);
+  // Neto de devoluciones: igual que lo que cobrará el servidor
+  const { alreadyPaid, remaining: remainingBalance } = paymentBalance(booking);
 
   return (
     <div className="dashboard-page checkout-page">
@@ -97,7 +97,7 @@ export default function CheckoutPage() {
             <p className="modal-copy">Tu reserva en <strong>{booking.suite?.name}</strong> está confirmada.</p>
             <div className="confirm-summary">
               {receipt?.receiptNumber && <div><span>Comprobante</span><strong>{receipt.receiptNumber}</strong></div>}
-              <div><span>Pagado</span><strong>{formatCOP(receipt?.amount ?? booking.amountPaid ?? booking.totalPrice)}</strong></div>
+              <div><span>Pagado</span><strong>{formatCOP(receipt?.amount ?? netPaid(booking))}</strong></div>
               <div><span>Check-in</span><strong>{formatCalendarDate(booking.checkIn)}</strong></div>
               <div><span>Check-out</span><strong>{formatCalendarDate(booking.checkOut)}</strong></div>
             </div>
