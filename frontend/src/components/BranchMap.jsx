@@ -20,7 +20,7 @@ const STYLE = {
  * (React.lazy) para no pesar en el resto del sitio. Si el navegador no puede crear
  * el mapa (sin WebGL, sin red), muestra la dirección como texto.
  */
-export default function BranchMap({ branch }) {
+export default function BranchMap({ branch, quiet = false }) {
   const ref = useRef(null);
   const [failed, setFailed] = useState(false);
   const lat = branch?.location?.lat;
@@ -71,6 +71,8 @@ export default function BranchMap({ branch }) {
   }, [lat, lng, branch]);
 
   if (typeof lat !== 'number' || typeof lng !== 'number' || failed) {
+    // `quiet`: el contenedor ya muestra la dirección en texto (p. ej. el modal de reserva)
+    if (quiet) return null;
     return <p className="muted">{branch?.address || 'Ubicación no disponible'}</p>;
   }
   return <div className="branch-map" ref={ref} role="region" aria-label={`Mapa de ${branch.name}`} />;

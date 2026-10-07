@@ -302,9 +302,9 @@ if (step >= 1 && suite) {
                 {stayBranch && (
                   <div className="stay-location">
                     <h3 className="stay-location-title">Dónde te hospedarás</h3>
-                    <p className="form-hint">{stayBranch.address}{stayBranch.zone ? ` · ${stayBranch.zone}` : ''}</p>
+                    <p className="form-hint">{stayBranch.address}{stayBranch.zone && !stayBranch.address?.includes(stayBranch.zone) ? ` · ${stayBranch.zone}` : ''}</p>
                     <Suspense fallback={<div className="branch-map"><div className="spinner" /></div>}>
-                      <BranchMap branch={stayBranch} />
+                      <BranchMap branch={stayBranch} quiet />
                     </Suspense>
                     {(stayBranch.checkInTime || stayBranch.checkOutTime) && (
                       <p className="form-hint">Check-in {stayBranch.checkInTime} · Check-out {stayBranch.checkOutTime}</p>
