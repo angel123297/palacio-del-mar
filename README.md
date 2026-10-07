@@ -19,7 +19,6 @@ Necesitas Docker. Desde la carpeta del proyecto:
 
 ```bash
 docker compose up -d --build        # o:  bash run.sh   (además guarda logs)
-docker compose exec backend npm run seed     # SOLO la primera vez: carga las sucursales y habitaciones
 ```
 
 Abre **http://localhost:8080**.
