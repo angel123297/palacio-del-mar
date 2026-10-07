@@ -3,6 +3,7 @@ import api from '../api/client';
 import { useBookingCart } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP } from '../utils/format';
+import { isObjectId } from '../utils/ids.js';
 
 const FALLBACK_EXPERIENCES = [
   { _id: 'fx-1', name: 'Islas del Rosario', shortDescription: 'Excursión con snorkel y almuerzo', price: 348000, durationHours: 8, icon: '⛵', mainImage: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=800&auto=format&fit=crop&q=80' },
@@ -36,6 +37,12 @@ export default function ExperiencesSection() {
   }, []);
 
   const handleToggle = (exp) => {
+    // Las experiencias de respaldo (ids "fx-…") solo se muestran si el servidor no
+    // devolvió datos; no existen en la base de datos y no se pueden reservar
+    if (!isObjectId(exp._id)) {
+      toast.info('Esta experiencia no está disponible para reservar en este momento.');
+      return;
+    }
     const wasAdded = experiences.some((e) => e._id === exp._id);
     toggleExperience(exp);
     toast[wasAdded ? 'info' : 'success'](

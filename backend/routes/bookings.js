@@ -91,6 +91,11 @@ const createBookingValidation = [
       return true;
     }),
   
+  // Cada id debe ser un ObjectId: un id inválido (p. ej. "fx-3") antes llegaba a
+  // Mongoose y terminaba en un 500
+  body('experiences.*')
+    .isMongoId().withMessage('Una de las experiencias seleccionadas no es válida. Quítala e inténtalo de nuevo.'),
+  
   body('guestName')
     .optional()
     .trim()

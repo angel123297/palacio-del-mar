@@ -9,6 +9,7 @@ import usePaymentConfig from '../hooks/usePaymentConfig.js';
 import { policyText } from '../utils/checkout.js';
 import { contactFromUser, contactAfterUserChange, userKey } from '../utils/contact.js';
 import { resolveSuiteBranch } from '../utils/stayLocation.js';
+import { isObjectId } from '../utils/ids.js';
 
 // El mapa (MapLibre) se descarga solo cuando el huésped llega al paso de confirmación
 const BranchMap = lazy(() => import('./BranchMap.jsx'));
@@ -88,7 +89,7 @@ export default function BookingModal() {
     }
   }, [user, authModal]);
 
-  const experienceIds = useMemo(() => experiences.map((e) => e._id), [experiences]);
+  const experienceIds = useMemo(() => experiences.map((e) => e._id).filter(isObjectId), [experiences]);
 
   // Dónde se hospedará (para la previsualización del mapa)
   const stayBranch = useMemo(() => resolveSuiteBranch(suite, branches), [suite, branches]);
