@@ -52,7 +52,7 @@ export default function CheckoutPage() {
     } catch (err) {
       const data = err.response?.data;
       setFailure({ message: data?.message || 'No se pudo procesar el pago. Intenta de nuevo.', code: data?.code });
-      if (data?.code === 'DECLINED') keyRef.current = newIdempotencyKey(); // rechazo: el siguiente intento es nuevo
+      if (['DECLINED', 'GATEWAY_ERROR', 'RETRY_NEW_KEY'].includes(data?.code)) keyRef.current = newIdempotencyKey(); // intento fallido: el siguiente es nuevo
       if (['HOLD_EXPIRED', 'NOT_PAYABLE', 'ALREADY_PAID'].includes(data?.code)) load();
     } finally {
       setPaying(false);

@@ -844,6 +844,21 @@ export const updatePaymentStatus = async (req, res) => {
   }
 };
 
+// Ingresos reales: lo cobrado menos lo reembolsado (una reserva cancelada o vencida
+// sin dinero recibido no suma; una cancelada con penalización retenida sí).
+// Se usa en las agregaciones de estadísticas de admin.
+const INACTIVE = ['cancelled', 'expired'];
+const COLLECTED = {
+  $subtract: [
+    { $cond: [
+      { $gt: [{ $ifNull: ['$amountPaid', 0] }, 0] },
+      '$amountPaid',
+      { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$totalPrice', 0] }
+    ] },
+    { $ifNull: ['$amountRefunded', 0] }
+  ]
+};
+
 /**
  * @desc    Obtener todas las reservas (Admin)
  * @route   GET /api/bookings/admin/all
@@ -864,31 +879,59 @@ export const getAllBookings = async (req, res) => {
     const query = {};
     if (status) query.status = status;
     if (startDate && endDate) {
-      query.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
-      };
+      const from = new Date(startDate);
+      const to = new Date(endDate);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        return res.status(400).json({ success: false, message: 'Fechas inválidas' });
+      }
+      query.createdAt = { $gte: from, $lte: to };
     }
     
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const skip = (pageNum - 1) * limitNum;
     
-    const [bookings, total] = await Promise.all([
+    const [bookings, total, [summary]] = await Promise.all([
       Booking.find(query)
         .populate('suite')
         .populate('experiences')
         .populate('user', 'name email')
         .sort('-createdAt')
         .skip(skip)
-        .limit(parseInt(limit)),
-      Booking.countDocuments(query)
+        .limit(limitNum),
+      Booking.countDocuments(query),
+      // Estadísticas sobre TODAS las reservas del filtro, no solo la página actual
+      Booking.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: COLLECTED },
+            // Pagos pendientes: solo reservas vivas con dinero por cobrar
+            // (una vencida o cancelada también tiene paymentStatus 'pending')
+            pendingPayments: {
+              $sum: {
+                $cond: [
+                  { $and: [
+                    { $not: [{ $in: ['$status', INACTIVE] }] },
+                    { $in: ['$paymentStatus', ['pending', 'partial', 'failed']] }
+                  ] },
+                  1,
+                  0
+                ]
+              }
+            },
+            confirmedBookings: { $sum: { $cond: [{ $eq: ['$status', 'confirmed'] }, 1, 0] } }
+          }
+        }
+      ])
     ]);
     
-    // Estadísticas
     const stats = {
       totalBookings: total,
-      totalRevenue: bookings.reduce((sum, b) => sum + getCollectedAmount(b), 0),
-      pendingPayments: bookings.filter(b => b.paymentStatus === 'pending').length,
-      confirmedBookings: bookings.filter(b => b.status === 'confirmed').length
+      totalRevenue: summary?.totalRevenue || 0,
+      pendingPayments: summary?.pendingPayments || 0,
+      confirmedBookings: summary?.confirmedBookings || 0
     };
     
     res.json({
@@ -897,8 +940,8 @@ export const getAllBookings = async (req, res) => {
         bookings,
         stats,
         pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / parseInt(limit)),
+          currentPage: pageNum,
+          totalPages: Math.ceil(total / limitNum),
           totalItems: total
         }
       }
@@ -1167,19 +1210,7 @@ export const sendBookingConfirmation = async (req, res) => {
  */
 export const getBookingStats = async (req, res) => {
   try {
-    // Ingresos reales: lo cobrado menos lo reembolsado (una reserva cancelada o vencida
-    // sin dinero recibido no suma; una cancelada con penalización retenida sí)
-    const INACTIVE = ['cancelled', 'expired'];
-    const COLLECTED = {
-      $subtract: [
-        { $cond: [
-          { $gt: [{ $ifNull: ['$amountPaid', 0] }, 0] },
-          '$amountPaid',
-          { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$totalPrice', 0] }
-        ] },
-        { $ifNull: ['$amountRefunded', 0] }
-      ]
-    };
+    // Ingresos reales: ver COLLECTED / INACTIVE (definidos arriba, compartidos con getAllBookings)
     
     const { startDate, endDate } = req.query;
     

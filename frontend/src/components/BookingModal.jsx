@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -8,13 +8,17 @@ import { formatCOP, formatDate } from '../utils/format';
 import usePaymentConfig from '../hooks/usePaymentConfig.js';
 import { policyText } from '../utils/checkout.js';
 import { contactFromUser, contactAfterUserChange, userKey } from '../utils/contact.js';
+import { resolveSuiteBranch } from '../utils/stayLocation.js';
+
+// El mapa (MapLibre) se descarga solo cuando el huésped llega al paso de confirmación
+const BranchMap = lazy(() => import('./BranchMap.jsx'));
 
 const STEPS = ['Fechas', 'Experiencias', 'Datos', 'Confirmación'];
 
 const SEASON_NAMES = { low: 'temporada baja', mid: 'temporada media', high: 'temporada alta', peak: 'temporada pico' };
 
 export default function BookingModal() {
-  const { bookingSuite, closeBooking, search, experiences, toggleExperience } = useBookingCart();
+  const { bookingSuite, closeBooking, search, experiences, toggleExperience, branches } = useBookingCart();
   const { user, isAuthenticated, authModal, setAuthModal } = useAuth();
   const navigate = useNavigate();
   const paymentConfig = usePaymentConfig();
@@ -85,6 +89,9 @@ export default function BookingModal() {
   }, [user, authModal]);
 
   const experienceIds = useMemo(() => experiences.map((e) => e._id), [experiences]);
+
+  // Dónde se hospedará (para la previsualización del mapa)
+  const stayBranch = useMemo(() => resolveSuiteBranch(suite, branches), [suite, branches]);
 
   const fetchPricing = async () => {
     if (!suite) return;
@@ -292,6 +299,18 @@ if (step >= 1 && suite) {
 
             {step === 3 && (
               <div className="booking-step-body">
+                {stayBranch && (
+                  <div className="stay-location">
+                    <h3 className="stay-location-title">Dónde te hospedarás</h3>
+                    <p className="form-hint">{stayBranch.address}{stayBranch.zone ? ` · ${stayBranch.zone}` : ''}</p>
+                    <Suspense fallback={<div className="branch-map"><div className="spinner" /></div>}>
+                      <BranchMap branch={stayBranch} />
+                    </Suspense>
+                    {(stayBranch.checkInTime || stayBranch.checkOutTime) && (
+                      <p className="form-hint">Check-in {stayBranch.checkInTime} · Check-out {stayBranch.checkOutTime}</p>
+                    )}
+                  </div>
+                )}
                 {pricingLoading && <p className="form-hint">Calculando precio…</p>}
                 {pricingError && <p className="form-error">{pricingError}</p>}
                 {pricing && (
