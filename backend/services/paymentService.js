@@ -36,7 +36,14 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
 
     // Mismo intento repetido (doble clic, reintento de red): devolver lo ya hecho
     const previous = await Payment.findOne({ booking: booking._id, idempotencyKey });
-    if (previous) return { payment: previous, booking, replay: true };
+    if (previous) {
+      // Un intento fallido (rechazado, error de pasarela o anulado) NO se "repite":
+      // devolverlo haría creer al cliente que pagó. Debe reintentar con otra clave.
+      if (['declined', 'void'].includes(previous.status)) {
+        throw new PaymentError(409, 'El intento de pago anterior no se completó. Intenta de nuevo.', 'RETRY_NEW_KEY');
+      }
+      return { payment: previous, booking, replay: true };
+    }
 
     if (booking.paymentStatus === 'paid') {
       const paid = await Payment.findOne({ booking: booking._id, status: 'approved' });
@@ -70,30 +77,45 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
       throw new PaymentError(409, 'Esta reserva ya está pagada', 'ALREADY_PAID');
     }
 
+    const createPayment = () => Payment.create({
+      booking: booking._id,
+      user: userId,
+      amount: chargeAmount,
+      currency: CURRENCY,
+      method,
+      provider: provider.name,
+      status: 'processing',
+      active: true,
+      idempotencyKey
+    });
+
     let payment;
     try {
-      payment = await Payment.create({
-        booking: booking._id,
-        user: userId,
-        amount: chargeAmount,
-        currency: CURRENCY,
-        method,
-        provider: provider.name,
-        status: 'processing',
-        active: true,
-        idempotencyKey
-      });
+      payment = await createPayment();
     } catch (err) {
-      if (err?.code === 11000) {
-        // Otra petición con la misma clave ganó la carrera
-        const winner = await Payment.findOne({ booking: booking._id, idempotencyKey });
-        if (winner) return { payment: winner, booking, replay: true };
+      if (err?.code !== 11000) throw err;
+      // Otra petición con la misma clave ganó la carrera
+      const winner = await Payment.findOne({ booking: booking._id, idempotencyKey });
+      if (winner) return { payment: winner, booking, replay: true };
+      const active = await Payment.findOne({ booking: booking._id, active: true });
+      if (active?.status === 'approved') {
+        // Pago aprobado ANTERIOR que quedó con active:true (versiones viejas del
+        // código). No es un reintento de este cobro: es el pago original, y dejarlo
+        // bloqueando impedía cobrar los días extra al modificar fechas.
+        // Se libera y se cobra el saldo pendiente.
+        await Payment.updateOne({ _id: active._id }, { $unset: { active: 1 } });
+        try {
+          payment = await createPayment();
+        } catch (err2) {
+          if (err2?.code === 11000) {
+            throw new PaymentError(409, 'Ya hay un pago en proceso para esta reserva. Espera unos segundos.', 'PAYMENT_IN_PROGRESS');
+          }
+          throw err2;
+        }
+      } else {
         // Otro intento (clave distinta) ya está cobrando esta reserva
-        const active = await Payment.findOne({ booking: booking._id, active: true });
-        if (active?.status === 'approved') return { payment: active, booking, replay: true };
         throw new PaymentError(409, 'Ya hay un pago en proceso para esta reserva. Espera unos segundos.', 'PAYMENT_IN_PROGRESS');
       }
-      throw err;
     }
 
     let result;
