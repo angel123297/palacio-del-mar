@@ -19,20 +19,24 @@ Necesitas Docker. Desde la carpeta del proyecto:
 
 ```bash
 docker compose up -d --build        # o:  bash run.sh   (además guarda logs)
-docker compose exec backend npm run seed     # SOLO la primera vez: carga las sucursales y habitaciones
 ```
 
-Abre **http://localhost:8080**.
+Abre **http://localhost:8080**. No hace falta ningún paso más: en el primer arranque el
+backend carga solo las sucursales, habitaciones y experiencias, y crea las cuentas de
+administrador y anfitrión de desarrollo.
 
-> `AUTO_SEED` está en `false` en el compose: sin el `seed` el catálogo sale vacío.
-> El `seed` **borra** sucursales, suites, experiencias, noches ocupadas y promociones
-> y las vuelve a crear (no borra reservas ni usuarios).
+> `AUTO_SEED` está en `true` en el compose: si el catálogo está vacío se carga solo, y en los
+> siguientes arranques no repite ni borra nada. Para **recargar desde cero** usa
+> `docker compose exec backend npm run seed`: borra sucursales, suites, experiencias, noches
+> ocupadas y promociones y las vuelve a crear (no borra reservas ni usuarios). Si solo faltan
+> experiencias: `docker compose exec backend npm run seed:experiences` (no borra nada).
 
 | Qué | Dónde |
 |---|---|
 | Sitio | http://localhost:8080 |
 | Panel de administración | http://localhost:8080/admin |
 | Cuenta de administrador | definida en `docker-compose.yml` (variables `ADMIN_*` y `DEV_ADMIN_*`); también `docker compose exec backend npm run create-admin` |
+| Cuenta de anfitrión | en desarrollo, `anfitrion@palaciomar.co` (ver `DEV_HOST_DEFAULTS` en `backend/bootstrap.js`); se puede cambiar con `HOST_EMAIL`, `HOST_PASSWORD` y `HOST_NAME`. **En producción no existe valor por defecto**: sin `HOST_EMAIL` y `HOST_PASSWORD` (12+ caracteres, letras y números) no se crea. |
 | MongoDB (Compass) | `mongodb://localhost:27017/palacio_db` (sin usuario; solo desde tu PC) |
 
 > Las credenciales de desarrollo y la clave JWT viven solo en `docker-compose.yml` y son

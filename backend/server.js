@@ -1,7 +1,8 @@
+// Primero: así .env ya está cargado cuando los demás módulos leen process.env al importarse
+import 'dotenv/config';
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
 import connectDB, { getConnectionStatus, startConnectionMonitoring, closeConnection } from './database/db.js';
@@ -20,6 +21,7 @@ import { isEmailConfigured } from './utils/email.js';
 import { runStartupBootstrap } from './bootstrap.js';
 import { runBranchMigration } from './migrations/branches.js';
 import { runHoldMigration } from './migrations/holds.js';
+import { runRepairPartialPending } from './migrations/repairPartialPending.js';
 import { startBookingExpiry, stopBookingExpiry } from './services/bookingExpiry.js';
 import { 
   errorHandler, 
@@ -28,8 +30,6 @@ import {
   asyncHandler 
 } from './middleware/errorHandler.js';
 
-// Cargar variables de entorno
-dotenv.config();
 
 // ============================================
 // CONFIGURACIÓN INICIAL
@@ -226,6 +226,7 @@ const startServer = async () => {
     
     await runBranchMigration();
     await runHoldMigration();
+    await runRepairPartialPending();
     await runStartupBootstrap();
     startBookingExpiry();
     

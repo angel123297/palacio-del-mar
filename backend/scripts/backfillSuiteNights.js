@@ -13,14 +13,14 @@
  *   segunda no puede bloquear: se lista para resolverla manualmente.
  * - Elimina bloqueos huérfanos (reserva inexistente o ya no bloqueante).
  */
-import dotenv from 'dotenv';
+// Primero: así .env ya está cargado cuando los demás módulos leen process.env al importarse
+import 'dotenv/config';
 import connectDB, { closeConnection } from '../database/db.js';
 import Booking, { BLOCKING_BOOKING_STATUSES } from '../models/Booking.js';
 import SuiteNight, { NightsConflictError } from '../models/SuiteNight.js';
 import Suite from '../models/Suite.js';
 import { eachNight } from '../utils/dates.js';
 
-dotenv.config();
 const apply = process.argv.includes('--apply');
 
 const run = async () => {

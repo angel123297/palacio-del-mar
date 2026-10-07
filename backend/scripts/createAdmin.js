@@ -11,11 +11,12 @@
  *   Con Docker Compose:  docker compose exec backend npm run create-admin
  *   Sin Docker:          npm run create-admin   (con un backend/.env)
  */
-import dotenv from 'dotenv';
+// Primero: así .env ya está cargado cuando los demás módulos leen process.env al importarse
+import 'dotenv/config';
 import connectDB, { closeConnection } from '../database/db.js';
 import User from '../models/User.js';
+import { isMainModule } from '../utils/isMain.js';
 
-dotenv.config();
 
 /** ¿Es una contraseña de administrador débil o de ejemplo? Reutilizado por bootstrap.js. */
 export const isWeakAdminPassword = (password) => {
@@ -90,7 +91,7 @@ const run = async () => {
   process.exit(0);
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   run().catch((error) => {
     console.error('❌ Error creando el administrador:', error.message);
     process.exit(1);

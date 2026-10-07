@@ -1,8 +1,8 @@
-import dotenv from 'dotenv';
+// Primero: así .env ya está cargado cuando los demás módulos leen process.env al importarse
+import 'dotenv/config';
 import mongoose from 'mongoose';
 
 // Cargar variables de entorno
-dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/palacio_del_mar';
 
@@ -13,6 +13,7 @@ import SuiteNight from '../models/SuiteNight.js';
 import Promotion from '../models/Promotion.js';
 import { ensureBranches } from './branches.js';
 import { buildSamplePromotions } from './promotions.js';
+import { isMainModule } from '../utils/isMain.js';
 
 export const suites = [
   { 
@@ -270,14 +271,22 @@ export const insertSeedData = async ({ clear = true } = {}) => {
   for (const suite of branchSuites) {
     await Suite.create(suite);
   }
+  // Sin `clear` (arranque automático) puede haber datos previos: no se duplican ni
+  // fallan por los índices únicos (nombre/slug de experiencia).
+  let createdExperiences = 0;
   for (const exp of experiences) {
+    if (!clear && (await Experience.exists({ name: exp.name }))) continue;
     await Experience.create(exp);
+    createdExperiences += 1;
   }
-  const promos = buildSamplePromotions(branchesBySlug);
-  for (const promo of promos) {
-    await Promotion.create(promo);
+  let promos = [];
+  if (clear || (await Promotion.countDocuments({ isSample: true })) === 0) {
+    promos = buildSamplePromotions(branchesBySlug);
+    for (const promo of promos) {
+      await Promotion.create(promo);
+    }
   }
-  return { branches: branchesBySlug.size, suites: branchSuites.length, experiences: experiences.length, promotions: promos.length };
+  return { branches: branchesBySlug.size, suites: branchSuites.length, experiences: createdExperiences, promotions: promos.length };
 };
 
 /**
@@ -318,6 +327,6 @@ const seedDatabase = async () => {
 
 // Solo se ejecuta como script (no al importar suites/experiences/insertSeedData
 // desde bootstrap.js)
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   seedDatabase();
 }

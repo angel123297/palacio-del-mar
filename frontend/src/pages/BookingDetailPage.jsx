@@ -8,6 +8,7 @@ import { useBookingCart } from '../context/BookingCartContext.jsx';
 import { downloadIcs } from '../utils/calendar.js';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatCOP, formatCalendarDate } from '../utils/format';
+import { paymentBalance } from '../utils/checkout.js';
 
 const STATUS_CLASS = {
   pending: 'pill-pending',
@@ -153,12 +154,12 @@ export default function BookingDetailPage() {
                 )}
                 <div className="price-total"><span>Total</span><span>{formatCOP(booking.totalPrice)}</span></div>
                 {booking.paymentStatus === 'partial' && (() => {
-                  // neto en poder del hotel = recibido − devuelto
-                  const paidNet = Math.max(0, (booking.amountPaid || 0) - (booking.amountRefunded || 0));
+                  // Misma cuenta que la pantalla de pago y que el servidor (neto de devoluciones)
+                  const { alreadyPaid, remaining } = paymentBalance(booking);
                   return (
                     <>
-                      <div><span>Ya pagado</span><span>{formatCOP(paidNet)}</span></div>
-                      <div><span><strong>Saldo por pagar</strong></span><span><strong>{formatCOP(Math.max(0, booking.totalPrice - paidNet))}</strong></span></div>
+                      <div><span>Ya pagado</span><span>{formatCOP(alreadyPaid)}</span></div>
+                      <div><span><strong>Saldo por pagar</strong></span><span><strong>{formatCOP(remaining)}</strong></span></div>
                     </>
                   );
                 })()}

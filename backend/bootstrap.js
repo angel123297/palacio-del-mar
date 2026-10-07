@@ -126,41 +126,68 @@ export const ensureAdminPhones = async () => {
 };
 
 /**
- * Crea automáticamente un usuario anfitrión (host) con acceso a todas las sucursales si no existe.
+ * Credenciales de anfitrión SOLO para desarrollo local (docker compose). En
+ * producción (NODE_ENV=production) nunca se usan: hay que definir HOST_EMAIL y
+ * HOST_PASSWORD de verdad.
  */
-export const autoCreateHostIfMissing = async () => {
-  const email = process.env.HOST_EMAIL || 'anfitrion@palaciomar.co';
-  const password = process.env.HOST_PASSWORD || 'AulaDocker2026Segura';
-  const name = process.env.HOST_NAME || 'Anfitrión General';
+export const DEV_HOST_DEFAULTS = {
+  name: 'Anfitrión General',
+  email: 'anfitrion@palaciomar.co',
+  password: 'AulaDocker2026Segura'
+};
 
-  const branches = await Branch.find().select('_id');
-  const branchIds = branches.map((b) => b._id);
+/**
+ * Crea el usuario anfitrión (host) con acceso a todas las sucursales si no existe.
+ *
+ * Reglas de seguridad:
+ *  - En producción no hay valores por defecto: sin HOST_EMAIL/HOST_PASSWORD (o con
+ *    una contraseña débil o la de ejemplo) no se crea nada y se avisa en el log.
+ *  - Una cuenta existente NUNCA se modifica salvo para completar sus sucursales si
+ *    las tiene vacías: no se cambia su contraseña, estado ni verificación (antes
+ *    cada reinicio volvía a escribir la contraseña por defecto).
+ *  - Si el correo ya pertenece a otro rol (cliente, admin) no se convierte en
+ *    anfitrión: se avisa y se deja intacto.
+ *
+ * `User`, `Branch` y `env` se pueden inyectar para probarla sin base de datos.
+ */
+export const autoCreateHostIfMissing = async ({ User: UserModel = User, Branch: BranchModel = Branch, env = process.env } = {}) => {
+  const isProduction = env.NODE_ENV === 'production';
+  const email = String(env.HOST_EMAIL || (isProduction ? '' : DEV_HOST_DEFAULTS.email)).trim().toLowerCase();
+  const password = env.HOST_PASSWORD || (isProduction ? '' : DEV_HOST_DEFAULTS.password);
+  const name = env.HOST_NAME || DEV_HOST_DEFAULTS.name;
 
-  let user = await User.findOne({ email: email.toLowerCase() }).select('+password');
-  if (user && user.role === 'host') {
-    // Asegurar que tenga las ramas actualizadas y la contraseña correcta
-    user.branches = branchIds;
-    user.status = 'active';
-    user.emailVerified = true;
-    user.password = password;
-    await user.save();
-    return { created: false, updated: true };
+  if (!email || !password) {
+    console.warn('[Bootstrap] ⚠️ NODE_ENV=production: no se crea el anfitrión automáticamente porque faltan HOST_EMAIL/HOST_PASSWORD (en producción no se usan valores por defecto).');
+    return { created: false, reason: 'missing_env' };
+  }
+  if (isProduction && (isWeakAdminPassword(password) || password === DEV_HOST_DEFAULTS.password)) {
+    console.warn('[Bootstrap] ⚠️ HOST_PASSWORD es débil o es la contraseña de ejemplo: no se creó el anfitrión. Usa 12+ caracteres con letras y números que no sean los de ejemplo.');
+    return { created: false, reason: 'weak_password' };
   }
 
-  if (user) {
-    // Si ya existe con otro rol, promover o actualizar
-    user.role = 'host';
-    user.branches = branchIds;
-    user.status = 'active';
-    user.emailVerified = true;
-    user.password = password;
-    await user.save();
-    return { created: false, updated: true };
+  const allBranchIds = async () => (await BranchModel.find().select('_id')).map((b) => b._id);
+
+  const existing = await UserModel.findOne({ email });
+  if (existing) {
+    if (existing.role !== 'host') {
+      console.warn(`[Bootstrap] ⚠️ ${email} ya existe con el rol "${existing.role}": no se convierte en anfitrión ni se modifica. Define otro HOST_EMAIL.`);
+      return { created: false, reason: 'email_in_use' };
+    }
+    // Solo se completan las sucursales si no tiene ninguna (p. ej. se creó antes que ellas)
+    if (!existing.branches || existing.branches.length === 0) {
+      const branchIds = await allBranchIds();
+      if (branchIds.length) {
+        await UserModel.updateOne({ _id: existing._id }, { $set: { branches: branchIds } });
+        return { created: false, updated: true };
+      }
+    }
+    return { created: false, updated: false };
   }
 
-  const hostUser = new User({
+  const branchIds = await allBranchIds();
+  const hostUser = new UserModel({
     name,
-    email: email.toLowerCase(),
+    email,
     password,
     role: 'host',
     branches: branchIds,
@@ -168,7 +195,13 @@ export const autoCreateHostIfMissing = async () => {
     emailVerified: true
   });
 
-  await hostUser.save();
+  try {
+    await hostUser.save();
+  } catch (err) {
+    // Dos instancias arrancando a la vez: la otra ya lo creó
+    if (err?.code === 11000) return { created: false, reason: 'race' };
+    throw err;
+  }
   console.log(`[Bootstrap] ✅ Anfitrión creado automáticamente: ${email} con acceso a ${branchIds.length} sucursales.`);
   return { created: true };
 };
