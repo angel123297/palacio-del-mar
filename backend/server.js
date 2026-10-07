@@ -1,7 +1,8 @@
+// Primero: así .env ya está cargado cuando los demás módulos leen process.env al importarse
+import 'dotenv/config';
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
 import connectDB, { getConnectionStatus, startConnectionMonitoring, closeConnection } from './database/db.js';
@@ -29,8 +30,6 @@ import {
   asyncHandler 
 } from './middleware/errorHandler.js';
 
-// Cargar variables de entorno
-dotenv.config();
 
 // ============================================
 // CONFIGURACIÓN INICIAL

@@ -8,13 +8,13 @@
  *
  * Uso:  docker compose exec backend npm run seed:experiences
  */
-import dotenv from 'dotenv';
+// Primero: así .env ya está cargado cuando los demás módulos leen process.env al importarse
+import 'dotenv/config';
 import connectDB, { closeConnection } from '../database/db.js';
 import Experience from '../models/Experience.js';
 import { experiences } from '../seed/seedData.js';
 import { isMainModule } from '../utils/isMain.js';
 
-dotenv.config();
 
 /** Inserta las experiencias del seed cuyo slug todavía no existe. Devuelve cuántas creó. */
 export const addMissingExperiences = async (model = Experience, seed = experiences) => {
