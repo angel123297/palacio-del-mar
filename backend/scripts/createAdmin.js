@@ -14,6 +14,7 @@
 import dotenv from 'dotenv';
 import connectDB, { closeConnection } from '../database/db.js';
 import User from '../models/User.js';
+import { isMainModule } from '../utils/isMain.js';
 
 dotenv.config();
 
@@ -90,7 +91,7 @@ const run = async () => {
   process.exit(0);
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   run().catch((error) => {
     console.error('❌ Error creando el administrador:', error.message);
     process.exit(1);
