@@ -99,11 +99,13 @@ const calculateTotalPrice = async (suite, checkInDate, checkOutDate, experienceI
  * de pago (/pagar/:id). Hoy el cobro es SIMULADO (ver services/payments).
  */
 // Marca el/los pago(s) aprobados de la reserva como reembolsados (no rompe la operación si falla)
-export const markPaymentsRefunded = async (bookingId, amount) => {
+// `refundedAmount` se ACUMULA ($inc): antes se sobrescribía y una cancelación borraba las
+// devoluciones parciales ya registradas por recordPartialRefund (quitar experiencias, acortar).
+export const markPaymentsRefunded = async (bookingId, amount, PaymentModel = Payment) => {
   try {
-    await Payment.updateMany(
+    await PaymentModel.updateMany(
       { booking: bookingId, status: 'approved' },
-      { $set: { status: 'refunded', refundedAmount: amount, refundedAt: new Date() }, $unset: { active: 1 } }
+      { $set: { status: 'refunded', refundedAt: new Date() }, $inc: { refundedAmount: amount }, $unset: { active: 1 } }
     );
   } catch (err) {
     console.error('[Reembolso] No se pudo marcar el pago como reembolsado:', err.message);
