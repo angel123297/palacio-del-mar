@@ -1,8 +1,8 @@
-import dotenv from 'dotenv';
+// Primero: así .env ya está cargado cuando los demás módulos leen process.env al importarse
+import 'dotenv/config';
 import mongoose from 'mongoose';
 
 // Cargar variables de entorno
-dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/palacio_del_mar';
 
