@@ -15,3 +15,15 @@ export const resolveSuiteBranch = (suite, branches = []) => {
   );
   return hasCoords(found) ? found : null;
 };
+
+// Mapa de respaldo (sin WebGL): el mapa embebido de OpenStreetMap en un <iframe>.
+// bbox = minLon,minLat,maxLon,maxLat ; marker = lat,lng
+export const osmEmbedUrl = (lat, lng) => {
+  const dLng = 0.006;
+  const dLat = 0.004;
+  const bbox = [lng - dLng, lat - dLat, lng + dLng, lat + dLat].map((n) => n.toFixed(5)).join(',');
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat.toFixed(5)}%2C${lng.toFixed(5)}`;
+};
+
+export const osmLinkUrl = (lat, lng) =>
+  `https://www.openstreetmap.org/?mlat=${lat.toFixed(5)}&mlon=${lng.toFixed(5)}#map=17/${lat.toFixed(5)}/${lng.toFixed(5)}`;

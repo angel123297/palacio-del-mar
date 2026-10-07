@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { osmEmbedUrl, osmLinkUrl } from '../utils/stayLocation.js';
 
 const STYLE = {
   version: 8,
@@ -60,7 +61,9 @@ export default function BranchMap({ branch, quiet = false }) {
         });
 
         map.on('error', () => { /* un mosaico que no carga no rompe el mapa */ });
-      } catch {
+      } catch (err) {
+        // Casi siempre: el navegador no tiene WebGL (aceleración desactivada o bloqueado)
+        console.warn('[BranchMap] No se pudo crear el mapa interactivo; se usa el mapa de respaldo:', err);
         if (!cancelled) setFailed(true);
       }
     })();
@@ -70,10 +73,26 @@ export default function BranchMap({ branch, quiet = false }) {
     };
   }, [lat, lng, branch]);
 
-  if (typeof lat !== 'number' || typeof lng !== 'number' || failed) {
+  if (typeof lat !== 'number' || typeof lng !== 'number') {
     // `quiet`: el contenedor ya muestra la dirección en texto (p. ej. el modal de reserva)
     if (quiet) return null;
     return <p className="muted">{branch?.address || 'Ubicación no disponible'}</p>;
+  }
+  if (failed) {
+    // Respaldo sin WebGL: mapa estático embebido de OpenStreetMap
+    return (
+      <div>
+        <iframe
+          className="branch-map"
+          title={`Mapa de ${branch.name}`}
+          src={osmEmbedUrl(lat, lng)}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          style={{ border: 0, width: '100%' }}
+        />
+        <p className="form-hint"><a href={osmLinkUrl(lat, lng)} target="_blank" rel="noopener noreferrer">Ver en OpenStreetMap</a></p>
+      </div>
+    );
   }
   return <div className="branch-map" ref={ref} role="region" aria-label={`Mapa de ${branch.name}`} />;
 }

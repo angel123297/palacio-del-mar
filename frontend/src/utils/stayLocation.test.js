@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveSuiteBranch } from './stayLocation.js';
+import { resolveSuiteBranch, osmEmbedUrl, osmLinkUrl } from './stayLocation.js';
 
 const loc = { lat: 10.42, lng: -75.55 };
 const branches = [
@@ -29,4 +29,18 @@ test('sin coordenadas, sin sucursal o sin lista: devuelve null (no se pinta el m
   assert.equal(resolveSuiteBranch(null, branches), null);
   assert.equal(resolveSuiteBranch({ branch: 'b1' }, []), null);
   assert.equal(resolveSuiteBranch({ branch: 'b1' }, undefined), null);
+});
+
+test('mapa de respaldo: bbox en orden lon,lat y marcador lat,lng', () => {
+  const url = new URL(osmEmbedUrl(10.42, -75.55));
+  assert.equal(url.origin + url.pathname, 'https://www.openstreetmap.org/export/embed.html');
+  const [minLon, minLat, maxLon, maxLat] = url.searchParams.get('bbox').split(',').map(Number);
+  assert.ok(minLon < -75.55 && -75.55 < maxLon, 'la longitud queda dentro del bbox');
+  assert.ok(minLat < 10.42 && 10.42 < maxLat, 'la latitud queda dentro del bbox');
+  assert.equal(url.searchParams.get('marker'), '10.42000,-75.55000');
+  assert.equal(url.searchParams.get('layer'), 'mapnik');
+});
+
+test('enlace a OpenStreetMap con la ubicación', () => {
+  assert.equal(osmLinkUrl(10.42, -75.55), 'https://www.openstreetmap.org/?mlat=10.42000&mlon=-75.55000#map=17/10.42000/-75.55000');
 });

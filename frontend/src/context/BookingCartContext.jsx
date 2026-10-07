@@ -1,3 +1,4 @@
+import { isObjectId } from '../utils/ids.js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import api from '../api/client';
 
@@ -79,6 +80,7 @@ export function BookingCartProvider({ children }) {
   }, []);
 
   const toggleExperience = useCallback((exp) => {
+    if (!isObjectId(exp?._id)) return; // nunca guardar experiencias que no existen en la BD
     setExperiences((prev) =>
       prev.some((e) => e._id === exp._id)
         ? prev.filter((e) => e._id !== exp._id)

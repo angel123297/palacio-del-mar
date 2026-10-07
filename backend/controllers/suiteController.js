@@ -651,6 +651,10 @@ export const calculatePrice = async (req, res) => {
     if (!isValidObjectId(String(suiteId))) {
       return res.status(400).json({ success: false, message: 'ID de suite inválido' });
     }
+    // Un id de experiencia inválido (p. ej. "fx-3") reventaba Mongoose con un 500
+    if (includeExperiences && Array.isArray(experienceIds) && !experienceIds.every((id) => isValidObjectId(String(id)))) {
+      return res.status(400).json({ success: false, message: 'Una de las experiencias seleccionadas no es válida. Quítala e inténtalo de nuevo.' });
+    }
     const suite = await Suite.findById(suiteId);
     if (!suite) {
       return res.status(404).json({
