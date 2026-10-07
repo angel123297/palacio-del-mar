@@ -7,3 +7,6 @@ dist/
 .DS_Store
 logs/
 *.patch
+
+frontend/playwright-report/
+frontend/test-results/
