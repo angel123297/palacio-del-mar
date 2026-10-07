@@ -270,14 +270,22 @@ export const insertSeedData = async ({ clear = true } = {}) => {
   for (const suite of branchSuites) {
     await Suite.create(suite);
   }
+  // Sin `clear` (arranque automático) puede haber datos previos: no se duplican ni
+  // fallan por los índices únicos (nombre/slug de experiencia).
+  let createdExperiences = 0;
   for (const exp of experiences) {
+    if (!clear && (await Experience.exists({ name: exp.name }))) continue;
     await Experience.create(exp);
+    createdExperiences += 1;
   }
-  const promos = buildSamplePromotions(branchesBySlug);
-  for (const promo of promos) {
-    await Promotion.create(promo);
+  let promos = [];
+  if (clear || (await Promotion.countDocuments({ isSample: true })) === 0) {
+    promos = buildSamplePromotions(branchesBySlug);
+    for (const promo of promos) {
+      await Promotion.create(promo);
+    }
   }
-  return { branches: branchesBySlug.size, suites: branchSuites.length, experiences: experiences.length, promotions: promos.length };
+  return { branches: branchesBySlug.size, suites: branchSuites.length, experiences: createdExperiences, promotions: promos.length };
 };
 
 /**
