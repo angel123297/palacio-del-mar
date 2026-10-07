@@ -110,6 +110,24 @@ export const markPaymentsRefunded = async (bookingId, amount) => {
   }
 };
 
+/**
+ * Devolución PARCIAL (la reserva sigue pagada: se quitó una experiencia o se acortó
+ * la estadía). Suma lo devuelto al pago aprobado más reciente sin cambiar su estado:
+ * marcarlo 'refunded' diría que se devolvió todo cuando la reserva sigue activa.
+ * No rompe la operación si falla.
+ */
+export const recordPartialRefund = async (bookingId, amount, PaymentModel = Payment) => {
+  try {
+    await PaymentModel.findOneAndUpdate(
+      { booking: bookingId, status: 'approved' },
+      { $inc: { refundedAmount: amount }, $set: { refundedAt: new Date() } },
+      { sort: { approvedAt: -1 } }
+    );
+  } catch (err) {
+    console.error('[Reembolso] No se pudo registrar la devolución parcial en el pago:', err.message);
+  }
+};
+
 const getPaymentInfo = (booking) => ({
   required: true,
   amount: booking.totalPrice,
@@ -685,8 +703,8 @@ export const modifyBookingDates = async (req, res) => {
       throw err;
     }
     if (refundAmount > 0) {
-      await markPaymentsRefunded(booking._id, refundAmount).catch((e) =>
-        console.error('[ModifyBookingDates] No se marcaron pagos como reembolsados:', e.message));
+      // La reserva sigue pagada: es una devolución parcial, no un pago reembolsado entero
+      await recordPartialRefund(booking._id, refundAmount);
     }
     // Guardado OK: liberar las noches que ya no se usan
     if (nightsToRelease.length) {
@@ -1140,8 +1158,9 @@ export const removeExperienceFromBooking = async (req, res) => {
     const { refundAmount, balanceDue } = settleTotalChange(booking, newTotal);
 
     await booking.save();
+    if (refundAmount > 0) await recordPartialRefund(booking._id, refundAmount);
     await booking.populate('experiences');
-    
+
     res.json({
       success: true,
       message: refundAmount > 0
