@@ -60,14 +60,19 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
       throw new PaymentError(409, 'El tiempo para pagar terminó. Vuelve a reservar.', 'HOLD_EXPIRED');
     }
 
+    // Lo que el hotel ya tiene (neto): recibido menos devuelto. Con amountPaid = bruto,
+    // restar lo devuelto evita cobrar de menos/de más tras un reembolso por cambio de precio.
+    const refunded = booking.amountRefunded || 0;
     let alreadyPaid = 0;
     if (booking.paymentStatus === 'partial') {
       if (booking.amountPaid > 0) {
-        alreadyPaid = booking.amountPaid;
+        alreadyPaid = Math.max(0, booking.amountPaid - refunded);
       } else {
         const approvedPayments = await Payment.find({ booking: booking._id, status: 'approved' });
         alreadyPaid = approvedPayments.reduce((sum, p) => sum + p.amount, 0);
-        if (alreadyPaid === 0 && booking.modificationHistory?.length) {
+        // Solo una reserva YA confirmada pudo haber pagado antes. Una pendiente que nunca se
+        // pagó (amountPaid 0, sin pagos) debe cobrarse completa, no solo la diferencia.
+        if (alreadyPaid === 0 && booking.status === 'confirmed' && booking.modificationHistory?.length) {
           alreadyPaid = booking.modificationHistory[booking.modificationHistory.length - 1].oldTotalPrice || 0;
         }
       }
@@ -164,7 +169,7 @@ export const createPaymentService = ({ Booking, Payment, provider, now = () => n
         $set: {
           status: 'confirmed',
           paymentStatus: 'paid',
-          amountPaid: booking.totalPrice,
+          amountPaid: booking.totalPrice + refunded, // bruto: neto = total + lo ya devuelto
           paidAt,
           paymentMethod: method,
           transactionId: result.providerRef

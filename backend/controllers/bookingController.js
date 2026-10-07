@@ -2,6 +2,7 @@ import Booking, { BOOKING_STATUS, PAYMENT_STATUS, STATUS_TRANSITIONS, PAYMENT_ST
 import SuiteNight, { NightsConflictError } from '../models/SuiteNight.js';
 import { toCalendarDate, todayCalendarDate, calculateNights, eachNight, daysBetween } from '../utils/dates.js';
 import { calculateCancellation, getCollectedAmount } from '../utils/pricing.js';
+import { settleTotalChange } from '../utils/settlement.js';
 
 const BLOCKING_STATUSES = [BOOKING_STATUS.PENDING, BOOKING_STATUS.CONFIRMED];
 import Suite from '../models/Suite.js';
@@ -141,7 +142,8 @@ const recalcExperienceTotals = async (booking) => {
   booking.discount = totals.discount;
   booking.discountReason = totals.discountReason;
   if (booking.pricing) booking.pricing.discountType = totals.discountType;
-  booking.totalPrice = totals.total;
+  // El nuevo total lo asigna settleTotalChange (cobra o devuelve la diferencia)
+  return totals.total;
 };
 // ============================================
 // MAIN CONTROLLERS
@@ -656,20 +658,9 @@ export const modifyBookingDates = async (req, res) => {
     booking.discount = pricing.discount;
     booking.discountReason = pricing.discountReason;
     booking.pricing = pricing.pricing;
-    booking.totalPrice = pricing.totalPrice;
-    let refundAmount = 0;
-    if (priceDifference > 0) {
-      booking.paymentStatus = PAYMENT_STATUS.PARTIAL;
-    } else if (priceDifference < 0 && (booking.paymentStatus === PAYMENT_STATUS.PAID || booking.paymentStatus === PAYMENT_STATUS.PARTIAL)) {
-      refundAmount = Math.abs(priceDifference);
-      booking.amountRefunded = (booking.amountRefunded || 0) + refundAmount;
-      if (booking.amountPaid && booking.amountPaid > booking.totalPrice) {
-        booking.amountPaid = booking.totalPrice;
-      }
-      if (booking.amountPaid && booking.amountPaid <= booking.amountRefunded) {
-        booking.paymentStatus = PAYMENT_STATUS.REFUNDED;
-      }
-    }
+    // Cobra o devuelve la diferencia solo si ya hubo dinero recibido; una reserva
+    // pendiente sin pagar solo cambia de total (antes quedaba 'partial' y se cobraba de menos)
+    const { refundAmount, balanceDue } = settleTotalChange(booking, pricing.totalPrice);
     booking.modifiedAt = new Date();
     booking.modificationHistory = booking.modificationHistory || [];
     booking.modificationHistory.push({
@@ -716,7 +707,8 @@ export const modifyBookingDates = async (req, res) => {
         addedNights,
         extraChargeExpiresAt,
         needsPayment: priceDifference > 0,
-        refundAmount: priceDifference < 0 ? Math.abs(priceDifference) : 0
+        balanceDue,
+        refundAmount
       }
     });
     
@@ -1065,17 +1057,23 @@ export const addExperienceToBooking = async (req, res) => {
     
     // Agregar experiencia
     booking.experiences.push(experienceId);
-    await recalcExperienceTotals(booking);
+    const newTotal = await recalcExperienceTotals(booking);
+    // Si la reserva ya estaba pagada, la experiencia nueva queda como saldo por pagar
+    const { balanceDue } = settleTotalChange(booking, newTotal);
     
     await booking.save();
     await booking.populate('experiences');
     
     res.json({
       success: true,
-      message: 'Experiencia agregada exitosamente',
+      message: balanceDue > 0
+        ? 'Experiencia agregada. Queda un saldo por pagar.'
+        : 'Experiencia agregada exitosamente',
       data: {
         booking,
-        addedExperience: experience
+        addedExperience: experience,
+        balanceDue,
+        needsPayment: balanceDue > 0
       }
     });
     
@@ -1137,15 +1135,21 @@ export const removeExperienceFromBooking = async (req, res) => {
     // Eliminar experiencia y recalcular totales
 
     booking.experiences.splice(experienceIndex, 1);
-    await recalcExperienceTotals(booking);
+    const newTotal = await recalcExperienceTotals(booking);
+    // Si ya estaba pagada, lo que sobra se registra como reembolso
+    const { refundAmount, balanceDue } = settleTotalChange(booking, newTotal);
 
     await booking.save();
     await booking.populate('experiences');
     
     res.json({
       success: true,
-      message: 'Experiencia eliminada exitosamente',
-      data: booking
+      message: refundAmount > 0
+        ? 'Experiencia eliminada. Se registró el reembolso de la diferencia.'
+        : 'Experiencia eliminada exitosamente',
+      // `data` sigue siendo la reserva (compatibilidad); el ajuste va aparte
+      data: booking,
+      settlement: { refundAmount, balanceDue }
     });
     
   } catch (error) {

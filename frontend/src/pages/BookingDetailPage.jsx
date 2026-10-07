@@ -45,8 +45,11 @@ export default function BookingDetailPage() {
   const addExperience = async (exp) => {
     setBusyId(exp._id);
     try {
-      await api.post(`/bookings/${id}/experiences`, { experienceId: exp._id });
-      toast.success(`${exp.name} agregada a tu reserva`);
+      const res = await api.post(`/bookings/${id}/experiences`, { experienceId: exp._id });
+      const due = res.data?.data?.balanceDue || 0;
+      toast.success(due > 0
+        ? `${exp.name} agregada. Tienes un saldo de ${formatCOP(due)} por pagar.`
+        : `${exp.name} agregada a tu reserva`);
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || 'No se pudo agregar la experiencia');
@@ -59,8 +62,11 @@ export default function BookingDetailPage() {
     if (!window.confirm(`¿Quitar "${exp.name}" de tu reserva?`)) return;
     setBusyId(exp._id);
     try {
-      await api.delete(`/bookings/${id}/experiences/${exp._id}`);
-      toast.info(`${exp.name} quitada de tu reserva`);
+      const res = await api.delete(`/bookings/${id}/experiences/${exp._id}`);
+      const refund = res.data?.settlement?.refundAmount || 0;
+      toast.info(refund > 0
+        ? `${exp.name} quitada. Se registró un reembolso de ${formatCOP(refund)}.`
+        : `${exp.name} quitada de tu reserva`);
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || 'No se pudo quitar la experiencia');
@@ -146,6 +152,16 @@ export default function BookingDetailPage() {
                   <div><span>{booking.discountReason || 'Descuento'}</span><span>− {formatCOP(booking.discount)}</span></div>
                 )}
                 <div className="price-total"><span>Total</span><span>{formatCOP(booking.totalPrice)}</span></div>
+                {booking.paymentStatus === 'partial' && (() => {
+                  // neto en poder del hotel = recibido − devuelto
+                  const paidNet = Math.max(0, (booking.amountPaid || 0) - (booking.amountRefunded || 0));
+                  return (
+                    <>
+                      <div><span>Ya pagado</span><span>{formatCOP(paidNet)}</span></div>
+                      <div><span><strong>Saldo por pagar</strong></span><span><strong>{formatCOP(Math.max(0, booking.totalPrice - paidNet))}</strong></span></div>
+                    </>
+                  );
+                })()}
               </div>
             </section>
 
