@@ -12,6 +12,7 @@ import dotenv from 'dotenv';
 import connectDB, { closeConnection } from '../database/db.js';
 import Experience from '../models/Experience.js';
 import { experiences } from '../seed/seedData.js';
+import { isMainModule } from '../utils/isMain.js';
 
 dotenv.config();
 
@@ -42,4 +43,4 @@ const run = async () => {
   }
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) run();
+if (isMainModule(import.meta.url)) run();

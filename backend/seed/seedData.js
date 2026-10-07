@@ -13,6 +13,7 @@ import SuiteNight from '../models/SuiteNight.js';
 import Promotion from '../models/Promotion.js';
 import { ensureBranches } from './branches.js';
 import { buildSamplePromotions } from './promotions.js';
+import { isMainModule } from '../utils/isMain.js';
 
 export const suites = [
   { 
@@ -326,6 +327,6 @@ const seedDatabase = async () => {
 
 // Solo se ejecuta como script (no al importar suites/experiences/insertSeedData
 // desde bootstrap.js)
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   seedDatabase();
 }
