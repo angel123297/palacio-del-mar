@@ -20,6 +20,7 @@ import { isEmailConfigured } from './utils/email.js';
 import { runStartupBootstrap } from './bootstrap.js';
 import { runBranchMigration } from './migrations/branches.js';
 import { runHoldMigration } from './migrations/holds.js';
+import { runRepairPartialPending } from './migrations/repairPartialPending.js';
 import { startBookingExpiry, stopBookingExpiry } from './services/bookingExpiry.js';
 import { 
   errorHandler, 
@@ -226,6 +227,7 @@ const startServer = async () => {
     
     await runBranchMigration();
     await runHoldMigration();
+    await runRepairPartialPending();
     await runStartupBootstrap();
     startBookingExpiry();
     
