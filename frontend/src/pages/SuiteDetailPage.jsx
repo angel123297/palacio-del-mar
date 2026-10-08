@@ -149,7 +149,7 @@ export default function SuiteDetailPage() {
               {quote ? (
                 <><strong>{formatCOP(Math.round(quote.lodging / quote.nights))}</strong><span> / noche (promedio)</span></>
               ) : (
-                <><strong>{formatCOP(suite.seasonalPrice)}</strong><span> / noche</span></>
+                <><strong>{formatCOP(suite.seasonalPrice || suite.basePrice)}</strong><span> / noche</span></>
               )}
             </div>
             {!quote && <p className="form-hint">{suite.priceNote}. Elige fechas para ver el total exacto.</p>}

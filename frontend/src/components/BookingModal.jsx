@@ -4,7 +4,7 @@ import api from '../api/client';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useBookingCart, todayISO, readDraft, writeDraft, clearDraft } from '../context/BookingCartContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { formatCOP, formatDate } from '../utils/format';
+import { formatCOP } from '../utils/format';
 import usePaymentConfig from '../hooks/usePaymentConfig.js';
 import { policyText } from '../utils/checkout.js';
 import { contactFromUser, contactAfterUserChange, userKey } from '../utils/contact.js';
@@ -53,7 +53,24 @@ export default function BookingModal() {
   useEffect(() => {
     const prev = userKeyRef.current;
     const next = userKey(user);
-    if (prev === next) return;
+    if (prev === next) {
+      if (user) {
+        setContact((c) => {
+          const fromUser = contactFromUser(user);
+          if (!c.guestPhone && fromUser.guestPhone) {
+            return { ...c, guestPhone: fromUser.guestPhone };
+          }
+          if (!c.guestName && fromUser.guestName) {
+            return { ...c, guestName: fromUser.guestName };
+          }
+          if (!c.guestEmail && fromUser.guestEmail) {
+            return { ...c, guestEmail: fromUser.guestEmail };
+          }
+          return c;
+        });
+      }
+      return;
+    }
     userKeyRef.current = next;
     setContact((c) => contactAfterUserChange(prev, user, c));
     if (prev !== null) {
@@ -71,7 +88,7 @@ export default function BookingModal() {
     setDates({ checkIn: search.checkIn, checkOut: search.checkOut, guests: search.guests, children: search.children || 0 });
     setStep(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suite?._id]);
+  }, [suite?._id || suite?.id]);
 
   // Guarda el borrador mientras la reserva está abierta y sin confirmar
   useEffect(() => {
@@ -89,18 +106,22 @@ export default function BookingModal() {
     }
   }, [user, authModal]);
 
-  const experienceIds = useMemo(() => experiences.map((e) => e._id).filter(isObjectId), [experiences]);
+  const experienceIds = useMemo(
+    () => experiences.map((e) => e._id || e.id).filter(isObjectId),
+    [experiences]
+  );
 
   // Dónde se hospedará (para la previsualización del mapa)
   const stayBranch = useMemo(() => resolveSuiteBranch(suite, branches), [suite, branches]);
 
   const fetchPricing = async () => {
     if (!suite) return;
+    const suiteId = suite._id || suite.id;
     setPricingLoading(true);
     setPricingError('');
     try {
       const res = await api.post('/suites/calculate-price', {
-        suiteId: suite._id,
+        suiteId,
         checkIn: dates.checkIn,
         checkOut: dates.checkOut,
         includeExperiences: experienceIds.length > 0,
@@ -108,7 +129,7 @@ export default function BookingModal() {
       });
       setPricing(res.data.data);
     } catch (err) {
-setPricingError(err.response?.data?.message || 'No se pudo calcular el precio para esta suite. Intenta de nuevo.');
+      setPricingError(err.response?.data?.message || 'No se pudo calcular el precio para esta suite. Intenta de nuevo.');
       setPricing(null);
     } finally {
       setPricingLoading(false);
@@ -116,7 +137,7 @@ setPricingError(err.response?.data?.message || 'No se pudo calcular el precio pa
   };
 
   useEffect(() => {
-if (step >= 1 && suite) {
+    if (step >= 1 && suite) {
       fetchPricing();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,15 +174,15 @@ if (step >= 1 && suite) {
 
   const submitBooking = async () => {
     if (!isAuthenticated) {
-      // Recién aquí se pide la cuenta; la selección se conserva en este modal
       pendingSubmit.current = true;
       setAuthModal('register');
       return;
     }
     setSubmitting(true);
     try {
+      const suiteId = suite._id || suite.id;
       const res = await api.post('/bookings', {
-        suiteId: suite._id,
+        suiteId,
         checkIn: dates.checkIn,
         checkOut: dates.checkOut,
         guests: dates.guests,
@@ -169,9 +190,12 @@ if (step >= 1 && suite) {
         experiences: experienceIds,
         ...contact
       });
-      const bookingId = res.data.data.booking._id;
+
+      const payload = res.data.data || res.data;
+      const bookingId = payload._id || payload.id || payload.booking?._id || payload.booking?.id;
+
       closeAndReset();
-      toast.success(res.data.data.existing ? 'Ya tenías esta reserva pendiente: continúa con el pago.' : 'Te guardamos la habitación. Completa el pago.');
+      toast.success(payload.existing ? 'Ya tenías esta reserva pendiente: continúa con el pago.' : 'Te guardamos la habitación. Completa el pago.');
       navigate(`/pagar/${bookingId}`);
     } catch (err) {
       toast.error(
@@ -194,7 +218,6 @@ if (step >= 1 && suite) {
   };
   const close = closeAndReset;
 
-  // Mientras se muestra el registro/login se oculta este modal (conserva su estado)
   if (authModal && !user) return null;
 
   return (
@@ -202,157 +225,158 @@ if (step >= 1 && suite) {
       <div className="modal-box modal-wide booking-modal">
         <button className="modal-close" onClick={close} aria-label="Cerrar">×</button>
 
-          <>
-            <div className="booking-steps">
-              {STEPS.map((label, i) => (
-                <div key={label} className={`booking-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
-                  <span>{i + 1}</span> {label}
-                </div>
-              ))}
+        <>
+          <div className="booking-steps">
+            {STEPS.map((label, i) => (
+              <div key={label} className={`booking-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
+                <span>{i + 1}</span> {label}
+              </div>
+            ))}
+          </div>
+
+          <h2 className="modal-title">{suite.name}</h2>
+          <p className="modal-copy">{suite.type} · {suite.size} m²</p>
+
+          {step === 0 && (
+            <div className="booking-step-body">
+              <label className="field-label">Llegada</label>
+              <input type="date" min={todayISO()} value={dates.checkIn}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const today = todayISO();
+                  const newIn = val && val < today ? today : (val || today);
+                  const addOne = (iso) => {
+                    const [y, m, d] = iso.split('-').map(Number);
+                    return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+                  };
+                  const newOut = dates.checkOut <= newIn ? addOne(newIn) : dates.checkOut;
+                  setDates({ ...dates, checkIn: newIn, checkOut: newOut });
+                }} />
+              <label className="field-label">Salida</label>
+              <input type="date" min={dates.checkIn} value={dates.checkOut}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const addOne = (iso) => {
+                    const [y, m, d] = iso.split('-').map(Number);
+                    return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+                  };
+                  const newOut = val && val <= dates.checkIn ? addOne(dates.checkIn) : (val || addOne(dates.checkIn));
+                  setDates({ ...dates, checkOut: newOut });
+                }} />
+              <label className="field-label">Adultos</label>
+              <select
+                value={Math.max(1, dates.guests - (dates.children || 0))}
+                onChange={(e) => setDates({ ...dates, guests: Number(e.target.value) + (dates.children || 0) })}
+              >
+                {Array.from({ length: suite.maxGuests || 4 }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <label className="field-label">Niños (máx. {suite.maxGuests || 4} huéspedes en total)</label>
+              <select
+                value={dates.children || 0}
+                onChange={(e) => {
+                  const kids = Number(e.target.value);
+                  setDates({ ...dates, children: kids, guests: Math.max(1, dates.guests - (dates.children || 0)) + kids });
+                }}
+              >
+                {Array.from({ length: Math.max(1, suite.maxGuests || 4) }, (_, i) => i).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <p className="form-hint">{nights} noche(s)</p>
             </div>
+          )}
 
-            <h2 className="modal-title">{suite.name}</h2>
-            <p className="modal-copy">{suite.type} · {suite.size} m²</p>
-
-            {step === 0 && (
-              <div className="booking-step-body">
-                <label className="field-label">Llegada</label>
-                <input type="date" min={todayISO()} value={dates.checkIn}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const today = todayISO();
-                    const newIn = val && val < today ? today : (val || today);
-                    const addOne = (iso) => {
-                      const [y, m, d] = iso.split('-').map(Number);
-                      return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
-                    };
-                    const newOut = dates.checkOut <= newIn ? addOne(newIn) : dates.checkOut;
-                    setDates({ ...dates, checkIn: newIn, checkOut: newOut });
-                  }} />
-                <label className="field-label">Salida</label>
-                <input type="date" min={dates.checkIn} value={dates.checkOut}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const addOne = (iso) => {
-                      const [y, m, d] = iso.split('-').map(Number);
-                      return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
-                    };
-                    const newOut = val && val <= dates.checkIn ? addOne(dates.checkIn) : (val || addOne(dates.checkIn));
-                    setDates({ ...dates, checkOut: newOut });
-                  }} />
-                <label className="field-label">Adultos</label>
-                <select
-                  value={Math.max(1, dates.guests - (dates.children || 0))}
-                  onChange={(e) => setDates({ ...dates, guests: Number(e.target.value) + (dates.children || 0) })}
-                >
-                  {Array.from({ length: suite.maxGuests }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-                <label className="field-label">Niños (máx. {suite.maxGuests} huéspedes en total)</label>
-                <select
-                  value={dates.children || 0}
-                  onChange={(e) => {
-                    const kids = Number(e.target.value);
-                    setDates({ ...dates, children: kids, guests: Math.max(1, dates.guests - (dates.children || 0)) + kids });
-                  }}
-                >
-                  {Array.from({ length: Math.max(1, suite.maxGuests) }, (_, i) => i).map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-                <p className="form-hint">{nights} noche(s)</p>
+          {step === 1 && (
+            <div className="booking-step-body">
+              <p className="form-hint">Suma experiencias a tu estadía (opcional)</p>
+              <div className="exp-pick-list">
+                {allExperiences.map((exp) => {
+                  const expId = exp._id || exp.id;
+                  const checked = experiences.some((e) => (e._id || e.id) === expId);
+                  return (
+                    <label className={`exp-pick ${checked ? 'checked' : ''}`} key={expId}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleExperience(exp)} />
+                      <span className="exp-pick-icon">{exp.icon || '✨'}</span>
+                      <span className="exp-pick-name">{exp.name}</span>
+                      <span className="exp-pick-price">{formatCOP(exp.price)}</span>
+                    </label>
+                  );
+                })}
               </div>
-            )}
+            </div>
+          )}
 
-            {step === 1 && (
-              <div className="booking-step-body">
-                <p className="form-hint">Suma experiencias a tu estadía (opcional)</p>
-                <div className="exp-pick-list">
-                  {allExperiences.map((exp) => {
-                    const checked = experiences.some((e) => e._id === exp._id);
-                    return (
-                      <label className={`exp-pick ${checked ? 'checked' : ''}`} key={exp._id}>
-                        <input type="checkbox" checked={checked} onChange={() => toggleExperience(exp)} />
-                        <span className="exp-pick-icon">{exp.icon}</span>
-                        <span className="exp-pick-name">{exp.name}</span>
-                        <span className="exp-pick-price">{formatCOP(exp.price)}</span>
-                      </label>
-                    );
-                  })}
+          {step === 2 && (
+            <div className="booking-step-body">
+              <label className="field-label">Nombre completo</label>
+              <input value={contact.guestName} onChange={(e) => setContact({ ...contact, guestName: e.target.value })} />
+              <label className="field-label">Email</label>
+              <input type="email" value={contact.guestEmail} onChange={(e) => setContact({ ...contact, guestEmail: e.target.value })} />
+              <label className="field-label">Teléfono</label>
+              <input value={contact.guestPhone} onChange={(e) => setContact({ ...contact, guestPhone: e.target.value })} />
+              <label className="field-label">Solicitudes especiales (opcional)</label>
+              <textarea rows={3} value={contact.specialRequests}
+                onChange={(e) => setContact({ ...contact, specialRequests: e.target.value })} />
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="booking-step-body">
+              {stayBranch && (
+                <div className="stay-location">
+                  <h3 className="stay-location-title">Dónde te hospedarás</h3>
+                  <p className="form-hint">{stayBranch.address}{stayBranch.zone && !stayBranch.address?.includes(stayBranch.zone) ? ` · ${stayBranch.zone}` : ''}</p>
+                  <Suspense fallback={<div className="branch-map"><div className="spinner" /></div>}>
+                    <BranchMap branch={stayBranch} quiet />
+                  </Suspense>
+                  {(stayBranch.checkInTime || stayBranch.checkOutTime) && (
+                    <p className="form-hint">Check-in {stayBranch.checkInTime} · Check-out {stayBranch.checkOutTime}</p>
+                  )}
                 </div>
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="booking-step-body">
-                <label className="field-label">Nombre completo</label>
-                <input value={contact.guestName} onChange={(e) => setContact({ ...contact, guestName: e.target.value })} />
-                <label className="field-label">Email</label>
-                <input type="email" value={contact.guestEmail} onChange={(e) => setContact({ ...contact, guestEmail: e.target.value })} />
-                <label className="field-label">Teléfono</label>
-                <input value={contact.guestPhone} onChange={(e) => setContact({ ...contact, guestPhone: e.target.value })} />
-                <label className="field-label">Solicitudes especiales (opcional)</label>
-                <textarea rows={3} value={contact.specialRequests}
-                  onChange={(e) => setContact({ ...contact, specialRequests: e.target.value })} />
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="booking-step-body">
-                {stayBranch && (
-                  <div className="stay-location">
-                    <h3 className="stay-location-title">Dónde te hospedarás</h3>
-                    <p className="form-hint">{stayBranch.address}{stayBranch.zone && !stayBranch.address?.includes(stayBranch.zone) ? ` · ${stayBranch.zone}` : ''}</p>
-                    <Suspense fallback={<div className="branch-map"><div className="spinner" /></div>}>
-                      <BranchMap branch={stayBranch} quiet />
-                    </Suspense>
-                    {(stayBranch.checkInTime || stayBranch.checkOutTime) && (
-                      <p className="form-hint">Check-in {stayBranch.checkInTime} · Check-out {stayBranch.checkOutTime}</p>
-                    )}
-                  </div>
-                )}
-                {pricingLoading && <p className="form-hint">Calculando precio…</p>}
-                {pricingError && <p className="form-error">{pricingError}</p>}
-                {pricing && (
-                  <div className="price-breakdown">
-                    {(pricing.lines?.length ? pricing.lines : [{ unitPrice: pricing.nightlyPrice, nights: pricing.dates.nights, amount: pricing.subtotal }]).map((l, i) => (
-                      <div key={i}>
-                        <span>{formatCOP(l.unitPrice)} × {l.nights} {l.nights === 1 ? 'noche' : 'noches'}{l.season ? ` · ${SEASON_NAMES[l.season]}` : ''}</span>
-                        <span>{formatCOP(l.amount)}</span>
-                      </div>
-                    ))}
-                    {pricing.experiencesTotal > 0 && (
-                      <div><span>Experiencias</span><span>{formatCOP(pricing.experiencesTotal)}</span></div>
-                    )}
-                    {pricing.discount > 0 && (
-                      <div className="price-discount"><span>{pricing.discountReason}</span><span>-{formatCOP(pricing.discount)}</span></div>
-                    )}
-                    <div className="price-total"><span>Total</span><span>{formatCOP(pricing.total)}</span></div>
-                  </div>
-                )}
-                {!isAuthenticated && (
-                  <p className="form-hint">Para confirmar necesitamos que crees tu cuenta o inicies sesión. Tu selección se conserva.</p>
-                )}
-                <p className="form-hint">
-                  Al continuar te guardamos la habitación mientras pagas en el siguiente paso. No se cobra nada hasta que pagues.
-                </p>
-                {paymentConfig?.cancellationPolicy && (
-                  <p className="form-hint">{policyText(paymentConfig.cancellationPolicy)}</p>
-                )}
-              </div>
-            )}
-
-            <div className="booking-nav">
-              {step > 0 && <button className="btn-outline" onClick={goBack} disabled={submitting}>Atrás</button>}
-              {step < STEPS.length - 1 && <button className="btn-primary" onClick={goNext}>Continuar</button>}
-              {step === STEPS.length - 1 && (
-                <button className="btn-primary" onClick={submitBooking} disabled={submitting}>
-                  {submitting ? 'Enviando…' : isAuthenticated ? 'Continuar al pago' : 'Continuar y crear cuenta'}
-                </button>
+              )}
+              {pricingLoading && <p className="form-hint">Calculando precio…</p>}
+              {pricingError && <p className="form-error">{pricingError}</p>}
+              {pricing && (
+                <div className="price-breakdown">
+                  {(pricing.lines?.length ? pricing.lines : [{ unitPrice: pricing.nightlyPrice, nights: pricing.dates.nights, amount: pricing.subtotal }]).map((l, i) => (
+                    <div key={i}>
+                      <span>{formatCOP(l.unitPrice)} × {l.nights} {l.nights === 1 ? 'noche' : 'noches'}{l.season ? ` · ${SEASON_NAMES[l.season]}` : ''}</span>
+                      <span>{formatCOP(l.amount)}</span>
+                    </div>
+                  ))}
+                  {pricing.experiencesTotal > 0 && (
+                    <div><span>Experiencias</span><span>{formatCOP(pricing.experiencesTotal)}</span></div>
+                  )}
+                  {pricing.discount > 0 && (
+                    <div className="price-discount"><span>{pricing.discountReason}</span><span>-{formatCOP(pricing.discount)}</span></div>
+                  )}
+                  <div className="price-total"><span>Total</span><span>{formatCOP(pricing.total)}</span></div>
+                </div>
+              )}
+              {!isAuthenticated && (
+                <p className="form-hint">Para confirmar necesitamos que crees tu cuenta o inicies sesión. Tu selección se conserva.</p>
+              )}
+              <p className="form-hint">
+                Al continuar te guardamos la habitación mientras pagas en el siguiente paso. No se cobra nada hasta que pagues.
+              </p>
+              {paymentConfig?.cancellationPolicy && (
+                <p className="form-hint">{policyText(paymentConfig.cancellationPolicy)}</p>
               )}
             </div>
-          </>
+          )}
+
+          <div className="booking-nav">
+            {step > 0 && <button className="btn-outline" onClick={goBack} disabled={submitting}>Atrás</button>}
+            {step < STEPS.length - 1 && <button className="btn-primary" onClick={goNext}>Continuar</button>}
+            {step === STEPS.length - 1 && (
+              <button className="btn-primary" onClick={submitBooking} disabled={submitting}>
+                {submitting ? 'Enviando…' : isAuthenticated ? 'Continuar al pago' : 'Continuar y crear cuenta'}
+              </button>
+            )}
+          </div>
+        </>
       </div>
     </div>
   );

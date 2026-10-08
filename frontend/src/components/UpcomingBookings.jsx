@@ -32,13 +32,16 @@ export default function UpcomingBookings({ reloadKey }) {
     <div className="upcoming-strip">
       <p className="sec-label">Próximas llegadas</p>
       <div className="upcoming-list">
-        {list.map((b) => (
-          <Link key={b._id} className="upcoming-card" to={`/reservas/${b._id}`}>
-            <strong>{b.suite?.name || 'Suite'}</strong>
-            <span>{formatCalendarDate(b.checkIn)} → {formatCalendarDate(b.checkOut)}</span>
-            <span className="upcoming-when">{whenLabel(b.checkIn)}</span>
-          </Link>
-        ))}
+        {list.map((b) => {
+          const bId = b._id || b.id;
+          return (
+            <Link key={bId} className="upcoming-card" to={`/reservas/${bId}`}>
+              <strong>{b.suite?.name || 'Suite'}</strong>
+              <span>{formatCalendarDate(b.checkIn)} → {formatCalendarDate(b.checkOut)}</span>
+              <span className="upcoming-when">{whenLabel(b.checkIn)}</span>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

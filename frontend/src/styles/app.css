@@ -50,7 +50,8 @@
    oculto al hover (más usable, con botón y disponibilidad siempre
    visibles en vez de solo aparecer al pasar el mouse). ---------- */
 .room-card {
-  height: auto;
+  height: auto !important;
+  min-height: 420px;
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.02);
@@ -1185,8 +1186,21 @@ input:focus, select:focus, textarea:focus {
   .detail-list { columns: 1; }
   .gallery-main { aspect-ratio: 4 / 3; }
 }
-.location-map .branch-map { height: 100%; margin: 0; border-radius: 0; }
-.booking-modal .branch-map { height: 220px; }
+.location-map {
+  min-height: 420px;
+  height: 420px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(201, 169, 110, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.location-map .branch-map {
+  min-height: 420px;
+  height: 420px !important;
+  margin: 0;
+  border-radius: 12px;
+}
+.booking-modal .branch-map { height: 260px; }
 .stay-location { margin-bottom: 16px; }
 .stay-location-title { font-size: 1rem; margin: 0 0 4px; }
 

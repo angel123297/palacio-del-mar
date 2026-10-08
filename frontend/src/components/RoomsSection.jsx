@@ -11,7 +11,6 @@ const shortBranch = (name = '') => name.replace(/^Palacio del Mar\s*·\s*/, '');
 export default function RoomsSection() {
   const [suites, setSuites] = useState(null);
   const [error, setError] = useState(false);
-  const [types, setTypes] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [maxPrice, setMaxPrice] = useState(0); // 0 = sin tope
   const [extras, setExtras] = useState([]);    // 'hasBalcony' | 'hasTerrace' | 'hasJacuzzi' | 'ocean'
@@ -34,25 +33,40 @@ export default function RoomsSection() {
     fetchSuites();
   }, [fetchSuites]);
 
-  // Tipos de suite para el filtro (GET /suites/types)
-  useEffect(() => {
-    api.get('/suites/types')
-      .then((res) => setTypes(res.data.data || []))
-      .catch(() => setTypes([]));
-  }, []);
+  const types = useMemo(() => {
+    if (!suites) return [];
+    const counts = {};
+    suites.forEach((s) => {
+      const t = s.type || 'Habitación';
+      counts[t] = (counts[t] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, count]) => ({ name, count }));
+  }, [suites]);
 
   // Si el huésped ya buscó disponibilidad (BookingBar), mostramos precio y
   // disponibilidad reales para esas fechas en vez del precio base genérico.
   const availabilityMap = useMemo(() => {
     if (!availability) return null;
     const map = new Map();
-    availability.availableSuites.forEach((s) => map.set(s._id, { ...s, isAvailable: true }));
-    (availability.unavailableSuites || []).forEach((s) => map.set(s._id, { ...s, isAvailable: false }));
+    availability.availableSuites.forEach((s) => map.set(s._id || s.id, { ...s, isAvailable: true }));
+    (availability.unavailableSuites || []).forEach((s) => map.set(s._id || s.id, { ...s, isAvailable: false }));
     return map;
   }, [availability]);
 
-  const matchesExtra = (suite, key) =>
-    key === 'ocean' ? ['ocean', 'partial_ocean'].includes(suite.view) : !!suite[key];
+  const matchesExtra = (suite, key) => {
+    if (key === 'ocean') {
+      return (
+        ['ocean', 'partial_ocean', 'Vista al mar'].includes(suite.view || suite.viewType) ||
+        suite.amenities?.some((a) => /mar|océano|playa/i.test(a))
+      );
+    }
+    if (suite[key] !== undefined && suite[key] !== null) {
+      return !!suite[key];
+    }
+    const term = key.replace(/^has/, '').toLowerCase();
+    return suite.amenities?.some((a) => a.toLowerCase().includes(term));
+  };
+
   const visibleSuites = suites && suites.filter((s) =>
     (!typeFilter || s.type === typeFilter) &&
     (!maxPrice || s.basePrice <= maxPrice) &&
@@ -172,14 +186,15 @@ export default function RoomsSection() {
           <div className="rooms-grid">
             {visibleSuites.length === 0 && <p className="muted">Ninguna habitación cumple esos filtros. Prueba quitar alguno.</p>}
             {visibleSuites.map((suite) => {
-              const av = availabilityMap?.get(suite._id);
+              const suiteId = suite._id || suite.id;
+              const av = availabilityMap?.get(suiteId);
               // Con una búsqueda activa, lo que no aparece como disponible no se puede reservar
               const isUnavailable = availabilityMap ? !av?.isAvailable : false;
               const nightly = av?.pricePerNight ?? suite.seasonalPrice ?? suite.basePrice;
               const totalForStay = av?.totalPrice;
 
               return (
-                <div className={`room-card ${isUnavailable ? 'room-unavailable' : ''}`} key={suite._id}>
+                <div className={`room-card ${isUnavailable ? 'room-unavailable' : ''}`} key={suiteId}>
                   <div className="room-img-wrap">
                     <img src={suite.mainImage} alt={suite.name} loading="lazy" />
                     {suite.featured && <span className="room-avail badge-ok">Recomendada</span>}
@@ -187,13 +202,13 @@ export default function RoomsSection() {
                   </div>
                   <div className="room-info">
                     <p className="room-type">{suite.type}{suite.branch?.name ? ` · ${shortBranch(suite.branch.name)}` : ''}</p>
-                    <h3 className="room-name"><Link to={`/habitaciones/${suite._id}`}>{suite.name}</Link></h3>
+                    <h3 className="room-name"><Link to={`/habitaciones/${suite.slug || suite.id || suite._id}`}>{suite.name}</Link></h3>
                     <div className="room-chips">
                       {(suite.amenities || []).slice(0, 3).map((a) => (
                         <span className="chip" key={a}>{a}</span>
                       ))}
-                      <span className="chip">{suite.size} m²</span>
-                      <span className="chip">Hasta {suite.maxGuests} huéspedes</span>
+                      <span className="chip">{suite.size || suite.sizeSqm || 30} m²</span>
+                      <span className="chip">Hasta {suite.maxGuests || suite.maxOccupancy || 2} huéspedes</span>
                     </div>
                     <div className="room-price">
                       {av?.priceBreakdown?.discount > 0 && availability?.nights > 0 && (
@@ -211,7 +226,7 @@ export default function RoomsSection() {
                     {av?.priceBreakdown?.discount > 0 && (
                       <p className="form-hint">{av.priceBreakdown.discountReason} · ahorras {formatCOP(av.priceBreakdown.discount)}</p>
                     )}
-                    <Link className="room-detail-link" to={`/habitaciones/${suite._id}`}>Ver detalles</Link>
+                    <Link className="room-detail-link" to={`/habitaciones/${suite.slug || suite.id || suite._id}`}>Ver detalles</Link>
                     <button
                       className="btn-book room-cta"
                       disabled={isUnavailable}

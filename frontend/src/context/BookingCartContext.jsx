@@ -71,19 +71,24 @@ export function BookingCartProvider({ children }) {
     }
   }, []);
 
+  const getExpId = (exp) => (typeof exp === 'string' ? exp : exp?._id || exp?.id);
+
   const addExperience = useCallback((exp) => {
-    setExperiences((prev) => (prev.some((e) => e._id === exp._id) ? prev : [...prev, exp]));
+    const id = getExpId(exp);
+    if (!id) return;
+    setExperiences((prev) => (prev.some((e) => getExpId(e) === id) ? prev : [...prev, exp]));
   }, []);
 
   const removeExperience = useCallback((id) => {
-    setExperiences((prev) => prev.filter((e) => e._id !== id));
+    setExperiences((prev) => prev.filter((e) => getExpId(e) !== id));
   }, []);
 
   const toggleExperience = useCallback((exp) => {
-    if (!isObjectId(exp?._id)) return; // nunca guardar experiencias que no existen en la BD
+    const id = getExpId(exp);
+    if (!isObjectId(id)) return; // nunca guardar experiencias que no existen en la BD
     setExperiences((prev) =>
-      prev.some((e) => e._id === exp._id)
-        ? prev.filter((e) => e._id !== exp._id)
+      prev.some((e) => getExpId(e) === id)
+        ? prev.filter((e) => getExpId(e) !== id)
         : [...prev, exp]
     );
   }, []);
