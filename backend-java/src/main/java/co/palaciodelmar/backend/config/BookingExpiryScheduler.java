@@ -19,13 +19,10 @@ public class BookingExpiryScheduler {
     private final BookingRepository bookingRepository;
     private final SuiteNightRepository suiteNightRepository;
 
-    @Scheduled(cron = "0 * * * * *")
+    @Scheduled(cron = "0 */5 * * * *")
     public void releaseExpiredBookings() {
         Instant now = Instant.now();
-        List<Booking> expiredPending = bookingRepository.findAll().stream()
-                .filter(b -> "pending".equalsIgnoreCase(b.getStatus()))
-                .filter(b -> b.getExpiresAt() != null && b.getExpiresAt().isBefore(now))
-                .toList();
+        List<Booking> expiredPending = bookingRepository.findByStatusAndExpiresAtBefore("pending", now);
 
         for (Booking booking : expiredPending) {
             log.info("Expirando reserva vencida: {}", booking.getId());
