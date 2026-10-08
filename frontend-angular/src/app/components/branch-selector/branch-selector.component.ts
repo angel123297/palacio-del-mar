@@ -23,7 +23,7 @@ import { Branch } from '../../models/types';
             (click)="selectBranch(branch.slug)"
           >
             <div class="branch-image-wrapper">
-              <img [src]="branch.mainImage || getFallbackImage(branch.slug)" [alt]="branch.name" />
+              <img [src]="branch.mainImage || getFallbackImage(branch.slug)" [alt]="branch.name" loading="lazy" decoding="async" />
               <div class="branch-overlay"></div>
               <span class="branch-badge">{{ branch.zone }}</span>
             </div>
