@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.BookingDTO;
+import co.palaciodelmar.backend.dto.PaymentDTO;
 import co.palaciodelmar.backend.dto.PaymentRequest;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Payment;
@@ -56,8 +57,10 @@ public class PaymentService {
             BookingDTO bookingDTO = bookingService.toDTO(booking);
             Payment existingPayment = paymentRepository.findByBooking(bookingId)
                     .stream().findFirst().orElse(null);
+            
+            Object paymentRes = existingPayment != null ? toDTO(existingPayment) : Map.of("amount", booking.getTotalPrice(), "status", "completed");
             return Map.of(
-                    "payment", existingPayment != null ? existingPayment : Map.of("amount", booking.getTotalPrice(), "status", "completed"),
+                    "payment", paymentRes,
                     "booking", bookingDTO
             );
         }
@@ -94,23 +97,13 @@ public class PaymentService {
 
         BookingDTO bookingDTO = bookingService.toDTO(updatedBooking);
 
-        Map<String, Object> paymentData = Map.of(
-                "id", savedPayment.getId(),
-                "receiptNumber", receiptNumber,
-                "amount", savedPayment.getAmount(),
-                "status", savedPayment.getStatus(),
-                "paymentMethod", savedPayment.getPaymentMethod(),
-                "transactionId", transactionId,
-                "createdAt", savedPayment.getCreatedAt()
-        );
-
         return Map.of(
-                "payment", paymentData,
+                "payment", toDTO(savedPayment),
                 "booking", bookingDTO
         );
     }
 
-    public Payment processPayment(String userId, PaymentRequest request) {
+    public PaymentDTO processPayment(String userId, PaymentRequest request) {
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + request.getBookingId()));
 
@@ -167,6 +160,22 @@ public class PaymentService {
             bookingRepository.save(booking);
         }
 
-        return savedPayment;
+        return toDTO(savedPayment);
+    }
+
+    public PaymentDTO toDTO(Payment payment) {
+        if (payment == null) return null;
+        return PaymentDTO.builder()
+                .id(payment.getId())
+                .bookingId(payment.getBooking())
+                .amount(payment.getAmount())
+                .currency(payment.getCurrency())
+                .status(payment.getStatus())
+                .provider(payment.getProvider())
+                .transactionId(payment.getTransactionId())
+                .paymentMethod(payment.getPaymentMethod())
+                .notes(payment.getNotes())
+                .createdAt(payment.getCreatedAt())
+                .build();
     }
 }

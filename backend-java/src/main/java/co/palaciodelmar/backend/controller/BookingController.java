@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 
@@ -23,7 +24,7 @@ public class BookingController {
     @PostMapping
     public ResponseEntity<ApiResponse<BookingDTO>> createBooking(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestBody BookingRequest request
+            @Valid @RequestBody BookingRequest request
     ) {
         String userId = principal != null ? principal.getUser().getId() : null;
         BookingDTO booking = bookingService.createBooking(userId, request);

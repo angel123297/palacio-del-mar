@@ -47,10 +47,23 @@ import { Suite } from '../../models/types';
               <app-custom-guestpicker [adults]="guests" [maxGuests]="suite.maxGuests || suite.maxGuests || 2" (adultsChange)="guests = $event"></app-custom-guestpicker>
             </div>
 
-            <button (click)="createBooking()" [disabled]="bookingBusy" style="width: 100%; background: var(--gold); color: #0d0d0d; font-weight: 700; padding: 14px; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">
+            <div style="margin-bottom: 1.5rem;">
+              <label style="display: block; color: var(--gold); font-size: 0.85rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">Peticiones Especiales / Notas</label>
+              <textarea [(ngModel)]="notes" placeholder="Alergias, hora estimada de llegada, ocasión especial..." style="width: 100%; height: 80px; background: rgba(0,0,0,0.5); border: 1px solid rgba(212,175,55,0.2); border-radius: 6px; padding: 10px; color: #fff; font-family: inherit; resize: vertical;"></textarea>
+            </div>
+
+            <button type="button" (click)="createBooking()" [disabled]="bookingBusy" style="width: 100%; background: var(--gold); color: #0d0d0d; font-weight: 700; padding: 14px; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">
               {{ bookingBusy ? 'Procesando…' : 'Confirmar Reserva' }}
             </button>
             <p *ngIf="message" style="margin-top: 1rem; text-align: center; font-size: 0.9rem;" [style.color]="isError ? '#ff4d4d' : 'var(--gold)'">{{ message }}</p>
+
+            <div style="margin-top: 2.5rem;">
+              <h4 style="color: var(--gold); margin-bottom: 1rem; font-family: var(--font-title); font-size: 1.2rem;">Ubicación</h4>
+              <div style="border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; overflow: hidden; height: 200px;">
+                <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-75.56846141815187%2C10.420601934399738%2C-75.53816318511964%2C10.434417758994511&amp;layer=mapnik" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+              </div>
+              <p style="font-size: 0.85rem; color: #aaa; margin-top: 0.5rem; text-align: center;">{{ suite.branch?.address || 'Cartagena de Indias, Colombia' }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -64,6 +77,7 @@ export class SuiteDetailComponent implements OnInit {
   checkIn = new Date().toISOString().slice(0, 10);
   checkOut = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
   guests = 2;
+  notes = '';
 
   get guestOptions(): number[] {
     const max = Math.max(1, this.suite?.maxGuests || (this.suite as any)?.capacity || 2);
@@ -99,7 +113,7 @@ export class SuiteDetailComponent implements OnInit {
   }
 
   createBooking(): void {
-    if (!this.auth.getToken()) {
+    if (!this.auth.isLoggedIn()) {
       this.message = 'Por favor inicia sesión para realizar tu reserva.';
       this.isError = true;
       return;
@@ -132,7 +146,8 @@ export class SuiteDetailComponent implements OnInit {
       suite: this.suite.id || this.suite._id,
       checkIn: this.checkIn,
       checkOut: this.checkOut,
-      guests: Number(this.guests)
+      guests: Number(this.guests),
+      notes: this.notes
     }).subscribe({
       next: () => {
         this.bookingBusy = false;

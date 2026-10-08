@@ -17,9 +17,9 @@ import { CommonModule } from '@angular/common';
         <div class="cgp-row">
           <span>Adultos</span>
           <div class="cgp-controls">
-            <button (click)="changeGuests(-1)" [disabled]="adults <= 1">-</button>
+            <button type="button" (click)="changeGuests(-1)" [disabled]="adults <= 1">-</button>
             <span>{{ adults }}</span>
-            <button (click)="changeGuests(1)" [disabled]="adults >= maxGuests">+</button>
+            <button type="button" (click)="changeGuests(1)" [disabled]="adults >= maxGuests">+</button>
           </div>
         </div>
       </div>

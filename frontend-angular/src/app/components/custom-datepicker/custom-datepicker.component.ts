@@ -15,9 +15,9 @@ import { CommonModule } from '@angular/common';
       
       <div class="cdp-dropdown" *ngIf="isOpen">
         <div class="cdp-header">
-          <button (click)="changeMonth(-1)">&larr;</button>
+          <button type="button" (click)="changeMonth(-1)">&larr;</button>
           <span>{{ currentMonthName }} {{ currentYear }}</span>
-          <button (click)="changeMonth(1)">&rarr;</button>
+          <button type="button" (click)="changeMonth(1)">&rarr;</button>
         </div>
         <div class="cdp-grid">
           <div class="cdp-day-name" *ngFor="let d of ['D','L','M','M','J','V','S']">{{d}}</div>
