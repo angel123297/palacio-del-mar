@@ -87,6 +87,10 @@ import { finalize } from 'rxjs';
               {{ submitting ? 'Procesando reserva…' : 'Confirmar Reserva' }}
             </button>
 
+            <p *ngIf="successMessage" style="color: #2ecc71; font-size: 0.95rem; text-align: center; margin-top: 8px; background: rgba(46,204,113,0.1); padding: 10px; border-radius: 6px;">
+              {{ successMessage }}
+            </p>
+
             <p *ngIf="errorMessage" style="color: #ff4d4d; font-size: 0.9rem; text-align: center; margin-top: 8px; background: rgba(255,77,77,0.1); padding: 8px; border-radius: 6px;">
               {{ errorMessage }}
             </p>
@@ -113,6 +117,7 @@ export class BookingModalComponent implements OnChanges {
   totalPrice: number = 0;
   submitting = false;
   errorMessage = '';
+  successMessage = '';
 
   constructor(
     private api: ApiService,
@@ -169,15 +174,44 @@ export class BookingModalComponent implements OnChanges {
   close(): void {
     this.isOpen = false;
     this.errorMessage = '';
+    this.successMessage = '';
     this.closeEvent.emit();
     this.cdr.detectChanges();
   }
 
+  private validate(): string {
+    const name = (this.guestName || '').trim();
+    const email = (this.guestEmail || '').trim();
+    const missing: string[] = [];
+    if (!this.checkIn) missing.push('fecha de llegada');
+    if (!this.checkOut) missing.push('fecha de salida');
+    if (!name) missing.push('nombre completo');
+    if (!email) missing.push('correo electrónico');
+    if (missing.length) return `Por favor completa: ${missing.join(', ')}.`;
+
+    const today = new Date().toISOString().split('T')[0];
+    if (this.checkIn < today) return 'La fecha de llegada no puede ser en el pasado.';
+    if (this.checkOut <= this.checkIn) return 'La fecha de salida debe ser posterior a la de llegada.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Ingresa un correo electrónico válido.';
+    if (name.length < 3) return 'Ingresa tu nombre completo.';
+    if (this.guests < 1 || this.guests > this.maxGuestsCount) return `Esta habitación admite máximo ${this.maxGuestsCount} huéspedes.`;
+    return '';
+  }
+
+  private friendlyError(err: any): string {
+    const msg: string = err?.error?.message || '';
+    if (err?.status === 0) return 'No hay conexión con el servidor. Intenta de nuevo en unos segundos.';
+    if (msg.startsWith('Suite no encontrada')) return 'Esta habitación ya no existe o no está disponible. Recarga la página y elige otra.';
+    return msg || 'No se pudo procesar la reserva. Intenta de nuevo.';
+  }
+
   confirmBooking(): void {
-    if (!this.suite) return;
+    if (!this.suite || this.submitting) return;
+    this.successMessage = '';
+    this.errorMessage = this.validate();
+    if (this.errorMessage) return;
+
     this.submitting = true;
-    this.errorMessage = '';
-    this.cdr.detectChanges();
 
     const payload = {
       suiteId: this.suite.id || this.suite._id,
@@ -192,15 +226,19 @@ export class BookingModalComponent implements OnChanges {
     this.api.post<any>('/bookings', payload).pipe(
       finalize(() => {
         this.submitting = false;
-        this.cdr.detectChanges();
       })
     ).subscribe({
       next: (res) => {
-        this.close();
-        this.router.navigate(['/mis-reservas']);
+        if (this.auth.getToken()) {
+          this.close();
+          this.router.navigate(['/mis-reservas']);
+          return;
+        }
+        const code = res?.data?.bookingCode;
+        this.successMessage = `¡Reserva creada!${code ? ' Código: ' + code + '.' : ''} Guarda este código para consultar tu reserva.`;
       },
       error: (err) => {
-        this.errorMessage = err.error?.message || 'No se pudo procesar la reserva. Intenta de nuevo.';
+        this.errorMessage = this.friendlyError(err);
       }
     });
   }
