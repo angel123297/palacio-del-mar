@@ -20,6 +20,7 @@ export interface Suite {
   type?: string;
   description?: string;
   basePrice?: number;
+  originalPrice?: number;
   pricePerNight?: number;
   seasonalPrice?: number;
   totalPrice?: number;
@@ -33,6 +34,7 @@ export interface Suite {
   images?: string[];
   available?: boolean;
   isAvailable?: boolean;
+  featured?: boolean;
 }
 
 export interface Experience {

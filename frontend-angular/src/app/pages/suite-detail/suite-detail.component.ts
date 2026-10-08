@@ -5,15 +5,12 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Suite } from '../../models/types';
-import { NavbarComponent } from '../../components/navbar/navbar.component';
-import { FooterComponent } from '../../components/footer/footer.component';
 
 @Component({
   selector: 'app-suite-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, NavbarComponent, FooterComponent],
+  imports: [CommonModule, RouterModule, FormsModule],
   template: `
-    <app-navbar></app-navbar>
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 2rem 1.5rem; max-width: 1100px; margin: 0 auto;">
       <div *ngIf="loading" style="text-align: center; color: var(--gold); padding: 4rem;">
         Cargando detalles de la suite…
@@ -24,9 +21,9 @@ import { FooterComponent } from '../../components/footer/footer.component';
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2.5rem; margin-top: 1.5rem;">
           <div>
             <img [src]="suite.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" [alt]="suite.name" style="width: 100%; height: 380px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.2);">
-            <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{suite.name}}</h1>
-            <p style="color: var(--gold); font-size: 0.95rem;">{{suite.type}} · {{suite.branch?.name || 'Centro Histórico'}}</p>
-            <p style="color: #cccccc; line-height: 1.6; margin-top: 1rem;">{{suite.description}}</p>
+            <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{ suite.name }}</h1>
+            <p style="color: var(--gold); font-size: 0.95rem;">{{ suite.type }} · {{ suite.branch?.name || 'Centro Histórico' }}</p>
+            <p style="color: #cccccc; line-height: 1.6; margin-top: 1rem;">{{ suite.description }}</p>
           </div>
 
           <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 12px; padding: 2rem;">
@@ -59,12 +56,11 @@ import { FooterComponent } from '../../components/footer/footer.component';
             <button (click)="createBooking()" [disabled]="bookingBusy" style="width: 100%; background: var(--gold); color: #0d0d0d; font-weight: 700; padding: 14px; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">
               {{ bookingBusy ? 'Procesando…' : 'Confirmar Reserva' }}
             </button>
-            <p *ngIf="message" style="margin-top: 1rem; text-align: center; font-size: 0.9rem;" [style.color]="isError ? '#ff4d4d' : 'var(--gold)'">{{message}}</p>
+            <p *ngIf="message" style="margin-top: 1rem; text-align: center; font-size: 0.9rem;" [style.color]="isError ? '#ff4d4d' : 'var(--gold)'">{{ message }}</p>
           </div>
         </div>
       </div>
     </div>
-    <app-footer></app-footer>
   `
 })
 export class SuiteDetailComponent implements OnInit {
