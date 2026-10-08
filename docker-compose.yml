@@ -25,7 +25,8 @@ services:
     ports:
       - "5000:5000"
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/palacio_del_mar
+      MONGODB_URI: mongodb://mongo:27017/palacio_db
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/palacio_db
       JWT_SECRET: 1cebc720b94ea82fec10c9b23952448c3e90f4b38aa3ac92b03d24e79c8bd9ff
       JWT_EXPIRATION: "604800000"
       SERVER_PORT: "5000"
