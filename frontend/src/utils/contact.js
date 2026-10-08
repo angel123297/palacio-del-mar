@@ -2,9 +2,9 @@
 // Funciones puras (se prueban con `npm test`).
 
 export const contactFromUser = (user) => ({
-  guestName: user?.name || '',
+  guestName: user?.name || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : '') || '',
   guestEmail: user?.email || '',
-  guestPhone: user?.phone || '',
+  guestPhone: user?.phone || user?.profile?.phone || '',
   specialRequests: ''
 });
 

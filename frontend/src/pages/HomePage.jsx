@@ -8,6 +8,9 @@ import ExperiencesSection from '../components/ExperiencesSection.jsx';
 import DiningSection from '../components/DiningSection.jsx';
 import SpaSection from '../components/SpaSection.jsx';
 import LocationSection from '../components/LocationSection.jsx';
+import TestimonialsSection from '../components/TestimonialsSection.jsx';
+import FaqSection from '../components/FaqSection.jsx';
+import ContactSection from '../components/ContactSection.jsx';
 import Footer from '../components/Footer.jsx';
 import AIChatWidget from '../components/AIChatWidget.jsx';
 import BookingModal from '../components/BookingModal.jsx';
@@ -25,6 +28,9 @@ export default function HomePage() {
       <DiningSection />
       <SpaSection />
       <LocationSection />
+      <TestimonialsSection />
+      <FaqSection />
+      <ContactSection />
       <Footer />
       <AIChatWidget />
       <BookingModal />

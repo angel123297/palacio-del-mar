@@ -19,8 +19,11 @@ const STATUS_CLASS = {
 };
 
 function ModifyDatesForm({ booking, onDone }) {
-  const [newCheckIn, setNewCheckIn] = useState(booking.checkIn.slice(0, 10));
-  const [newCheckOut, setNewCheckOut] = useState(booking.checkOut.slice(0, 10));
+  const bId = booking._id || booking.id;
+  const [newCheckIn, setNewCheckIn] = useState(booking.checkIn?.slice(0, 10) || '');
+  const [newCheckOut, setNewCheckOut] = useState(booking.checkOut?.slice(0, 10) || '');
+  const [guests, setGuests] = useState(booking.guests || 2);
+  const [children, setChildren] = useState(booking.children || 0);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
 
@@ -28,24 +31,51 @@ function ModifyDatesForm({ booking, onDone }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const res = await api.put(`/bookings/${booking._id}/modify-dates`, { newCheckIn, newCheckOut });
-      toast.success(res.data?.message || 'Fechas actualizadas');
+      const res = await api.put(`/bookings/${bId}/modify-dates`, {
+        checkIn: newCheckIn,
+        checkOut: newCheckOut,
+        newCheckIn,
+        newCheckOut,
+        guests: Number(guests),
+        children: Number(children)
+      });
+      toast.success(res.data?.message || 'Reserva actualizada');
       onDone(true);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'No se pudieron modificar las fechas');
+      toast.error(err.response?.data?.message || 'No se pudo modificar la reserva');
       setBusy(false);
     }
   };
 
   return (
-    <form className="inline-edit-form" onSubmit={submit}>
+    <form className="inline-edit-form" onSubmit={submit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', alignItems: 'center' }}>
       <p className="form-hint" style={{ gridColumn: '1 / -1', margin: '0 0 4px 0' }}>
-        Nota: Los días adicionales o de mayor tarifa se recalcularán e incluirán en tu saldo. Podrás gestionar pagos pendientes en tu panel.
+        Nota: Modifica fechas o número de huéspedes. El saldo se recalculará automáticamente.
       </p>
-      <input type="date" value={newCheckIn} onChange={(e) => setNewCheckIn(e.target.value)} required />
-      <input type="date" value={newCheckOut} min={newCheckIn} onChange={(e) => setNewCheckOut(e.target.value)} required />
-      <button className="btn-primary" type="submit" disabled={busy}>{busy ? 'Guardando…' : 'Guardar'}</button>
-      <button type="button" className="link-btn" onClick={() => onDone(false)}>Cancelar</button>
+      <div>
+        <label className="field-label" style={{ fontSize: '0.8rem' }}>Check-in</label>
+        <input type="date" value={newCheckIn} onChange={(e) => setNewCheckIn(e.target.value)} required />
+      </div>
+      <div>
+        <label className="field-label" style={{ fontSize: '0.8rem' }}>Check-out</label>
+        <input type="date" value={newCheckOut} min={newCheckIn} onChange={(e) => setNewCheckOut(e.target.value)} required />
+      </div>
+      <div>
+        <label className="field-label" style={{ fontSize: '0.8rem' }}>Adultos</label>
+        <select value={guests} onChange={(e) => setGuests(e.target.value)}>
+          {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n} {n === 1 ? 'adulto' : 'adultos'}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="field-label" style={{ fontSize: '0.8rem' }}>Niños</label>
+        <select value={children} onChange={(e) => setChildren(e.target.value)}>
+          {[0, 1, 2, 3, 4].map((n) => <option key={n} value={n}>{n} {n === 1 ? 'niño' : 'niños'}</option>)}
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', gridColumn: '1 / -1', marginTop: '4px' }}>
+        <button className="btn-primary" type="submit" disabled={busy}>{busy ? 'Guardando…' : 'Guardar Cambios'}</button>
+        <button type="button" className="link-btn" onClick={() => onDone(false)}>Cancelar</button>
+      </div>
     </form>
   );
 }
@@ -54,16 +84,14 @@ function BookingCard({ booking, onChanged }) {
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const bId = booking._id || booking.id;
 
   const cancel = async () => {
     if (!window.confirm('¿Seguro que quieres cancelar esta reserva?')) return;
     setBusy(true);
     try {
-      const res = await api.put(`/bookings/${booking._id}/cancel`, {});
-      const refund = res.data?.data?.refundAmount || 0;
-      toast.success(refund > 0
-        ? `Reserva cancelada. Reembolso estimado: ${refund.toLocaleString('es-CO')} (se procesa manualmente)`
-        : 'Reserva cancelada');
+      const res = await api.post(`/bookings/${bId}/cancel`, {});
+      toast.success('Reserva cancelada');
       onChanged();
     } catch (err) {
       toast.error(err.response?.data?.message || 'No se pudo cancelar la reserva');
@@ -82,12 +110,12 @@ function BookingCard({ booking, onChanged }) {
         <div className="booking-card-head">
           <div>
             <h3>{booking.suite?.name || 'Suite'}</h3>
-            <p className="form-hint">Reserva #{String(booking._id).slice(-8).toUpperCase()}</p>
+            <p className="form-hint">Reserva #{booking.bookingCode || String(bId).slice(-8).toUpperCase()}</p>
           </div>
           <div className="pill-group">
             <span className={`pill ${STATUS_CLASS[booking.status] || 'pill-pending'}`}>{booking.statusLabel || booking.status}</span>
-            <span className={`pill ${booking.paymentStatus === 'paid' ? 'pill-ok' : 'pill-pending'}`}>
-              {booking.paymentStatusLabel || booking.paymentStatus}
+            <span className={`pill ${booking.paymentStatus === 'paid' ? 'pill-ok' : (booking.paymentStatus === 'refunded' ? 'pill-cancelled' : 'pill-pending')}`}>
+              {booking.paymentStatus === 'refunded' ? 'REEMBOLSADO' : (booking.paymentStatusLabel || booking.paymentStatus?.toUpperCase())}
             </span>
             {!['cancelled', 'expired', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid' && (
               <span className="pill pill-pending" style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}>⚠️ Pago pendiente</span>
@@ -96,6 +124,14 @@ function BookingCard({ booking, onChanged }) {
         </div>
 
         <HoldNotice booking={booking} />
+
+        {booking.status === 'cancelled' && (
+          <p className="form-hint" style={{ marginTop: 8, color: 'var(--gold)', fontWeight: 500 }}>
+            {booking.paymentStatus === 'refunded' || (booking.refundedAmount && booking.refundedAmount > 0) || (booking.paidAmount && booking.paidAmount > 0)
+              ? `ℹ️ Reserva cancelada. El reembolso del dinero abonado (${formatCOP(booking.refundedAmount || booking.paidAmount)}) será transferido a tu cuenta bancaria / método de pago en un plazo de 24 a 48 horas.`
+              : 'Reserva cancelada sin cargos.'}
+          </p>
+        )}
 
         {editing ? (
           <ModifyDatesForm booking={booking} onDone={(changed) => { setEditing(false); if (changed) onChanged(); }} />
@@ -114,17 +150,19 @@ function BookingCard({ booking, onChanged }) {
 
         {!editing && (
           <div className="booking-card-actions">
-            {!['cancelled', 'expired', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid' && (
-              <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora</Link>
+            {(!['cancelled', 'expired', 'completed'].includes(booking.status) && (booking.paymentStatus !== 'paid' || (booking.balanceDue && booking.balanceDue > 0))) && (
+              <Link className="btn-primary" to={`/pagar/${bId}`}>
+                Pagar ahora {booking.balanceDue > 0 ? `(${formatCOP(booking.balanceDue)})` : ''}
+              </Link>
             )}
-            <Link className="btn-outline" to={`/reservas/${booking._id}`}>Ver detalle</Link>
-            {booking.isModifiable && (
+            <Link className="btn-outline" to={`/reservas/${bId}`}>Ver detalle</Link>
+            {(booking.isModifiable !== false && !['cancelled', 'expired', 'completed'].includes(booking.status)) && (
               <button className="btn-outline" onClick={() => setEditing(true)} disabled={busy}>Modificar fechas</button>
             )}
-            {booking.isCancellable && (
+            {((booking.isCancellable ?? booking.isCancelable) !== false && !['cancelled', 'expired', 'completed'].includes(booking.status)) && (
               <button className="btn-outline btn-danger" onClick={cancel} disabled={busy}>Cancelar reserva</button>
             )}
-            {!booking.isModifiable && !booking.isCancellable && (
+            {['cancelled', 'expired', 'completed'].includes(booking.status) && (
               <span className="form-hint">Esta reserva ya no admite cambios.</span>
             )}
           </div>
@@ -142,12 +180,10 @@ export default function DashboardPage() {
 
   const load = useCallback(() => {
     api.get('/bookings', { params: filter === 'all' ? {} : { status: filter } })
-      // Antes se guardaba la respuesta completa (res.data, con
-      // "success" incluido) directo en el estado de "reservas", así que
-      // .map() sobre un objeto tiraba un error de JavaScript y la
-      // pantalla completa de "Mis reservas" quedaba en blanco. La forma
-      // real es res.data.data.bookings.
-      .then((res) => setBookings(res.data.data.bookings))
+      .then((res) => {
+        const raw = res.data.data;
+        setBookings(Array.isArray(raw) ? raw : raw?.bookings || []);
+      })
       .catch((err) => setError(err.response?.data?.message || 'No se pudieron cargar tus reservas'));
   }, [filter]);
 

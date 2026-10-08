@@ -45,7 +45,8 @@ export default function CheckoutPage() {
     setPaying(true);
     setFailure(null);
     try {
-      const res = await api.post('/payments/checkout', { bookingId: booking._id, method, idempotencyKey: keyRef.current });
+      const bId = booking._id || booking.id;
+      const res = await api.post('/payments/checkout', { bookingId: bId, method, idempotencyKey: keyRef.current });
       setReceipt(res.data.data.payment);
       toast.success('¡Pago aprobado!');
       load();
@@ -92,7 +93,7 @@ export default function CheckoutPage() {
 
         {booking && isPaid && (
           <section className="checkout-card receipt">
-            <p className="modal-eyebrow">Reserva #{String(booking._id).slice(-8).toUpperCase()}</p>
+            <p className="modal-eyebrow">Reserva #{String(booking._id || booking.id).slice(-8).toUpperCase()}</p>
             <h2 className="modal-title">¡Pago aprobado!</h2>
             <p className="modal-copy">Tu reserva en <strong>{booking.suite?.name}</strong> está confirmada.</p>
             <div className="confirm-summary">
@@ -103,7 +104,7 @@ export default function CheckoutPage() {
             </div>
             <p className="form-hint">Te enviamos el comprobante por correo.</p>
             <div className="booking-card-actions">
-              <Link className="btn-primary" to={`/reservas/${booking._id}`}>Ver mi reserva</Link>
+              <Link className="btn-primary" to={`/reservas/${booking._id || booking.id}`}>Ver mi reserva</Link>
               <Link className="btn-outline" to="/dashboard">Mis reservas</Link>
             </div>
           </section>

@@ -44,9 +44,10 @@ export default function BookingDetailPage() {
   }, []);
 
   const addExperience = async (exp) => {
-    setBusyId(exp._id);
+    const expId = exp._id || exp.id;
+    setBusyId(expId);
     try {
-      const res = await api.post(`/bookings/${id}/experiences`, { experienceId: exp._id });
+      const res = await api.post(`/bookings/${id}/experiences`, { experienceId: expId });
       const due = res.data?.data?.balanceDue || 0;
       toast.success(due > 0
         ? `${exp.name} agregada. Tienes un saldo de ${formatCOP(due)} por pagar.`
@@ -60,10 +61,11 @@ export default function BookingDetailPage() {
   };
 
   const removeExperience = async (exp) => {
+    const expId = exp._id || exp.id || exp.experienceId;
     if (!window.confirm(`¿Quitar "${exp.name}" de tu reserva?`)) return;
-    setBusyId(exp._id);
+    setBusyId(expId);
     try {
-      const res = await api.delete(`/bookings/${id}/experiences/${exp._id}`);
+      const res = await api.delete(`/bookings/${id}/experiences/${expId}`);
       const refund = res.data?.settlement?.refundAmount || 0;
       toast.info(refund > 0
         ? `${exp.name} quitada. Se registró un reembolso de ${formatCOP(refund)}.`
@@ -77,10 +79,11 @@ export default function BookingDetailPage() {
   };
 
   const mine = booking?.experiences || [];
-  const mineIds = new Set(mine.map((e) => e._id));
-  const available = catalog.filter((e) => e.available !== false && !mineIds.has(e._id));
-  const canEdit = !!booking?.isModifiable;
+  const mineIds = new Set(mine.map((e) => e._id || e.id || e.experienceId));
+  const available = catalog.filter((e) => e.available !== false && !mineIds.has(e._id || e.id));
+  const canEdit = booking?.isModifiable !== false && !['cancelled', 'expired', 'completed'].includes(booking?.status);
   const full = mine.length >= MAX_EXPERIENCES;
+  const bookingCodeDisplay = booking?.bookingCode || String(booking?._id || booking?.id || '').slice(-8).toUpperCase();
 
   return (
     <div className="dashboard-page">
@@ -103,11 +106,11 @@ export default function BookingDetailPage() {
           <div className="detail-grid">
             <section className="detail-card">
               <div className="booking-card-head">
-                <p className="form-hint">Reserva #{String(booking._id).slice(-8).toUpperCase()}</p>
+                <p className="form-hint">Reserva #{bookingCodeDisplay}</p>
                 <div className="pill-group">
                   <span className={`pill ${STATUS_CLASS[booking.status] || 'pill-pending'}`}>{booking.statusLabel || booking.status}</span>
-                  <span className={`pill ${booking.paymentStatus === 'paid' ? 'pill-ok' : 'pill-pending'}`}>
-                    {booking.paymentStatusLabel || booking.paymentStatus}
+                  <span className={`pill ${booking.paymentStatus === 'paid' ? 'pill-ok' : (booking.paymentStatus === 'refunded' ? 'pill-cancelled' : 'pill-pending')}`}>
+                    {booking.paymentStatus === 'refunded' ? 'REEMBOLSADO' : (booking.paymentStatusLabel || booking.paymentStatus?.toUpperCase())}
                   </span>
                   {!['cancelled', 'expired', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid' && (
                     <span className="pill pill-pending" style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}>⚠️ Pago pendiente</span>
@@ -115,9 +118,19 @@ export default function BookingDetailPage() {
                 </div>
               </div>
               <HoldNotice booking={booking} />
-              {!['cancelled', 'expired', 'completed'].includes(booking.status) && booking.paymentStatus !== 'paid' && (
+
+              {booking.status === 'cancelled' && (
+                <p className="form-hint" style={{ marginTop: 8, color: 'var(--gold)', fontWeight: 500 }}>
+                  {booking.paymentStatus === 'refunded' || (booking.refundedAmount && booking.refundedAmount > 0) || (booking.paidAmount && booking.paidAmount > 0)
+                    ? `ℹ️ Reserva cancelada. El reembolso del dinero abonado (${formatCOP(booking.refundedAmount || booking.paidAmount)}) será transferido a tu cuenta bancaria / método de pago en un plazo de 24 a 48 horas.`
+                    : 'Reserva cancelada sin cargos.'}
+                </p>
+              )}
+              {(!['cancelled', 'expired', 'completed'].includes(booking.status) && (booking.paymentStatus !== 'paid' || (booking.balanceDue && booking.balanceDue > 0))) && (
                 <div className="booking-card-actions">
-                  <Link className="btn-primary" to={`/pagar/${booking._id}`}>Pagar ahora / Completar saldo</Link>
+                  <Link className="btn-primary" to={`/pagar/${booking._id || booking.id}`}>
+                    Pagar ahora / Completar saldo {booking.balanceDue > 0 ? `(${formatCOP(booking.balanceDue)})` : ''}
+                  </Link>
                 </div>
               )}
               {['confirmed', 'completed'].includes(booking.status) && (
@@ -169,31 +182,37 @@ export default function BookingDetailPage() {
             <section className="detail-card detail-wide">
               <h3 className="profile-form-title">Experiencias de tu reserva</h3>
               {mine.length === 0 && <p className="form-hint">Aún no has agregado experiencias.</p>}
-              {mine.map((exp) => (
-                <div className="exp-row" key={exp._id}>
-                  <span>{exp.name}</span>
-                  <span>{formatCOP(exp.price)}</span>
-                  {canEdit && (
-                    <button className="link-btn danger" onClick={() => removeExperience(exp)} disabled={busyId === exp._id}>
-                      Quitar
-                    </button>
-                  )}
-                </div>
-              ))}
+              {mine.map((exp, idx) => {
+                const eId = exp._id || exp.id || exp.experienceId || idx;
+                return (
+                  <div className="exp-row" key={eId}>
+                    <span>{exp.name}</span>
+                    <span>{formatCOP(exp.price)}</span>
+                    {canEdit && (
+                      <button className="link-btn danger" onClick={() => removeExperience(exp)} disabled={busyId === eId}>
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
 
               {canEdit && available.length > 0 && (
                 <>
                   <h3 className="profile-form-title" style={{ marginTop: 22 }}>Agregar experiencias</h3>
                   {full && <p className="form-hint">Llegaste al máximo de {MAX_EXPERIENCES} experiencias por reserva.</p>}
-                  {available.map((exp) => (
-                    <div className="exp-row" key={exp._id}>
-                      <span>{exp.name}</span>
-                      <span>{formatCOP(exp.price)}</span>
-                      <button className="btn-outline" onClick={() => addExperience(exp)} disabled={full || busyId === exp._id}>
-                        {busyId === exp._id ? 'Agregando…' : 'Agregar'}
-                      </button>
-                    </div>
-                  ))}
+                  {available.map((exp) => {
+                    const eId = exp._id || exp.id;
+                    return (
+                      <div className="exp-row" key={eId}>
+                        <span>{exp.name}</span>
+                        <span>{formatCOP(exp.price)}</span>
+                        <button className="btn-outline" onClick={() => addExperience(exp)} disabled={full || busyId === eId}>
+                          {busyId === eId ? 'Agregando…' : 'Agregar'}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </>
               )}
               {!canEdit && <p className="form-hint">Esta reserva ya no admite cambios.</p>}
