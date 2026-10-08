@@ -25,18 +25,25 @@ public class BookingController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody BookingRequest request
     ) {
-        BookingDTO booking = bookingService.createBooking(principal.getUser().getId(), request);
+        String userId = principal != null ? principal.getUser().getId() : null;
+        BookingDTO booking = bookingService.createBooking(userId, request);
         return ResponseEntity.ok(ApiResponse.ok("Reserva creada exitosamente", booking));
     }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<BookingDTO>>> getUserBookings(@AuthenticationPrincipal UserPrincipal principal) {
+        if (principal == null) {
+            return ResponseEntity.ok(ApiResponse.ok(List.of()));
+        }
         List<BookingDTO> bookings = bookingService.getUserBookings(principal.getUser().getId());
         return ResponseEntity.ok(ApiResponse.ok(bookings));
     }
 
     @GetMapping("/my-bookings")
     public ResponseEntity<ApiResponse<List<BookingDTO>>> getMyBookings(@AuthenticationPrincipal UserPrincipal principal) {
+        if (principal == null) {
+            return ResponseEntity.ok(ApiResponse.ok(List.of()));
+        }
         List<BookingDTO> bookings = bookingService.getUserBookings(principal.getUser().getId());
         return ResponseEntity.ok(ApiResponse.ok(bookings));
     }

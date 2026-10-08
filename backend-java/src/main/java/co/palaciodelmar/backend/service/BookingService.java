@@ -13,6 +13,7 @@ import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.ExperienceRepository;
 import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
+import co.palaciodelmar.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -34,9 +35,29 @@ public class BookingService {
     private final BranchRepository branchRepository;
     private final ExperienceRepository experienceRepository;
     private final SuiteNightRepository suiteNightRepository;
+    private final UserRepository userRepository;
 
     public BookingDTO createBooking(String userId, BookingRequest request) {
+        if (userId == null || userId.isBlank()) {
+            String email = request.getGuestEmail() != null ? request.getGuestEmail().toLowerCase().trim() : "invitado@palaciodelmar.co";
+            User guest = userRepository.findByEmail(email).orElseGet(() -> {
+                User u = User.builder()
+                        .name(request.getGuestName() != null ? request.getGuestName() : "Huésped")
+                        .email(email)
+                        .role("user")
+                        .status("active")
+                        .emailVerified(true)
+                        .profile(User.Profile.builder().phone(request.getGuestPhone()).build())
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                return userRepository.save(u);
+            });
+            userId = guest.getId();
+        }
+
         Suite suite = suiteRepository.findById(request.getSuiteId())
+                .or(() -> suiteRepository.findBySlug(request.getSuiteId().toLowerCase()))
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: " + request.getSuiteId()));
 
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
@@ -123,6 +144,7 @@ public class BookingService {
         }
 
         Suite suite = suiteRepository.findById(booking.getSuite())
+                .or(() -> suiteRepository.findBySlug(booking.getSuite().toLowerCase()))
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada"));
 
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());

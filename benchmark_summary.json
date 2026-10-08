@@ -1,0 +1,4680 @@
+{
+  "Nginx Proxy (4200)": {
+    "GET /api/branches": {
+      "status": 200,
+      "ttfb_avg": 12.75,
+      "ttfb_min": 10.88,
+      "ttfb_max": 14.7,
+      "total_avg": 12.81,
+      "total_min": 10.92,
+      "total_max": 14.8,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": [
+          {
+            "id": "6ac69edfa8d23fe6a20e1363",
+            "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+            "slug": "centro-historico",
+            "zone": "Centro Hist\u00f3rico",
+            "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+            "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+            "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+            "location": {
+              "lat": 10.4236,
+              "lng": -75.5515
+            },
+            "mainImage": null,
+            "vibe": [
+              "hist\u00f3rico",
+              "rom\u00e1ntico",
+              "caminable"
+            ],
+            "highlights": [
+              {
+                "name": "Torre del Reloj",
+                "type": "historia",
+                "walkMinutes": 6,
+                "location": {
+                  "lat": 10.4247,
+                  "lng": -75.5513
+                }
+              },
+              {
+                "name": "Plaza de Santo Domingo",
+                "type": "gastronomia",
+                "walkMinutes": 3,
+                "location": {
+                  "lat": 10.4237,
+                  "lng": -75.5517
+                }
+              },
+              {
+                "name": "Palacio de la Inquisici\u00f3n",
+                "type": "cultura",
+                "walkMinutes": 5,
+                "location": {
+                  "lat": 10.4238,
+                  "lng": -75.5535
+                }
+              },
+              {
+                "name": "Murallas al atardecer",
+                "type": "historia",
+                "walkMinutes": 8,
+                "location": {
+                  "lat": 10.4264,
+                  "lng": -75.5509
+                }
+              },
+              {
+                "name": "Castillo de San Felipe",
+                "type": "historia",
+                "walkMinutes": 25,
+                "location": {
+                  "lat": 10.4228,
+                  "lng": -75.539
+                }
+              }
+            ],
+            "phone": null,
+            "checkInTime": "15:00",
+            "checkOutTime": "12:00",
+            "active": true,
+            "order": 1,
+            "fromPrice": 860000,
+            "roomTypes": 5,
+            "createdAt": "2026-10-07T19:34:55.689Z",
+            "updatedAt": "2026-10-08T03:37:34.900Z"
+          },
+          {
+            "id": "6ac69edfa8d23fe6a20e136c",
+            "name": "Palacio del Mar \u00b7 Getseman\u00ed",
+            "slug": "getsemani",
+            "zone": "Getseman\u00ed",
+            "tagline": "Arte callejero, m\u00fasica y la mejor vida nocturna",
+            "description": "Casa de barrio con patio, en el sector m\u00e1s colorido y vivo de la ciudad. Ideal para quien quiere cultura local, murales, bares y buena comida a toda hora.",
+            "address": "Calle del Arsenal, Getseman\u00ed, Cartagena",
+            "location": {
+              "lat": 10.4225,
+              "lng": -75.5462
+            },
+            "mainImage": null,
+            "vibe": [
+              "art\u00edstico",
+              "nocturno",
+              "bohemio"
+            ],
+            "highlights": [
+              {
+                "name": "Plaza de la Trinidad",
+                "type": "vida-nocturna",
+                "walkMinutes": 4,
+                "location": {
+                  "lat": 10.4211,
+                  "lng": -75.547
+                }
+              },
+              {
+                "name": "Murales y arte callejero",
+                "type": "cultura",
+                "walkMinutes": 2,
+                "location": null
+              },
+              {
+                "name": "Camell\u00f3n de los M\u00e1rtires",
+                "type": "historia",
+                "walkMinutes": 7,
+                "location": {
+                  "lat": 10.4249,
+                  "lng": -75.5468
+                }
+              },
+              {
+                "name": "Ciudad amurallada",
+                "type": "historia",
+                "walkMinutes": 10,
+                "location": {
+                  "lat": 10.4247,
+                  "lng": -75.5513
+                }
+              }
+            ],
+            "phone": null,
+            "checkInTime": "15:00",
+            "checkOutTime": "12:00",
+            "active": true,
+            "order": 2,
+            "fromPrice": 730000,
+            "roomTypes": 2,
+            "createdAt": "2026-10-07T19:34:55.732Z",
+            "updatedAt": "2026-10-08T03:37:34.945Z"
+          },
+          {
+            "id": "6ac69edfa8d23fe6a20e1373",
+            "name": "Palacio del Mar \u00b7 Bocagrande",
+            "slug": "bocagrande",
+            "zone": "Bocagrande",
+            "tagline": "Frente a la playa, con restaurantes y compras",
+            "description": "Edificio frente al mar en la zona hotelera moderna: playa a la puerta, restaurantes, centros comerciales y vistas abiertas a la bah\u00eda.",
+            "address": "Avenida San Mart\u00edn, Bocagrande, Cartagena",
+            "location": {
+              "lat": 10.401,
+              "lng": -75.5575
+            },
+            "mainImage": null,
+            "vibe": [
+              "playero",
+              "familiar",
+              "moderno"
+            ],
+            "highlights": [
+              {
+                "name": "Playa de Bocagrande",
+                "type": "playa",
+                "walkMinutes": 2,
+                "location": {
+                  "lat": 10.4005,
+                  "lng": -75.5565
+                }
+              },
+              {
+                "name": "Avenida San Mart\u00edn",
+                "type": "gastronomia",
+                "walkMinutes": 1,
+                "location": {
+                  "lat": 10.4015,
+                  "lng": -75.5585
+                }
+              },
+              {
+                "name": "Castillogrande",
+                "type": "compras",
+                "walkMinutes": 15,
+                "location": {
+                  "lat": 10.3925,
+                  "lng": -75.5522
+                }
+              },
+              {
+                "name": "Centros comerciales",
+                "type": "compras",
+                "walkMinutes": 10,
+                "location": null
+              }
+            ],
+            "phone": null,
+            "checkInTime": "15:00",
+            "checkOutTime": "12:00",
+            "active": true,
+            "order": 3,
+            "fromPrice": 950000,
+            "roomTypes": 3,
+            "createdAt": "2026-10-07T19:34:55.755Z",
+            "updatedAt": "2026-10-08T03:37:34.958Z"
+          },
+          {
+            "id": "6ac69edfa8d23fe6a20e1376",
+            "name": "Palacio del Mar \u00b7 La Boquilla",
+            "slug": "la-boquilla",
+            "zone": "La Boquilla",
+            "tagline": "Mar, manglares y tranquilidad al norte",
+            "description": "Refugio frente a la playa y la ci\u00e9naga, lejos del bullicio. Perfecto para descansar, comer pescado fresco y recorrer los manglares en canoa.",
+            "address": "V\u00eda al Mar, La Boquilla, Cartagena",
+            "location": {
+              "lat": 10.47,
+              "lng": -75.512
+            },
+            "mainImage": null,
+            "vibe": [
+              "tranquilo",
+              "naturaleza",
+              "playero"
+            ],
+            "highlights": [
+              {
+                "name": "Playa de La Boquilla",
+                "type": "playa",
+                "walkMinutes": 3,
+                "location": {
+                  "lat": 10.4695,
+                  "lng": -75.5105
+                }
+              },
+              {
+                "name": "Manglares y paseo en canoa",
+                "type": "naturaleza",
+                "walkMinutes": 8,
+                "location": {
+                  "lat": 10.4735,
+                  "lng": -75.5135
+                }
+              },
+              {
+                "name": "Restaurantes de pescado frito",
+                "type": "gastronomia",
+                "walkMinutes": 4,
+                "location": null
+              }
+            ],
+            "phone": null,
+            "checkInTime": "15:00",
+            "checkOutTime": "12:00",
+            "active": true,
+            "order": 4,
+            "fromPrice": 690000,
+            "roomTypes": 2,
+            "createdAt": "2026-10-07T19:34:55.764Z",
+            "updatedAt": "2026-10-08T03:37:34.969Z"
+          }
+        ]
+      }
+    },
+    "GET /api/suites": {
+      "status": 200,
+      "ttfb_avg": 12.74,
+      "ttfb_min": 11.56,
+      "ttfb_max": 14.68,
+      "total_avg": 12.87,
+      "total_min": 11.67,
+      "total_max": 14.84,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": [
+          {
+            "id": "6ac69edf287238e812d63540",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Superior Patio",
+            "slug": "superior-patio-centro-historico",
+            "type": "Habitaci\u00f3n",
+            "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+            "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+            "basePrice": 860000,
+            "originalPrice": 1050000,
+            "seasonalPrice": 860000,
+            "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 42,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Jard\u00edn privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 4,
+            "active": true,
+            "available": true,
+            "featured": false,
+            "order": 1,
+            "createdAt": "2026-10-07T19:34:55.997Z",
+            "updatedAt": "2026-10-07T19:34:56.002Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63543",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Suite Colonial",
+            "slug": "suite-colonial-centro-historico",
+            "type": "Suite Deluxe",
+            "description": "Suite hist\u00f3rica con patio colonial y tina hidromasaje, combinando el encanto del pasado con comodidades modernas.",
+            "shortDescription": "Suite hist\u00f3rica con patio colonial",
+            "basePrice": 1310000,
+            "originalPrice": 1650000,
+            "seasonalPrice": 1310000,
+            "mainImage": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 65,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Patio colonial",
+              "Tina hidromasaje",
+              "Balc\u00f3n",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 3,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 2,
+            "createdAt": "2026-10-07T19:34:56.013Z",
+            "updatedAt": "2026-10-07T19:34:56.014Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63546",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Suite Bah\u00eda",
+            "slug": "suite-bahia-centro-historico",
+            "type": "Suite Premium",
+            "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+            "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+            "basePrice": 1720000,
+            "originalPrice": 2150000,
+            "seasonalPrice": 1720000,
+            "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 85,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Vista al mar",
+              "Jacuzzi",
+              "Balc\u00f3n privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 2,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 3,
+            "createdAt": "2026-10-07T19:34:56.019Z",
+            "updatedAt": "2026-10-07T19:34:56.020Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63548",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Suite Presidencial",
+            "slug": "suite-presidencial-centro-historico",
+            "type": "Suite Presidencial",
+            "description": "La m\u00e1xima expresi\u00f3n de lujo. Terraza privada con jacuzzi, mayordomo personal y vistas espectaculares.",
+            "shortDescription": "Lujo m\u00e1ximo con terraza privada y mayordomo",
+            "basePrice": 2780000,
+            "originalPrice": 3440000,
+            "seasonalPrice": 2780000,
+            "mainImage": "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 4,
+            "size": 180,
+            "bathrooms": 1,
+            "view": "ocean",
+            "hasBalcony": true,
+            "hasTerrace": true,
+            "hasJacuzzi": true,
+            "beds": [],
+            "amenities": [
+              "Terraza privada",
+              "Jacuzzi",
+              "Mayordomo 24/7",
+              "Sala de estar",
+              "Cama king",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 1,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 4,
+            "createdAt": "2026-10-07T19:34:56.023Z",
+            "updatedAt": "2026-10-07T19:34:56.024Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d6354b",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Penthouse Muralla",
+            "slug": "penthouse-muralla-centro-historico",
+            "type": "Suite Exclusiva",
+            "description": "El \u00e1tico m\u00e1s exclusivo con vista 360\u00b0 de la ciudad. Piscina privada y terraza doble para eventos exclusivos.",
+            "shortDescription": "\u00c1tico exclusivo con piscina privada y vista 360\u00b0",
+            "basePrice": 3640000,
+            "originalPrice": 4280000,
+            "seasonalPrice": 3640000,
+            "mainImage": "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 6,
+            "size": 220,
+            "bathrooms": 1,
+            "view": "ocean",
+            "hasBalcony": true,
+            "hasTerrace": true,
+            "hasJacuzzi": true,
+            "beds": [],
+            "amenities": [
+              "Vista 360\u00b0",
+              "Piscina privada",
+              "Terraza doble",
+              "Cocina completa",
+              "Mayordomo",
+              "Sala de estar",
+              "Comedor",
+              "Aire acondicionado"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 1,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 5,
+            "createdAt": "2026-10-07T19:34:56.029Z",
+            "updatedAt": "2026-10-07T19:34:56.030Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d6354e",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e136c",
+              "name": "Palacio del Mar \u00b7 Getseman\u00ed",
+              "slug": "getsemani",
+              "zone": "Getseman\u00ed",
+              "tagline": "Arte callejero, m\u00fasica y la mejor vida nocturna",
+              "description": "Casa de barrio con patio, en el sector m\u00e1s colorido y vivo de la ciudad. Ideal para quien quiere cultura local, murales, bares y buena comida a toda hora.",
+              "address": "Calle del Arsenal, Getseman\u00ed, Cartagena",
+              "location": {
+                "lat": 10.4225,
+                "lng": -75.5462
+              },
+              "mainImage": null,
+              "vibe": [
+                "art\u00edstico",
+                "nocturno",
+                "bohemio"
+              ],
+              "highlights": [
+                {
+                  "name": "Plaza de la Trinidad",
+                  "type": "vida-nocturna",
+                  "walkMinutes": 4,
+                  "location": {
+                    "lat": 10.4211,
+                    "lng": -75.547
+                  }
+                },
+                {
+                  "name": "Murales y arte callejero",
+                  "type": "cultura",
+                  "walkMinutes": 2,
+                  "location": null
+                },
+                {
+                  "name": "Camell\u00f3n de los M\u00e1rtires",
+                  "type": "historia",
+                  "walkMinutes": 7,
+                  "location": {
+                    "lat": 10.4249,
+                    "lng": -75.5468
+                  }
+                },
+                {
+                  "name": "Ciudad amurallada",
+                  "type": "historia",
+                  "walkMinutes": 10,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 2,
+              "createdAt": "2026-10-07T19:34:55.732Z",
+              "updatedAt": "2026-10-08T03:37:34.945Z",
+              "_id": "6ac69edfa8d23fe6a20e136c"
+            },
+            "name": "Superior Patio",
+            "slug": "superior-patio-getsemani",
+            "type": "Habitaci\u00f3n",
+            "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+            "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+            "basePrice": 730000,
+            "originalPrice": 890000,
+            "seasonalPrice": 730000,
+            "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 42,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Jard\u00edn privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 5,
+            "active": true,
+            "available": true,
+            "featured": false,
+            "order": 1,
+            "createdAt": "2026-10-07T19:34:56.035Z",
+            "updatedAt": "2026-10-07T19:34:56.035Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63550",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e136c",
+              "name": "Palacio del Mar \u00b7 Getseman\u00ed",
+              "slug": "getsemani",
+              "zone": "Getseman\u00ed",
+              "tagline": "Arte callejero, m\u00fasica y la mejor vida nocturna",
+              "description": "Casa de barrio con patio, en el sector m\u00e1s colorido y vivo de la ciudad. Ideal para quien quiere cultura local, murales, bares y buena comida a toda hora.",
+              "address": "Calle del Arsenal, Getseman\u00ed, Cartagena",
+              "location": {
+                "lat": 10.4225,
+                "lng": -75.5462
+              },
+              "mainImage": null,
+              "vibe": [
+                "art\u00edstico",
+                "nocturno",
+                "bohemio"
+              ],
+              "highlights": [
+                {
+                  "name": "Plaza de la Trinidad",
+                  "type": "vida-nocturna",
+                  "walkMinutes": 4,
+                  "location": {
+                    "lat": 10.4211,
+                    "lng": -75.547
+                  }
+                },
+                {
+                  "name": "Murales y arte callejero",
+                  "type": "cultura",
+                  "walkMinutes": 2,
+                  "location": null
+                },
+                {
+                  "name": "Camell\u00f3n de los M\u00e1rtires",
+                  "type": "historia",
+                  "walkMinutes": 7,
+                  "location": {
+                    "lat": 10.4249,
+                    "lng": -75.5468
+                  }
+                },
+                {
+                  "name": "Ciudad amurallada",
+                  "type": "historia",
+                  "walkMinutes": 10,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 2,
+              "createdAt": "2026-10-07T19:34:55.732Z",
+              "updatedAt": "2026-10-08T03:37:34.945Z",
+              "_id": "6ac69edfa8d23fe6a20e136c"
+            },
+            "name": "Suite Colonial",
+            "slug": "suite-colonial-getsemani",
+            "type": "Suite Deluxe",
+            "description": "Suite hist\u00f3rica con patio colonial y tina hidromasaje, combinando el encanto del pasado con comodidades modernas.",
+            "shortDescription": "Suite hist\u00f3rica con patio colonial",
+            "basePrice": 1110000,
+            "originalPrice": 1400000,
+            "seasonalPrice": 1110000,
+            "mainImage": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 65,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Patio colonial",
+              "Tina hidromasaje",
+              "Balc\u00f3n",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 3,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 2,
+            "createdAt": "2026-10-07T19:34:56.038Z",
+            "updatedAt": "2026-10-07T19:34:56.039Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63552",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1373",
+              "name": "Palacio del Mar \u00b7 Bocagrande",
+              "slug": "bocagrande",
+              "zone": "Bocagrande",
+              "tagline": "Frente a la playa, con restaurantes y compras",
+              "description": "Edificio frente al mar en la zona hotelera moderna: playa a la puerta, restaurantes, centros comerciales y vistas abiertas a la bah\u00eda.",
+              "address": "Avenida San Mart\u00edn, Bocagrande, Cartagena",
+              "location": {
+                "lat": 10.401,
+                "lng": -75.5575
+              },
+              "mainImage": null,
+              "vibe": [
+                "playero",
+                "familiar",
+                "moderno"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de Bocagrande",
+                  "type": "playa",
+                  "walkMinutes": 2,
+                  "location": {
+                    "lat": 10.4005,
+                    "lng": -75.5565
+                  }
+                },
+                {
+                  "name": "Avenida San Mart\u00edn",
+                  "type": "gastronomia",
+                  "walkMinutes": 1,
+                  "location": {
+                    "lat": 10.4015,
+                    "lng": -75.5585
+                  }
+                },
+                {
+                  "name": "Castillogrande",
+                  "type": "compras",
+                  "walkMinutes": 15,
+                  "location": {
+                    "lat": 10.3925,
+                    "lng": -75.5522
+                  }
+                },
+                {
+                  "name": "Centros comerciales",
+                  "type": "compras",
+                  "walkMinutes": 10,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 3,
+              "createdAt": "2026-10-07T19:34:55.755Z",
+              "updatedAt": "2026-10-08T03:37:34.958Z",
+              "_id": "6ac69edfa8d23fe6a20e1373"
+            },
+            "name": "Superior Patio",
+            "slug": "superior-patio-bocagrande",
+            "type": "Habitaci\u00f3n",
+            "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+            "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+            "basePrice": 950000,
+            "originalPrice": 1160000,
+            "seasonalPrice": 950000,
+            "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 42,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Jard\u00edn privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 6,
+            "active": true,
+            "available": true,
+            "featured": false,
+            "order": 1,
+            "createdAt": "2026-10-07T19:34:56.043Z",
+            "updatedAt": "2026-10-07T19:34:56.044Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63554",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1373",
+              "name": "Palacio del Mar \u00b7 Bocagrande",
+              "slug": "bocagrande",
+              "zone": "Bocagrande",
+              "tagline": "Frente a la playa, con restaurantes y compras",
+              "description": "Edificio frente al mar en la zona hotelera moderna: playa a la puerta, restaurantes, centros comerciales y vistas abiertas a la bah\u00eda.",
+              "address": "Avenida San Mart\u00edn, Bocagrande, Cartagena",
+              "location": {
+                "lat": 10.401,
+                "lng": -75.5575
+              },
+              "mainImage": null,
+              "vibe": [
+                "playero",
+                "familiar",
+                "moderno"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de Bocagrande",
+                  "type": "playa",
+                  "walkMinutes": 2,
+                  "location": {
+                    "lat": 10.4005,
+                    "lng": -75.5565
+                  }
+                },
+                {
+                  "name": "Avenida San Mart\u00edn",
+                  "type": "gastronomia",
+                  "walkMinutes": 1,
+                  "location": {
+                    "lat": 10.4015,
+                    "lng": -75.5585
+                  }
+                },
+                {
+                  "name": "Castillogrande",
+                  "type": "compras",
+                  "walkMinutes": 15,
+                  "location": {
+                    "lat": 10.3925,
+                    "lng": -75.5522
+                  }
+                },
+                {
+                  "name": "Centros comerciales",
+                  "type": "compras",
+                  "walkMinutes": 10,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 3,
+              "createdAt": "2026-10-07T19:34:55.755Z",
+              "updatedAt": "2026-10-08T03:37:34.958Z",
+              "_id": "6ac69edfa8d23fe6a20e1373"
+            },
+            "name": "Suite Bah\u00eda",
+            "slug": "suite-bahia-bocagrande",
+            "type": "Suite Premium",
+            "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+            "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+            "basePrice": 1890000,
+            "originalPrice": 2370000,
+            "seasonalPrice": 1890000,
+            "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 85,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Vista al mar",
+              "Jacuzzi",
+              "Balc\u00f3n privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 4,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 3,
+            "createdAt": "2026-10-07T19:34:56.048Z",
+            "updatedAt": "2026-10-07T19:34:56.048Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63556",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1373",
+              "name": "Palacio del Mar \u00b7 Bocagrande",
+              "slug": "bocagrande",
+              "zone": "Bocagrande",
+              "tagline": "Frente a la playa, con restaurantes y compras",
+              "description": "Edificio frente al mar en la zona hotelera moderna: playa a la puerta, restaurantes, centros comerciales y vistas abiertas a la bah\u00eda.",
+              "address": "Avenida San Mart\u00edn, Bocagrande, Cartagena",
+              "location": {
+                "lat": 10.401,
+                "lng": -75.5575
+              },
+              "mainImage": null,
+              "vibe": [
+                "playero",
+                "familiar",
+                "moderno"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de Bocagrande",
+                  "type": "playa",
+                  "walkMinutes": 2,
+                  "location": {
+                    "lat": 10.4005,
+                    "lng": -75.5565
+                  }
+                },
+                {
+                  "name": "Avenida San Mart\u00edn",
+                  "type": "gastronomia",
+                  "walkMinutes": 1,
+                  "location": {
+                    "lat": 10.4015,
+                    "lng": -75.5585
+                  }
+                },
+                {
+                  "name": "Castillogrande",
+                  "type": "compras",
+                  "walkMinutes": 15,
+                  "location": {
+                    "lat": 10.3925,
+                    "lng": -75.5522
+                  }
+                },
+                {
+                  "name": "Centros comerciales",
+                  "type": "compras",
+                  "walkMinutes": 10,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 3,
+              "createdAt": "2026-10-07T19:34:55.755Z",
+              "updatedAt": "2026-10-08T03:37:34.958Z",
+              "_id": "6ac69edfa8d23fe6a20e1373"
+            },
+            "name": "Suite Presidencial",
+            "slug": "suite-presidencial-bocagrande",
+            "type": "Suite Presidencial",
+            "description": "La m\u00e1xima expresi\u00f3n de lujo. Terraza privada con jacuzzi, mayordomo personal y vistas espectaculares.",
+            "shortDescription": "Lujo m\u00e1ximo con terraza privada y mayordomo",
+            "basePrice": 3060000,
+            "originalPrice": 3780000,
+            "seasonalPrice": 3060000,
+            "mainImage": "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 4,
+            "size": 180,
+            "bathrooms": 1,
+            "view": "ocean",
+            "hasBalcony": true,
+            "hasTerrace": true,
+            "hasJacuzzi": true,
+            "beds": [],
+            "amenities": [
+              "Terraza privada",
+              "Jacuzzi",
+              "Mayordomo 24/7",
+              "Sala de estar",
+              "Cama king",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 2,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 4,
+            "createdAt": "2026-10-07T19:34:56.051Z",
+            "updatedAt": "2026-10-07T19:34:56.052Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63558",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1376",
+              "name": "Palacio del Mar \u00b7 La Boquilla",
+              "slug": "la-boquilla",
+              "zone": "La Boquilla",
+              "tagline": "Mar, manglares y tranquilidad al norte",
+              "description": "Refugio frente a la playa y la ci\u00e9naga, lejos del bullicio. Perfecto para descansar, comer pescado fresco y recorrer los manglares en canoa.",
+              "address": "V\u00eda al Mar, La Boquilla, Cartagena",
+              "location": {
+                "lat": 10.47,
+                "lng": -75.512
+              },
+              "mainImage": null,
+              "vibe": [
+                "tranquilo",
+                "naturaleza",
+                "playero"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de La Boquilla",
+                  "type": "playa",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4695,
+                    "lng": -75.5105
+                  }
+                },
+                {
+                  "name": "Manglares y paseo en canoa",
+                  "type": "naturaleza",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4735,
+                    "lng": -75.5135
+                  }
+                },
+                {
+                  "name": "Restaurantes de pescado frito",
+                  "type": "gastronomia",
+                  "walkMinutes": 4,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 4,
+              "createdAt": "2026-10-07T19:34:55.764Z",
+              "updatedAt": "2026-10-08T03:37:34.969Z",
+              "_id": "6ac69edfa8d23fe6a20e1376"
+            },
+            "name": "Superior Patio",
+            "slug": "superior-patio-la-boquilla",
+            "type": "Habitaci\u00f3n",
+            "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+            "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+            "basePrice": 690000,
+            "originalPrice": 840000,
+            "seasonalPrice": 690000,
+            "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 42,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Jard\u00edn privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 4,
+            "active": true,
+            "available": true,
+            "featured": false,
+            "order": 1,
+            "createdAt": "2026-10-07T19:34:56.055Z",
+            "updatedAt": "2026-10-07T19:34:56.056Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d6355a",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1376",
+              "name": "Palacio del Mar \u00b7 La Boquilla",
+              "slug": "la-boquilla",
+              "zone": "La Boquilla",
+              "tagline": "Mar, manglares y tranquilidad al norte",
+              "description": "Refugio frente a la playa y la ci\u00e9naga, lejos del bullicio. Perfecto para descansar, comer pescado fresco y recorrer los manglares en canoa.",
+              "address": "V\u00eda al Mar, La Boquilla, Cartagena",
+              "location": {
+                "lat": 10.47,
+                "lng": -75.512
+              },
+              "mainImage": null,
+              "vibe": [
+                "tranquilo",
+                "naturaleza",
+                "playero"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de La Boquilla",
+                  "type": "playa",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4695,
+                    "lng": -75.5105
+                  }
+                },
+                {
+                  "name": "Manglares y paseo en canoa",
+                  "type": "naturaleza",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4735,
+                    "lng": -75.5135
+                  }
+                },
+                {
+                  "name": "Restaurantes de pescado frito",
+                  "type": "gastronomia",
+                  "walkMinutes": 4,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 4,
+              "createdAt": "2026-10-07T19:34:55.764Z",
+              "updatedAt": "2026-10-08T03:37:34.969Z",
+              "_id": "6ac69edfa8d23fe6a20e1376"
+            },
+            "name": "Suite Bah\u00eda",
+            "slug": "suite-bahia-la-boquilla",
+            "type": "Suite Premium",
+            "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+            "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+            "basePrice": 1380000,
+            "originalPrice": 1720000,
+            "seasonalPrice": 1380000,
+            "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 85,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Vista al mar",
+              "Jacuzzi",
+              "Balc\u00f3n privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 3,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 3,
+            "createdAt": "2026-10-07T19:34:56.059Z",
+            "updatedAt": "2026-10-07T19:34:56.060Z"
+          }
+        ]
+      }
+    },
+    "GET /api/experiences": {
+      "status": 200,
+      "ttfb_avg": 10.45,
+      "ttfb_min": 9.98,
+      "ttfb_max": 10.79,
+      "total_avg": 10.53,
+      "total_min": 10.07,
+      "total_max": 10.89,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": [
+          {
+            "id": "6ac69ee0287238e812d6355d",
+            "name": "Islas del Rosario",
+            "description": "Navegaci\u00f3n privada a las cristalinas aguas del Parque Natural Nacional Rosario. Snorkel en arrecifes de coral, avistamiento de peces tropicales y almuerzo t\u00edpico caribe\u00f1o.",
+            "shortDescription": "Excursi\u00f3n a las Islas del Rosario con snorkel y almuerzo",
+            "price": 348000,
+            "branch": null,
+            "category": "aventura",
+            "image": null,
+            "mainImage": "https://images.unsplash.com/photo-1533105079780-92b9be482077?w=800&auto=format&fit=crop&q=80",
+            "active": true,
+            "available": true,
+            "createdAt": "2026-10-07T19:34:56.069Z",
+            "updatedAt": "2026-10-07T19:34:56.071Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63560",
+            "name": "Atardecer en la Muralla",
+            "description": "C\u00f3ctel al atardecer sobre la muralla colonial con vistas al Caribe y degustaci\u00f3n de ron artesanal colombiano.",
+            "shortDescription": "Atardecer exclusivo en la muralla con coctel y ron artesanal",
+            "price": 184000,
+            "branch": null,
+            "category": "cultural",
+            "image": null,
+            "mainImage": "https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=800&auto=format&fit=crop&q=80",
+            "active": true,
+            "available": true,
+            "createdAt": "2026-10-07T19:34:56.078Z",
+            "updatedAt": "2026-10-07T19:34:56.079Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63563",
+            "name": "Ruta del Sabor",
+            "description": "Tour gastron\u00f3mico por mercados locales con nuestro chef ejecutivo. Cocina en vivo y degustaci\u00f3n de platos t\u00edpicos.",
+            "shortDescription": "Tour gastron\u00f3mico por mercados locales con chef",
+            "price": 266000,
+            "branch": null,
+            "category": "gastronom\u00eda",
+            "image": null,
+            "mainImage": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop&q=80",
+            "active": true,
+            "available": true,
+            "createdAt": "2026-10-07T19:34:56.085Z",
+            "updatedAt": "2026-10-07T19:34:56.086Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63566",
+            "name": "Noche de Palenque",
+            "description": "Noche cultural con m\u00fasicos de Palenque, baile de mapal\u00e9 y cena en terraza bajo el cielo caribe\u00f1o.",
+            "shortDescription": "Noche cultural con m\u00fasica y baile de Palenque",
+            "price": 389000,
+            "branch": null,
+            "category": "cultural",
+            "image": null,
+            "mainImage": "https://images.unsplash.com/photo-1534367507873-de2f85e8dbdf?w=800&auto=format&fit=crop&q=80",
+            "active": true,
+            "available": true,
+            "createdAt": "2026-10-07T19:34:56.093Z",
+            "updatedAt": "2026-10-07T19:34:56.094Z"
+          }
+        ]
+      }
+    },
+    "POST /api/auth/register": {
+      "status": 200,
+      "ttfb_avg": 74.66,
+      "total_avg": 74.72
+    },
+    "POST /api/auth/login": {
+      "status": 200,
+      "ttfb_avg": 77.45,
+      "ttfb_min": 68.22,
+      "ttfb_max": 99.54,
+      "total_avg": 77.52,
+      "total_min": 68.32,
+      "total_max": 99.62,
+      "sample_json": {
+        "data": {
+          "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwcm9mXzQyMDBfMTc5MTQ5MTE5OTYxNl80QHRlc3QuY29tIiwiaWF0IjoxNzkxNDkxMjAwLCJleHAiOjE3OTIwOTYwMDB9.0Q2A9xCzNspLkC6QOFctbTtqs0rLuvSzbCLwWNg_hTA",
+          "user": {
+            "id": "6ac7fc80bb1ffc406c1427cb",
+            "name": "Prof",
+            "lastName": "User",
+            "email": "prof_4200_1791491199616_4@test.com",
+            "password": null,
+            "role": "user",
+            "branches": [],
+            "status": "active",
+            "emailVerified": true,
+            "profile": {
+              "phone": "+573001234567",
+              "address": null,
+              "documentId": null,
+              "documentType": null,
+              "avatar": null
+            },
+            "createdAt": "2026-10-08T20:26:40.477Z",
+            "updatedAt": "2026-10-08T20:26:40.477Z",
+            "deletedAt": null,
+            "_id": "6ac7fc80bb1ffc406c1427cb"
+          }
+        },
+        "success": true,
+        "message": "Inicio de sesi\u00f3n exitoso",
+        "user": {
+          "id": "6ac7fc80bb1ffc406c1427cb",
+          "name": "Prof",
+          "lastName": "User",
+          "email": "prof_4200_1791491199616_4@test.com",
+          "password": null,
+          "role": "user",
+          "branches": [],
+          "status": "active",
+          "emailVerified": true,
+          "profile": {
+            "phone": "+573001234567",
+            "address": null,
+            "documentId": null,
+            "documentType": null,
+            "avatar": null
+          },
+          "createdAt": "2026-10-08T20:26:40.477Z",
+          "updatedAt": "2026-10-08T20:26:40.477Z",
+          "deletedAt": null,
+          "_id": "6ac7fc80bb1ffc406c1427cb"
+        },
+        "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwcm9mXzQyMDBfMTc5MTQ5MTE5OTYxNl80QHRlc3QuY29tIiwiaWF0IjoxNzkxNDkxMjAwLCJleHAiOjE3OTIwOTYwMDB9.0Q2A9xCzNspLkC6QOFctbTtqs0rLuvSzbCLwWNg_hTA"
+      }
+    },
+    "GET /api/availability": {
+      "status": 200,
+      "ttfb_avg": 45.71,
+      "ttfb_min": 40.93,
+      "ttfb_max": 49.33,
+      "total_avg": 45.79,
+      "total_min": 40.98,
+      "total_max": 49.43,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": {
+          "availableSuites": [
+            {
+              "availableUnits": 4,
+              "isAvailable": true,
+              "pricePerNight": 860000,
+              "suite": {
+                "id": "6ac69edf287238e812d63540",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Superior Patio",
+                "slug": "superior-patio-centro-historico",
+                "type": "Habitaci\u00f3n",
+                "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+                "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+                "basePrice": 860000,
+                "originalPrice": 1050000,
+                "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 42,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Jard\u00edn privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 4,
+                "active": true,
+                "available": true,
+                "featured": false,
+                "order": 1,
+                "createdAt": "2026-10-07T19:34:55.997Z",
+                "updatedAt": "2026-10-07T19:34:56.002Z",
+                "_id": "6ac69edf287238e812d63540"
+              },
+              "totalPrice": 1720000,
+              "totalUnits": 4
+            },
+            {
+              "availableUnits": 3,
+              "isAvailable": true,
+              "pricePerNight": 1310000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63543",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Suite Colonial",
+                "slug": "suite-colonial-centro-historico",
+                "type": "Suite Deluxe",
+                "description": "Suite hist\u00f3rica con patio colonial y tina hidromasaje, combinando el encanto del pasado con comodidades modernas.",
+                "shortDescription": "Suite hist\u00f3rica con patio colonial",
+                "basePrice": 1310000,
+                "originalPrice": 1650000,
+                "mainImage": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 65,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Patio colonial",
+                  "Tina hidromasaje",
+                  "Balc\u00f3n",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 3,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 2,
+                "createdAt": "2026-10-07T19:34:56.013Z",
+                "updatedAt": "2026-10-07T19:34:56.014Z",
+                "_id": "6ac69ee0287238e812d63543"
+              },
+              "totalPrice": 2620000,
+              "totalUnits": 3
+            },
+            {
+              "availableUnits": 2,
+              "isAvailable": true,
+              "pricePerNight": 1720000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63546",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Suite Bah\u00eda",
+                "slug": "suite-bahia-centro-historico",
+                "type": "Suite Premium",
+                "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+                "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+                "basePrice": 1720000,
+                "originalPrice": 2150000,
+                "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 85,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Vista al mar",
+                  "Jacuzzi",
+                  "Balc\u00f3n privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 2,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 3,
+                "createdAt": "2026-10-07T19:34:56.019Z",
+                "updatedAt": "2026-10-07T19:34:56.020Z",
+                "_id": "6ac69ee0287238e812d63546"
+              },
+              "totalPrice": 3440000,
+              "totalUnits": 2
+            },
+            {
+              "availableUnits": 1,
+              "isAvailable": true,
+              "pricePerNight": 2780000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63548",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Suite Presidencial",
+                "slug": "suite-presidencial-centro-historico",
+                "type": "Suite Presidencial",
+                "description": "La m\u00e1xima expresi\u00f3n de lujo. Terraza privada con jacuzzi, mayordomo personal y vistas espectaculares.",
+                "shortDescription": "Lujo m\u00e1ximo con terraza privada y mayordomo",
+                "basePrice": 2780000,
+                "originalPrice": 3440000,
+                "mainImage": "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 4,
+                "size": 180,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Terraza privada",
+                  "Jacuzzi",
+                  "Mayordomo 24/7",
+                  "Sala de estar",
+                  "Cama king",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito"
+                ],
+                "hasBalcony": true,
+                "hasTerrace": true,
+                "hasJacuzzi": true,
+                "view": "ocean",
+                "images": [
+                  "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 1,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 4,
+                "createdAt": "2026-10-07T19:34:56.023Z",
+                "updatedAt": "2026-10-07T19:34:56.024Z",
+                "_id": "6ac69ee0287238e812d63548"
+              },
+              "totalPrice": 5560000,
+              "totalUnits": 1
+            },
+            {
+              "availableUnits": 1,
+              "isAvailable": true,
+              "pricePerNight": 3640000,
+              "suite": {
+                "id": "6ac69ee0287238e812d6354b",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Penthouse Muralla",
+                "slug": "penthouse-muralla-centro-historico",
+                "type": "Suite Exclusiva",
+                "description": "El \u00e1tico m\u00e1s exclusivo con vista 360\u00b0 de la ciudad. Piscina privada y terraza doble para eventos exclusivos.",
+                "shortDescription": "\u00c1tico exclusivo con piscina privada y vista 360\u00b0",
+                "basePrice": 3640000,
+                "originalPrice": 4280000,
+                "mainImage": "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 6,
+                "size": 220,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Vista 360\u00b0",
+                  "Piscina privada",
+                  "Terraza doble",
+                  "Cocina completa",
+                  "Mayordomo",
+                  "Sala de estar",
+                  "Comedor",
+                  "Aire acondicionado"
+                ],
+                "hasBalcony": true,
+                "hasTerrace": true,
+                "hasJacuzzi": true,
+                "view": "ocean",
+                "images": [
+                  "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 1,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 5,
+                "createdAt": "2026-10-07T19:34:56.029Z",
+                "updatedAt": "2026-10-07T19:34:56.030Z",
+                "_id": "6ac69ee0287238e812d6354b"
+              },
+              "totalPrice": 7280000,
+              "totalUnits": 1
+            },
+            {
+              "availableUnits": 5,
+              "isAvailable": true,
+              "pricePerNight": 730000,
+              "suite": {
+                "id": "6ac69ee0287238e812d6354e",
+                "branch": "6ac69edfa8d23fe6a20e136c",
+                "name": "Superior Patio",
+                "slug": "superior-patio-getsemani",
+                "type": "Habitaci\u00f3n",
+                "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+                "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+                "basePrice": 730000,
+                "originalPrice": 890000,
+                "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 42,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Jard\u00edn privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 5,
+                "active": true,
+                "available": true,
+                "featured": false,
+                "order": 1,
+                "createdAt": "2026-10-07T19:34:56.035Z",
+                "updatedAt": "2026-10-07T19:34:56.035Z",
+                "_id": "6ac69ee0287238e812d6354e"
+              },
+              "totalPrice": 1460000,
+              "totalUnits": 5
+            },
+            {
+              "availableUnits": 3,
+              "isAvailable": true,
+              "pricePerNight": 1110000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63550",
+                "branch": "6ac69edfa8d23fe6a20e136c",
+                "name": "Suite Colonial",
+                "slug": "suite-colonial-getsemani",
+                "type": "Suite Deluxe",
+                "description": "Suite hist\u00f3rica con patio colonial y tina hidromasaje, combinando el encanto del pasado con comodidades modernas.",
+                "shortDescription": "Suite hist\u00f3rica con patio colonial",
+                "basePrice": 1110000,
+                "originalPrice": 1400000,
+                "mainImage": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 65,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Patio colonial",
+                  "Tina hidromasaje",
+                  "Balc\u00f3n",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 3,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 2,
+                "createdAt": "2026-10-07T19:34:56.038Z",
+                "updatedAt": "2026-10-07T19:34:56.039Z",
+                "_id": "6ac69ee0287238e812d63550"
+              },
+              "totalPrice": 2220000,
+              "totalUnits": 3
+            },
+            {
+              "availableUnits": 6,
+              "isAvailable": true,
+              "pricePerNight": 950000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63552",
+                "branch": "6ac69edfa8d23fe6a20e1373",
+                "name": "Superior Patio",
+                "slug": "superior-patio-bocagrande",
+                "type": "Habitaci\u00f3n",
+                "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+                "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+                "basePrice": 950000,
+                "originalPrice": 1160000,
+                "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 42,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Jard\u00edn privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 6,
+                "active": true,
+                "available": true,
+                "featured": false,
+                "order": 1,
+                "createdAt": "2026-10-07T19:34:56.043Z",
+                "updatedAt": "2026-10-07T19:34:56.044Z",
+                "_id": "6ac69ee0287238e812d63552"
+              },
+              "totalPrice": 1900000,
+              "totalUnits": 6
+            },
+            {
+              "availableUnits": 4,
+              "isAvailable": true,
+              "pricePerNight": 1890000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63554",
+                "branch": "6ac69edfa8d23fe6a20e1373",
+                "name": "Suite Bah\u00eda",
+                "slug": "suite-bahia-bocagrande",
+                "type": "Suite Premium",
+                "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+                "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+                "basePrice": 1890000,
+                "originalPrice": 2370000,
+                "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 85,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Vista al mar",
+                  "Jacuzzi",
+                  "Balc\u00f3n privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 4,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 3,
+                "createdAt": "2026-10-07T19:34:56.048Z",
+                "updatedAt": "2026-10-07T19:34:56.048Z",
+                "_id": "6ac69ee0287238e812d63554"
+              },
+              "totalPrice": 3780000,
+              "totalUnits": 4
+            },
+            {
+              "availableUnits": 2,
+              "isAvailable": true,
+              "pricePerNight": 3060000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63556",
+                "branch": "6ac69edfa8d23fe6a20e1373",
+                "name": "Suite Presidencial",
+                "slug": "suite-presidencial-bocagrande",
+                "type": "Suite Presidencial",
+                "description": "La m\u00e1xima expresi\u00f3n de lujo. Terraza privada con jacuzzi, mayordomo personal y vistas espectaculares.",
+                "shortDescription": "Lujo m\u00e1ximo con terraza privada y mayordomo",
+                "basePrice": 3060000,
+                "originalPrice": 3780000,
+                "mainImage": "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 4,
+                "size": 180,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Terraza privada",
+                  "Jacuzzi",
+                  "Mayordomo 24/7",
+                  "Sala de estar",
+                  "Cama king",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito"
+                ],
+                "hasBalcony": true,
+                "hasTerrace": true,
+                "hasJacuzzi": true,
+                "view": "ocean",
+                "images": [
+                  "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 2,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 4,
+                "createdAt": "2026-10-07T19:34:56.051Z",
+                "updatedAt": "2026-10-07T19:34:56.052Z",
+                "_id": "6ac69ee0287238e812d63556"
+              },
+              "totalPrice": 6120000,
+              "totalUnits": 2
+            },
+            {
+              "availableUnits": 4,
+              "isAvailable": true,
+              "pricePerNight": 690000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63558",
+                "branch": "6ac69edfa8d23fe6a20e1376",
+                "name": "Superior Patio",
+                "slug": "superior-patio-la-boquilla",
+                "type": "Habitaci\u00f3n",
+                "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+                "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+                "basePrice": 690000,
+                "originalPrice": 840000,
+                "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 42,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Jard\u00edn privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 4,
+                "active": true,
+                "available": true,
+                "featured": false,
+                "order": 1,
+                "createdAt": "2026-10-07T19:34:56.055Z",
+                "updatedAt": "2026-10-07T19:34:56.056Z",
+                "_id": "6ac69ee0287238e812d63558"
+              },
+              "totalPrice": 1380000,
+              "totalUnits": 4
+            },
+            {
+              "availableUnits": 3,
+              "isAvailable": true,
+              "pricePerNight": 1380000,
+              "suite": {
+                "id": "6ac69ee0287238e812d6355a",
+                "branch": "6ac69edfa8d23fe6a20e1376",
+                "name": "Suite Bah\u00eda",
+                "slug": "suite-bahia-la-boquilla",
+                "type": "Suite Premium",
+                "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+                "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+                "basePrice": 1380000,
+                "originalPrice": 1720000,
+                "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 85,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Vista al mar",
+                  "Jacuzzi",
+                  "Balc\u00f3n privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 3,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 3,
+                "createdAt": "2026-10-07T19:34:56.059Z",
+                "updatedAt": "2026-10-07T19:34:56.060Z",
+                "_id": "6ac69ee0287238e812d6355a"
+              },
+              "totalPrice": 2760000,
+              "totalUnits": 3
+            }
+          ],
+          "checkIn": "2026-10-08",
+          "checkOut": "2026-10-10",
+          "nights": 2,
+          "unavailableSuites": []
+        }
+      }
+    },
+    "POST /api/suites/calculate-price": {
+      "status": 200,
+      "ttfb_avg": 9.03,
+      "ttfb_min": 8.51,
+      "ttfb_max": 9.71,
+      "total_avg": 9.07,
+      "total_min": 8.55,
+      "total_max": 9.75,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": {
+          "suiteId": "6ac69edf287238e812d63540",
+          "dates": {
+            "checkIn": "2026-10-08",
+            "checkOut": "2026-10-10",
+            "nights": 2
+          },
+          "nightlyPrice": 860000,
+          "subtotal": 1720000,
+          "experiencesTotal": 0,
+          "discount": 0,
+          "discountReason": null,
+          "total": 1720000,
+          "lines": [
+            {
+              "unitPrice": 860000,
+              "nights": 2,
+              "amount": 1720000,
+              "season": "low"
+            }
+          ]
+        }
+      }
+    },
+    "POST /api/bookings": {
+      "status": 200,
+      "ttfb_avg": 32.76,
+      "total_avg": 32.81
+    },
+    "POST /api/payments/process": {
+      "status": 200,
+      "ttfb_avg": 20.97,
+      "total_avg": 21.05
+    },
+    "POST /api/chat": {
+      "status": 200,
+      "ttfb_avg": 5.84,
+      "ttfb_min": 5.22,
+      "ttfb_max": 6.9,
+      "total_avg": 5.89,
+      "total_min": 5.27,
+      "total_max": 6.94,
+      "sample_json": {
+        "metadata": {
+          "responseTime": 15,
+          "language": "es"
+        },
+        "success": true,
+        "reply": "Con gusto te ayudo. \u00bfTe gustar\u00eda conocer nuestras suites, experiencias, precios o hacer una reserva? Estoy aqu\u00ed para asistirte en todo lo que necesites. \ud83c\udf1f"
+      }
+    }
+  },
+  "Backend Java (5000)": {
+    "GET /api/branches": {
+      "status": 200,
+      "ttfb_avg": 12.12,
+      "ttfb_min": 10.65,
+      "ttfb_max": 13.85,
+      "total_avg": 12.22,
+      "total_min": 10.72,
+      "total_max": 13.98,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": [
+          {
+            "id": "6ac69edfa8d23fe6a20e1363",
+            "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+            "slug": "centro-historico",
+            "zone": "Centro Hist\u00f3rico",
+            "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+            "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+            "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+            "location": {
+              "lat": 10.4236,
+              "lng": -75.5515
+            },
+            "mainImage": null,
+            "vibe": [
+              "hist\u00f3rico",
+              "rom\u00e1ntico",
+              "caminable"
+            ],
+            "highlights": [
+              {
+                "name": "Torre del Reloj",
+                "type": "historia",
+                "walkMinutes": 6,
+                "location": {
+                  "lat": 10.4247,
+                  "lng": -75.5513
+                }
+              },
+              {
+                "name": "Plaza de Santo Domingo",
+                "type": "gastronomia",
+                "walkMinutes": 3,
+                "location": {
+                  "lat": 10.4237,
+                  "lng": -75.5517
+                }
+              },
+              {
+                "name": "Palacio de la Inquisici\u00f3n",
+                "type": "cultura",
+                "walkMinutes": 5,
+                "location": {
+                  "lat": 10.4238,
+                  "lng": -75.5535
+                }
+              },
+              {
+                "name": "Murallas al atardecer",
+                "type": "historia",
+                "walkMinutes": 8,
+                "location": {
+                  "lat": 10.4264,
+                  "lng": -75.5509
+                }
+              },
+              {
+                "name": "Castillo de San Felipe",
+                "type": "historia",
+                "walkMinutes": 25,
+                "location": {
+                  "lat": 10.4228,
+                  "lng": -75.539
+                }
+              }
+            ],
+            "phone": null,
+            "checkInTime": "15:00",
+            "checkOutTime": "12:00",
+            "active": true,
+            "order": 1,
+            "fromPrice": 860000,
+            "roomTypes": 5,
+            "createdAt": "2026-10-07T19:34:55.689Z",
+            "updatedAt": "2026-10-08T03:37:34.900Z"
+          },
+          {
+            "id": "6ac69edfa8d23fe6a20e136c",
+            "name": "Palacio del Mar \u00b7 Getseman\u00ed",
+            "slug": "getsemani",
+            "zone": "Getseman\u00ed",
+            "tagline": "Arte callejero, m\u00fasica y la mejor vida nocturna",
+            "description": "Casa de barrio con patio, en el sector m\u00e1s colorido y vivo de la ciudad. Ideal para quien quiere cultura local, murales, bares y buena comida a toda hora.",
+            "address": "Calle del Arsenal, Getseman\u00ed, Cartagena",
+            "location": {
+              "lat": 10.4225,
+              "lng": -75.5462
+            },
+            "mainImage": null,
+            "vibe": [
+              "art\u00edstico",
+              "nocturno",
+              "bohemio"
+            ],
+            "highlights": [
+              {
+                "name": "Plaza de la Trinidad",
+                "type": "vida-nocturna",
+                "walkMinutes": 4,
+                "location": {
+                  "lat": 10.4211,
+                  "lng": -75.547
+                }
+              },
+              {
+                "name": "Murales y arte callejero",
+                "type": "cultura",
+                "walkMinutes": 2,
+                "location": null
+              },
+              {
+                "name": "Camell\u00f3n de los M\u00e1rtires",
+                "type": "historia",
+                "walkMinutes": 7,
+                "location": {
+                  "lat": 10.4249,
+                  "lng": -75.5468
+                }
+              },
+              {
+                "name": "Ciudad amurallada",
+                "type": "historia",
+                "walkMinutes": 10,
+                "location": {
+                  "lat": 10.4247,
+                  "lng": -75.5513
+                }
+              }
+            ],
+            "phone": null,
+            "checkInTime": "15:00",
+            "checkOutTime": "12:00",
+            "active": true,
+            "order": 2,
+            "fromPrice": 730000,
+            "roomTypes": 2,
+            "createdAt": "2026-10-07T19:34:55.732Z",
+            "updatedAt": "2026-10-08T03:37:34.945Z"
+          },
+          {
+            "id": "6ac69edfa8d23fe6a20e1373",
+            "name": "Palacio del Mar \u00b7 Bocagrande",
+            "slug": "bocagrande",
+            "zone": "Bocagrande",
+            "tagline": "Frente a la playa, con restaurantes y compras",
+            "description": "Edificio frente al mar en la zona hotelera moderna: playa a la puerta, restaurantes, centros comerciales y vistas abiertas a la bah\u00eda.",
+            "address": "Avenida San Mart\u00edn, Bocagrande, Cartagena",
+            "location": {
+              "lat": 10.401,
+              "lng": -75.5575
+            },
+            "mainImage": null,
+            "vibe": [
+              "playero",
+              "familiar",
+              "moderno"
+            ],
+            "highlights": [
+              {
+                "name": "Playa de Bocagrande",
+                "type": "playa",
+                "walkMinutes": 2,
+                "location": {
+                  "lat": 10.4005,
+                  "lng": -75.5565
+                }
+              },
+              {
+                "name": "Avenida San Mart\u00edn",
+                "type": "gastronomia",
+                "walkMinutes": 1,
+                "location": {
+                  "lat": 10.4015,
+                  "lng": -75.5585
+                }
+              },
+              {
+                "name": "Castillogrande",
+                "type": "compras",
+                "walkMinutes": 15,
+                "location": {
+                  "lat": 10.3925,
+                  "lng": -75.5522
+                }
+              },
+              {
+                "name": "Centros comerciales",
+                "type": "compras",
+                "walkMinutes": 10,
+                "location": null
+              }
+            ],
+            "phone": null,
+            "checkInTime": "15:00",
+            "checkOutTime": "12:00",
+            "active": true,
+            "order": 3,
+            "fromPrice": 950000,
+            "roomTypes": 3,
+            "createdAt": "2026-10-07T19:34:55.755Z",
+            "updatedAt": "2026-10-08T03:37:34.958Z"
+          },
+          {
+            "id": "6ac69edfa8d23fe6a20e1376",
+            "name": "Palacio del Mar \u00b7 La Boquilla",
+            "slug": "la-boquilla",
+            "zone": "La Boquilla",
+            "tagline": "Mar, manglares y tranquilidad al norte",
+            "description": "Refugio frente a la playa y la ci\u00e9naga, lejos del bullicio. Perfecto para descansar, comer pescado fresco y recorrer los manglares en canoa.",
+            "address": "V\u00eda al Mar, La Boquilla, Cartagena",
+            "location": {
+              "lat": 10.47,
+              "lng": -75.512
+            },
+            "mainImage": null,
+            "vibe": [
+              "tranquilo",
+              "naturaleza",
+              "playero"
+            ],
+            "highlights": [
+              {
+                "name": "Playa de La Boquilla",
+                "type": "playa",
+                "walkMinutes": 3,
+                "location": {
+                  "lat": 10.4695,
+                  "lng": -75.5105
+                }
+              },
+              {
+                "name": "Manglares y paseo en canoa",
+                "type": "naturaleza",
+                "walkMinutes": 8,
+                "location": {
+                  "lat": 10.4735,
+                  "lng": -75.5135
+                }
+              },
+              {
+                "name": "Restaurantes de pescado frito",
+                "type": "gastronomia",
+                "walkMinutes": 4,
+                "location": null
+              }
+            ],
+            "phone": null,
+            "checkInTime": "15:00",
+            "checkOutTime": "12:00",
+            "active": true,
+            "order": 4,
+            "fromPrice": 690000,
+            "roomTypes": 2,
+            "createdAt": "2026-10-07T19:34:55.764Z",
+            "updatedAt": "2026-10-08T03:37:34.969Z"
+          }
+        ]
+      }
+    },
+    "GET /api/suites": {
+      "status": 200,
+      "ttfb_avg": 14.85,
+      "ttfb_min": 11.88,
+      "ttfb_max": 18.68,
+      "total_avg": 15.64,
+      "total_min": 12.2,
+      "total_max": 20.02,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": [
+          {
+            "id": "6ac69edf287238e812d63540",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Superior Patio",
+            "slug": "superior-patio-centro-historico",
+            "type": "Habitaci\u00f3n",
+            "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+            "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+            "basePrice": 860000,
+            "originalPrice": 1050000,
+            "seasonalPrice": 860000,
+            "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 42,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Jard\u00edn privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 4,
+            "active": true,
+            "available": true,
+            "featured": false,
+            "order": 1,
+            "createdAt": "2026-10-07T19:34:55.997Z",
+            "updatedAt": "2026-10-07T19:34:56.002Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63543",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Suite Colonial",
+            "slug": "suite-colonial-centro-historico",
+            "type": "Suite Deluxe",
+            "description": "Suite hist\u00f3rica con patio colonial y tina hidromasaje, combinando el encanto del pasado con comodidades modernas.",
+            "shortDescription": "Suite hist\u00f3rica con patio colonial",
+            "basePrice": 1310000,
+            "originalPrice": 1650000,
+            "seasonalPrice": 1310000,
+            "mainImage": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 65,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Patio colonial",
+              "Tina hidromasaje",
+              "Balc\u00f3n",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 3,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 2,
+            "createdAt": "2026-10-07T19:34:56.013Z",
+            "updatedAt": "2026-10-07T19:34:56.014Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63546",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Suite Bah\u00eda",
+            "slug": "suite-bahia-centro-historico",
+            "type": "Suite Premium",
+            "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+            "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+            "basePrice": 1720000,
+            "originalPrice": 2150000,
+            "seasonalPrice": 1720000,
+            "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 85,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Vista al mar",
+              "Jacuzzi",
+              "Balc\u00f3n privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 2,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 3,
+            "createdAt": "2026-10-07T19:34:56.019Z",
+            "updatedAt": "2026-10-07T19:34:56.020Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63548",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Suite Presidencial",
+            "slug": "suite-presidencial-centro-historico",
+            "type": "Suite Presidencial",
+            "description": "La m\u00e1xima expresi\u00f3n de lujo. Terraza privada con jacuzzi, mayordomo personal y vistas espectaculares.",
+            "shortDescription": "Lujo m\u00e1ximo con terraza privada y mayordomo",
+            "basePrice": 2780000,
+            "originalPrice": 3440000,
+            "seasonalPrice": 2780000,
+            "mainImage": "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 4,
+            "size": 180,
+            "bathrooms": 1,
+            "view": "ocean",
+            "hasBalcony": true,
+            "hasTerrace": true,
+            "hasJacuzzi": true,
+            "beds": [],
+            "amenities": [
+              "Terraza privada",
+              "Jacuzzi",
+              "Mayordomo 24/7",
+              "Sala de estar",
+              "Cama king",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 1,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 4,
+            "createdAt": "2026-10-07T19:34:56.023Z",
+            "updatedAt": "2026-10-07T19:34:56.024Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d6354b",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1363",
+              "name": "Palacio del Mar \u00b7 Centro Hist\u00f3rico",
+              "slug": "centro-historico",
+              "zone": "Centro Hist\u00f3rico",
+              "tagline": "Dentro de la ciudad amurallada, a pasos de todo",
+              "description": "Casona colonial restaurada dentro de las murallas. Calles empedradas, plazas con vida y los principales monumentos de Cartagena a pocos minutos caminando.",
+              "address": "Calle de la Factor\u00eda, Centro Hist\u00f3rico, Cartagena",
+              "location": {
+                "lat": 10.4236,
+                "lng": -75.5515
+              },
+              "mainImage": null,
+              "vibe": [
+                "hist\u00f3rico",
+                "rom\u00e1ntico",
+                "caminable"
+              ],
+              "highlights": [
+                {
+                  "name": "Torre del Reloj",
+                  "type": "historia",
+                  "walkMinutes": 6,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                },
+                {
+                  "name": "Plaza de Santo Domingo",
+                  "type": "gastronomia",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4237,
+                    "lng": -75.5517
+                  }
+                },
+                {
+                  "name": "Palacio de la Inquisici\u00f3n",
+                  "type": "cultura",
+                  "walkMinutes": 5,
+                  "location": {
+                    "lat": 10.4238,
+                    "lng": -75.5535
+                  }
+                },
+                {
+                  "name": "Murallas al atardecer",
+                  "type": "historia",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4264,
+                    "lng": -75.5509
+                  }
+                },
+                {
+                  "name": "Castillo de San Felipe",
+                  "type": "historia",
+                  "walkMinutes": 25,
+                  "location": {
+                    "lat": 10.4228,
+                    "lng": -75.539
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 1,
+              "createdAt": "2026-10-07T19:34:55.689Z",
+              "updatedAt": "2026-10-08T03:37:34.900Z",
+              "_id": "6ac69edfa8d23fe6a20e1363"
+            },
+            "name": "Penthouse Muralla",
+            "slug": "penthouse-muralla-centro-historico",
+            "type": "Suite Exclusiva",
+            "description": "El \u00e1tico m\u00e1s exclusivo con vista 360\u00b0 de la ciudad. Piscina privada y terraza doble para eventos exclusivos.",
+            "shortDescription": "\u00c1tico exclusivo con piscina privada y vista 360\u00b0",
+            "basePrice": 3640000,
+            "originalPrice": 4280000,
+            "seasonalPrice": 3640000,
+            "mainImage": "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 6,
+            "size": 220,
+            "bathrooms": 1,
+            "view": "ocean",
+            "hasBalcony": true,
+            "hasTerrace": true,
+            "hasJacuzzi": true,
+            "beds": [],
+            "amenities": [
+              "Vista 360\u00b0",
+              "Piscina privada",
+              "Terraza doble",
+              "Cocina completa",
+              "Mayordomo",
+              "Sala de estar",
+              "Comedor",
+              "Aire acondicionado"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 1,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 5,
+            "createdAt": "2026-10-07T19:34:56.029Z",
+            "updatedAt": "2026-10-07T19:34:56.030Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d6354e",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e136c",
+              "name": "Palacio del Mar \u00b7 Getseman\u00ed",
+              "slug": "getsemani",
+              "zone": "Getseman\u00ed",
+              "tagline": "Arte callejero, m\u00fasica y la mejor vida nocturna",
+              "description": "Casa de barrio con patio, en el sector m\u00e1s colorido y vivo de la ciudad. Ideal para quien quiere cultura local, murales, bares y buena comida a toda hora.",
+              "address": "Calle del Arsenal, Getseman\u00ed, Cartagena",
+              "location": {
+                "lat": 10.4225,
+                "lng": -75.5462
+              },
+              "mainImage": null,
+              "vibe": [
+                "art\u00edstico",
+                "nocturno",
+                "bohemio"
+              ],
+              "highlights": [
+                {
+                  "name": "Plaza de la Trinidad",
+                  "type": "vida-nocturna",
+                  "walkMinutes": 4,
+                  "location": {
+                    "lat": 10.4211,
+                    "lng": -75.547
+                  }
+                },
+                {
+                  "name": "Murales y arte callejero",
+                  "type": "cultura",
+                  "walkMinutes": 2,
+                  "location": null
+                },
+                {
+                  "name": "Camell\u00f3n de los M\u00e1rtires",
+                  "type": "historia",
+                  "walkMinutes": 7,
+                  "location": {
+                    "lat": 10.4249,
+                    "lng": -75.5468
+                  }
+                },
+                {
+                  "name": "Ciudad amurallada",
+                  "type": "historia",
+                  "walkMinutes": 10,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 2,
+              "createdAt": "2026-10-07T19:34:55.732Z",
+              "updatedAt": "2026-10-08T03:37:34.945Z",
+              "_id": "6ac69edfa8d23fe6a20e136c"
+            },
+            "name": "Superior Patio",
+            "slug": "superior-patio-getsemani",
+            "type": "Habitaci\u00f3n",
+            "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+            "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+            "basePrice": 730000,
+            "originalPrice": 890000,
+            "seasonalPrice": 730000,
+            "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 42,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Jard\u00edn privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 5,
+            "active": true,
+            "available": true,
+            "featured": false,
+            "order": 1,
+            "createdAt": "2026-10-07T19:34:56.035Z",
+            "updatedAt": "2026-10-07T19:34:56.035Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63550",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e136c",
+              "name": "Palacio del Mar \u00b7 Getseman\u00ed",
+              "slug": "getsemani",
+              "zone": "Getseman\u00ed",
+              "tagline": "Arte callejero, m\u00fasica y la mejor vida nocturna",
+              "description": "Casa de barrio con patio, en el sector m\u00e1s colorido y vivo de la ciudad. Ideal para quien quiere cultura local, murales, bares y buena comida a toda hora.",
+              "address": "Calle del Arsenal, Getseman\u00ed, Cartagena",
+              "location": {
+                "lat": 10.4225,
+                "lng": -75.5462
+              },
+              "mainImage": null,
+              "vibe": [
+                "art\u00edstico",
+                "nocturno",
+                "bohemio"
+              ],
+              "highlights": [
+                {
+                  "name": "Plaza de la Trinidad",
+                  "type": "vida-nocturna",
+                  "walkMinutes": 4,
+                  "location": {
+                    "lat": 10.4211,
+                    "lng": -75.547
+                  }
+                },
+                {
+                  "name": "Murales y arte callejero",
+                  "type": "cultura",
+                  "walkMinutes": 2,
+                  "location": null
+                },
+                {
+                  "name": "Camell\u00f3n de los M\u00e1rtires",
+                  "type": "historia",
+                  "walkMinutes": 7,
+                  "location": {
+                    "lat": 10.4249,
+                    "lng": -75.5468
+                  }
+                },
+                {
+                  "name": "Ciudad amurallada",
+                  "type": "historia",
+                  "walkMinutes": 10,
+                  "location": {
+                    "lat": 10.4247,
+                    "lng": -75.5513
+                  }
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 2,
+              "createdAt": "2026-10-07T19:34:55.732Z",
+              "updatedAt": "2026-10-08T03:37:34.945Z",
+              "_id": "6ac69edfa8d23fe6a20e136c"
+            },
+            "name": "Suite Colonial",
+            "slug": "suite-colonial-getsemani",
+            "type": "Suite Deluxe",
+            "description": "Suite hist\u00f3rica con patio colonial y tina hidromasaje, combinando el encanto del pasado con comodidades modernas.",
+            "shortDescription": "Suite hist\u00f3rica con patio colonial",
+            "basePrice": 1110000,
+            "originalPrice": 1400000,
+            "seasonalPrice": 1110000,
+            "mainImage": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 65,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Patio colonial",
+              "Tina hidromasaje",
+              "Balc\u00f3n",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 3,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 2,
+            "createdAt": "2026-10-07T19:34:56.038Z",
+            "updatedAt": "2026-10-07T19:34:56.039Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63552",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1373",
+              "name": "Palacio del Mar \u00b7 Bocagrande",
+              "slug": "bocagrande",
+              "zone": "Bocagrande",
+              "tagline": "Frente a la playa, con restaurantes y compras",
+              "description": "Edificio frente al mar en la zona hotelera moderna: playa a la puerta, restaurantes, centros comerciales y vistas abiertas a la bah\u00eda.",
+              "address": "Avenida San Mart\u00edn, Bocagrande, Cartagena",
+              "location": {
+                "lat": 10.401,
+                "lng": -75.5575
+              },
+              "mainImage": null,
+              "vibe": [
+                "playero",
+                "familiar",
+                "moderno"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de Bocagrande",
+                  "type": "playa",
+                  "walkMinutes": 2,
+                  "location": {
+                    "lat": 10.4005,
+                    "lng": -75.5565
+                  }
+                },
+                {
+                  "name": "Avenida San Mart\u00edn",
+                  "type": "gastronomia",
+                  "walkMinutes": 1,
+                  "location": {
+                    "lat": 10.4015,
+                    "lng": -75.5585
+                  }
+                },
+                {
+                  "name": "Castillogrande",
+                  "type": "compras",
+                  "walkMinutes": 15,
+                  "location": {
+                    "lat": 10.3925,
+                    "lng": -75.5522
+                  }
+                },
+                {
+                  "name": "Centros comerciales",
+                  "type": "compras",
+                  "walkMinutes": 10,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 3,
+              "createdAt": "2026-10-07T19:34:55.755Z",
+              "updatedAt": "2026-10-08T03:37:34.958Z",
+              "_id": "6ac69edfa8d23fe6a20e1373"
+            },
+            "name": "Superior Patio",
+            "slug": "superior-patio-bocagrande",
+            "type": "Habitaci\u00f3n",
+            "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+            "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+            "basePrice": 950000,
+            "originalPrice": 1160000,
+            "seasonalPrice": 950000,
+            "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 42,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Jard\u00edn privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 6,
+            "active": true,
+            "available": true,
+            "featured": false,
+            "order": 1,
+            "createdAt": "2026-10-07T19:34:56.043Z",
+            "updatedAt": "2026-10-07T19:34:56.044Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63554",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1373",
+              "name": "Palacio del Mar \u00b7 Bocagrande",
+              "slug": "bocagrande",
+              "zone": "Bocagrande",
+              "tagline": "Frente a la playa, con restaurantes y compras",
+              "description": "Edificio frente al mar en la zona hotelera moderna: playa a la puerta, restaurantes, centros comerciales y vistas abiertas a la bah\u00eda.",
+              "address": "Avenida San Mart\u00edn, Bocagrande, Cartagena",
+              "location": {
+                "lat": 10.401,
+                "lng": -75.5575
+              },
+              "mainImage": null,
+              "vibe": [
+                "playero",
+                "familiar",
+                "moderno"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de Bocagrande",
+                  "type": "playa",
+                  "walkMinutes": 2,
+                  "location": {
+                    "lat": 10.4005,
+                    "lng": -75.5565
+                  }
+                },
+                {
+                  "name": "Avenida San Mart\u00edn",
+                  "type": "gastronomia",
+                  "walkMinutes": 1,
+                  "location": {
+                    "lat": 10.4015,
+                    "lng": -75.5585
+                  }
+                },
+                {
+                  "name": "Castillogrande",
+                  "type": "compras",
+                  "walkMinutes": 15,
+                  "location": {
+                    "lat": 10.3925,
+                    "lng": -75.5522
+                  }
+                },
+                {
+                  "name": "Centros comerciales",
+                  "type": "compras",
+                  "walkMinutes": 10,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 3,
+              "createdAt": "2026-10-07T19:34:55.755Z",
+              "updatedAt": "2026-10-08T03:37:34.958Z",
+              "_id": "6ac69edfa8d23fe6a20e1373"
+            },
+            "name": "Suite Bah\u00eda",
+            "slug": "suite-bahia-bocagrande",
+            "type": "Suite Premium",
+            "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+            "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+            "basePrice": 1890000,
+            "originalPrice": 2370000,
+            "seasonalPrice": 1890000,
+            "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 85,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Vista al mar",
+              "Jacuzzi",
+              "Balc\u00f3n privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 4,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 3,
+            "createdAt": "2026-10-07T19:34:56.048Z",
+            "updatedAt": "2026-10-07T19:34:56.048Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63556",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1373",
+              "name": "Palacio del Mar \u00b7 Bocagrande",
+              "slug": "bocagrande",
+              "zone": "Bocagrande",
+              "tagline": "Frente a la playa, con restaurantes y compras",
+              "description": "Edificio frente al mar en la zona hotelera moderna: playa a la puerta, restaurantes, centros comerciales y vistas abiertas a la bah\u00eda.",
+              "address": "Avenida San Mart\u00edn, Bocagrande, Cartagena",
+              "location": {
+                "lat": 10.401,
+                "lng": -75.5575
+              },
+              "mainImage": null,
+              "vibe": [
+                "playero",
+                "familiar",
+                "moderno"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de Bocagrande",
+                  "type": "playa",
+                  "walkMinutes": 2,
+                  "location": {
+                    "lat": 10.4005,
+                    "lng": -75.5565
+                  }
+                },
+                {
+                  "name": "Avenida San Mart\u00edn",
+                  "type": "gastronomia",
+                  "walkMinutes": 1,
+                  "location": {
+                    "lat": 10.4015,
+                    "lng": -75.5585
+                  }
+                },
+                {
+                  "name": "Castillogrande",
+                  "type": "compras",
+                  "walkMinutes": 15,
+                  "location": {
+                    "lat": 10.3925,
+                    "lng": -75.5522
+                  }
+                },
+                {
+                  "name": "Centros comerciales",
+                  "type": "compras",
+                  "walkMinutes": 10,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 3,
+              "createdAt": "2026-10-07T19:34:55.755Z",
+              "updatedAt": "2026-10-08T03:37:34.958Z",
+              "_id": "6ac69edfa8d23fe6a20e1373"
+            },
+            "name": "Suite Presidencial",
+            "slug": "suite-presidencial-bocagrande",
+            "type": "Suite Presidencial",
+            "description": "La m\u00e1xima expresi\u00f3n de lujo. Terraza privada con jacuzzi, mayordomo personal y vistas espectaculares.",
+            "shortDescription": "Lujo m\u00e1ximo con terraza privada y mayordomo",
+            "basePrice": 3060000,
+            "originalPrice": 3780000,
+            "seasonalPrice": 3060000,
+            "mainImage": "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 4,
+            "size": 180,
+            "bathrooms": 1,
+            "view": "ocean",
+            "hasBalcony": true,
+            "hasTerrace": true,
+            "hasJacuzzi": true,
+            "beds": [],
+            "amenities": [
+              "Terraza privada",
+              "Jacuzzi",
+              "Mayordomo 24/7",
+              "Sala de estar",
+              "Cama king",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 2,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 4,
+            "createdAt": "2026-10-07T19:34:56.051Z",
+            "updatedAt": "2026-10-07T19:34:56.052Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63558",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1376",
+              "name": "Palacio del Mar \u00b7 La Boquilla",
+              "slug": "la-boquilla",
+              "zone": "La Boquilla",
+              "tagline": "Mar, manglares y tranquilidad al norte",
+              "description": "Refugio frente a la playa y la ci\u00e9naga, lejos del bullicio. Perfecto para descansar, comer pescado fresco y recorrer los manglares en canoa.",
+              "address": "V\u00eda al Mar, La Boquilla, Cartagena",
+              "location": {
+                "lat": 10.47,
+                "lng": -75.512
+              },
+              "mainImage": null,
+              "vibe": [
+                "tranquilo",
+                "naturaleza",
+                "playero"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de La Boquilla",
+                  "type": "playa",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4695,
+                    "lng": -75.5105
+                  }
+                },
+                {
+                  "name": "Manglares y paseo en canoa",
+                  "type": "naturaleza",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4735,
+                    "lng": -75.5135
+                  }
+                },
+                {
+                  "name": "Restaurantes de pescado frito",
+                  "type": "gastronomia",
+                  "walkMinutes": 4,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 4,
+              "createdAt": "2026-10-07T19:34:55.764Z",
+              "updatedAt": "2026-10-08T03:37:34.969Z",
+              "_id": "6ac69edfa8d23fe6a20e1376"
+            },
+            "name": "Superior Patio",
+            "slug": "superior-patio-la-boquilla",
+            "type": "Habitaci\u00f3n",
+            "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+            "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+            "basePrice": 690000,
+            "originalPrice": 840000,
+            "seasonalPrice": 690000,
+            "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 42,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Jard\u00edn privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 4,
+            "active": true,
+            "available": true,
+            "featured": false,
+            "order": 1,
+            "createdAt": "2026-10-07T19:34:56.055Z",
+            "updatedAt": "2026-10-07T19:34:56.056Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d6355a",
+            "branch": {
+              "id": "6ac69edfa8d23fe6a20e1376",
+              "name": "Palacio del Mar \u00b7 La Boquilla",
+              "slug": "la-boquilla",
+              "zone": "La Boquilla",
+              "tagline": "Mar, manglares y tranquilidad al norte",
+              "description": "Refugio frente a la playa y la ci\u00e9naga, lejos del bullicio. Perfecto para descansar, comer pescado fresco y recorrer los manglares en canoa.",
+              "address": "V\u00eda al Mar, La Boquilla, Cartagena",
+              "location": {
+                "lat": 10.47,
+                "lng": -75.512
+              },
+              "mainImage": null,
+              "vibe": [
+                "tranquilo",
+                "naturaleza",
+                "playero"
+              ],
+              "highlights": [
+                {
+                  "name": "Playa de La Boquilla",
+                  "type": "playa",
+                  "walkMinutes": 3,
+                  "location": {
+                    "lat": 10.4695,
+                    "lng": -75.5105
+                  }
+                },
+                {
+                  "name": "Manglares y paseo en canoa",
+                  "type": "naturaleza",
+                  "walkMinutes": 8,
+                  "location": {
+                    "lat": 10.4735,
+                    "lng": -75.5135
+                  }
+                },
+                {
+                  "name": "Restaurantes de pescado frito",
+                  "type": "gastronomia",
+                  "walkMinutes": 4,
+                  "location": null
+                }
+              ],
+              "phone": null,
+              "checkInTime": "15:00",
+              "checkOutTime": "12:00",
+              "active": true,
+              "order": 4,
+              "createdAt": "2026-10-07T19:34:55.764Z",
+              "updatedAt": "2026-10-08T03:37:34.969Z",
+              "_id": "6ac69edfa8d23fe6a20e1376"
+            },
+            "name": "Suite Bah\u00eda",
+            "slug": "suite-bahia-la-boquilla",
+            "type": "Suite Premium",
+            "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+            "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+            "basePrice": 1380000,
+            "originalPrice": 1720000,
+            "seasonalPrice": 1380000,
+            "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+            "maxGuests": 2,
+            "size": 85,
+            "bathrooms": 1,
+            "view": "city",
+            "hasBalcony": false,
+            "hasTerrace": false,
+            "hasJacuzzi": false,
+            "beds": [],
+            "amenities": [
+              "Vista al mar",
+              "Jacuzzi",
+              "Balc\u00f3n privado",
+              "Aire acondicionado",
+              "Minibar",
+              "WiFi gratuito",
+              "TV LED"
+            ],
+            "images": [
+              "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+            ],
+            "totalUnits": 3,
+            "active": true,
+            "available": true,
+            "featured": true,
+            "order": 3,
+            "createdAt": "2026-10-07T19:34:56.059Z",
+            "updatedAt": "2026-10-07T19:34:56.060Z"
+          }
+        ]
+      }
+    },
+    "GET /api/experiences": {
+      "status": 200,
+      "ttfb_avg": 9.01,
+      "ttfb_min": 7.28,
+      "ttfb_max": 10.39,
+      "total_avg": 9.11,
+      "total_min": 7.35,
+      "total_max": 10.59,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": [
+          {
+            "id": "6ac69ee0287238e812d6355d",
+            "name": "Islas del Rosario",
+            "description": "Navegaci\u00f3n privada a las cristalinas aguas del Parque Natural Nacional Rosario. Snorkel en arrecifes de coral, avistamiento de peces tropicales y almuerzo t\u00edpico caribe\u00f1o.",
+            "shortDescription": "Excursi\u00f3n a las Islas del Rosario con snorkel y almuerzo",
+            "price": 348000,
+            "branch": null,
+            "category": "aventura",
+            "image": null,
+            "mainImage": "https://images.unsplash.com/photo-1533105079780-92b9be482077?w=800&auto=format&fit=crop&q=80",
+            "active": true,
+            "available": true,
+            "createdAt": "2026-10-07T19:34:56.069Z",
+            "updatedAt": "2026-10-07T19:34:56.071Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63560",
+            "name": "Atardecer en la Muralla",
+            "description": "C\u00f3ctel al atardecer sobre la muralla colonial con vistas al Caribe y degustaci\u00f3n de ron artesanal colombiano.",
+            "shortDescription": "Atardecer exclusivo en la muralla con coctel y ron artesanal",
+            "price": 184000,
+            "branch": null,
+            "category": "cultural",
+            "image": null,
+            "mainImage": "https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=800&auto=format&fit=crop&q=80",
+            "active": true,
+            "available": true,
+            "createdAt": "2026-10-07T19:34:56.078Z",
+            "updatedAt": "2026-10-07T19:34:56.079Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63563",
+            "name": "Ruta del Sabor",
+            "description": "Tour gastron\u00f3mico por mercados locales con nuestro chef ejecutivo. Cocina en vivo y degustaci\u00f3n de platos t\u00edpicos.",
+            "shortDescription": "Tour gastron\u00f3mico por mercados locales con chef",
+            "price": 266000,
+            "branch": null,
+            "category": "gastronom\u00eda",
+            "image": null,
+            "mainImage": "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop&q=80",
+            "active": true,
+            "available": true,
+            "createdAt": "2026-10-07T19:34:56.085Z",
+            "updatedAt": "2026-10-07T19:34:56.086Z"
+          },
+          {
+            "id": "6ac69ee0287238e812d63566",
+            "name": "Noche de Palenque",
+            "description": "Noche cultural con m\u00fasicos de Palenque, baile de mapal\u00e9 y cena en terraza bajo el cielo caribe\u00f1o.",
+            "shortDescription": "Noche cultural con m\u00fasica y baile de Palenque",
+            "price": 389000,
+            "branch": null,
+            "category": "cultural",
+            "image": null,
+            "mainImage": "https://images.unsplash.com/photo-1534367507873-de2f85e8dbdf?w=800&auto=format&fit=crop&q=80",
+            "active": true,
+            "available": true,
+            "createdAt": "2026-10-07T19:34:56.093Z",
+            "updatedAt": "2026-10-07T19:34:56.094Z"
+          }
+        ]
+      }
+    },
+    "POST /api/auth/register": {
+      "status": 200,
+      "ttfb_avg": 81.45,
+      "total_avg": 81.53
+    },
+    "POST /api/auth/login": {
+      "status": 200,
+      "ttfb_avg": 68.3,
+      "ttfb_min": 68.03,
+      "ttfb_max": 68.65,
+      "total_avg": 68.38,
+      "total_min": 68.11,
+      "total_max": 68.73,
+      "sample_json": {
+        "data": {
+          "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwcm9mXzUwMDBfMTc5MTQ5MTE5OTYxNl80QHRlc3QuY29tIiwiaWF0IjoxNzkxNDkxMjAzLCJleHAiOjE3OTIwOTYwMDN9.FnR4TdWYZr7Kl1KzeXtDyEGLosj1Q70MeR-9fcJgu8U",
+          "user": {
+            "id": "6ac7fc82bb1ffc406c1427e4",
+            "name": "Prof",
+            "lastName": "User",
+            "email": "prof_5000_1791491199616_4@test.com",
+            "password": null,
+            "role": "user",
+            "branches": [],
+            "status": "active",
+            "emailVerified": true,
+            "profile": {
+              "phone": "+573001234567",
+              "address": null,
+              "documentId": null,
+              "documentType": null,
+              "avatar": null
+            },
+            "createdAt": "2026-10-08T20:26:42.760Z",
+            "updatedAt": "2026-10-08T20:26:42.760Z",
+            "deletedAt": null,
+            "_id": "6ac7fc82bb1ffc406c1427e4"
+          }
+        },
+        "success": true,
+        "message": "Inicio de sesi\u00f3n exitoso",
+        "user": {
+          "id": "6ac7fc82bb1ffc406c1427e4",
+          "name": "Prof",
+          "lastName": "User",
+          "email": "prof_5000_1791491199616_4@test.com",
+          "password": null,
+          "role": "user",
+          "branches": [],
+          "status": "active",
+          "emailVerified": true,
+          "profile": {
+            "phone": "+573001234567",
+            "address": null,
+            "documentId": null,
+            "documentType": null,
+            "avatar": null
+          },
+          "createdAt": "2026-10-08T20:26:42.760Z",
+          "updatedAt": "2026-10-08T20:26:42.760Z",
+          "deletedAt": null,
+          "_id": "6ac7fc82bb1ffc406c1427e4"
+        },
+        "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwcm9mXzUwMDBfMTc5MTQ5MTE5OTYxNl80QHRlc3QuY29tIiwiaWF0IjoxNzkxNDkxMjAzLCJleHAiOjE3OTIwOTYwMDN9.FnR4TdWYZr7Kl1KzeXtDyEGLosj1Q70MeR-9fcJgu8U"
+      }
+    },
+    "GET /api/availability": {
+      "status": 200,
+      "ttfb_avg": 38.37,
+      "ttfb_min": 33.76,
+      "ttfb_max": 44.33,
+      "total_avg": 38.46,
+      "total_min": 33.85,
+      "total_max": 44.43,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": {
+          "availableSuites": [
+            {
+              "availableUnits": 4,
+              "isAvailable": true,
+              "pricePerNight": 860000,
+              "suite": {
+                "id": "6ac69edf287238e812d63540",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Superior Patio",
+                "slug": "superior-patio-centro-historico",
+                "type": "Habitaci\u00f3n",
+                "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+                "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+                "basePrice": 860000,
+                "originalPrice": 1050000,
+                "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 42,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Jard\u00edn privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 4,
+                "active": true,
+                "available": true,
+                "featured": false,
+                "order": 1,
+                "createdAt": "2026-10-07T19:34:55.997Z",
+                "updatedAt": "2026-10-07T19:34:56.002Z",
+                "_id": "6ac69edf287238e812d63540"
+              },
+              "totalPrice": 1720000,
+              "totalUnits": 4
+            },
+            {
+              "availableUnits": 3,
+              "isAvailable": true,
+              "pricePerNight": 1310000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63543",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Suite Colonial",
+                "slug": "suite-colonial-centro-historico",
+                "type": "Suite Deluxe",
+                "description": "Suite hist\u00f3rica con patio colonial y tina hidromasaje, combinando el encanto del pasado con comodidades modernas.",
+                "shortDescription": "Suite hist\u00f3rica con patio colonial",
+                "basePrice": 1310000,
+                "originalPrice": 1650000,
+                "mainImage": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 65,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Patio colonial",
+                  "Tina hidromasaje",
+                  "Balc\u00f3n",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 3,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 2,
+                "createdAt": "2026-10-07T19:34:56.013Z",
+                "updatedAt": "2026-10-07T19:34:56.014Z",
+                "_id": "6ac69ee0287238e812d63543"
+              },
+              "totalPrice": 2620000,
+              "totalUnits": 3
+            },
+            {
+              "availableUnits": 2,
+              "isAvailable": true,
+              "pricePerNight": 1720000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63546",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Suite Bah\u00eda",
+                "slug": "suite-bahia-centro-historico",
+                "type": "Suite Premium",
+                "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+                "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+                "basePrice": 1720000,
+                "originalPrice": 2150000,
+                "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 85,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Vista al mar",
+                  "Jacuzzi",
+                  "Balc\u00f3n privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 2,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 3,
+                "createdAt": "2026-10-07T19:34:56.019Z",
+                "updatedAt": "2026-10-07T19:34:56.020Z",
+                "_id": "6ac69ee0287238e812d63546"
+              },
+              "totalPrice": 3440000,
+              "totalUnits": 2
+            },
+            {
+              "availableUnits": 1,
+              "isAvailable": true,
+              "pricePerNight": 2780000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63548",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Suite Presidencial",
+                "slug": "suite-presidencial-centro-historico",
+                "type": "Suite Presidencial",
+                "description": "La m\u00e1xima expresi\u00f3n de lujo. Terraza privada con jacuzzi, mayordomo personal y vistas espectaculares.",
+                "shortDescription": "Lujo m\u00e1ximo con terraza privada y mayordomo",
+                "basePrice": 2780000,
+                "originalPrice": 3440000,
+                "mainImage": "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 4,
+                "size": 180,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Terraza privada",
+                  "Jacuzzi",
+                  "Mayordomo 24/7",
+                  "Sala de estar",
+                  "Cama king",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito"
+                ],
+                "hasBalcony": true,
+                "hasTerrace": true,
+                "hasJacuzzi": true,
+                "view": "ocean",
+                "images": [
+                  "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 1,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 4,
+                "createdAt": "2026-10-07T19:34:56.023Z",
+                "updatedAt": "2026-10-07T19:34:56.024Z",
+                "_id": "6ac69ee0287238e812d63548"
+              },
+              "totalPrice": 5560000,
+              "totalUnits": 1
+            },
+            {
+              "availableUnits": 1,
+              "isAvailable": true,
+              "pricePerNight": 3640000,
+              "suite": {
+                "id": "6ac69ee0287238e812d6354b",
+                "branch": "6ac69edfa8d23fe6a20e1363",
+                "name": "Penthouse Muralla",
+                "slug": "penthouse-muralla-centro-historico",
+                "type": "Suite Exclusiva",
+                "description": "El \u00e1tico m\u00e1s exclusivo con vista 360\u00b0 de la ciudad. Piscina privada y terraza doble para eventos exclusivos.",
+                "shortDescription": "\u00c1tico exclusivo con piscina privada y vista 360\u00b0",
+                "basePrice": 3640000,
+                "originalPrice": 4280000,
+                "mainImage": "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 6,
+                "size": 220,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Vista 360\u00b0",
+                  "Piscina privada",
+                  "Terraza doble",
+                  "Cocina completa",
+                  "Mayordomo",
+                  "Sala de estar",
+                  "Comedor",
+                  "Aire acondicionado"
+                ],
+                "hasBalcony": true,
+                "hasTerrace": true,
+                "hasJacuzzi": true,
+                "view": "ocean",
+                "images": [
+                  "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 1,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 5,
+                "createdAt": "2026-10-07T19:34:56.029Z",
+                "updatedAt": "2026-10-07T19:34:56.030Z",
+                "_id": "6ac69ee0287238e812d6354b"
+              },
+              "totalPrice": 7280000,
+              "totalUnits": 1
+            },
+            {
+              "availableUnits": 5,
+              "isAvailable": true,
+              "pricePerNight": 730000,
+              "suite": {
+                "id": "6ac69ee0287238e812d6354e",
+                "branch": "6ac69edfa8d23fe6a20e136c",
+                "name": "Superior Patio",
+                "slug": "superior-patio-getsemani",
+                "type": "Habitaci\u00f3n",
+                "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+                "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+                "basePrice": 730000,
+                "originalPrice": 890000,
+                "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 42,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Jard\u00edn privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 5,
+                "active": true,
+                "available": true,
+                "featured": false,
+                "order": 1,
+                "createdAt": "2026-10-07T19:34:56.035Z",
+                "updatedAt": "2026-10-07T19:34:56.035Z",
+                "_id": "6ac69ee0287238e812d6354e"
+              },
+              "totalPrice": 1460000,
+              "totalUnits": 5
+            },
+            {
+              "availableUnits": 3,
+              "isAvailable": true,
+              "pricePerNight": 1110000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63550",
+                "branch": "6ac69edfa8d23fe6a20e136c",
+                "name": "Suite Colonial",
+                "slug": "suite-colonial-getsemani",
+                "type": "Suite Deluxe",
+                "description": "Suite hist\u00f3rica con patio colonial y tina hidromasaje, combinando el encanto del pasado con comodidades modernas.",
+                "shortDescription": "Suite hist\u00f3rica con patio colonial",
+                "basePrice": 1110000,
+                "originalPrice": 1400000,
+                "mainImage": "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 65,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Patio colonial",
+                  "Tina hidromasaje",
+                  "Balc\u00f3n",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 3,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 2,
+                "createdAt": "2026-10-07T19:34:56.038Z",
+                "updatedAt": "2026-10-07T19:34:56.039Z",
+                "_id": "6ac69ee0287238e812d63550"
+              },
+              "totalPrice": 2220000,
+              "totalUnits": 3
+            },
+            {
+              "availableUnits": 6,
+              "isAvailable": true,
+              "pricePerNight": 950000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63552",
+                "branch": "6ac69edfa8d23fe6a20e1373",
+                "name": "Superior Patio",
+                "slug": "superior-patio-bocagrande",
+                "type": "Habitaci\u00f3n",
+                "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+                "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+                "basePrice": 950000,
+                "originalPrice": 1160000,
+                "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 42,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Jard\u00edn privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 6,
+                "active": true,
+                "available": true,
+                "featured": false,
+                "order": 1,
+                "createdAt": "2026-10-07T19:34:56.043Z",
+                "updatedAt": "2026-10-07T19:34:56.044Z",
+                "_id": "6ac69ee0287238e812d63552"
+              },
+              "totalPrice": 1900000,
+              "totalUnits": 6
+            },
+            {
+              "availableUnits": 4,
+              "isAvailable": true,
+              "pricePerNight": 1890000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63554",
+                "branch": "6ac69edfa8d23fe6a20e1373",
+                "name": "Suite Bah\u00eda",
+                "slug": "suite-bahia-bocagrande",
+                "type": "Suite Premium",
+                "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+                "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+                "basePrice": 1890000,
+                "originalPrice": 2370000,
+                "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 85,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Vista al mar",
+                  "Jacuzzi",
+                  "Balc\u00f3n privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 4,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 3,
+                "createdAt": "2026-10-07T19:34:56.048Z",
+                "updatedAt": "2026-10-07T19:34:56.048Z",
+                "_id": "6ac69ee0287238e812d63554"
+              },
+              "totalPrice": 3780000,
+              "totalUnits": 4
+            },
+            {
+              "availableUnits": 2,
+              "isAvailable": true,
+              "pricePerNight": 3060000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63556",
+                "branch": "6ac69edfa8d23fe6a20e1373",
+                "name": "Suite Presidencial",
+                "slug": "suite-presidencial-bocagrande",
+                "type": "Suite Presidencial",
+                "description": "La m\u00e1xima expresi\u00f3n de lujo. Terraza privada con jacuzzi, mayordomo personal y vistas espectaculares.",
+                "shortDescription": "Lujo m\u00e1ximo con terraza privada y mayordomo",
+                "basePrice": 3060000,
+                "originalPrice": 3780000,
+                "mainImage": "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 4,
+                "size": 180,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Terraza privada",
+                  "Jacuzzi",
+                  "Mayordomo 24/7",
+                  "Sala de estar",
+                  "Cama king",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito"
+                ],
+                "hasBalcony": true,
+                "hasTerrace": true,
+                "hasJacuzzi": true,
+                "view": "ocean",
+                "images": [
+                  "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 2,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 4,
+                "createdAt": "2026-10-07T19:34:56.051Z",
+                "updatedAt": "2026-10-07T19:34:56.052Z",
+                "_id": "6ac69ee0287238e812d63556"
+              },
+              "totalPrice": 6120000,
+              "totalUnits": 2
+            },
+            {
+              "availableUnits": 4,
+              "isAvailable": true,
+              "pricePerNight": 690000,
+              "suite": {
+                "id": "6ac69ee0287238e812d63558",
+                "branch": "6ac69edfa8d23fe6a20e1376",
+                "name": "Superior Patio",
+                "slug": "superior-patio-la-boquilla",
+                "type": "Habitaci\u00f3n",
+                "description": "Acogedora habitaci\u00f3n con jard\u00edn privado, ideal para una estancia relajante en el coraz\u00f3n de Cartagena.",
+                "shortDescription": "Habitaci\u00f3n acogedora con jard\u00edn privado",
+                "basePrice": 690000,
+                "originalPrice": 840000,
+                "mainImage": "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 42,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Jard\u00edn privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 4,
+                "active": true,
+                "available": true,
+                "featured": false,
+                "order": 1,
+                "createdAt": "2026-10-07T19:34:56.055Z",
+                "updatedAt": "2026-10-07T19:34:56.056Z",
+                "_id": "6ac69ee0287238e812d63558"
+              },
+              "totalPrice": 1380000,
+              "totalUnits": 4
+            },
+            {
+              "availableUnits": 3,
+              "isAvailable": true,
+              "pricePerNight": 1380000,
+              "suite": {
+                "id": "6ac69ee0287238e812d6355a",
+                "branch": "6ac69edfa8d23fe6a20e1376",
+                "name": "Suite Bah\u00eda",
+                "slug": "suite-bahia-la-boquilla",
+                "type": "Suite Premium",
+                "description": "Espaciosa suite con vista al mar y jacuzzi privado. Disfruta del atardecer caribe\u00f1o desde tu balc\u00f3n.",
+                "shortDescription": "Suite espaciosa con vista al mar y jacuzzi",
+                "basePrice": 1380000,
+                "originalPrice": 1720000,
+                "mainImage": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+                "maxGuests": 2,
+                "size": 85,
+                "maxOccupancy": 2,
+                "sizeSqm": 30,
+                "beds": [],
+                "viewType": null,
+                "amenities": [
+                  "Vista al mar",
+                  "Jacuzzi",
+                  "Balc\u00f3n privado",
+                  "Aire acondicionado",
+                  "Minibar",
+                  "WiFi gratuito",
+                  "TV LED"
+                ],
+                "hasBalcony": false,
+                "hasTerrace": false,
+                "hasJacuzzi": false,
+                "view": "city",
+                "images": [
+                  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
+                ],
+                "totalUnits": 3,
+                "active": true,
+                "available": true,
+                "featured": true,
+                "order": 3,
+                "createdAt": "2026-10-07T19:34:56.059Z",
+                "updatedAt": "2026-10-07T19:34:56.060Z",
+                "_id": "6ac69ee0287238e812d6355a"
+              },
+              "totalPrice": 2760000,
+              "totalUnits": 3
+            }
+          ],
+          "checkIn": "2026-10-08",
+          "checkOut": "2026-10-10",
+          "nights": 2,
+          "unavailableSuites": []
+        }
+      }
+    },
+    "POST /api/suites/calculate-price": {
+      "status": 200,
+      "ttfb_avg": 8.6,
+      "ttfb_min": 7.46,
+      "ttfb_max": 9.44,
+      "total_avg": 8.68,
+      "total_min": 7.54,
+      "total_max": 9.52,
+      "sample_json": {
+        "success": true,
+        "message": null,
+        "data": {
+          "suiteId": "6ac69edf287238e812d63540",
+          "dates": {
+            "checkIn": "2026-10-08",
+            "checkOut": "2026-10-10",
+            "nights": 2
+          },
+          "nightlyPrice": 860000,
+          "subtotal": 1720000,
+          "experiencesTotal": 0,
+          "discount": 0,
+          "discountReason": null,
+          "total": 1720000,
+          "lines": [
+            {
+              "unitPrice": 860000,
+              "nights": 2,
+              "amount": 1720000,
+              "season": "low"
+            }
+          ]
+        }
+      }
+    },
+    "POST /api/bookings": {
+      "status": 200,
+      "ttfb_avg": 31.44,
+      "total_avg": 31.51
+    },
+    "POST /api/payments/process": {
+      "status": 200,
+      "ttfb_avg": 19.44,
+      "total_avg": 19.57
+    },
+    "POST /api/chat": {
+      "status": 200,
+      "ttfb_avg": 5.18,
+      "ttfb_min": 4.82,
+      "ttfb_max": 5.63,
+      "total_avg": 5.26,
+      "total_min": 4.91,
+      "total_max": 5.7,
+      "sample_json": {
+        "metadata": {
+          "responseTime": 15,
+          "language": "es"
+        },
+        "success": true,
+        "reply": "Con gusto te ayudo. \u00bfTe gustar\u00eda conocer nuestras suites, experiencias, precios o hacer una reserva? Estoy aqu\u00ed para asistirte en todo lo que necesites. \ud83c\udf1f"
+      }
+    }
+  }
+}

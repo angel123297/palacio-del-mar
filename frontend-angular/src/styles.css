@@ -2093,6 +2093,11 @@ input, select, textarea {
   font-size: 0.9rem;
   width: 100%;
 }
+select option {
+  background-color: #121212 !important;
+  color: #f5e6c8 !important;
+  padding: 8px;
+}
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--gold);

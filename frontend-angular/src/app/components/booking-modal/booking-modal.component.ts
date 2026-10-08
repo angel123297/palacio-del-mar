@@ -1,10 +1,11 @@
-import { Component, Input, Output, EventEmitter, OnChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Suite } from '../../models/types';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-booking-modal',
@@ -43,11 +44,10 @@ import { Suite } from '../../models/types';
 
             <div>
               <label class="field-label">Huéspedes</label>
-              <select [(ngModel)]="guests" name="guests" style="width: 100%;">
-                <option [ngValue]="1">1 Huésped</option>
-                <option [ngValue]="2">2 Huéspedes</option>
-                <option [ngValue]="3">3 Huéspedes</option>
-                <option [ngValue]="4">4 Huéspedes</option>
+              <select [(ngModel)]="guests" name="guests" style="width: 100%; background-color: #141414; color: #f5e6c8; border: 1px solid rgba(212,175,55,0.3); border-radius: 6px; padding: 10px; font-size: 0.95rem;">
+                <option *ngFor="let opt of guestOptions" [ngValue]="opt" style="background-color: #141414; color: #f5e6c8;">
+                  {{ opt }} {{ opt === 1 ? 'Huésped' : 'Huéspedes' }}
+                </option>
               </select>
             </div>
 
@@ -87,7 +87,9 @@ import { Suite } from '../../models/types';
               {{ submitting ? 'Procesando reserva…' : 'Confirmar Reserva' }}
             </button>
 
-            <p *ngIf="errorMessage" style="color: #ff4d4d; font-size: 0.85rem; text-align: center; margin: 0;">{{ errorMessage }}</p>
+            <p *ngIf="errorMessage" style="color: #ff4d4d; font-size: 0.9rem; text-align: center; margin-top: 8px; background: rgba(255,77,77,0.1); padding: 8px; border-radius: 6px;">
+              {{ errorMessage }}
+            </p>
           </form>
         </div>
 
@@ -115,7 +117,8 @@ export class BookingModalComponent implements OnChanges {
   constructor(
     private api: ApiService,
     private auth: AuthService,
-    private router: Router
+    private router: Router,
+    private cdr: ChangeDetectorRef
   ) {
     const today = new Date();
     const tomorrow = new Date(today);
@@ -124,8 +127,24 @@ export class BookingModalComponent implements OnChanges {
     this.checkOut = tomorrow.toISOString().split('T')[0];
   }
 
+  get maxGuestsCount(): number {
+    return Math.max(1, this.suite?.maxGuests || (this.suite as any)?.capacity || 2);
+  }
+
+  get guestOptions(): number[] {
+    const max = this.maxGuestsCount;
+    const options: number[] = [];
+    for (let i = 1; i <= max; i++) {
+      options.push(i);
+    }
+    return options;
+  }
+
   ngOnChanges(): void {
     if (this.suite) {
+      if (this.guests > this.maxGuestsCount) {
+        this.guests = this.maxGuestsCount;
+      }
       this.recalculateNights();
       const currentUser = this.auth.currentUserValue;
       if (currentUser) {
@@ -149,34 +168,41 @@ export class BookingModalComponent implements OnChanges {
 
   close(): void {
     this.isOpen = false;
+    this.errorMessage = '';
     this.closeEvent.emit();
+    this.cdr.detectChanges();
   }
 
   confirmBooking(): void {
     if (!this.suite) return;
     this.submitting = true;
     this.errorMessage = '';
+    this.cdr.detectChanges();
 
     const payload = {
       suiteId: this.suite.id || this.suite._id,
       checkIn: this.checkIn,
       checkOut: this.checkOut,
       guests: this.guests,
-      guestName: this.guestName,
-      guestEmail: this.guestEmail,
-      guestPhone: this.guestPhone
+      guestName: (this.guestName || '').trim(),
+      guestEmail: (this.guestEmail || '').trim(),
+      guestPhone: (this.guestPhone || '').trim()
     };
 
-    this.api.post<any>('/bookings', payload).subscribe({
-      next: (res) => {
+    this.api.post<any>('/bookings', payload).pipe(
+      finalize(() => {
         this.submitting = false;
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
+      next: (res) => {
         this.close();
         this.router.navigate(['/mis-reservas']);
       },
       error: (err) => {
-        this.submitting = false;
-        this.errorMessage = err.error?.message || 'No se pudo crear la reserva.';
+        this.errorMessage = err.error?.message || 'No se pudo procesar la reserva. Intenta de nuevo.';
       }
     });
   }
 }
+

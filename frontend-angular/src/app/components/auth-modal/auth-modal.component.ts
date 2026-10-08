@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
@@ -38,7 +38,9 @@ import { AuthService } from '../../services/auth.service';
             {{ busy ? 'Entrando…' : 'Iniciar sesión' }}
           </button>
 
-          <p *ngIf="message" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.85rem;">{{ message }}</p>
+          <p *ngIf="message" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.9rem; font-weight: 500; background: rgba(255, 77, 77, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 77, 77, 0.3);">
+            {{ message }}
+          </p>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿No tienes cuenta?
@@ -82,7 +84,9 @@ import { AuthService } from '../../services/auth.service';
             {{ busy ? 'Creando cuenta…' : 'Crear cuenta' }}
           </button>
 
-          <p *ngIf="message" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.85rem;">{{ message }}</p>
+          <p *ngIf="message" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.9rem; font-weight: 500; background: rgba(255, 77, 77, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 77, 77, 0.3);">
+            {{ message }}
+          </p>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿Ya tienes cuenta?
@@ -155,7 +159,7 @@ export class AuthModalComponent {
   message = '';
   sentForgot = false;
 
-  constructor(private auth: AuthService) {}
+  constructor(private auth: AuthService, private cdr: ChangeDetectorRef) {}
 
   close(): void {
     this.isOpen = false;
@@ -166,11 +170,13 @@ export class AuthModalComponent {
     this.name = '';
     this.phone = '';
     this.closeEvent.emit();
+    this.cdr.detectChanges();
   }
 
   submitLogin(): void {
     this.busy = true;
     this.message = '';
+    this.cdr.detectChanges();
 
     const payload = {
       email: (this.email || '').trim(),
@@ -181,10 +187,12 @@ export class AuthModalComponent {
       next: () => {
         this.busy = false;
         this.close();
+        this.cdr.detectChanges();
       },
       error: (err) => {
         this.busy = false;
         this.message = err.error?.message || 'Credenciales inválidas.';
+        this.cdr.detectChanges();
       }
     });
   }
@@ -201,6 +209,7 @@ export class AuthModalComponent {
 
     this.busy = true;
     this.message = '';
+    this.cdr.detectChanges();
 
     const payload = {
       email: (this.email || '').trim(),
@@ -213,10 +222,17 @@ export class AuthModalComponent {
       next: () => {
         this.busy = false;
         this.close();
+        this.cdr.detectChanges();
       },
       error: (err) => {
         this.busy = false;
-        this.message = err.error?.message || 'No se pudo crear la cuenta.';
+        const rawMsg = err.error?.message || '';
+        if (rawMsg.toLowerCase().includes('registrado') || rawMsg.toLowerCase().includes('email')) {
+          this.message = `El correo ${payload.email} ya está registrado. Por favor haz clic en "Inicia sesión".`;
+        } else {
+          this.message = rawMsg || 'No se pudo crear la cuenta. Intenta de nuevo.';
+        }
+        this.cdr.detectChanges();
       }
     });
   }
@@ -225,12 +241,15 @@ export class AuthModalComponent {
     this.busy = true;
     this.message = '';
     this.sentForgot = false;
+    this.cdr.detectChanges();
 
     setTimeout(() => {
       this.busy = false;
       this.sentForgot = true;
       this.message = 'Si el correo está registrado, te llegará un enlace para restablecer tu contraseña.';
+      this.cdr.detectChanges();
     }, 600);
   }
 }
+
 
