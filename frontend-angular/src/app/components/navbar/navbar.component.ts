@@ -10,41 +10,41 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
   imports: [CommonModule, RouterModule, AuthModalComponent],
   template: `
     <header id="navbar">
-      <nav className="main-nav">
-        <a routerLink="/" className="logo">
+      <nav class="main-nav">
+        <a routerLink="/" class="logo">
           <span style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 400; color: #e2c99b; letter-spacing: 1px;">
             Palacio del Mar
           </span>
         </a>
 
-        <div className="nav-links">
-          <button className="nav-link-btn" (click)="scrollTo('#rooms')">Suites</button>
-          <button className="nav-link-btn" (click)="scrollTo('#experiences')">Experiencias</button>
-          <button className="nav-link-btn" (click)="scrollTo('#dining')">Gastronomía</button>
-          <button className="nav-link-btn" (click)="scrollTo('#spa')">Spa</button>
-          <button className="nav-link-btn" (click)="scrollTo('#location')">Ubicación</button>
+        <div class="nav-links">
+          <button class="nav-link-btn" (click)="scrollTo('#rooms')">Suites</button>
+          <button class="nav-link-btn" (click)="scrollTo('#experiences')">Experiencias</button>
+          <button class="nav-link-btn" (click)="scrollTo('#dining')">Gastronomía</button>
+          <button class="nav-link-btn" (click)="scrollTo('#spa')">Spa</button>
+          <button class="nav-link-btn" (click)="scrollTo('#location')">Ubicación</button>
         </div>
 
-        <div className="nav-right">
+        <div class="nav-right">
           <ng-container *ngIf="auth.currentUser$ | async as user; else notLogged">
-            <div className="nav-user-menu" style="display: flex; align-items: center; gap: 10px;">
-              <a routerLink="/mis-reservas" className="btn-outline nav-user-btn" style="padding: 6px 14px; text-decoration: none;">
+            <div class="nav-user-menu" style="display: flex; align-items: center; gap: 10px;">
+              <a routerLink="/mis-reservas" class="btn-outline nav-user-btn" style="padding: 6px 14px; text-decoration: none;">
                 Hola, {{ user.name ? user.name.split(' ')[0] : 'Huésped' }}
               </a>
-              <a *ngIf="user.role === 'ADMIN' || user.role === 'admin'" routerLink="/admin" className="btn-outline" style="padding: 6px 14px; text-decoration: none;">
+              <a *ngIf="user.role === 'ADMIN' || user.role === 'admin'" routerLink="/admin" class="btn-outline" style="padding: 6px 14px; text-decoration: none;">
                 Admin
               </a>
-              <button className="link-btn" (click)="auth.logout()" style="background: none; border: none; color: #c9a96e; cursor: pointer;">
+              <button class="link-btn" (click)="auth.logout()" style="background: none; border: none; color: #c9a96e; cursor: pointer;">
                 Salir
               </button>
             </div>
           </ng-container>
           <ng-template #notLogged>
             <div style="display: flex; align-items: center; gap: 12px;">
-              <button className="link-btn" (click)="openAuth('login')" style="background: none; border: none; color: #f5f0e8; cursor: pointer; font-size: 0.85rem;">
+              <button class="link-btn" (click)="openAuth('login')" style="background: none; border: none; color: #f5f0e8; cursor: pointer; font-size: 0.85rem;">
                 Iniciar sesión
               </button>
-              <button className="btn-outline" (click)="openAuth('register')" style="padding: 6px 16px; cursor: pointer;">
+              <button class="btn-outline" (click)="openAuth('register')" style="padding: 6px 16px; cursor: pointer;">
                 Regístrate
               </button>
             </div>

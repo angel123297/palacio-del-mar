@@ -7,10 +7,10 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <section id="testimonials" style="padding: 4rem 1.5rem; background-color: #121212; border-top: 1px solid rgba(212,175,55,0.15);">
-      <div className="rooms-header" style="text-align: center; margin-bottom: 3rem;">
-        <p className="sec-label">Experiencias inolvidables</p>
-        <h2 className="sec-title">Lo que dicen nuestros huéspedes</h2>
-        <p className="sec-sub">Calificación promedio 9.8/10 basada en más de 450 reseñas verificadas</p>
+      <div class="rooms-header" style="text-align: center; margin-bottom: 3rem;">
+        <p class="sec-label">Experiencias inolvidables</p>
+        <h2 class="sec-title">Lo que dicen nuestros huéspedes</h2>
+        <p class="sec-sub">Calificación promedio 9.8/10 basada en más de 450 reseñas verificadas</p>
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; max-width: 1200px; margin: 0 auto;">

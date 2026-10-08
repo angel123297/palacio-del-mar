@@ -11,19 +11,19 @@ import { BookingModalComponent } from '../booking-modal/booking-modal.component'
   imports: [CommonModule, RouterModule, BookingModalComponent],
   template: `
     <section id="rooms">
-      <div className="rooms-header">
-        <p className="sec-label">Alojamiento</p>
-        <h2 className="sec-title">Nuestras suites</h2>
-        <p className="sec-sub">
+      <div class="rooms-header">
+        <p class="sec-label">Alojamiento</p>
+        <h2 class="sec-title">Nuestras suites</h2>
+        <p class="sec-sub">
           Elige tu zona en Cartagena: murallas coloniales, Getsemaní, Bocagrande o La Boquilla
         </p>
       </div>
 
       <!-- Sucursales Filter -->
-      <div className="filter-row" *ngIf="branches.length > 0">
+      <div class="filter-row" *ngIf="branches.length > 0">
         <button
           type="button"
-          className="filter-btn"
+          class="filter-btn"
           [class.is-active]="selectedBranch === ''"
           (click)="selectBranch('')"
         >
@@ -32,7 +32,7 @@ import { BookingModalComponent } from '../booking-modal/booking-modal.component'
         <button
           *ngFor="let b of branches"
           type="button"
-          className="filter-btn"
+          class="filter-btn"
           [class.is-active]="selectedBranch === b.slug"
           (click)="selectBranch(b.slug)"
         >
@@ -41,10 +41,10 @@ import { BookingModalComponent } from '../booking-modal/booking-modal.component'
       </div>
 
       <!-- Tipos Filter -->
-      <div className="filter-row" *ngIf="types.length > 0" style="margin-top: 10px;">
+      <div class="filter-row" *ngIf="types.length > 0" style="margin-top: 10px;">
         <button
           type="button"
-          className="filter-btn"
+          class="filter-btn"
           [class.is-active]="selectedType === ''"
           (click)="selectedType = ''"
         >
@@ -53,7 +53,7 @@ import { BookingModalComponent } from '../booking-modal/booking-modal.component'
         <button
           *ngFor="let t of types"
           type="button"
-          className="filter-btn"
+          class="filter-btn"
           [class.is-active]="selectedType === t.name"
           (click)="selectedType = t.name"
         >
@@ -71,44 +71,44 @@ import { BookingModalComponent } from '../booking-modal/booking-modal.component'
       </div>
 
       <!-- Rooms Grid -->
-      <div className="rooms-grid" *ngIf="!loading && visibleSuites.length > 0">
-        <div className="room-card" *ngFor="let suite of visibleSuites">
-          <div className="room-img-wrap">
+      <div class="rooms-grid" *ngIf="!loading && visibleSuites.length > 0">
+        <div class="room-card" *ngFor="let suite of visibleSuites">
+          <div class="room-img-wrap">
             <img [src]="suite.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" [alt]="suite.name" loading="lazy" />
-            <span className="room-avail badge-ok" *ngIf="suite.featured">Recomendada</span>
+            <span class="room-avail badge-ok" *ngIf="suite.featured">Recomendada</span>
           </div>
 
-          <div className="room-info">
-            <p className="room-type">
+          <div class="room-info">
+            <p class="room-type">
               {{ suite.type || 'Suite' }}
               <span *ngIf="suite.branch?.name"> · {{ getShortBranch(suite.branch?.name || '') }}</span>
             </p>
 
-            <h3 className="room-name">
+            <h3 class="room-name">
               <a [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
                 {{ suite.name }}
               </a>
             </h3>
 
-            <div className="room-chips">
-              <span className="chip" *ngFor="let amenity of (suite.amenities || []).slice(0, 3)">
+            <div class="room-chips">
+              <span class="chip" *ngFor="let amenity of (suite.amenities || []).slice(0, 3)">
                 {{ amenity }}
               </span>
-              <span className="chip">{{ suite.size || 35 }} m²</span>
-              <span className="chip">Hasta {{ suite.maxGuests || 2 }} huéspedes</span>
+              <span class="chip">{{ suite.size || 35 }} m²</span>
+              <span class="chip">Hasta {{ suite.maxGuests || 2 }} huéspedes</span>
             </div>
 
-            <div className="room-price">
-              <span className="price-old" *ngIf="suite.originalPrice">$ {{ suite.originalPrice | number:'1.0-0' }}</span>
+            <div class="room-price">
+              <span class="price-old" *ngIf="suite.originalPrice">$ {{ suite.originalPrice | number:'1.0-0' }}</span>
               <strong>$ {{ (suite.basePrice || suite.pricePerNight || 450000) | number:'1.0-0' }}</strong>
               <span> / noche</span>
             </div>
 
-            <a className="room-detail-link" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
+            <a class="room-detail-link" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
               Ver detalles
             </a>
 
-            <button className="btn-book room-cta" (click)="openBookingModal(suite)">
+            <button class="btn-book room-cta" (click)="openBookingModal(suite)">
               Reservar
             </button>
           </div>

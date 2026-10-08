@@ -10,8 +10,8 @@ import { FormsModule } from '@angular/forms';
     <section id="contact" style="padding: 4rem 1.5rem; background-color: #121212; border-top: 1px solid rgba(212,175,55,0.15);">
       <div style="max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 3rem;">
         <div>
-          <p className="sec-label">Atención personalizada</p>
-          <h2 className="sec-title">Eventos, Bodas y Consultas VIP</h2>
+          <p class="sec-label">Atención personalizada</p>
+          <h2 class="sec-title">Eventos, Bodas y Consultas VIP</h2>
           <p style="color: #cccccc; line-height: 1.6; margin-bottom: 2rem;">
             ¿Planeas una boda colonial en Cartagena, un retiro corporativo o una celebración exclusiva en nuestras sucursales? Nuestro equipo de concierge planificará cada detalle.
           </p>
@@ -37,7 +37,7 @@ import { FormsModule } from '@angular/forms';
         >
           <h3 style="color: #ffffff; margin: 0 0 0.5rem 0;">Envíanos tu solicitud</h3>
           <div>
-            <label className="field-label">Nombre completo</label>
+            <label class="field-label">Nombre completo</label>
             <input
               type="text"
               required
@@ -50,7 +50,7 @@ import { FormsModule } from '@angular/forms';
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div>
-              <label className="field-label">Correo electrónico</label>
+              <label class="field-label">Correo electrónico</label>
               <input
                 type="email"
                 required
@@ -61,7 +61,7 @@ import { FormsModule } from '@angular/forms';
               />
             </div>
             <div>
-              <label className="field-label">Teléfono</label>
+              <label class="field-label">Teléfono</label>
               <input
                 type="tel"
                 placeholder="+57 300..."
@@ -73,7 +73,7 @@ import { FormsModule } from '@angular/forms';
           </div>
 
           <div>
-            <label className="field-label">Tipo de solicitud</label>
+            <label class="field-label">Tipo de solicitud</label>
             <select [(ngModel)]="formData.eventType" name="eventType" style="width: 100%;">
               <option value="consulta">Consulta General</option>
               <option value="boda">Boda o Aniversario</option>
@@ -83,7 +83,7 @@ import { FormsModule } from '@angular/forms';
           </div>
 
           <div>
-            <label className="field-label">Mensaje o requerimientos especiales</label>
+            <label class="field-label">Mensaje o requerimientos especiales</label>
             <textarea
               rows="4"
               required
@@ -94,7 +94,7 @@ import { FormsModule } from '@angular/forms';
             ></textarea>
           </div>
 
-          <button className="btn-primary" type="submit" [disabled]="busy">
+          <button class="btn-primary" type="submit" [disabled]="busy">
             {{ busy ? 'Enviando solicitud…' : 'Enviar Mensaje' }}
           </button>
           <p *ngIf="sentSuccess" style="color: #6fcf97; font-size: 0.9rem; margin: 0; text-align: center;">

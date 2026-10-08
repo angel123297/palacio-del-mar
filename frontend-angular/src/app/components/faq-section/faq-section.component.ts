@@ -8,9 +8,9 @@ import { CommonModule } from '@angular/common';
   template: `
     <section id="faq" style="padding: 4rem 1.5rem; background-color: #0d0d0d;">
       <div style="max-width: 900px; margin: 0 auto;">
-        <div className="rooms-header" style="text-align: center; margin-bottom: 3rem;">
-          <p className="sec-label">Preguntas frecuentes</p>
-          <h2 className="sec-title">Resuelve tus dudas antes de viajar</h2>
+        <div class="rooms-header" style="text-align: center; margin-bottom: 3rem;">
+          <p class="sec-label">Preguntas frecuentes</p>
+          <h2 class="sec-title">Resuelve tus dudas antes de viajar</h2>
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 1rem;">

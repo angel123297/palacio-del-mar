@@ -10,29 +10,29 @@ import { ApiService } from '../../services/api.service';
   template: `
     <div id="ai-chat">
       <div id="ai-window" [class.open]="open" *ngIf="open">
-        <div className="ai-header">
-          <span className="ai-avatar">🌊</span>
-          <div className="ai-header-info">
-            <span className="ai-name">Sofía · Concierge</span>
-            <span className="ai-status">En línea</span>
+        <div class="ai-header">
+          <span class="ai-avatar">🌊</span>
+          <div class="ai-header-info">
+            <span class="ai-name">Sofía · Concierge</span>
+            <span class="ai-status">En línea</span>
           </div>
           <button id="ai-header-close" (click)="open = false" aria-label="Cerrar chat">×</button>
         </div>
         <div id="ai-messages" #listRef>
           <div 
             *ngFor="let m of messages" 
-            className="ai-msg"
+            class="ai-msg"
             [class.bot]="m.role === 'assistant'"
             [class.user]="m.role === 'user'"
           >
             {{ m.content }}
           </div>
-          <div className="ai-msg bot ai-typing" *ngIf="sending">
+          <div class="ai-msg bot ai-typing" *ngIf="sending">
             <span></span><span></span><span></span>
           </div>
         </div>
-        <div className="ai-quick-btns" *ngIf="messages.length < 3">
-          <button className="ai-quick" *ngFor="let q of quickReplies" (click)="send(q)">{{ q }}</button>
+        <div class="ai-quick-btns" *ngIf="messages.length < 3">
+          <button class="ai-quick" *ngFor="let q of quickReplies" (click)="send(q)">{{ q }}</button>
         </div>
         <div id="ai-input-area">
           <input
@@ -45,7 +45,7 @@ import { ApiService } from '../../services/api.service';
         </div>
       </div>
       <button id="ai-toggle" (click)="open = !open" aria-label="Abrir chat">
-        <span className="ai-dot"></span>
+        <span class="ai-dot"></span>
         {{ open ? 'Cerrar chat' : 'Habla con Sofía' }}
       </button>
     </div>

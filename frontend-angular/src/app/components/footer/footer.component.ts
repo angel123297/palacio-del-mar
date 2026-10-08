@@ -7,19 +7,19 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <footer>
-      <div className="footer-top">
-        <div className="footer-col">
-          <p className="footer-logo">Palacio del Mar</p>
-          <p className="footer-desc">
+      <div class="footer-top">
+        <div class="footer-col">
+          <p class="footer-logo">Palacio del Mar</p>
+          <p class="footer-desc">
             Hotel boutique de lujo en el centro histórico amurallado de Cartagena de Indias.
           </p>
-          <div className="footer-awards">
-            <span className="footer-award">🏆 Travellers' Choice 2026</span>
-            <span className="footer-award">⭐ 9.8 Booking.com</span>
+          <div class="footer-awards">
+            <span class="footer-award">🏆 Travellers' Choice 2026</span>
+            <span class="footer-award">⭐ 9.8 Booking.com</span>
           </div>
         </div>
 
-        <div className="footer-col">
+        <div class="footer-col">
           <h4>Explorar</h4>
           <ul>
             <li (click)="scrollTo('#rooms')">Suites</li>
@@ -30,7 +30,7 @@ import { CommonModule } from '@angular/common';
           </ul>
         </div>
 
-        <div className="footer-col">
+        <div class="footer-col">
           <h4>Contacto VIP</h4>
           <ul>
             <li><a href="mailto:reservas@palaciomar.co" style="color: inherit; text-decoration: none;">reservas&#64;palaciomar.co</a></li>
@@ -39,16 +39,16 @@ import { CommonModule } from '@angular/common';
           </ul>
         </div>
 
-        <div className="footer-col">
+        <div class="footer-col">
           <h4>Síguenos</h4>
-          <div className="social-links">
+          <div class="social-links">
             <a href="https://instagram.com" target="_blank" rel="noreferrer">Instagram</a>
             <a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a>
           </div>
         </div>
       </div>
 
-      <div className="footer-bottom">
+      <div class="footer-bottom">
         <p>© {{ currentYear }} Palacio del Mar · Todos los derechos reservados.</p>
       </div>
     </footer>
