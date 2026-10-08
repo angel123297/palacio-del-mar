@@ -44,15 +44,5 @@ services:
     depends_on:
       - backend-java
 
-  # --- Frontend React + Vite --------------------------------------------------
-  web-react:
-    build: ./frontend
-    container_name: palacio-web-react
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    depends_on:
-      - backend-java
-
 volumes:
   mongo-data:
