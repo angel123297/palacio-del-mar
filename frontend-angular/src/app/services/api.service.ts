@@ -16,14 +16,18 @@ export class ApiService {
         }
       });
     }
-    return this.http.get<T>(`\${environment.apiUrl}\${path}`, { params: httpParams });
+    return this.http.get<T>(`${environment.apiUrl}${path}`, { params: httpParams });
   }
 
   post<T>(path: string, body: any): Observable<T> {
-    return this.http.post<T>(`\${environment.apiUrl}\${path}`, body);
+    return this.http.post<T>(`${environment.apiUrl}${path}`, body);
   }
   
   put<T>(path: string, body: any): Observable<T> {
-    return this.http.put<T>(`\${environment.apiUrl}\${path}`, body);
+    return this.http.put<T>(`${environment.apiUrl}${path}`, body);
+  }
+
+  delete<T>(path: string): Observable<T> {
+    return this.http.delete<T>(`${environment.apiUrl}${path}`);
   }
 }

@@ -36,7 +36,11 @@ public class ChatService {
 
     private String detectLanguage(String message) {
         String lower = message.toLowerCase();
-        if (lower.matches(".*[áéíóúñ¿¡]|hola|gracias|por favor|qué|cómo|cuándo|dónde|quién.*")) {
+        if (lower.matches(".*[áéíóúñ¿¡].*") ||
+            lower.contains("hola") || lower.contains("gracias") || lower.contains("favor") ||
+            lower.contains("cuanto") || lower.contains("cuánto") || lower.contains("precio") ||
+            lower.contains("suite") || lower.contains("habitacion") || lower.contains("habitación") ||
+            lower.contains("reserva") || lower.contains("disponib") || lower.contains("cartagena")) {
             return "es";
         }
         return "en";

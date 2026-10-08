@@ -7,6 +7,7 @@ import co.palaciodelmar.backend.model.Branch;
 import co.palaciodelmar.backend.model.Experience;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.model.SuiteNight;
+import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.ExperienceRepository;
@@ -198,6 +199,23 @@ public class BookingService {
 
     public BookingDTO getBookingById(String id) {
         return toDTO(getBookingEntityById(id));
+    }
+
+    public BookingDTO getBookingByIdSecure(String id, User user) {
+        Booking booking = getBookingEntityById(id);
+        if (user == null || (!booking.getUser().equals(user.getId()) && !"ADMIN".equalsIgnoreCase(user.getRole()) && !"HOST".equalsIgnoreCase(user.getRole()))) {
+            throw new IllegalArgumentException("No tienes permiso para acceder a esta reserva");
+        }
+        return toDTO(booking);
+    }
+
+    public BookingDTO getBookingByCodeSecure(String bookingCode, User user) {
+        Booking booking = bookingRepository.findByBookingCode(bookingCode)
+                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada con código: " + bookingCode));
+        if (user == null || (!booking.getUser().equals(user.getId()) && !"ADMIN".equalsIgnoreCase(user.getRole()) && !"HOST".equalsIgnoreCase(user.getRole()))) {
+            throw new IllegalArgumentException("No tienes permiso para acceder a esta reserva");
+        }
+        return toDTO(booking);
     }
 
     public Booking getBookingEntityById(String id) {

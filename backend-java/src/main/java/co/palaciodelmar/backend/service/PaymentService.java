@@ -42,6 +42,14 @@ public class PaymentService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
 
+        if (userId != null && !booking.getUser().equals(userId)) {
+            throw new IllegalArgumentException("No tienes permiso para pagar esta reserva");
+        }
+
+        if ("cancelled".equalsIgnoreCase(booking.getStatus()) || "expired".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("No se puede pagar una reserva cancelada o vencida");
+        }
+
         BigDecimal balance = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
 
         if ("paid".equalsIgnoreCase(booking.getPaymentStatus()) && balance.compareTo(BigDecimal.ZERO) <= 0) {
@@ -106,11 +114,25 @@ public class PaymentService {
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + request.getBookingId()));
 
+        if (userId != null && !booking.getUser().equals(userId)) {
+            throw new IllegalArgumentException("No tienes permiso para pagar esta reserva");
+        }
+
+        if ("cancelled".equalsIgnoreCase(booking.getStatus()) || "expired".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalArgumentException("No se puede pagar una reserva cancelada o vencida");
+        }
+
         boolean isSuccess = request.getSimulateFailure() == null || !request.getSimulateFailure();
         String paymentStatus = isSuccess ? "completed" : "failed";
         String transactionId = "TX-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
 
-        BigDecimal amount = request.getAmount() != null ? request.getAmount() : booking.getTotalPrice();
+        BigDecimal balance = booking.getBalanceDue() != null && booking.getBalanceDue().compareTo(BigDecimal.ZERO) > 0
+                ? booking.getBalanceDue()
+                : booking.getTotalPrice();
+
+        BigDecimal amount = request.getAmount() != null && request.getAmount().compareTo(BigDecimal.ZERO) > 0
+                ? request.getAmount()
+                : balance;
 
         Payment payment = Payment.builder()
                 .booking(booking.getId())
@@ -129,11 +151,16 @@ public class PaymentService {
         Payment savedPayment = paymentRepository.save(payment);
 
         if (isSuccess) {
-            booking.setPaidAmount(booking.getPaidAmount().add(amount));
-            if (booking.getPaidAmount().compareTo(booking.getTotalPrice()) >= 0) {
+            BigDecimal currentPaid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal newPaid = currentPaid.add(amount);
+            booking.setPaidAmount(newPaid);
+
+            if (newPaid.compareTo(booking.getTotalPrice()) >= 0) {
+                booking.setBalanceDue(BigDecimal.ZERO);
                 booking.setPaymentStatus("paid");
                 booking.setStatus("confirmed");
             } else {
+                booking.setBalanceDue(booking.getTotalPrice().subtract(newPaid));
                 booking.setPaymentStatus("partial");
             }
             booking.setUpdatedAt(Instant.now());
