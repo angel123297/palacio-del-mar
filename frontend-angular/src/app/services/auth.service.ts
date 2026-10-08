@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, tap } from 'rxjs';
+import { BehaviorSubject, tap, timeout } from 'rxjs';
 import { User, AuthResponse } from '../models/types';
 import { environment } from '../../environments/environment';
 
@@ -9,6 +9,7 @@ export class AuthService {
   private apiUrl = environment.apiUrl + '/auth';
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   currentUser$ = this.currentUserSubject.asObservable();
+  private readonly TIMEOUT_MS = 15000;
 
   get currentUserValue(): User | null {
     return this.currentUserSubject.value;
@@ -31,6 +32,7 @@ export class AuthService {
 
   login(credentials: any) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(
+      timeout(this.TIMEOUT_MS),
       tap(res => {
         const token = res.token || (res as any).data?.token;
         const user = res.user || (res as any).data?.user;
@@ -45,6 +47,7 @@ export class AuthService {
 
   register(data: any) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data).pipe(
+      timeout(this.TIMEOUT_MS),
       tap(res => {
         const token = res.token || (res as any).data?.token;
         const user = res.user || (res as any).data?.user;

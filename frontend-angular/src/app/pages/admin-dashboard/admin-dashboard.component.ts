@@ -12,8 +12,9 @@ import { Booking } from '../../models/types';
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 3rem 1.5rem; max-width: 1200px; margin: 0 auto;">
       <h1 style="font-family: var(--font-title); font-size: 2.2rem; color: var(--gold); margin-bottom: 2rem;">Panel Administrativo</h1>
 
-      <div *ngIf="loading" style="text-align: center; color: var(--gold); padding: 3rem;">
-        Cargando gestión de reservas…
+      <div *ngIf="loading" class="luxury-loader-container">
+        <div class="luxury-spinner"></div>
+        <p class="luxury-loader-text">Cargando...</p>
       </div>
 
       <div *ngIf="!loading">

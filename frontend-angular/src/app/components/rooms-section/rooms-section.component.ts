@@ -62,8 +62,9 @@ import { BookingModalComponent } from '../booking-modal/booking-modal.component'
       </div>
 
       <!-- Loading / Empty states -->
-      <div *ngIf="loading" style="text-align: center; padding: 4rem;">
-        <p style="color: #c9a96e;">Cargando suites exclusivas…</p>
+      <div *ngIf="loading" class="luxury-loader-container">
+        <div class="luxury-spinner"></div>
+        <p class="luxury-loader-text">Cargando...</p>
       </div>
 
       <div *ngIf="!loading && visibleSuites.length === 0" style="text-align: center; padding: 4rem;">

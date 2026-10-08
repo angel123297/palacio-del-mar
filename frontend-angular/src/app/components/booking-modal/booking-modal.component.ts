@@ -56,7 +56,7 @@ import { finalize } from 'rxjs';
               <input type="text" [(ngModel)]="guestName" name="guestName" required placeholder="Ej: Alejandro Silva" style="width: 100%;" />
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div *ngIf="!isLoggedIn" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div>
                 <label class="field-label">Correo Electrónico</label>
                 <input type="email" [(ngModel)]="guestEmail" name="guestEmail" required placeholder="ejemplo@correo.com" style="width: 100%;" />
@@ -132,6 +132,10 @@ export class BookingModalComponent implements OnChanges {
     this.checkOut = tomorrow.toISOString().split('T')[0];
   }
 
+  get isLoggedIn(): boolean {
+    return !!this.auth.getToken();
+  }
+
   get maxGuestsCount(): number {
     return Math.max(1, this.suite?.maxGuests || (this.suite as any)?.capacity || 2);
   }
@@ -186,7 +190,7 @@ export class BookingModalComponent implements OnChanges {
     if (!this.checkIn) missing.push('fecha de llegada');
     if (!this.checkOut) missing.push('fecha de salida');
     if (!name) missing.push('nombre completo');
-    if (!email) missing.push('correo electrónico');
+    if (!this.isLoggedIn && !email) missing.push('correo electrónico');
     if (missing.length) return `Por favor completa: ${missing.join(', ')}.`;
 
     const today = new Date().toISOString().split('T')[0];

@@ -3134,3 +3134,61 @@ input:focus, select:focus, textarea:focus {
   .receipt-page { background: #fff; padding: 0; }
   .receipt { box-shadow: none; padding: 0; }
 }
+
+/* Luxury Loader */
+.luxury-loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  color: var(--gold);
+}
+
+.luxury-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(212, 175, 55, 0.2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.luxury-loader-text {
+  font-family: var(--font-title);
+  font-size: 1.2rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Select Inputs Styling */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4af37' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  background-color: #141414 !important;
+  color: #f5e6c8 !important;
+  border: 1px solid rgba(212,175,55,0.3) !important;
+  border-radius: 6px;
+  padding: 10px 30px 10px 10px;
+}
+select option {
+  background-color: #141414 !important;
+  color: #f5e6c8 !important;
+  padding: 10px;
+}
