@@ -1,6 +1,8 @@
 import { Component, Input, Output, EventEmitter, OnChanges, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { CustomDatepickerComponent } from '../custom-datepicker/custom-datepicker.component';
+import { CustomGuestpickerComponent } from '../custom-guestpicker/custom-guestpicker.component';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
@@ -10,7 +12,7 @@ import { finalize } from 'rxjs';
 @Component({
   selector: 'app-booking-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, CustomDatepickerComponent, CustomGuestpickerComponent],
   template: `
     <div class="modal-backdrop" *ngIf="isOpen" (click)="close()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
       <div class="modal-content" (click)="$event.stopPropagation()" style="background: var(--dark); border: 1px solid var(--gold); border-radius: 12px; max-width: 550px; width: 100%; padding: 2rem; color: var(--cream); position: relative; max-height: 90vh; overflow-y: auto;">
@@ -32,23 +34,11 @@ import { finalize } from 'rxjs';
 
           <form (ngSubmit)="confirmBooking()" style="display: flex; flex-direction: column; gap: 1rem;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-              <div>
-                <label class="field-label">Fecha de Llegada</label>
-                <input type="date" [(ngModel)]="checkIn" name="checkIn" required (change)="recalculateNights()" style="width: 100%;" />
-              </div>
-              <div>
-                <label class="field-label">Fecha de Salida</label>
-                <input type="date" [(ngModel)]="checkOut" name="checkOut" required (change)="recalculateNights()" style="width: 100%;" />
-              </div>
+                <app-custom-datepicker label="Llegada" [date]="checkIn" (dateChange)="checkIn = $event; recalculateNights()"></app-custom-datepicker>
+                <app-custom-datepicker label="Salida" [date]="checkOut" (dateChange)="checkOut = $event; recalculateNights()"></app-custom-datepicker>
             </div>
-
-            <div>
-              <label class="field-label">Huéspedes</label>
-              <select [(ngModel)]="guests" name="guests" style="width: 100%; background-color: #141414; color: #f5e6c8; border: 1px solid rgba(212,175,55,0.3); border-radius: 6px; padding: 10px; font-size: 0.95rem;">
-                <option *ngFor="let opt of guestOptions" [ngValue]="opt" style="background-color: #141414; color: #f5e6c8;">
-                  {{ opt }} {{ opt === 1 ? 'Huésped' : 'Huéspedes' }}
-                </option>
-              </select>
+            <div style="margin-top: 1rem;">
+                <app-custom-guestpicker [adults]="guests" [maxGuests]="maxGuestsCount" (adultsChange)="guests = $event"></app-custom-guestpicker>
             </div>
 
             <div>

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
@@ -132,7 +132,7 @@ export class RoomsSectionComponent implements OnInit {
   bookingModalOpen = false;
   selectedSuiteForBooking: Suite | null = null;
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.fetchData();
@@ -142,12 +142,14 @@ export class RoomsSectionComponent implements OnInit {
     this.api.get<any>('/branches').subscribe({
       next: (res) => {
         this.branches = res.data || res;
+        this.cdr.detectChanges();
       }
     });
 
     this.api.get<any>('/suites/types').subscribe({
       next: (res) => {
         this.types = res.data || res;
+        this.cdr.detectChanges();
       }
     });
 
@@ -157,10 +159,12 @@ export class RoomsSectionComponent implements OnInit {
         const list = Array.isArray(raw) ? raw : (raw.suites || []);
         this.suites = list;
         this.loading = false;
+        this.cdr.detectChanges();
       },
       error: () => {
         this.loadError = true;
         this.loading = false;
+        this.cdr.detectChanges();
       }
     });
   }

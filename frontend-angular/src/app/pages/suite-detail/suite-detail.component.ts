@@ -1,7 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { CustomDatepickerComponent } from '../../components/custom-datepicker/custom-datepicker.component';
+import { CustomGuestpickerComponent } from '../../components/custom-guestpicker/custom-guestpicker.component';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Suite } from '../../models/types';
@@ -9,7 +11,7 @@ import { Suite } from '../../models/types';
 @Component({
   selector: 'app-suite-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, CustomDatepickerComponent, CustomGuestpickerComponent],
   template: `
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 2rem 1.5rem; max-width: 1100px; margin: 0 auto;">
       <div *ngIf="loading" class="luxury-loader-container">
@@ -40,22 +42,9 @@ import { Suite } from '../../models/types';
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
-              <div>
-                <label style="display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 4px;">Check-in</label>
-                <input type="date" [(ngModel)]="checkIn" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.5); border: 1px solid rgba(212,175,55,0.3); color: #fff; border-radius: 6px;">
-              </div>
-              <div>
-                <label style="display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 4px;">Check-out</label>
-                <input type="date" [(ngModel)]="checkOut" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.5); border: 1px solid rgba(212,175,55,0.3); color: #fff; border-radius: 6px;">
-              </div>
-              <div>
-                <label style="display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 4px;">Huéspedes</label>
-                <select [(ngModel)]="guests"  style="width: 100%; padding: 10px; background: rgba(0,0,0,0.5); border: 1px solid rgba(212,175,55,0.3); color: #fff; border-radius: 6px;">
-                  <option *ngFor="let opt of guestOptions" [value]="opt" style="background-color: #141414; color: #f5e6c8;">
-                    {{ opt }} {{ opt === 1 ? 'Huésped' : 'Huéspedes' }}
-                  </option>
-                </select>
-              </div>
+              <app-custom-datepicker label="Check-in" [date]="checkIn" (dateChange)="checkIn = $event"></app-custom-datepicker>
+              <app-custom-datepicker label="Check-out" [date]="checkOut" (dateChange)="checkOut = $event"></app-custom-datepicker>
+              <app-custom-guestpicker [adults]="guests" [maxGuests]="suite.maxGuests || suite.maxGuests || 2" (adultsChange)="guests = $event"></app-custom-guestpicker>
             </div>
 
             <button (click)="createBooking()" [disabled]="bookingBusy" style="width: 100%; background: var(--gold); color: #0d0d0d; font-weight: 700; padding: 14px; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">
@@ -88,7 +77,8 @@ export class SuiteDetailComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
-    private auth: AuthService
+    private auth: AuthService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -98,9 +88,11 @@ export class SuiteDetailComponent implements OnInit {
         next: (res) => {
           this.suite = res.data || res;
           this.loading = false;
+          this.cdr.detectChanges();
         },
         error: () => {
           this.loading = false;
+          this.cdr.detectChanges();
         }
       });
     }
