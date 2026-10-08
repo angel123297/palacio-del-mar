@@ -19,6 +19,7 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
 
         <div class="nav-links">
           <button class="nav-link-btn" (click)="scrollTo('#rooms')">Suites</button>
+          <a routerLink="/calendario" class="nav-link-btn" style="text-decoration: none;">Calendario</a>
           <button class="nav-link-btn" (click)="scrollTo('#experiences')">Experiencias</button>
           <button class="nav-link-btn" (click)="scrollTo('#dining')">Gastronomía</button>
           <button class="nav-link-btn" (click)="scrollTo('#spa')">Spa</button>
@@ -30,6 +31,9 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
             <div class="nav-user-menu" style="display: flex; align-items: center; gap: 10px;">
               <a routerLink="/mis-reservas" class="btn-outline nav-user-btn" style="padding: 6px 14px; text-decoration: none;">
                 {{ user.name ? user.name.split(' ')[0] : 'Huésped' }}
+              </a>
+              <a routerLink="/perfil" class="btn-outline nav-user-btn" style="padding: 6px 14px; text-decoration: none;">
+                Perfil
               </a>
               <a *ngIf="user.role === 'ADMIN' || user.role === 'admin'" routerLink="/admin" class="btn-outline" style="padding: 6px 14px; text-decoration: none;">
                 Admin

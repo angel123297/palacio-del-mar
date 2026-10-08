@@ -38,10 +38,7 @@ public class BookingService {
     private final UserRepository userRepository;
 
     public BookingDTO createBooking(String userId, BookingRequest request) {
-        if (request.getSuiteId() == null || request.getSuiteId().isBlank()
-                || request.getCheckIn() == null || request.getCheckOut() == null) {
-            throw new IllegalArgumentException("Por favor completa la habitación y las fechas de la reserva");
-        }
+
         if (userId == null || userId.isBlank()) {
             String rawEmail = request.getGuestEmail() == null ? "" : request.getGuestEmail().trim();
             String rawName = request.getGuestName() == null ? "" : request.getGuestName().trim();

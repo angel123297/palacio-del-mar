@@ -1,6 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Booking } from '../../models/types';
@@ -43,9 +43,9 @@ import { finalize } from 'rxjs';
                     [style.color]="booking.status === 'confirmed' ? '#2ecc71' : '#f1c40f'">
                 {{ booking.status }}
               </span>
-              <button *ngIf="booking.status === 'pending'" (click)="payBooking(booking)" [disabled]="payingId === booking.id || payingId === booking._id" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem;">
-                {{ (payingId === booking.id || payingId === booking._id) ? 'Procesando...' : 'Pagar' }}
-              </button>
+              <a [routerLink]="['/reservas', booking.id || booking._id]" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Ver Detalles</a>
+              <a *ngIf="booking.status === 'pending'" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Pagar</a>
+              <a *ngIf="booking.status === 'confirmed'" [routerLink]="['/reservas', booking.id || booking._id, 'comprobante']" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #2ecc71; color: #2ecc71; text-decoration: none;">Ver Factura</a>
             </div>
             <p *ngIf="payError && (payingId === booking.id || payingId === booking._id)" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">{{ payError }}</p>
           </div>
@@ -63,40 +63,65 @@ export class MyBookingsComponent implements OnInit {
   constructor(
     private api: ApiService,
     private auth: AuthService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private router: Router
   ) {}
 
+  printInvoice(booking: any) {
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write(`
+        <html>
+        <head>
+          <title>Factura - ${booking.bookingCode || booking.id}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; padding: 40px; }
+            .header { text-align: center; margin-bottom: 40px; }
+            h1 { color: #d4af37; margin: 0; }
+            .details { margin-bottom: 30px; }
+            .details table { width: 100%; border-collapse: collapse; }
+            .details th, .details td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
+            .total { text-align: right; font-size: 1.5em; font-weight: bold; margin-top: 30px; color: #d4af37; }
+            @media print {
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print" style="margin-bottom: 20px;">
+            <button onclick="window.print()" style="padding: 10px 20px; background: #d4af37; color: white; border: none; cursor: pointer; font-size: 16px;">Imprimir PDF</button>
+          </div>
+          <div class="header">
+            <h1>Palacio del Mar</h1>
+            <p>Factura de Reserva</p>
+          </div>
+          <div class="details">
+            <table>
+              <tr><th>Reserva ID</th><td>${booking.bookingCode || booking.id || booking._id}</td></tr>
+              <tr><th>Suite</th><td>${booking.suite?.name || 'Suite de Lujo'}</td></tr>
+              <tr><th>Llegada</th><td>${new Date(booking.checkIn).toLocaleDateString()}</td></tr>
+              <tr><th>Salida</th><td>${new Date(booking.checkOut).toLocaleDateString()}</td></tr>
+              <tr><th>Estado</th><td>Pagado (Confirmada)</td></tr>
+            </table>
+          </div>
+          <div class="total">
+            Total Pagado: $ ${booking.totalPrice.toLocaleString('es-CO')}
+          </div>
+          <p style="margin-top: 50px; text-align: center; color: #888; font-size: 0.9em;">Gracias por su preferencia.</p>
+        </body>
+        </html>
+      `);
+      w.document.close();
+    }
+  }
 
   payBooking(booking: any): void {
     const id = booking.id || booking._id;
-    this.payingId = id;
-    this.payError = '';
-    
-    // Simulating payment or calling API
-    this.api.post<any>('/payments/process', { bookingId: id, amount: booking.totalPrice, method: 'CREDIT_CARD' }).pipe(
-      finalize(() => {
-        this.payingId = null;
-        this.cdr.detectChanges();
-      })
-    ).subscribe({
-      next: (res) => {
-        booking.status = 'confirmed';
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        // Fallback simulate success if backend doesn't have the endpoint for now
-        if (err.status === 404) {
-           booking.status = 'confirmed';
-        } else {
-           this.payError = 'Error al procesar el pago. Intenta de nuevo.';
-        }
-        this.cdr.detectChanges();
-      }
-    });
+    this.router.navigate(['/checkout', id]);
   }
 
   ngOnInit(): void {
-    if (!this.auth.getToken()) {
+    if (!this.auth.isLoggedIn()) {
       this.loading = false;
       this.cdr.detectChanges();
       return;

@@ -15,28 +15,53 @@ export class AuthService {
     return this.currentUserSubject.value;
   }
 
+  isLoggedIn(): boolean {
+    return !!this.currentUserSubject.value;
+  }
+
   constructor(private http: HttpClient) {
-    const user = localStorage.getItem('user');
-    if (user) {
+    // Try to load user from local cache immediately so UI doesn't flicker
+    const cachedUser = localStorage.getItem('user');
+    if (cachedUser) {
       try {
-        this.currentUserSubject.next(JSON.parse(user));
+        this.currentUserSubject.next(JSON.parse(cachedUser));
       } catch (e) {
         localStorage.removeItem('user');
       }
     }
+
+    // Verify actual session with the backend asynchronously
+    this.fetchMe();
   }
 
-  getToken(): string | null {
-    return localStorage.getItem('token');
+  private fetchMe() {
+    this.http.get<any>(`${this.apiUrl}/me`).subscribe({
+      next: (res) => {
+        const user = res.user || res.data?.user;
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+          this.currentUserSubject.next(user);
+        } else {
+          this.clearLocalData();
+        }
+      },
+      error: () => {
+        // If /me fails (e.g. 401 Unauthorized), we clear the local state
+        this.clearLocalData();
+      }
+    });
+  }
+
+  private clearLocalData() {
+    localStorage.removeItem('user');
+    this.currentUserSubject.next(null);
   }
 
   login(credentials: any) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(
       timeout(this.TIMEOUT_MS),
       tap(res => {
-        const token = res.token || (res as any).data?.token;
         const user = res.user || (res as any).data?.user;
-        if (token) localStorage.setItem('token', token);
         if (user) {
           localStorage.setItem('user', JSON.stringify(user));
           this.currentUserSubject.next(user);
@@ -49,9 +74,7 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data).pipe(
       timeout(this.TIMEOUT_MS),
       tap(res => {
-        const token = res.token || (res as any).data?.token;
         const user = res.user || (res as any).data?.user;
-        if (token) localStorage.setItem('token', token);
         if (user) {
           localStorage.setItem('user', JSON.stringify(user));
           this.currentUserSubject.next(user);
@@ -61,8 +84,16 @@ export class AuthService {
   }
 
   logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    this.currentUserSubject.next(null);
+    // Also notify backend to clear the HttpOnly cookie
+    return this.http.post(`${this.apiUrl}/logout`, {}).pipe(
+      tap(() => {
+        this.clearLocalData();
+      })
+    ).subscribe({
+      error: () => {
+        // Even if the server request fails, clear local state
+        this.clearLocalData();
+      }
+    });
   }
 }

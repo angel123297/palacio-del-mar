@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.controller;
 
 import co.palaciodelmar.backend.dto.ApiResponse;
+import co.palaciodelmar.backend.dto.PaymentDTO;
 import co.palaciodelmar.backend.dto.PaymentRequest;
 import co.palaciodelmar.backend.model.Payment;
 import co.palaciodelmar.backend.security.UserPrincipal;
@@ -39,11 +40,11 @@ public class PaymentController {
     }
 
     @PostMapping("/process")
-    public ResponseEntity<ApiResponse<Payment>> processPayment(
+    public ResponseEntity<ApiResponse<PaymentDTO>> processPayment(
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody PaymentRequest request
     ) {
-        Payment payment = paymentService.processPayment(principal.getUser().getId(), request);
+        PaymentDTO payment = paymentService.processPayment(principal.getUser().getId(), request);
         return ResponseEntity.ok(ApiResponse.ok("Pago procesado exitosamente (simulado)", payment));
     }
 }

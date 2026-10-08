@@ -123,7 +123,7 @@ export class BookingModalComponent implements OnChanges {
   }
 
   get isLoggedIn(): boolean {
-    return !!this.auth.getToken();
+    return this.auth.isLoggedIn();
   }
 
   get maxGuestsCount(): number {
@@ -223,7 +223,7 @@ export class BookingModalComponent implements OnChanges {
       })
     ).subscribe({
       next: (res) => {
-        if (this.auth.getToken()) {
+        if (this.auth.isLoggedIn()) {
           this.close();
           this.router.navigate(['/mis-reservas']);
           return;
