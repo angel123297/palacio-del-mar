@@ -51,6 +51,9 @@ import { AuthService } from '../../services/auth.service';
 })
 export class AuthModalComponent {
   @Input() isOpen = false;
+  @Input() set initialMode(mode: 'login' | 'register') {
+    this.isRegister = mode === 'register';
+  }
   @Output() closeEvent = new EventEmitter<void>();
 
   isRegister = false;

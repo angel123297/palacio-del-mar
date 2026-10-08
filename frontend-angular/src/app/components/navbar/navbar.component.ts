@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { AuthModalComponent } from '../auth-modal/auth-modal.component';
 
@@ -9,36 +9,73 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
   standalone: true,
   imports: [CommonModule, RouterModule, AuthModalComponent],
   template: `
-    <nav class="navbar">
-      <div class="logo"><a routerLink="/">Palacio del Mar</a></div>
-      <div class="links">
-        <a routerLink="/#rooms">Suites</a>
-        <a routerLink="/#experiences">Experiencias</a>
-      </div>
-      <div class="auth">
-        <ng-container *ngIf="auth.currentUser$ | async as user; else notLogged">
-          <span style="margin-right: 12px;">Hola, {{user.name}}</span>
-          <a routerLink="/mis-reservas">Mis Reservas</a>
-          <a *ngIf="user.role === 'ADMIN'" routerLink="/admin">Admin</a>
-          <button (click)="auth.logout()" style="margin-left: 12px;">Salir</button>
-        </ng-container>
-        <ng-template #notLogged>
-          <button (click)="authModalOpen = true">Iniciar Sesión</button>
-        </ng-template>
-      </div>
-    </nav>
-    <app-auth-modal [isOpen]="authModalOpen" (closeEvent)="authModalOpen = false"></app-auth-modal>
-  `,
-  styles: [`
-    .navbar { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background: #0d0d0d; color: #d4af37; border-bottom: 1px solid rgba(212,175,55,0.3); }
-    .navbar .logo a { font-family: var(--font-title); font-size: 1.4rem; font-weight: 700; color: #d4af37; text-decoration: none; }
-    .navbar a { color: #ffffff; text-decoration: none; margin: 0 1rem; font-size: 0.95rem; }
-    .navbar a:hover { color: #d4af37; }
-    .navbar button { background: #d4af37; color: #0d0d0d; font-weight: 700; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; cursor: pointer; }
-  `]
+    <header id="navbar">
+      <nav className="main-nav">
+        <a routerLink="/" className="logo">
+          <span style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 400; color: #e2c99b; letter-spacing: 1px;">
+            Palacio del Mar
+          </span>
+        </a>
+
+        <div className="nav-links">
+          <button className="nav-link-btn" (click)="scrollTo('#rooms')">Suites</button>
+          <button className="nav-link-btn" (click)="scrollTo('#experiences')">Experiencias</button>
+          <button className="nav-link-btn" (click)="scrollTo('#dining')">Gastronomía</button>
+          <button className="nav-link-btn" (click)="scrollTo('#spa')">Spa</button>
+          <button className="nav-link-btn" (click)="scrollTo('#location')">Ubicación</button>
+        </div>
+
+        <div className="nav-right">
+          <ng-container *ngIf="auth.currentUser$ | async as user; else notLogged">
+            <div className="nav-user-menu" style="display: flex; align-items: center; gap: 10px;">
+              <a routerLink="/mis-reservas" className="btn-outline nav-user-btn" style="padding: 6px 14px; text-decoration: none;">
+                Hola, {{ user.name ? user.name.split(' ')[0] : 'Huésped' }}
+              </a>
+              <a *ngIf="user.role === 'ADMIN' || user.role === 'admin'" routerLink="/admin" className="btn-outline" style="padding: 6px 14px; text-decoration: none;">
+                Admin
+              </a>
+              <button className="link-btn" (click)="auth.logout()" style="background: none; border: none; color: #c9a96e; cursor: pointer;">
+                Salir
+              </button>
+            </div>
+          </ng-container>
+          <ng-template #notLogged>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <button className="link-btn" (click)="openAuth('login')" style="background: none; border: none; color: #f5f0e8; cursor: pointer; font-size: 0.85rem;">
+                Iniciar sesión
+              </button>
+              <button className="btn-outline" (click)="openAuth('register')" style="padding: 6px 16px; cursor: pointer;">
+                Regístrate
+              </button>
+            </div>
+          </ng-template>
+        </div>
+      </nav>
+    </header>
+
+    <app-auth-modal [isOpen]="authModalOpen" [initialMode]="authMode" (closeEvent)="authModalOpen = false"></app-auth-modal>
+  `
 })
 export class NavbarComponent {
   authModalOpen = false;
+  authMode: 'login' | 'register' = 'login';
 
-  constructor(public auth: AuthService) {}
+  constructor(public auth: AuthService, private router: Router) {}
+
+  openAuth(mode: 'login' | 'register'): void {
+    this.authMode = mode;
+    this.authModalOpen = true;
+  }
+
+  scrollTo(hash: string): void {
+    if (this.router.url !== '/') {
+      this.router.navigate(['/']).then(() => {
+        setTimeout(() => {
+          document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      });
+      return;
+    }
+    document.querySelector(hash)?.scrollIntoView({ behavior: 'smooth' });
+  }
 }

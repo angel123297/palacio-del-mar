@@ -1,15 +1,63 @@
 import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-footer',
   standalone: true,
+  imports: [CommonModule],
   template: `
-    <footer class="footer">
-      <p>&copy; 2026 Palacio del Mar. Todos los derechos reservados.</p>
+    <footer>
+      <div className="footer-top">
+        <div className="footer-col">
+          <p className="footer-logo">Palacio del Mar</p>
+          <p className="footer-desc">
+            Hotel boutique de lujo en el centro histórico amurallado de Cartagena de Indias.
+          </p>
+          <div className="footer-awards">
+            <span className="footer-award">🏆 Travellers' Choice 2026</span>
+            <span className="footer-award">⭐ 9.8 Booking.com</span>
+          </div>
+        </div>
+
+        <div className="footer-col">
+          <h4>Explorar</h4>
+          <ul>
+            <li (click)="scrollTo('#rooms')">Suites</li>
+            <li (click)="scrollTo('#experiences')">Experiencias</li>
+            <li (click)="scrollTo('#dining')">Gastronomía</li>
+            <li (click)="scrollTo('#spa')">Spa</li>
+            <li (click)="scrollTo('#faq')">Preguntas frecuentes</li>
+          </ul>
+        </div>
+
+        <div className="footer-col">
+          <h4>Contacto VIP</h4>
+          <ul>
+            <li><a href="mailto:reservas@palaciomar.co" style="color: inherit; text-decoration: none;">reservas&#64;palaciomar.co</a></li>
+            <li><a href="https://wa.me/573009876543" target="_blank" rel="noreferrer" style="color: inherit; text-decoration: none;">+57 300 987 6543</a></li>
+            <li>Calle del Santísimo # 8-12, Centro Histórico</li>
+          </ul>
+        </div>
+
+        <div className="footer-col">
+          <h4>Síguenos</h4>
+          <div className="social-links">
+            <a href="https://instagram.com" target="_blank" rel="noreferrer">Instagram</a>
+            <a href="https://facebook.com" target="_blank" rel="noreferrer">Facebook</a>
+          </div>
+        </div>
+      </div>
+
+      <div className="footer-bottom">
+        <p>© {{ currentYear }} Palacio del Mar · Todos los derechos reservados.</p>
+      </div>
     </footer>
-  `,
-  styles: [`
-    .footer { text-align: center; padding: 2rem; background: #0d0d0d; color: #d4af37; border-top: 1px solid #d4af37; }
-  `]
+  `
 })
-export class FooterComponent {}
+export class FooterComponent {
+  currentYear = new Date().getFullYear();
+
+  scrollTo(selector: string): void {
+    document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth' });
+  }
+}
