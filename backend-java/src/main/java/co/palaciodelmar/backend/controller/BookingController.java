@@ -48,14 +48,20 @@ public class BookingController {
     }
 
     @GetMapping("/code/{bookingCode}")
-    public ResponseEntity<ApiResponse<BookingDTO>> getBookingByCode(@PathVariable String bookingCode) {
-        BookingDTO booking = bookingService.getBookingByCode(bookingCode);
+    public ResponseEntity<ApiResponse<BookingDTO>> getBookingByCode(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String bookingCode
+    ) {
+        BookingDTO booking = bookingService.getBookingByCodeSecure(bookingCode, principal != null ? principal.getUser() : null);
         return ResponseEntity.ok(ApiResponse.ok(booking));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<BookingDTO>> getBookingById(@PathVariable String id) {
-        BookingDTO booking = bookingService.getBookingById(id);
+    public ResponseEntity<ApiResponse<BookingDTO>> getBookingById(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String id
+    ) {
+        BookingDTO booking = bookingService.getBookingByIdSecure(id, principal != null ? principal.getUser() : null);
         return ResponseEntity.ok(ApiResponse.ok(booking));
     }
 
@@ -91,8 +97,11 @@ public class BookingController {
     }
 
     @GetMapping("/{id}/voucher")
-    public ResponseEntity<ApiResponse<BookingDTO>> getVoucher(@PathVariable String id) {
-        BookingDTO booking = bookingService.getBookingById(id);
+    public ResponseEntity<ApiResponse<BookingDTO>> getVoucher(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String id
+    ) {
+        BookingDTO booking = bookingService.getBookingByIdSecure(id, principal != null ? principal.getUser() : null);
         return ResponseEntity.ok(ApiResponse.ok("Comprobante de reserva generado", booking));
     }
 

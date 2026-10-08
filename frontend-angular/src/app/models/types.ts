@@ -1,50 +1,95 @@
 export interface Branch {
-  id: string;
+  id?: string;
+  _id?: string;
   name: string;
   slug: string;
-  location: string;
+  zone?: string;
+  address?: string;
+  description?: string;
+  location?: any;
 }
 
 export interface Suite {
-  id: string;
+  id?: string;
+  _id?: string;
   name: string;
-  slug: string;
-  description: string;
-  pricePerNight: number;
-  capacity: number;
-  amenities: string[];
-  branchId: string;
+  slug?: string;
+  type?: string;
+  description?: string;
+  basePrice?: number;
+  pricePerNight?: number;
+  seasonalPrice?: number;
+  totalPrice?: number;
+  maxGuests?: number;
+  size?: number;
+  amenities?: string[];
+  features?: string[];
+  branchId?: string;
   branch?: Branch;
-  images: string[];
+  mainImage?: string;
+  images?: string[];
+  available?: boolean;
+  isAvailable?: boolean;
 }
 
 export interface Experience {
-  id: string;
-  title: string;
-  description: string;
+  id?: string;
+  _id?: string;
+  name: string;
+  title?: string;
+  description?: string;
+  shortDescription?: string;
   price: number;
-  imageUrl: string;
+  mainImage?: string;
+  image?: string;
+  imageUrl?: string;
+  icon?: string;
+  durationHours?: number;
+  category?: string;
 }
 
 export interface User {
-  id: string;
+  id?: string;
+  _id?: string;
   email: string;
   name: string;
+  phone?: string;
   role: string;
 }
 
 export interface AuthResponse {
   token: string;
   user: User;
+  data?: {
+    token: string;
+    user: User;
+  };
 }
 
 export interface Booking {
-  id: string;
-  userId: string;
-  suiteId: string;
+  id?: string;
+  _id?: string;
+  user?: User | string;
+  userId?: string;
+  suite?: Suite;
+  suiteId?: string;
+  branch?: Branch;
   checkIn: string;
   checkOut: string;
+  nights?: number;
+  guests?: number;
+  children?: number;
   totalPrice: number;
+  paidAmount?: number;
+  refundedAmount?: number;
+  balanceDue?: number;
   status: string;
-  suite?: Suite;
+  paymentStatus?: string;
+  bookingCode?: string;
+  isModifiable?: boolean;
+  isCancelable?: boolean;
+  experiences?: Experience[];
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
 }

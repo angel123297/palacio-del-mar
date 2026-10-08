@@ -13,7 +13,11 @@ export class AuthService {
   constructor(private http: HttpClient) {
     const user = localStorage.getItem('user');
     if (user) {
-      this.currentUserSubject.next(JSON.parse(user));
+      try {
+        this.currentUserSubject.next(JSON.parse(user));
+      } catch (e) {
+        localStorage.removeItem('user');
+      }
     }
   }
 
@@ -22,11 +26,29 @@ export class AuthService {
   }
 
   login(credentials: any) {
-    return this.http.post<AuthResponse>(`\${this.apiUrl}/login`, credentials).pipe(
+    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(
       tap(res => {
-        localStorage.setItem('token', res.token);
-        localStorage.setItem('user', JSON.stringify(res.user));
-        this.currentUserSubject.next(res.user);
+        const token = res.token || (res as any).data?.token;
+        const user = res.user || (res as any).data?.user;
+        if (token) localStorage.setItem('token', token);
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+          this.currentUserSubject.next(user);
+        }
+      })
+    );
+  }
+
+  register(data: any) {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data).pipe(
+      tap(res => {
+        const token = res.token || (res as any).data?.token;
+        const user = res.user || (res as any).data?.user;
+        if (token) localStorage.setItem('token', token);
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+          this.currentUserSubject.next(user);
+        }
       })
     );
   }
