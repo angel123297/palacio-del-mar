@@ -1,16 +1,20 @@
 import { Component } from '@angular/core';
+import { NavbarComponent } from '../../components/navbar/navbar.component';
 import { HeroComponent } from '../../components/hero/hero.component';
+import { RoomsSectionComponent } from '../../components/rooms-section/rooms-section.component';
+import { ExperiencesSectionComponent } from '../../components/experiences-section/experiences-section.component';
+import { FooterComponent } from '../../components/footer/footer.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [HeroComponent],
+  imports: [NavbarComponent, HeroComponent, RoomsSectionComponent, ExperiencesSectionComponent, FooterComponent],
   template: `
+    <app-navbar></app-navbar>
     <app-hero></app-hero>
-    <div class="container" style="padding: 2rem;">
-      <h2 style="color: #d4af37">Nuestras Sucursales</h2>
-      <p style="color: white">Cartagena, Getsemaní, Bocagrande, La Boquilla</p>
-    </div>
+    <app-rooms-section></app-rooms-section>
+    <app-experiences-section></app-experiences-section>
+    <app-footer></app-footer>
   `
 })
 export class HomeComponent {}

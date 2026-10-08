@@ -44,6 +44,12 @@ public class BookingService {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
         }
 
+        List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDateBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
+        int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
+        if (occupiedNights.size() >= totalCapacity) {
+            throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
+        }
+
         BigDecimal pricePerNight = suite.getBasePrice();
         BigDecimal totalRoomPrice = pricePerNight.multiply(BigDecimal.valueOf(nights));
 
