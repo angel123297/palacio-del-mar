@@ -1,9 +1,76 @@
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { Suite, Branch } from '../../models/types';
 import { BookingModalComponent } from '../booking-modal/booking-modal.component';
+
+const FALLBACK_SUITES: Suite[] = [
+  {
+    id: 's-1',
+    _id: 's-1',
+    name: 'Superior Patio Colonial',
+    slug: 'superior-patio-centro',
+    type: 'Habitación',
+    description: 'Acogedora habitación con jardín colonial privado, ideal para una estancia relajante.',
+    basePrice: 860000,
+    originalPrice: 1050000,
+    mainImage: 'https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80',
+    amenities: ['Jardín privado', 'Aire acondicionado', 'Minibar'],
+    size: 42,
+    maxGuests: 2,
+    featured: false,
+    branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico' }
+  },
+  {
+    id: 's-2',
+    _id: 's-2',
+    name: 'Suite Colonial Imperial',
+    slug: 'suite-colonial-centro',
+    type: 'Suite Deluxe',
+    description: 'Suite histórica con patio colonial, arcos originales y tina hidromasaje.',
+    basePrice: 1310000,
+    originalPrice: 1650000,
+    mainImage: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80',
+    amenities: ['Patio colonial', 'Tina hidromasaje', 'Balcón'],
+    size: 65,
+    maxGuests: 2,
+    featured: true,
+    branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico' }
+  },
+  {
+    id: 's-3',
+    _id: 's-3',
+    name: 'Suite Vista Murallas',
+    slug: 'suite-vista-murallas-centro',
+    type: 'Suite Premium',
+    description: 'Espaciosa suite con vista privilegiada a las murallas coloniales y jacuzzi privado.',
+    basePrice: 1720000,
+    originalPrice: 2150000,
+    mainImage: 'https://images.unsplash.com/photo-1591088398332-8a7791972843?w=800&auto=format&fit=crop&q=80',
+    amenities: ['Vista a murallas', 'Jacuzzi', 'Balcón privado'],
+    size: 85,
+    maxGuests: 2,
+    featured: true,
+    branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico' }
+  },
+  {
+    id: 's-4',
+    _id: 's-4',
+    name: 'Gran Suite Presidencial',
+    slug: 'suite-presidencial-centro',
+    type: 'Suite Presidencial',
+    description: 'La máxima expresión de lujo colonial. Terraza privada de 80 m² con jacuzzi y servicio de mayordomo.',
+    basePrice: 2780000,
+    originalPrice: 3440000,
+    mainImage: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80',
+    amenities: ['Terraza privada', 'Jacuzzi', 'Mayordomo 24/7'],
+    size: 180,
+    maxGuests: 4,
+    featured: true,
+    branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico' }
+  }
+];
 
 @Component({
   selector: 'app-rooms-section',
@@ -151,10 +218,13 @@ export class RoomsSectionComponent implements OnInit {
 
     this.api.get<any>('/suites').subscribe({
       next: (res) => {
-        this.suites = res.data || res;
+        const raw = res.data || res;
+        const list = Array.isArray(raw) ? raw : (raw.suites || []);
+        this.suites = list.length > 0 ? list : FALLBACK_SUITES;
         this.loading = false;
       },
       error: () => {
+        this.suites = FALLBACK_SUITES;
         this.loading = false;
       }
     });
