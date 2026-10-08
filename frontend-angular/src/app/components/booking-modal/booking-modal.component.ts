@@ -11,8 +11,8 @@ import { Suite } from '../../models/types';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div className="modal-backdrop" *ngIf="isOpen" (click)="close()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
-      <div className="modal-content" (click)="$event.stopPropagation()" style="background: var(--dark); border: 1px solid var(--gold); border-radius: 12px; max-width: 550px; width: 100%; padding: 2rem; color: var(--cream); position: relative; max-height: 90vh; overflow-y: auto;">
+    <div class="modal-backdrop" *ngIf="isOpen" (click)="close()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
+      <div class="modal-content" (click)="$event.stopPropagation()" style="background: var(--dark); border: 1px solid var(--gold); border-radius: 12px; max-width: 550px; width: 100%; padding: 2rem; color: var(--cream); position: relative; max-height: 90vh; overflow-y: auto;">
         
         <button (click)="close()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; color: #aaaaaa; font-size: 1.5rem; cursor: pointer;">×</button>
 
@@ -21,10 +21,10 @@ import { Suite } from '../../models/types';
           <h2 style="margin: 4px 0 1rem 0; font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; color: #ffffff;">{{ suite.name }}</h2>
 
           <div style="display: flex; gap: 8px; margin-bottom: 1.5rem;">
-            <span className="chip" style="background: rgba(212,175,55,0.1); color: var(--gold); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">
+            <span class="chip" style="background: rgba(212,175,55,0.1); color: var(--gold); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">
               {{ suite.type }}
             </span>
-            <span className="chip" style="background: rgba(255,255,255,0.05); color: #ccc; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">
+            <span class="chip" style="background: rgba(255,255,255,0.05); color: #ccc; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">
               Hasta {{ suite.maxGuests || 2 }} huéspedes
             </span>
           </div>
@@ -32,17 +32,17 @@ import { Suite } from '../../models/types';
           <form (ngSubmit)="confirmBooking()" style="display: flex; flex-direction: column; gap: 1rem;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div>
-                <label className="field-label">Fecha de Llegada</label>
+                <label class="field-label">Fecha de Llegada</label>
                 <input type="date" [(ngModel)]="checkIn" name="checkIn" required (change)="recalculateNights()" style="width: 100%;" />
               </div>
               <div>
-                <label className="field-label">Fecha de Salida</label>
+                <label class="field-label">Fecha de Salida</label>
                 <input type="date" [(ngModel)]="checkOut" name="checkOut" required (change)="recalculateNights()" style="width: 100%;" />
               </div>
             </div>
 
             <div>
-              <label className="field-label">Huéspedes</label>
+              <label class="field-label">Huéspedes</label>
               <select [(ngModel)]="guests" name="guests" style="width: 100%;">
                 <option [ngValue]="1">1 Huésped</option>
                 <option [ngValue]="2">2 Huéspedes</option>
@@ -52,17 +52,17 @@ import { Suite } from '../../models/types';
             </div>
 
             <div>
-              <label className="field-label">Nombre Completo</label>
+              <label class="field-label">Nombre Completo</label>
               <input type="text" [(ngModel)]="guestName" name="guestName" required placeholder="Ej: Alejandro Silva" style="width: 100%;" />
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div>
-                <label className="field-label">Correo Electrónico</label>
+                <label class="field-label">Correo Electrónico</label>
                 <input type="email" [(ngModel)]="guestEmail" name="guestEmail" required placeholder="ejemplo@correo.com" style="width: 100%;" />
               </div>
               <div>
-                <label className="field-label">Teléfono</label>
+                <label class="field-label">Teléfono</label>
                 <input type="tel" [(ngModel)]="guestPhone" name="guestPhone" placeholder="+57 300..." style="width: 100%;" />
               </div>
             </div>
@@ -83,7 +83,7 @@ import { Suite } from '../../models/types';
               </div>
             </div>
 
-            <button type="submit" className="btn-primary" [disabled]="submitting" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 1rem;">
+            <button type="submit" class="btn-primary" [disabled]="submitting" style="width: 100%; padding: 12px; margin-top: 8px; font-size: 1rem;">
               {{ submitting ? 'Procesando reserva…' : 'Confirmar Reserva' }}
             </button>
 

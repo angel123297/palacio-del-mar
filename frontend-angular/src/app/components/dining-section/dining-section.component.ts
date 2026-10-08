@@ -7,17 +7,17 @@ import { CommonModule } from '@angular/common';
   imports: [CommonModule],
   template: `
     <section id="dining">
-      <div className="dining-content">
-        <p className="sec-label">Gastronomía</p>
-        <h2 className="sec-title">Gastronomía de autor</h2>
+      <div class="dining-content">
+        <p class="sec-label">Gastronomía</p>
+        <h2 class="sec-title">Gastronomía de autor</h2>
         <p>
           Nuestro chef ejecutivo reinterpreta la cocina caribeña con producto local: pesca del
           día, coco, plátano y especias del Caribe colombiano, servidos en el patio central bajo
           las estrellas.
         </p>
-        <div className="dining-items">
-          <div className="dining-item" *ngFor="let d of dishes">
-            <span className="dining-num">{{ d.num }}</span>
+        <div class="dining-items">
+          <div class="dining-item" *ngFor="let d of dishes">
+            <span class="dining-num">{{ d.num }}</span>
             <div>
               <strong>{{ d.name }} <span style="color: var(--gold); margin-left: 8px; font-size: 0.9rem;">{{ d.price }}</span></strong>
               <p>{{ d.desc }}</p>
@@ -26,7 +26,7 @@ import { CommonModule } from '@angular/common';
         </div>
         <button
           type="button"
-          className="btn-outline"
+          class="btn-outline"
           style="margin-top: 1.5rem;"
           (click)="showMenu = true"
         >
@@ -34,7 +34,7 @@ import { CommonModule } from '@angular/common';
         </button>
       </div>
 
-      <div className="dining-img">
+      <div class="dining-img">
         <img
           src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&auto=format&fit=crop&q=80"
           alt="Restaurante de Palacio del Mar"
@@ -42,8 +42,8 @@ import { CommonModule } from '@angular/common';
         />
       </div>
 
-      <div className="modal-backdrop" *ngIf="showMenu" (click)="showMenu = false" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center;">
-        <div className="modal-content" (click)="$event.stopPropagation()" style="background: var(--dark); border: 1px solid var(--gold); max-width: 650px; padding: 2rem; border-radius: 8px; width: 90%;">
+      <div class="modal-backdrop" *ngIf="showMenu" (click)="showMenu = false" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <div class="modal-content" (click)="$event.stopPropagation()" style="background: var(--dark); border: 1px solid var(--gold); max-width: 650px; padding: 2rem; border-radius: 8px; width: 90%;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(212,175,55,0.3); padding-bottom: 1rem;">
             <h3 style="margin: 0; color: var(--gold);">🍽️ Carta del Restaurante Palacio del Mar</h3>
             <button (click)="showMenu = false" style="background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">×</button>
@@ -57,7 +57,7 @@ import { CommonModule } from '@angular/common';
             </ul>
           </div>
           <div style="text-align: center; margin-top: 1.5rem;">
-            <button className="btn-primary" (click)="showMenu = false">Cerrar Menú</button>
+            <button class="btn-primary" (click)="showMenu = false">Cerrar Menú</button>
           </div>
         </div>
       </div>

@@ -9,15 +9,15 @@ import { Experience } from '../../models/types';
   imports: [CommonModule],
   template: `
     <section id="experiences">
-      <div className="rooms-header">
-        <p className="sec-label">Vive Cartagena</p>
-        <h2 className="sec-title">Experiencias exclusivas</h2>
+      <div class="rooms-header">
+        <p class="sec-label">Vive Cartagena</p>
+        <h2 class="sec-title">Experiencias exclusivas</h2>
       </div>
 
-      <div className="filter-row" *ngIf="categories.length > 0">
+      <div class="filter-row" *ngIf="categories.length > 0">
         <button
           type="button"
-          className="filter-btn"
+          class="filter-btn"
           [class.is-active]="selectedCategory === ''"
           (click)="selectedCategory = ''"
         >
@@ -26,7 +26,7 @@ import { Experience } from '../../models/types';
         <button
           *ngFor="let cat of categories"
           type="button"
-          className="filter-btn"
+          class="filter-btn"
           [class.is-active]="selectedCategory === cat"
           (click)="selectedCategory = cat"
         >
@@ -34,23 +34,23 @@ import { Experience } from '../../models/types';
         </button>
       </div>
 
-      <div className="exp-container" style="max-width: 1200px; margin: 0 auto; position: relative;">
-        <div className="exp-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;">
-          <div className="exp-card" *ngFor="let exp of visibleExperiences">
-            <div className="exp-img-wrap">
+      <div class="exp-container" style="max-width: 1200px; margin: 0 auto; position: relative;">
+        <div class="exp-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;">
+          <div class="exp-card" *ngFor="let exp of visibleExperiences">
+            <div class="exp-img-wrap">
               <img [src]="exp.mainImage || exp.image || exp.imageUrl || 'https://images.unsplash.com/photo-1533105079780-92b9be482077?w=800'" [alt]="exp.name" loading="lazy" />
-              <span className="exp-badge" *ngIf="exp.category">{{ exp.category }}</span>
+              <span class="exp-badge" *ngIf="exp.category">{{ exp.category }}</span>
             </div>
-            <div className="exp-content">
-              <span className="exp-icon">{{ exp.icon || '✨' }}</span>
+            <div class="exp-content">
+              <span class="exp-icon">{{ exp.icon || '✨' }}</span>
               <h3>{{ exp.name || exp.title }}</h3>
               <p>{{ exp.shortDescription || exp.description }}</p>
-              <div className="exp-price-row">
-                <span className="exp-price">$ {{ exp.price | number:'1.0-0' }}</span>
-                <span className="chip" *ngIf="exp.durationHours">{{ exp.durationHours }}h</span>
+              <div class="exp-price-row">
+                <span class="exp-price">$ {{ exp.price | number:'1.0-0' }}</span>
+                <span class="chip" *ngIf="exp.durationHours">{{ exp.durationHours }}h</span>
               </div>
               <button 
-                className="exp-btn" 
+                class="exp-btn" 
                 [class.exp-btn-added]="isAdded(exp)"
                 (click)="toggleExperience(exp)"
               >
