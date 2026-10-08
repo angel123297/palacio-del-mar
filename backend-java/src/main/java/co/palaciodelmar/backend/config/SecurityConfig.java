@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/availability/**").permitAll()
                         .requestMatchers("/api/chat/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/config").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/bookings").permitAll()
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "HOST")
                         .anyRequest().authenticated()
                 )

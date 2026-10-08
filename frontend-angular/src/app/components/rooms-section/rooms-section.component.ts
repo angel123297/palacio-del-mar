@@ -7,10 +7,10 @@ import { BookingModalComponent } from '../booking-modal/booking-modal.component'
 
 const FALLBACK_SUITES: Suite[] = [
   {
-    id: 's-1',
-    _id: 's-1',
+    id: 'superior-patio-centro-historico',
+    _id: 'superior-patio-centro-historico',
     name: 'Superior Patio Colonial',
-    slug: 'superior-patio-centro',
+    slug: 'superior-patio-centro-historico',
     type: 'Habitación',
     description: 'Acogedora habitación con jardín colonial privado, ideal para una estancia relajante.',
     basePrice: 860000,
@@ -23,10 +23,10 @@ const FALLBACK_SUITES: Suite[] = [
     branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico' }
   },
   {
-    id: 's-2',
-    _id: 's-2',
+    id: 'suite-colonial-centro-historico',
+    _id: 'suite-colonial-centro-historico',
     name: 'Suite Colonial Imperial',
-    slug: 'suite-colonial-centro',
+    slug: 'suite-colonial-centro-historico',
     type: 'Suite Deluxe',
     description: 'Suite histórica con patio colonial, arcos originales y tina hidromasaje.',
     basePrice: 1310000,
@@ -39,34 +39,34 @@ const FALLBACK_SUITES: Suite[] = [
     branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico' }
   },
   {
-    id: 's-3',
-    _id: 's-3',
-    name: 'Suite Vista Murallas',
-    slug: 'suite-vista-murallas-centro',
+    id: 'suite-bahia-centro-historico',
+    _id: 'suite-bahia-centro-historico',
+    name: 'Suite Bahía',
+    slug: 'suite-bahia-centro-historico',
     type: 'Suite Premium',
-    description: 'Espaciosa suite con vista privilegiada a las murallas coloniales y jacuzzi privado.',
+    description: 'Espaciosa suite con vista privilegiada a la bahía y jacuzzi privado.',
     basePrice: 1720000,
     originalPrice: 2150000,
     mainImage: 'https://images.unsplash.com/photo-1591088398332-8a7791972843?w=800&auto=format&fit=crop&q=80',
-    amenities: ['Vista a murallas', 'Jacuzzi', 'Balcón privado'],
+    amenities: ['Vista a la bahía', 'Jacuzzi', 'Balcón privado'],
     size: 85,
     maxGuests: 2,
     featured: true,
     branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico' }
   },
   {
-    id: 's-4',
-    _id: 's-4',
-    name: 'Gran Suite Presidencial',
-    slug: 'suite-presidencial-centro',
+    id: 'penthouse-muralla-centro-historico',
+    _id: 'penthouse-muralla-centro-historico',
+    name: 'Penthouse Muralla',
+    slug: 'penthouse-muralla-centro-historico',
     type: 'Suite Presidencial',
     description: 'La máxima expresión de lujo colonial. Terraza privada de 80 m² con jacuzzi y servicio de mayordomo.',
-    basePrice: 2780000,
-    originalPrice: 3440000,
+    basePrice: 3640000,
+    originalPrice: 4200000,
     mainImage: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80',
     amenities: ['Terraza privada', 'Jacuzzi', 'Mayordomo 24/7'],
     size: 180,
-    maxGuests: 4,
+    maxGuests: 6,
     featured: true,
     branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico' }
   }
@@ -187,12 +187,12 @@ const FALLBACK_SUITES: Suite[] = [
   `
 })
 export class RoomsSectionComponent implements OnInit {
-  suites: Suite[] = [];
+  suites: Suite[] = FALLBACK_SUITES;
   branches: Branch[] = [];
   types: any[] = [];
   selectedBranch: string = '';
   selectedType: string = '';
-  loading = true;
+  loading = false;
 
   bookingModalOpen = false;
   selectedSuiteForBooking: Suite | null = null;

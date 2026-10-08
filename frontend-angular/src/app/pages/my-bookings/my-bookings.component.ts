@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Booking } from '../../models/types';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-my-bookings',
@@ -50,22 +51,32 @@ export class MyBookingsComponent implements OnInit {
   bookings: Booking[] = [];
   loading = true;
 
-  constructor(private api: ApiService, private auth: AuthService) {}
+  constructor(
+    private api: ApiService,
+    private auth: AuthService,
+    private cdr: ChangeDetectorRef
+  ) {}
 
   ngOnInit(): void {
     if (!this.auth.getToken()) {
       this.loading = false;
+      this.cdr.detectChanges();
       return;
     }
 
-    this.api.get<any>('/bookings').subscribe({
+    this.api.get<any>('/bookings').pipe(
+      finalize(() => {
+        this.loading = false;
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
       next: (res) => {
         const raw = res.data || res;
         this.bookings = Array.isArray(raw) ? raw : (raw.bookings || []);
-        this.loading = false;
+        this.cdr.detectChanges();
       },
       error: () => {
-        this.loading = false;
+        this.cdr.detectChanges();
       }
     });
   }
