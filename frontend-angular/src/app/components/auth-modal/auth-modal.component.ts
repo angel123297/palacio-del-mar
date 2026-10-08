@@ -159,6 +159,12 @@ export class AuthModalComponent {
 
   close(): void {
     this.isOpen = false;
+    this.message = '';
+    this.email = '';
+    this.password = '';
+    this.confirmPassword = '';
+    this.name = '';
+    this.phone = '';
     this.closeEvent.emit();
   }
 
@@ -166,7 +172,12 @@ export class AuthModalComponent {
     this.busy = true;
     this.message = '';
 
-    this.auth.login({ email: this.email, password: this.password }).subscribe({
+    const payload = {
+      email: (this.email || '').trim(),
+      password: this.password
+    };
+
+    this.auth.login(payload).subscribe({
       next: () => {
         this.busy = false;
         this.close();
@@ -191,7 +202,14 @@ export class AuthModalComponent {
     this.busy = true;
     this.message = '';
 
-    this.auth.register({ email: this.email, password: this.password, name: this.name, phone: this.phone }).subscribe({
+    const payload = {
+      email: (this.email || '').trim(),
+      password: this.password,
+      name: (this.name || '').trim(),
+      phone: (this.phone || '').trim()
+    };
+
+    this.auth.register(payload).subscribe({
       next: () => {
         this.busy = false;
         this.close();
