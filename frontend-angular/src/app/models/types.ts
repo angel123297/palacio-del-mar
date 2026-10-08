@@ -4,8 +4,11 @@ export interface Branch {
   name: string;
   slug: string;
   zone?: string;
+  tagline?: string;
   address?: string;
   description?: string;
+  mainImage?: string;
+  vibe?: string[];
   location?: any;
 }
 

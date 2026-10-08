@@ -34,7 +34,9 @@ public class SuiteService {
 
     public List<SuiteResponseDTO> getAllActiveSuites(String branchFilter) {
         Map<String, Branch> branchMap = getBranchMap();
-        List<Suite> suites = suiteRepository.findByActiveTrue();
+        List<Suite> suites = suiteRepository.findAll().stream()
+                .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+                .toList();
 
         if (branchFilter != null && !branchFilter.isBlank()) {
             String lower = branchFilter.trim().toLowerCase();
@@ -60,7 +62,8 @@ public class SuiteService {
                 .orElse(null);
         String targetId = branch != null ? branch.getId() : branchId;
 
-        return suiteRepository.findByBranchAndActiveTrue(targetId).stream()
+        return suiteRepository.findAll().stream()
+                .filter(s -> targetId.equals(s.getBranch()) && !Boolean.FALSE.equals(s.getActive()))
                 .map(s -> SuiteResponseDTO.from(s, branch))
                 .collect(Collectors.toList());
     }

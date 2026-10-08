@@ -26,10 +26,11 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        Branch b1, b2, b3, b4;
         if (branchRepository.count() == 0) {
 
             // 1. Branches with location coordinates
-            Branch b1 = branchRepository.save(Branch.builder()
+            b1 = branchRepository.save(Branch.builder()
                     .name("Palacio del Mar · Centro Histórico")
                     .slug("centro-historico")
                     .zone("Centro Histórico")
@@ -47,7 +48,7 @@ public class DataInitializer implements CommandLineRunner {
                     .order(1)
                     .build());
 
-            Branch b2 = branchRepository.save(Branch.builder()
+            b2 = branchRepository.save(Branch.builder()
                     .name("Palacio del Mar · Getsemaní")
                     .slug("getsemani")
                     .zone("Getsemaní")
@@ -65,7 +66,7 @@ public class DataInitializer implements CommandLineRunner {
                     .order(2)
                     .build());
 
-            Branch b3 = branchRepository.save(Branch.builder()
+            b3 = branchRepository.save(Branch.builder()
                     .name("Palacio del Mar · Bocagrande")
                     .slug("bocagrande")
                     .zone("Bocagrande")
@@ -83,7 +84,7 @@ public class DataInitializer implements CommandLineRunner {
                     .order(3)
                     .build());
 
-            Branch b4 = branchRepository.save(Branch.builder()
+            b4 = branchRepository.save(Branch.builder()
                     .name("Palacio del Mar · La Boquilla")
                     .slug("la-boquilla")
                     .zone("La Boquilla")
@@ -100,8 +101,15 @@ public class DataInitializer implements CommandLineRunner {
                     .active(true)
                     .order(4)
                     .build());
+        } else {
+            List<Branch> branches = branchRepository.findAll();
+            b1 = branches.size() > 0 ? branches.get(0) : null;
+            b2 = branches.size() > 1 ? branches.get(1) : b1;
+            b3 = branches.size() > 2 ? branches.get(2) : b1;
+            b4 = branches.size() > 3 ? branches.get(3) : b1;
+        }
 
-            // 2. Suites for Centro Histórico (b1)
+        if (suiteRepository.count() == 0 && b1 != null) {
             suiteRepository.save(Suite.builder()
                     .branch(b1.getId())
                     .name("Superior Patio Colonial")
@@ -443,7 +451,9 @@ public class DataInitializer implements CommandLineRunner {
                     .featured(true)
                     .order(3)
                     .build());
+        }
 
+        if (experienceRepository.count() == 0) {
             // 6. Experiences
             experienceRepository.save(Experience.builder()
                     .name("Islas del Rosario")
