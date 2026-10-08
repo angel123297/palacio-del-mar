@@ -34,7 +34,7 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
               <a *ngIf="user.role === 'ADMIN' || user.role === 'admin'" routerLink="/admin" class="btn-outline" style="padding: 6px 14px; text-decoration: none;">
                 Admin
               </a>
-              <button class="link-btn" (click)="auth.logout()" style="background: none; border: none; color: #c9a96e; cursor: pointer;">
+              <button class="link-btn" (click)="logout()" style="background: none; border: none; color: #c9a96e; cursor: pointer;">
                 Salir
               </button>
             </div>
@@ -65,6 +65,11 @@ export class NavbarComponent {
   openAuth(mode: 'login' | 'register'): void {
     this.authMode = mode;
     this.authModalOpen = true;
+  }
+
+  logout(): void {
+    this.auth.logout();
+    this.router.navigate(['/']);
   }
 
   scrollTo(hash: string): void {

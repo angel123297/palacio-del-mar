@@ -38,8 +38,20 @@ public class BookingService {
     private final UserRepository userRepository;
 
     public BookingDTO createBooking(String userId, BookingRequest request) {
+        if (request.getSuiteId() == null || request.getSuiteId().isBlank()
+                || request.getCheckIn() == null || request.getCheckOut() == null) {
+            throw new IllegalArgumentException("Por favor completa la habitación y las fechas de la reserva");
+        }
         if (userId == null || userId.isBlank()) {
-            String email = request.getGuestEmail() != null ? request.getGuestEmail().toLowerCase().trim() : "invitado@palaciodelmar.co";
+            String rawEmail = request.getGuestEmail() == null ? "" : request.getGuestEmail().trim();
+            String rawName = request.getGuestName() == null ? "" : request.getGuestName().trim();
+            if (rawName.isEmpty() || rawEmail.isEmpty()) {
+                throw new IllegalArgumentException("Por favor completa tu nombre y correo electrónico");
+            }
+            if (!rawEmail.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+                throw new IllegalArgumentException("Ingresa un correo electrónico válido");
+            }
+            String email = rawEmail.toLowerCase();
             User guest = userRepository.findByEmail(email).orElseGet(() -> {
                 User u = User.builder()
                         .name(request.getGuestName() != null ? request.getGuestName() : "Huésped")
@@ -58,7 +70,12 @@ public class BookingService {
 
         Suite suite = suiteRepository.findById(request.getSuiteId())
                 .or(() -> suiteRepository.findBySlug(request.getSuiteId().toLowerCase()))
-                .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: " + request.getSuiteId()));
+                .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: esta habitación no existe o ya no está disponible"));
+
+        int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
+        if (request.getGuests() != null && (request.getGuests() < 1 || request.getGuests() > maxGuests)) {
+            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
+        }
 
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
         if (nights <= 0) {
