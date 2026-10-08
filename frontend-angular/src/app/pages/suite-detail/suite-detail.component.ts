@@ -12,8 +12,14 @@ import { Suite } from '../../models/types';
   imports: [CommonModule, RouterModule, FormsModule],
   template: `
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 2rem 1.5rem; max-width: 1100px; margin: 0 auto;">
-      <div *ngIf="loading" style="text-align: center; color: var(--gold); padding: 4rem;">
-        Cargando detalles de la suite…
+      <div *ngIf="loading" class="luxury-loader-container">
+        <div class="luxury-spinner"></div>
+        <p class="luxury-loader-text">Cargando...</p>
+      </div>
+
+      <div *ngIf="!loading && !suite" style="text-align: center; color: #ff4d4d; padding: 4rem;">
+        <h3>La suite que buscas no existe o no está disponible.</h3>
+        <a routerLink="/" style="color: var(--gold); text-decoration: none; margin-top: 1rem; display: inline-block;">← Volver al inicio</a>
       </div>
 
       <div *ngIf="!loading && suite">
@@ -44,11 +50,10 @@ import { Suite } from '../../models/types';
               </div>
               <div>
                 <label style="display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 4px;">Huéspedes</label>
-                <select [(ngModel)]="guests" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.5); border: 1px solid rgba(212,175,55,0.3); color: #fff; border-radius: 6px;">
-                  <option [value]="1">1 Huésped</option>
-                  <option [value]="2">2 Huéspedes</option>
-                  <option [value]="3">3 Huéspedes</option>
-                  <option [value]="4">4 Huéspedes</option>
+                <select [(ngModel)]="guests"  style="width: 100%; padding: 10px; background: rgba(0,0,0,0.5); border: 1px solid rgba(212,175,55,0.3); color: #fff; border-radius: 6px;">
+                  <option *ngFor="let opt of guestOptions" [value]="opt" style="background-color: #141414; color: #f5e6c8;">
+                    {{ opt }} {{ opt === 1 ? 'Huésped' : 'Huéspedes' }}
+                  </option>
                 </select>
               </div>
             </div>
@@ -70,6 +75,13 @@ export class SuiteDetailComponent implements OnInit {
   checkIn = new Date().toISOString().slice(0, 10);
   checkOut = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
   guests = 2;
+
+  get guestOptions(): number[] {
+    const max = Math.max(1, this.suite?.maxGuests || (this.suite as any)?.capacity || 2);
+    const opts = [];
+    for (let i = 1; i <= max; i++) opts.push(i);
+    return opts;
+  }
   message = '';
   isError = false;
 
@@ -101,6 +113,24 @@ export class SuiteDetailComponent implements OnInit {
       return;
     }
     if (!this.suite) return;
+
+    if (!this.checkIn || !this.checkOut) {
+      this.message = 'Por favor selecciona las fechas de llegada y salida.';
+      this.isError = true;
+      return;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    if (this.checkIn < today) {
+      this.message = 'La fecha de llegada no puede ser en el pasado.';
+      this.isError = true;
+      return;
+    }
+    if (this.checkOut <= this.checkIn) {
+      this.message = 'La fecha de salida debe ser posterior a la de llegada.';
+      this.isError = true;
+      return;
+    }
+
 
     this.bookingBusy = true;
     this.message = '';

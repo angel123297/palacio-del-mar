@@ -14,8 +14,9 @@ import { finalize } from 'rxjs';
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 3rem 1.5rem; max-width: 1100px; margin: 0 auto;">
       <h1 style="font-family: var(--font-title); font-size: 2.2rem; color: var(--gold); margin-bottom: 2rem;">Mis Reservas</h1>
 
-      <div *ngIf="loading" style="text-align: center; color: var(--gold); padding: 3rem;">
-        Cargando tus reservas…
+      <div *ngIf="loading" class="luxury-loader-container">
+        <div class="luxury-spinner"></div>
+        <p class="luxury-loader-text">Cargando...</p>
       </div>
 
       <div *ngIf="!loading && bookings.length === 0" style="text-align: center; padding: 4rem 1rem; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(212,175,55,0.2);">

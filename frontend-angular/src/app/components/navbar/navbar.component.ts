@@ -69,7 +69,7 @@ export class NavbarComponent {
 
   logout(): void {
     this.auth.logout();
-    this.router.navigate(['/']);
+    window.location.href = '/';
   }
 
   scrollTo(hash: string): void {
