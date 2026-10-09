@@ -3,6 +3,7 @@ package co.palaciodelmar.backend.service;
 import co.palaciodelmar.backend.dto.AuthRequest;
 import co.palaciodelmar.backend.dto.AuthResponse;
 import co.palaciodelmar.backend.dto.RegisterRequest;
+import co.palaciodelmar.backend.dto.UserDTO;
 import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.UserRepository;
 import co.palaciodelmar.backend.security.JwtService;
@@ -28,6 +29,9 @@ public class AuthService {
         if (userRepository.existsByEmail(request.getEmail().toLowerCase())) {
             throw new IllegalArgumentException("El email ya está registrado");
         }
+        if (request.getPhone() != null && !request.getPhone().trim().isEmpty() && userRepository.existsByProfilePhone(request.getPhone())) {
+            throw new IllegalArgumentException("El número de teléfono ya está registrado");
+        }
 
         User user = User.builder()
                 .name(request.getName())
@@ -49,12 +53,9 @@ public class AuthService {
         UserPrincipal userPrincipal = new UserPrincipal(user);
         String jwtToken = jwtService.generateToken(userPrincipal);
 
-        // Hide password in response
-        user.setPassword(null);
-
         return AuthResponse.builder()
                 .token(jwtToken)
-                .user(user)
+                .user(toDTO(user))
                 .build();
     }
 
@@ -72,15 +73,13 @@ public class AuthService {
         UserPrincipal userPrincipal = new UserPrincipal(user);
         String jwtToken = jwtService.generateToken(userPrincipal);
 
-        user.setPassword(null);
-
         return AuthResponse.builder()
                 .token(jwtToken)
-                .user(user)
+                .user(toDTO(user))
                 .build();
     }
 
-    public User updateProfile(String userId, User updateRequest) {
+    public UserDTO updateProfile(String userId, User updateRequest) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
@@ -88,16 +87,22 @@ public class AuthService {
         if (updateRequest.getLastName() != null) user.setLastName(updateRequest.getLastName());
         if (updateRequest.getProfile() != null) {
             if (user.getProfile() == null) user.setProfile(new User.Profile());
-            if (updateRequest.getProfile().getPhone() != null) user.getProfile().setPhone(updateRequest.getProfile().getPhone());
+            if (updateRequest.getProfile().getPhone() != null) {
+                String newPhone = updateRequest.getProfile().getPhone();
+                if (!newPhone.trim().isEmpty() && !newPhone.equals(user.getProfile().getPhone())) {
+                    if (userRepository.existsByProfilePhone(newPhone)) {
+                        throw new IllegalArgumentException("El número de teléfono ya está registrado por otro usuario");
+                    }
+                }
+                user.getProfile().setPhone(newPhone);
+            }
             if (updateRequest.getProfile().getDocumentId() != null) user.getProfile().setDocumentId(updateRequest.getProfile().getDocumentId());
             if (updateRequest.getProfile().getDocumentType() != null) user.getProfile().setDocumentType(updateRequest.getProfile().getDocumentType());
             if (updateRequest.getProfile().getAvatar() != null) user.getProfile().setAvatar(updateRequest.getProfile().getAvatar());
             if (updateRequest.getProfile().getAddress() != null) user.getProfile().setAddress(updateRequest.getProfile().getAddress());
         }
         user.setUpdatedAt(Instant.now());
-        User saved = userRepository.save(user);
-        saved.setPassword(null);
-        return saved;
+        return toDTO(userRepository.save(user));
     }
 
     public void changePassword(String userId, String currentPassword, String newPassword) {
@@ -113,5 +118,23 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
+    }
+
+    public UserDTO toDTO(User user) {
+        if (user == null) return null;
+        return UserDTO.builder()
+                .id(user.getId())
+                ._id(user.getId())
+                .name(user.getName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .branches(user.getBranches())
+                .status(user.getStatus())
+                .emailVerified(user.getEmailVerified())
+                .profile(user.getProfile())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .build();
     }
 }

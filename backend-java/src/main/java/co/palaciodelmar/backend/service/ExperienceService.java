@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.ExperienceCategoryDTO;
+import co.palaciodelmar.backend.dto.ExperienceDTO;
 import co.palaciodelmar.backend.model.Experience;
 import co.palaciodelmar.backend.repository.ExperienceRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,12 +17,12 @@ public class ExperienceService {
 
     private final ExperienceRepository experienceRepository;
 
-    public List<Experience> getAllActiveExperiences() {
-        return experienceRepository.findByActiveTrue();
+    public List<ExperienceDTO> getAllActiveExperiences() {
+        return experienceRepository.findByActiveTrue().stream().map(this::toDTO).toList();
     }
 
-    public List<Experience> getExperiencesByBranch(String branchId) {
-        return experienceRepository.findByBranchAndActiveTrue(branchId);
+    public List<ExperienceDTO> getExperiencesByBranch(String branchId) {
+        return experienceRepository.findByBranchAndActiveTrue(branchId).stream().map(this::toDTO).toList();
     }
 
     public List<ExperienceCategoryDTO> getCategories() {
@@ -49,12 +50,28 @@ public class ExperienceService {
                 .toList();
     }
 
-    public List<Experience> getFeaturedExperiences() {
-        return experienceRepository.findByActiveTrue();
+    public List<ExperienceDTO> getFeaturedExperiences() {
+        return experienceRepository.findByActiveTrue().stream().map(this::toDTO).toList();
     }
 
-    public Experience getExperienceById(String id) {
-        return experienceRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Experiencia no encontrada con id: " + id));
+    public ExperienceDTO getExperienceById(String id) {
+        return toDTO(experienceRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Experiencia no encontrada con id: " + id)));
+    }
+
+    public ExperienceDTO toDTO(Experience experience) {
+        if (experience == null) return null;
+        return co.palaciodelmar.backend.dto.ExperienceDTO.builder()
+                .id(experience.getId())
+                .name(experience.getName())
+                .description(experience.getDescription())
+                .shortDescription(experience.getShortDescription())
+                .price(experience.getPrice())
+                .branch(experience.getBranch())
+                .category(experience.getCategory())
+                .image(experience.getImage())
+                .mainImage(experience.getMainImage())
+                .available(experience.getAvailable())
+                .build();
     }
 }

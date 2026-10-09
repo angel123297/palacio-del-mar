@@ -5,6 +5,7 @@ import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.model.SuiteNight;
 import co.palaciodelmar.backend.repository.BookingRepository;
+import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.PromotionRepository;
 import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
@@ -26,6 +27,7 @@ public class AvailabilityService {
     private final SuiteNightRepository suiteNightRepository;
     private final BookingRepository bookingRepository;
     private final PromotionRepository promotionRepository;
+    private final BranchRepository branchRepository;
 
     @Data
     @Builder
@@ -83,12 +85,17 @@ public class AvailabilityService {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
         }
 
+        String resolvedBranchId = null;
+        if (branchId != null && !branchId.isEmpty()) {
+            resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
+        }
+
         List<Suite> allSuites = suiteRepository.findByActiveTrue();
         List<SuiteAvailabilityResult> availableSuites = new ArrayList<>();
         List<SuiteAvailabilityResult> unavailableSuites = new ArrayList<>();
 
         for (Suite suite : allSuites) {
-            if (branchId != null && !branchId.isEmpty() && !branchId.equals(suite.getBranch())) {
+            if (resolvedBranchId != null && !resolvedBranchId.equals(suite.getBranch())) {
                 continue;
             }
             if (suiteType != null && !suiteType.isEmpty() && !"Todas las suites".equalsIgnoreCase(suiteType) && !suiteType.equalsIgnoreCase(suite.getType())) {
@@ -98,7 +105,7 @@ public class AvailabilityService {
                 continue;
             }
 
-            List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDateBetween(suite.getId(), checkIn, checkOut.minusDays(1));
+            List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), checkIn, checkOut.minusDays(1));
             int occupiedUnits = occupiedNights.size();
             int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
             int free = Math.max(0, totalCapacity - occupiedUnits);
@@ -135,11 +142,16 @@ public class AvailabilityService {
         LocalDate startDate = LocalDate.of(year, month, 1);
         int daysInMonth = startDate.lengthOfMonth();
 
+        String resolvedBranchId = null;
+        if (branchId != null && !branchId.isEmpty()) {
+            resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
+        }
+
         List<Suite> allSuites = suiteRepository.findByActiveTrue();
         List<Suite> filteredSuites = new ArrayList<>();
 
         for (Suite suite : allSuites) {
-            if (branchId != null && !branchId.isEmpty() && !branchId.equals(suite.getBranch())) {
+            if (resolvedBranchId != null && !resolvedBranchId.equals(suite.getBranch())) {
                 continue;
             }
             if (suiteType != null && !suiteType.isEmpty() && !"Todas las suites".equalsIgnoreCase(suiteType) && !suiteType.equalsIgnoreCase(suite.getType())) {
@@ -166,7 +178,7 @@ public class AvailabilityService {
             int totalOccupiedOnDay = 0;
 
             for (Suite s : filteredSuites) {
-                List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDateBetween(s.getId(), currentDay, currentDay);
+                List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(s.getId(), currentDay, currentDay);
                 totalOccupiedOnDay += occupied.size();
             }
 
@@ -207,8 +219,10 @@ public class AvailabilityService {
     public List<Promotion> getMonthlyPromotions(int year, int month, String branchId) {
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
+        String resolvedBranchId = null;
         if (branchId != null && !branchId.isEmpty()) {
-            return promotionRepository.findByBranchAndActiveTrue(branchId);
+            resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
+            return promotionRepository.findByBranchAndActiveTrue(resolvedBranchId);
         }
         return promotionRepository.findByActiveTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqual(endDate, startDate);
     }

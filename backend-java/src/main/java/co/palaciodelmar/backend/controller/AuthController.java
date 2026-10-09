@@ -4,6 +4,7 @@ import co.palaciodelmar.backend.dto.ApiResponse;
 import co.palaciodelmar.backend.dto.AuthRequest;
 import co.palaciodelmar.backend.dto.AuthResponse;
 import co.palaciodelmar.backend.dto.RegisterRequest;
+import co.palaciodelmar.backend.dto.UserDTO;
 import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.AuthService;
@@ -74,12 +75,12 @@ public class AuthController {
             return ResponseEntity.status(401).body(err);
         }
         User user = principal.getUser();
-        user.setPassword(null);
+        UserDTO userDTO = authService.toDTO(user);
 
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
-        body.put("user", user);
-        body.put("data", Map.of("user", user));
+        body.put("user", userDTO);
+        body.put("data", Map.of("user", userDTO));
         return ResponseEntity.ok(body);
     }
 
@@ -99,11 +100,11 @@ public class AuthController {
     }
 
     @PutMapping("/profile")
-    public ResponseEntity<ApiResponse<User>> updateProfile(
+    public ResponseEntity<ApiResponse<UserDTO>> updateProfile(
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody User request
     ) {
-        User updated = authService.updateProfile(principal.getUser().getId(), request);
+        UserDTO updated = authService.updateProfile(principal.getUser().getId(), request);
         return ResponseEntity.ok(ApiResponse.ok("Perfil actualizado exitosamente", updated));
     }
 

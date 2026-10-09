@@ -36,6 +36,7 @@ public class BookingService {
     private final ExperienceRepository experienceRepository;
     private final SuiteNightRepository suiteNightRepository;
     private final UserRepository userRepository;
+    private final PricingService pricingService;
 
     public BookingDTO createBooking(String userId, BookingRequest request) {
 
@@ -79,14 +80,14 @@ public class BookingService {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
         }
 
-        List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDateBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
+        List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
         if (occupiedNights.size() >= totalCapacity) {
             throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
         }
 
-        BigDecimal pricePerNight = suite.getBasePrice();
-        BigDecimal totalRoomPrice = pricePerNight.multiply(BigDecimal.valueOf(nights));
+        PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), BigDecimal.ZERO);
+        BigDecimal totalRoomPrice = pricingResult.total();
 
         List<Booking.SelectedExperience> selectedExpList = parseExperiences(request.getExperiences());
         BigDecimal experiencesTotal = BigDecimal.ZERO;
@@ -109,7 +110,11 @@ public class BookingService {
                 .nights((int) nights)
                 .guests(request.getGuests() != null ? request.getGuests() : 1)
                 .children(request.getChildren() != null ? request.getChildren() : 0)
-                .pricePerNight(pricePerNight)
+                .pricePerNight(suite.getBasePrice())
+                .subtotal(pricingResult.subtotal())
+                .discount(pricingResult.discount())
+                .taxes(pricingResult.taxes())
+                .nightlyPrices(pricingResult.nightlyPrices().stream().map(np -> new Booking.NightlyPrice(np.date(), np.price())).toList())
                 .totalPrice(totalPrice)
                 .paidAmount(BigDecimal.ZERO)
                 .balanceDue(totalPrice)
@@ -132,7 +137,7 @@ public class BookingService {
                     .suite(suite.getId())
                     .branch(suite.getBranch())
                     .unitSlot(1)
-                    .date(date)
+                    .dates(java.util.Collections.singletonList(date))
                     .booking(savedBooking.getId())
                     .status("held")
                     .expiresAt(savedBooking.getExpiresAt())
@@ -204,7 +209,7 @@ public class BookingService {
                     .suite(suite.getId())
                     .branch(suite.getBranch())
                     .unitSlot(1)
-                    .date(date)
+                    .dates(java.util.Collections.singletonList(date))
                     .booking(booking.getId())
                     .status("blocked")
                     .createdAt(Instant.now())
@@ -504,5 +509,27 @@ public class BookingService {
                 .phone(phone != null ? phone : "")
                 .specialRequests(specialRequests != null ? specialRequests : "")
                 .build();
+    }
+
+    public void changeBookingStatus(Booking booking, co.palaciodelmar.backend.model.BookingStatus newStatus, String changedBy, String reason) {
+        co.palaciodelmar.backend.model.BookingStatus currentStatus;
+        try {
+            currentStatus = co.palaciodelmar.backend.model.BookingStatus.valueOf(booking.getStatus().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            currentStatus = co.palaciodelmar.backend.model.BookingStatus.PENDING; // Fallback
+        }
+
+        if (!currentStatus.canTransitionTo(newStatus)) {
+            throw new IllegalStateException("No se puede transicionar del estado " + currentStatus + " a " + newStatus);
+        }
+
+        booking.setStatus(newStatus.name().toLowerCase());
+        booking.getStatusHistory().add(Booking.StatusHistoryEntry.builder()
+                .status(newStatus.name().toLowerCase())
+                .timestamp(Instant.now())
+                .changedBy(changedBy)
+                .reason(reason)
+                .build());
+        booking.setUpdatedAt(Instant.now());
     }
 }

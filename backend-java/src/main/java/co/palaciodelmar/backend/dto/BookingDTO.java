@@ -51,6 +51,8 @@ public class BookingDTO {
 
     private Booking.GuestDetails guestDetails;
     private List<Booking.SelectedExperience> experiences;
+    private Boolean airportPickup;
+    private List<Booking.FoodOrder> foodOrders;
 
     private String cancellationReason;
     private Instant expiresAt;

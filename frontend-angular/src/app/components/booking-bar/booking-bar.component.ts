@@ -1,234 +1,149 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormGroup, FormControl } from '@angular/forms';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
-import { Branch } from '../../models/types';
+import { SearchStateService } from '../../services/search-state.service';
+import { Branch, ApiResponse } from '../../models/types';
 
 @Component({
   selector: 'app-booking-bar',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatDatepickerModule, MatNativeDateModule],
   template: `
-    <div id="booking-bar">
-      <form class="bf-form" (ngSubmit)="submit()">
-        <div class="bf">
-          <label class="bf-label">Llegada</label>
-          <input
-            type="date"
-            [(ngModel)]="checkIn"
-            (change)="onCheckInChange()"
-            [min]="minCheckIn"
-            name="checkIn"
-            class="bf-input"
-          />
-          <span class="bf-subtext" *ngIf="checkIn">Check-in desde 3:00 PM</span>
+    <div id="booking-bar" class="bg-[#161311] border-b-2 border-[rgba(201,169,110,0.3)] shadow-2xl sticky top-[57px] z-[190] px-4 md:px-12 relative">
+      
+      <form class="flex flex-col md:flex-row items-stretch w-full" (ngSubmit)="submit()">
+        
+        <!-- Fechas (Datepicker Material Oculto, Custom Trigger) -->
+        <div class="flex-1 min-w-[240px] p-4 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] cursor-pointer hover:bg-[rgba(201,169,110,0.05)] transition relative flex flex-col justify-center group" (click)="picker.open()">
+          <label class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1">Fechas</label>
+          <div class="text-[#f5f0e8] font-serif text-lg md:text-xl font-medium select-none">
+            {{ dateRange.value.start ? (dateRange.value.start | date:'dd MMM yyyy') : 'Llegada' }} 
+            &nbsp;&mdash;&nbsp; 
+            {{ dateRange.value.end ? (dateRange.value.end | date:'dd MMM yyyy') : 'Salida' }}
+          </div>
+          <span class="text-[11px] text-[rgba(201,169,110,0.7)] mt-1" *ngIf="searchState.nights() > 0">
+            {{ searchState.nights() }} noche(s) de estancia
+          </span>
+          
+          <!-- Flexible Pricing Graph Overlay -->
+          <div class="absolute left-0 right-0 top-full mt-2 bg-[#161311] border border-[rgba(201,169,110,0.3)] rounded-lg p-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <p class="text-[10px] text-[#c9a96e] uppercase tracking-widest mb-2 text-center">Tendencia de Precios</p>
+            <div class="flex items-end justify-between h-12 gap-1">
+              <div *ngFor="let h of [40, 60, 30, 80, 50, 40, 90, 70, 40, 30, 50, 60, 40, 30]" 
+                   class="w-full bg-[rgba(201,169,110,0.4)] rounded-t-sm"
+                   [style.height.%]="h"></div>
+            </div>
+          </div>
+
+          <!-- Angular Material Datepicker -->
+          <mat-date-range-input [rangePicker]="picker" [formGroup]="dateRange" [min]="minDate" style="display: none; visibility: hidden; width: 0; height: 0;">
+            <input matStartDate formControlName="start">
+            <input matEndDate formControlName="end" (dateChange)="onDatesChanged()">
+          </mat-date-range-input>
+          <mat-date-range-picker #picker></mat-date-range-picker>
         </div>
 
-        <div class="bf">
-          <label class="bf-label">Salida</label>
-          <input
-            type="date"
-            [(ngModel)]="checkOut"
-            (change)="onCheckOutChange()"
-            [min]="minCheckOut"
-            name="checkOut"
-            class="bf-input"
-          />
-          <span class="bf-subtext" *ngIf="nightsCount > 0">{{ nightsCount }} {{ nightsCount === 1 ? 'noche' : 'noches' }} de estancia</span>
-        </div>
-
-        <div class="bf" *ngIf="branches.length > 0">
-          <label class="bf-label">Sucursal</label>
-          <select [(ngModel)]="selectedBranch" name="selectedBranch" class="bf-input">
-            <option value="">Todas las sucursales</option>
-            <option *ngFor="let b of branches" [value]="b.slug">{{ b.zone || getShortBranch(b.name) }}</option>
-          </select>
-          <span class="bf-subtext">Cartagena de Indias</span>
-        </div>
-
-        <div class="bf">
-          <label class="bf-label">Adultos</label>
-          <select [(ngModel)]="adults" name="adults" class="bf-input">
-            <option [ngValue]="1">1 adulto</option>
-            <option [ngValue]="2">2 adultos</option>
-            <option [ngValue]="3">3 adultos</option>
-            <option [ngValue]="4">4 adultos</option>
+        <!-- Sucursal -->
+        <div class="flex-1 min-w-[140px] p-4 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center" *ngIf="branches.length > 0">
+          <label class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1">Sucursal</label>
+          <select [ngModel]="searchState.filters().branchSlug" (ngModelChange)="searchState.updateBranch($event)" name="branch" class="bg-transparent border-none text-[#f5f0e8] font-serif text-lg md:text-xl font-medium outline-none cursor-pointer appearance-none">
+            <option value="" class="bg-[#161311] text-[#f5f0e8]">Todas</option>
+            <option *ngFor="let b of branches" [value]="b.slug" class="bg-[#161311] text-[#f5f0e8]">
+              {{ b.zone || b.name }}
+            </option>
           </select>
         </div>
 
-        <div class="bf">
-          <label class="bf-label">Niños</label>
-          <select [(ngModel)]="children" name="children" class="bf-input">
-            <option [ngValue]="0">0 niños</option>
-            <option [ngValue]="1">1 niño</option>
-            <option [ngValue]="2">2 niños</option>
+        <!-- Huéspedes -->
+        <div class="flex-1 min-w-[120px] p-4 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center">
+          <label class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1">Adultos</label>
+          <select [ngModel]="searchState.filters().adults" (ngModelChange)="updateAdults($event)" name="adults" class="bg-transparent border-none text-[#f5f0e8] font-serif text-lg md:text-xl font-medium outline-none cursor-pointer appearance-none">
+            <option [ngValue]="1" class="bg-[#161311]">1 adulto</option>
+            <option [ngValue]="2" class="bg-[#161311]">2 adultos</option>
+            <option [ngValue]="3" class="bg-[#161311]">3 adultos</option>
+            <option [ngValue]="4" class="bg-[#161311]">4 adultos</option>
           </select>
         </div>
 
-        <div class="bf bf-submit">
-          <button class="btn-primary bf-submit-btn" type="submit">
-            Ver disponibilidad
+        <!-- AI Vibe Matcher -->
+        <div class="flex-1 min-w-[150px] p-4 hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center">
+          <label class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1 flex items-center gap-1">
+            <span>✨ Vibe</span>
+          </label>
+          <select [ngModel]="searchState.filters().vibe" (ngModelChange)="searchState.updateVibe($event)" name="vibe" class="bg-transparent border-none text-[#f5f0e8] font-serif text-lg md:text-xl font-medium outline-none cursor-pointer appearance-none">
+            <option value="" class="bg-[#161311]">Cualquiera</option>
+            <option value="romantico" class="bg-[#161311]">Romántico</option>
+            <option value="aventura" class="bg-[#161311]">Aventura</option>
+            <option value="relax" class="bg-[#161311]">Relax Total</option>
+            <option value="fiesta" class="bg-[#161311]">Fiesta</option>
+          </select>
+        </div>
+
+        <!-- Botón de Búsqueda -->
+        <div class="flex items-center justify-center p-0">
+          <button type="submit" class="w-full h-full min-h-[60px] bg-[#c9a96e] text-[#0d0d0d] px-8 text-sm tracking-[0.24em] uppercase font-semibold hover:bg-[#e8d5a3] transition-colors whitespace-nowrap">
+            Buscar Suites
           </button>
         </div>
+
       </form>
     </div>
-  `,
-  styles: [`
-    #booking-bar {
-      background: #161311;
-      border-bottom: 2px solid rgba(201, 169, 110, 0.3);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-      position: sticky;
-      top: 57px;
-      z-index: 190;
-      padding: 0 2rem;
-    }
-    .bf-form {
-      display: flex;
-      align-items: stretch;
-      width: 100%;
-      flex-wrap: wrap;
-    }
-    .bf {
-      flex: 1;
-      min-width: 140px;
-      padding: 14px 20px;
-      border-right: 1px solid rgba(201, 169, 110, 0.18);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      transition: background 0.3s ease;
-    }
-    .bf:hover {
-      background: rgba(201, 169, 110, 0.05);
-    }
-    .bf:last-of-type {
-      border-right: none;
-    }
-    .bf-label {
-      font-size: 0.62rem;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 4px;
-      font-weight: 600;
-    }
-    .bf-input {
-      background: transparent;
-      border: none;
-      color: #f5f0e8;
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.05rem;
-      font-weight: 500;
-      outline: none;
-      width: 100%;
-      cursor: pointer;
-      color-scheme: dark;
-    }
-    .bf-input::-webkit-calendar-picker-indicator {
-      filter: invert(0.85) sepia(100%) hue-rotate(5deg) saturate(200%);
-      cursor: pointer;
-      opacity: 0.9;
-      padding: 2px;
-      transition: transform 0.2s ease, opacity 0.2s ease;
-    }
-    .bf-input::-webkit-calendar-picker-indicator:hover {
-      opacity: 1;
-      transform: scale(1.15);
-    }
-    .bf-input option {
-      background: #161311;
-      color: #f5f0e8;
-      font-family: 'Jost', sans-serif;
-      padding: 8px;
-    }
-    .bf-subtext {
-      font-size: 0.65rem;
-      color: rgba(201, 169, 110, 0.7);
-      margin-top: 2px;
-    }
-    .bf-submit {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-right: none !important;
-    }
-    .bf-submit-btn {
-      white-space: nowrap;
-      padding: 10px 24px;
-      font-size: 0.9rem;
-    }
-  `]
+  `
 })
 export class BookingBarComponent implements OnInit {
-  checkIn: string = '';
-  checkOut: string = '';
-  minCheckIn: string = '';
-  minCheckOut: string = '';
-  selectedBranch: string = '';
-  adults: number = 2;
-  children: number = 0;
-  branches: Branch[] = [];
+  api = inject(ApiService);
+  router = inject(Router);
+  searchState = inject(SearchStateService);
 
-  constructor(private api: ApiService) {
-    const today = new Date();
-    this.minCheckIn = this.formatDate(today);
-    
-    this.checkIn = this.minCheckIn;
-    this.checkOut = this.addDays(this.checkIn, 2);
-    this.minCheckOut = this.addDays(this.checkIn, 1);
+  branches: Branch[] = [];
+  minDate = new Date();
+
+  dateRange = new FormGroup({
+    start: new FormControl<Date | null>(null),
+    end: new FormControl<Date | null>(null)
+  });
+
+  constructor() {
+    // Sync initial state from service using safe midday parsing
+    const f = this.searchState.filters();
+    this.dateRange.setValue({
+      start: this.searchState.parseToMidday(f.checkIn),
+      end: this.searchState.parseToMidday(f.checkOut)
+    }, { emitEvent: false });
   }
 
   ngOnInit(): void {
-    this.api.get<any>('/branches').subscribe({
+    // Strongly typed response
+    this.api.get<ApiResponse<Branch[]> | Branch[]>('/branches').subscribe({
       next: (res) => {
-        this.branches = res.data || res;
+        if (Array.isArray(res)) {
+          this.branches = res;
+        } else if (res.data) {
+          this.branches = res.data;
+        } else {
+          this.branches = [];
+        }
       }
     });
   }
 
-  private formatDate(d: Date): string {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  private addDays(dateStr: string, days: number): string {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    date.setDate(date.getDate() + days);
-    return this.formatDate(date);
-  }
-
-  get nightsCount(): number {
-    if (!this.checkIn || !this.checkOut) return 0;
-    const d1 = new Date(this.checkIn);
-    const d2 = new Date(this.checkOut);
-    const diff = Math.ceil((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24));
-    return diff > 0 ? diff : 1;
-  }
-
-  onCheckInChange(): void {
-    this.minCheckOut = this.addDays(this.checkIn, 1);
-    if (!this.checkOut || this.checkOut <= this.checkIn) {
-      this.checkOut = this.addDays(this.checkIn, 2);
+  onDatesChanged(): void {
+    const { start, end } = this.dateRange.value;
+    if (start && end) {
+      this.searchState.updateDates(start, end);
     }
   }
 
-  onCheckOutChange(): void {
-    if (this.checkOut <= this.checkIn) {
-      this.checkIn = this.addDays(this.checkOut, -1);
-    }
-  }
-
-  getShortBranch(name: string): string {
-    return name.replace(/^Palacio del Mar\s*·\s*/i, '');
+  updateAdults(val: number) {
+    this.searchState.updateGuests(val, this.searchState.filters().children);
   }
 
   submit(): void {
-    document.querySelector('#rooms')?.scrollIntoView({ behavior: 'smooth' });
+    this.router.navigate(['/buscar']);
   }
 }
 

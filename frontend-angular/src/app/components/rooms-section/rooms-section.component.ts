@@ -3,12 +3,12 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { Suite, Branch } from '../../models/types';
-import { BookingModalComponent } from '../booking-modal/booking-modal.component';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-rooms-section',
   standalone: true,
-  imports: [CommonModule, RouterModule, BookingModalComponent],
+  imports: [CommonModule, RouterModule],
   template: `
     <section id="rooms">
       <div class="rooms-header">
@@ -109,15 +109,13 @@ import { BookingModalComponent } from '../booking-modal/booking-modal.component'
               Ver detalles
             </a>
 
-            <button class="btn-book room-cta" (click)="openBookingModal(suite)">
+            <a class="btn-book room-cta" style="text-decoration: none; display: inline-block; text-align: center;" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
               Reservar
-            </button>
+            </a>
           </div>
         </div>
       </div>
     </section>
-
-    <app-booking-modal [isOpen]="bookingModalOpen" [suite]="selectedSuiteForBooking" (closeEvent)="bookingModalOpen = false"></app-booking-modal>
   `
 })
 export class RoomsSectionComponent implements OnInit {
@@ -128,9 +126,6 @@ export class RoomsSectionComponent implements OnInit {
   selectedType: string = '';
   loading = true;
   loadError = false;
-
-  bookingModalOpen = false;
-  selectedSuiteForBooking: Suite | null = null;
 
   constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
@@ -188,10 +183,5 @@ export class RoomsSectionComponent implements OnInit {
 
   getShortBranch(name: string): string {
     return name.replace(/^Palacio del Mar\s*·\s*/i, '');
-  }
-
-  openBookingModal(suite: Suite): void {
-    this.selectedSuiteForBooking = suite;
-    this.bookingModalOpen = true;
   }
 }

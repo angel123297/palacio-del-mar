@@ -25,6 +25,7 @@ services:
     ports:
       - "5000:5000"
     environment:
+      MONGO_HOST: mongo
       MONGODB_URI: mongodb://mongo:27017/palacio_db
       SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/palacio_db
       JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en el archivo .env (copia .env.example)}

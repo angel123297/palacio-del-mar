@@ -177,6 +177,32 @@ import { finalize } from 'rxjs';
                  <span style="color: #aaa;">Noches</span>
                  <span style="font-weight: 600;">{{ booking.nights || 1 }}</span>
                </div>
+
+               <!-- EXTRAS IN CHECKOUT SUMMARY -->
+               <div *ngIf="booking.experiences?.length || booking.airportPickup || booking.foodOrders?.length" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                 <h4 style="color: var(--gold); margin: 0 0 0.8rem 0; font-size: 0.95rem; text-transform: uppercase;">Extras Seleccionados</h4>
+                 
+                 <div *ngFor="let exp of booking.experiences" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                   <span style="color: #ccc;">{{ exp.name }}</span>
+                   <span>$ {{ exp.price | number:'1.0-0' }}</span>
+                 </div>
+                 
+                 <div *ngIf="booking.airportPickup" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                   <span style="color: #ccc;">Recogida Aeropuerto</span>
+                   <span>$ 150,000</span>
+                 </div>
+
+                 <ng-container *ngFor="let food of booking.foodOrders">
+                   <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                     <span style="color: #ccc;">Comida Personalizada</span>
+                     <span>$ {{ food.price | number:'1.0-0' }}</span>
+                   </div>
+                   <div *ngIf="food.includesBreakfastCombo" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85rem; padding-left: 1rem;">
+                     <span style="color: #aaa;">↳ Combo Desayuno</span>
+                     <span style="color: #aaa;">$ 35,000</span>
+                   </div>
+                 </ng-container>
+               </div>
              </div>
 
              <div style="border-top: 1px dashed rgba(212,175,55,0.4); padding-top: 1.5rem; margin-bottom: 1.5rem;">

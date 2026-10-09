@@ -13,4 +13,6 @@ public interface BookingRepository extends MongoRepository<Booking, String> {
     Optional<Booking> findByBookingCode(String bookingCode);
     List<Booking> findBySuiteAndStatusIn(String suiteId, List<String> statuses);
     List<Booking> findByStatusAndExpiresAtBefore(String status, java.time.Instant now);
+    org.springframework.data.domain.Page<Booking> findByBranchIn(List<String> branches, org.springframework.data.domain.Pageable pageable);
+    List<Booking> findByBranchIn(List<String> branches);
 }

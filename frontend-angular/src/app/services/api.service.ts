@@ -9,7 +9,7 @@ export class ApiService {
 
   constructor(private http: HttpClient) {}
 
-  get<T>(path: string, params?: any): Observable<T> {
+  get<T>(path: string, params?: Record<string, string | number | boolean>): Observable<T> {
     let httpParams = new HttpParams();
     if (params) {
       Object.keys(params).forEach(key => {
@@ -21,11 +21,11 @@ export class ApiService {
     return this.http.get<T>(`${environment.apiUrl}${path}`, { params: httpParams }).pipe(timeout(this.TIMEOUT_MS));
   }
 
-  post<T>(path: string, body: any): Observable<T> {
+  post<T>(path: string, body: unknown): Observable<T> {
     return this.http.post<T>(`${environment.apiUrl}${path}`, body).pipe(timeout(this.TIMEOUT_MS));
   }
   
-  put<T>(path: string, body: any): Observable<T> {
+  put<T>(path: string, body: unknown): Observable<T> {
     return this.http.put<T>(`${environment.apiUrl}${path}`, body).pipe(timeout(this.TIMEOUT_MS));
   }
 

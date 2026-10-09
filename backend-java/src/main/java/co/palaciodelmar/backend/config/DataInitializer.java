@@ -24,6 +24,9 @@ public class DataInitializer implements CommandLineRunner {
     private final SuiteNightRepository suiteNightRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @org.springframework.beans.factory.annotation.Value("${admin.default.password:Admin123456!}")
+    private String adminPassword;
+
     @Override
     public void run(String... args) {
         Branch b1, b2, b3, b4;
@@ -123,6 +126,7 @@ public class DataInitializer implements CommandLineRunner {
                     .images(List.of(
                             "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Jardín privado", "Aire acondicionado", "Minibar", "WiFi gratuito", "Caja fuerte"))
@@ -150,6 +154,7 @@ public class DataInitializer implements CommandLineRunner {
                     .images(List.of(
                             "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Patio colonial", "Tina hidromasaje", "Balcón", "WiFi gratuito", "Desayuno incluido"))
@@ -177,6 +182,7 @@ public class DataInitializer implements CommandLineRunner {
                     .images(List.of(
                             "https://images.unsplash.com/photo-1591088398332-8a7791972843?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Vista a murallas", "Jacuzzi", "Balcón privado", "Servicio a la habitación"))
@@ -204,6 +210,7 @@ public class DataInitializer implements CommandLineRunner {
                     .images(List.of(
                             "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1616046229478-9901c5536a45?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1616046229478-9901c5536a45?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Terraza privada", "Jacuzzi", "Mayordomo 24/7", "Sala de estar", "Bar privado"))
@@ -231,6 +238,8 @@ public class DataInitializer implements CommandLineRunner {
                     .mainImage("https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?w=800&auto=format&fit=crop&q=80")
                     .images(List.of(
                             "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Patio bohemio", "Aire acondicionado", "WiFi ultra rápido", "Hamaca"))
@@ -256,6 +265,8 @@ public class DataInitializer implements CommandLineRunner {
                     .mainImage("https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80")
                     .images(List.of(
                             "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1616046229478-9901c5536a45?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1616046229478-9901c5536a45?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1616046229478-9901c5536a45?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Colección de arte", "Patio privado", "Minibar gourmet", "Sonido Bluetooth"))
@@ -282,6 +293,8 @@ public class DataInitializer implements CommandLineRunner {
                     .mainImage("https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&auto=format&fit=crop&q=80")
                     .images(List.of(
                             "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Balcón colonial", "Tina hidromasaje", "Aislamiento acústico", "WiFi de alta velocidad"))
@@ -309,6 +322,8 @@ public class DataInitializer implements CommandLineRunner {
                     .mainImage("https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800&auto=format&fit=crop&q=80")
                     .images(List.of(
                             "https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Vista al mar", "Escritorio de trabajo", "Smart TV 65\"", "Máquina Nespresso"))
@@ -334,6 +349,8 @@ public class DataInitializer implements CommandLineRunner {
                     .mainImage("https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop&q=80")
                     .images(List.of(
                             "https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Terraza vista al mar", "Jacuzzi", "King Bed", "Acceso a Lounge"))
@@ -353,16 +370,18 @@ public class DataInitializer implements CommandLineRunner {
                     .name("Penthouse Ocean Front")
                     .slug("penthouse-bocagrande")
                     .type("Suite Presidencial")
-                    .description("Penthouse exclusivo de dos niveles con piscina privada infiniti y vista 360 al Caribe.")
-                    .shortDescription("Penthouse de lujo con piscina privada infiniti y vista 360")
+                    .description("Penthouse exclusivo de dos niveles con piscina privada infiniti al Caribe.")
+                    .shortDescription("Penthouse de lujo con piscina privada infiniti")
                     .basePrice(BigDecimal.valueOf(2450000))
                     .originalPrice(BigDecimal.valueOf(3100000))
                     .mainImage("https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&auto=format&fit=crop&q=80")
                     .images(List.of(
                             "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=800&auto=format&fit=crop&q=80"
                     ))
-                    .amenities(List.of("Piscina privada", "Vista 360", "Mayordomo privado", "Chef bajo solicitud"))
+                    .amenities(List.of("Piscina privada", "Mayordomo privado", "Chef bajo solicitud"))
                     .hasBalcony(true)
                     .hasTerrace(true)
                     .hasJacuzzi(true)
@@ -387,6 +406,8 @@ public class DataInitializer implements CommandLineRunner {
                     .mainImage("https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&auto=format&fit=crop&q=80")
                     .images(List.of(
                             "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Salida directa a playa", "Hamacas", "Climatización", "Ducha exterior"))
@@ -412,6 +433,8 @@ public class DataInitializer implements CommandLineRunner {
                     .mainImage("https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80")
                     .images(List.of(
                             "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Tina al aire libre", "Deck de madera", "Kayak incluido", "Desayuno artesanal"))
@@ -438,6 +461,8 @@ public class DataInitializer implements CommandLineRunner {
                     .mainImage("https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop&q=80")
                     .images(List.of(
                             "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&auto=format&fit=crop&q=80",
+                            "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&auto=format&fit=crop&q=80",
                             "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&auto=format&fit=crop&q=80"
                     ))
                     .amenities(List.of("Piscina privada", "Jardín tropical", "Cocina equipada", "Servicio de playa privado"))
@@ -557,7 +582,7 @@ public class DataInitializer implements CommandLineRunner {
                     .name("Admin")
                     .lastName("Palacio")
                     .email("admin@palaciodelmar.co")
-                    .password(passwordEncoder.encode("Admin123456!"))
+                    .password(passwordEncoder.encode(adminPassword))
                     .role("admin")
                     .status("active")
                     .emailVerified(true)

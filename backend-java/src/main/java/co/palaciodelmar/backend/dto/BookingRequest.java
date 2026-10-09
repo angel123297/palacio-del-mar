@@ -43,6 +43,9 @@ public class BookingRequest {
     private String specialRequests;
     private Booking.GuestDetails guestDetails;
     private List<Object> experiences;
+    
+    private Boolean airportPickup;
+    private List<Booking.FoodOrder> foodOrders;
 
     public LocalDate getCheckIn() {
         return checkIn != null ? checkIn : newCheckIn;

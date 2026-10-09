@@ -1,101 +1,113 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { CustomDatepickerComponent } from '../../components/custom-datepicker/custom-datepicker.component';
-import { CustomGuestpickerComponent } from '../../components/custom-guestpicker/custom-guestpicker.component';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
-import { Suite } from '../../models/types';
+import { SearchStateService } from '../../services/search-state.service';
+import { Suite, Experience } from '../../models/types';
+import { format } from 'date-fns';
+import { AuthModalComponent } from '../../components/auth-modal/auth-modal.component';
 
 @Component({
   selector: 'app-suite-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, CustomDatepickerComponent, CustomGuestpickerComponent],
-  template: `
-    <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 2rem 1.5rem; max-width: 1100px; margin: 0 auto;">
-      <div *ngIf="loading" class="luxury-loader-container">
-        <div class="luxury-spinner"></div>
-        <p class="luxury-loader-text">Cargando...</p>
-      </div>
-
-      <div *ngIf="!loading && !suite" style="text-align: center; color: #ff4d4d; padding: 4rem;">
-        <h3>La suite que buscas no existe o no está disponible.</h3>
-        <a routerLink="/" style="color: var(--gold); text-decoration: none; margin-top: 1rem; display: inline-block;">← Volver al inicio</a>
-      </div>
-
-      <div *ngIf="!loading && suite">
-        <a routerLink="/" style="color: var(--gold); text-decoration: none; font-size: 0.9rem;">← Volver al inicio</a>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2.5rem; margin-top: 1.5rem;">
-          <div>
-            <img [src]="suite.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" [alt]="suite.name" style="width: 100%; height: 380px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.2);">
-            <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{ suite.name }}</h1>
-            <p style="color: var(--gold); font-size: 0.95rem;">{{ suite.type }} · {{ suite.branch?.name || 'Centro Histórico' }}</p>
-            <p style="color: #cccccc; line-height: 1.6; margin-top: 1rem;">{{ suite.description }}</p>
-          </div>
-
-          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 12px; padding: 2rem;">
-            <h3 style="color: var(--gold); margin: 0 0 1rem 0; font-size: 1.4rem;">Reservar esta Suite</h3>
-            <div style="margin-bottom: 1.5rem;">
-              <strong style="font-size: 1.8rem;">$ {{ (suite.basePrice || suite.pricePerNight || 450000) | number:'1.0-0' }}</strong>
-              <span style="color: #aaa;"> / noche</span>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
-              <app-custom-datepicker label="Check-in" [date]="checkIn" (dateChange)="checkIn = $event"></app-custom-datepicker>
-              <app-custom-datepicker label="Check-out" [date]="checkOut" (dateChange)="checkOut = $event"></app-custom-datepicker>
-              <app-custom-guestpicker [adults]="guests" [maxGuests]="suite.maxGuests || suite.maxGuests || 2" (adultsChange)="guests = $event"></app-custom-guestpicker>
-            </div>
-
-            <div style="margin-bottom: 1.5rem;">
-              <label style="display: block; color: var(--gold); font-size: 0.85rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">Peticiones Especiales / Notas</label>
-              <textarea [(ngModel)]="notes" placeholder="Alergias, hora estimada de llegada, ocasión especial..." style="width: 100%; height: 80px; background: rgba(0,0,0,0.5); border: 1px solid rgba(212,175,55,0.2); border-radius: 6px; padding: 10px; color: #fff; font-family: inherit; resize: vertical;"></textarea>
-            </div>
-
-            <button type="button" (click)="createBooking()" [disabled]="bookingBusy" style="width: 100%; background: var(--gold); color: #0d0d0d; font-weight: 700; padding: 14px; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer;">
-              {{ bookingBusy ? 'Procesando…' : 'Confirmar Reserva' }}
-            </button>
-            <p *ngIf="message" style="margin-top: 1rem; text-align: center; font-size: 0.9rem;" [style.color]="isError ? '#ff4d4d' : 'var(--gold)'">{{ message }}</p>
-
-            <div style="margin-top: 2.5rem;">
-              <h4 style="color: var(--gold); margin-bottom: 1rem; font-family: var(--font-title); font-size: 1.2rem;">Ubicación</h4>
-              <div style="border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; overflow: hidden; height: 200px;">
-                <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-75.56846141815187%2C10.420601934399738%2C-75.53816318511964%2C10.434417758994511&amp;layer=mapnik" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
-              </div>
-              <p style="font-size: 0.85rem; color: #aaa; margin-top: 0.5rem; text-align: center;">{{ suite.branch?.address || 'Cartagena de Indias, Colombia' }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `
+  imports: [CommonModule, RouterModule, FormsModule, CustomDatepickerComponent, AuthModalComponent],
+  templateUrl: './suite-detail.component.html',
+  styleUrls: ['./suite-detail.component.css']
 })
 export class SuiteDetailComponent implements OnInit {
   suite: Suite | null = null;
   loading = true;
-  bookingBusy = false;
-  checkIn = new Date().toISOString().slice(0, 10);
-  checkOut = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10);
+  step = 1;
+  
+  // Step 1: Basic Booking Info
+  checkIn = format(new Date(), 'yyyy-MM-dd');
+  checkOut = format(new Date(Date.now() + 86400000 * 2), 'yyyy-MM-dd');
   guests = 2;
-  notes = '';
+  today = format(new Date(), 'yyyy-MM-dd');
 
-  get guestOptions(): number[] {
-    const max = Math.max(1, this.suite?.maxGuests || (this.suite as any)?.capacity || 2);
-    const opts = [];
-    for (let i = 1; i <= max; i++) opts.push(i);
-    return opts;
-  }
+  // Step 2: Experiences
+  experiences: Experience[] = [];
+  selectedExperiences: { exp: Experience; qty: number }[] = [];
+
+  // Step 3: VIP Services
+  airportPickup = false;
+  wantFood = false;
+  foodType = '';
+  customFood = '';
+  breakfastCombo = false;
+
+  // Step 4: Summary & Payment
+  guestName = '';
+  guestEmail = '';
+  guestPhone = '';
+  bookingBusy = false;
   message = '';
   isError = false;
+  paymentSuccess = false;
+  
+  authModalOpen = false;
+  authMode: 'login' | 'register' = 'login';
+  
+  openAuth() {
+    this.authModalOpen = true;
+  }
+  
+  onAuthClose() {
+    this.authModalOpen = false;
+    if (this.auth.isLoggedIn()) {
+       const user = this.auth.currentUserValue;
+       if (user) {
+         this.guestName = user.name || '';
+         this.guestEmail = user.email || '';
+         this.guestPhone = user.profile?.phone || user.phone || '';
+       }
+    }
+  }
+
+  foodOptions = [
+    { id: 't1', name: 'Cazuela de Mariscos (Típico)' },
+    { id: 't2', name: 'Mojarra Frita con Arroz de Coco (Típico)' },
+    { id: 't3', name: 'Posta Cartagenera (Típico)' },
+    { id: 'n1', name: 'Hamburguesa Artesanal (Normal)' },
+    { id: 'n2', name: 'Pasta Alfredo (Normal)' },
+    { id: 'other', name: 'Otro (Especificar)' }
+  ];
 
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
-    private auth: AuthService,
-    private cdr: ChangeDetectorRef
+    public auth: AuthService,
+    private searchState: SearchStateService,
+    private cdr: ChangeDetectorRef,
+    private sanitizer: DomSanitizer,
+    private router: Router
   ) {}
 
+  get mapUrl(): SafeResourceUrl {
+    const address = this.suite?.branch?.address || 'Cartagena, Colombia';
+    const url = `https://maps.google.com/maps?q=${encodeURIComponent(address)}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
   ngOnInit(): void {
+    const filters = this.searchState.filters();
+    if (filters.checkIn) this.checkIn = filters.checkIn;
+    if (filters.checkOut) this.checkOut = filters.checkOut;
+    if (filters.adults) this.guests = filters.adults;
+
+    if (this.auth.isLoggedIn()) {
+       const user = this.auth.currentUserValue;
+       if (user) {
+         this.guestName = user.name || '';
+         this.guestEmail = user.email || '';
+         this.guestPhone = user.profile?.phone || user.phone || '';
+       }
+    }
+
     const idOrSlug = this.route.snapshot.paramMap.get('idOrSlug');
     if (idOrSlug) {
       this.api.get<any>(`/suites/${idOrSlug}`).subscribe({
@@ -109,55 +121,124 @@ export class SuiteDetailComponent implements OnInit {
           this.cdr.detectChanges();
         }
       });
+      
+      this.api.get<any>('/experiences').subscribe({
+        next: (res) => {
+           this.experiences = res.data || res;
+        }
+      });
     }
+  }
+
+  validateDates() {
+    if (this.checkOut <= this.checkIn) {
+      const d = new Date(this.checkIn + 'T12:00:00');
+      d.setDate(d.getDate() + 1);
+      this.checkOut = format(d, 'yyyy-MM-dd');
+    }
+  }
+
+  get nights(): number {
+    const diffTime = Math.abs(new Date(this.checkOut).getTime() - new Date(this.checkIn).getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+  }
+
+  get totalRoomPrice(): number {
+    return (this.suite?.basePrice || 0) * this.nights;
+  }
+
+  get totalExperiencesPrice(): number {
+    return this.selectedExperiences.reduce((sum, item) => sum + (item.exp.price * item.qty), 0);
+  }
+
+  get totalVipPrice(): number {
+    let total = 0;
+    if (this.airportPickup) total += 150000;
+    if (this.wantFood && this.foodType) {
+      total += 80000;
+      if (this.breakfastCombo) total += 35000;
+    }
+    return total;
+  }
+
+  get grandTotal(): number {
+    return this.totalRoomPrice + this.totalExperiencesPrice + this.totalVipPrice;
+  }
+
+  toggleExperience(exp: Experience) {
+    const idx = this.selectedExperiences.findIndex(e => e.exp.id === exp.id);
+    if (idx > -1) {
+      this.selectedExperiences.splice(idx, 1);
+    } else {
+      this.selectedExperiences.push({ exp, qty: 1 });
+    }
+  }
+  
+  isExperienceSelected(exp: Experience): boolean {
+    return this.selectedExperiences.findIndex(e => e.exp.id === exp.id) > -1;
+  }
+
+  nextStep() {
+    if (this.step < 4) this.step++;
+    window.scrollTo(0,0);
+  }
+
+  prevStep() {
+    if (this.step > 1) this.step--;
+    window.scrollTo(0,0);
+  }
+  
+  goToStep(s: number) {
+    this.step = s;
+    window.scrollTo(0,0);
   }
 
   createBooking(): void {
     if (!this.auth.isLoggedIn()) {
-      this.message = 'Por favor inicia sesión para realizar tu reserva.';
+      this.message = 'Debes iniciar sesión para confirmar la reserva.';
       this.isError = true;
       return;
     }
-    if (!this.suite) return;
-
-    if (!this.checkIn || !this.checkOut) {
-      this.message = 'Por favor selecciona las fechas de llegada y salida.';
-      this.isError = true;
-      return;
-    }
-    const today = new Date().toISOString().split('T')[0];
-    if (this.checkIn < today) {
-      this.message = 'La fecha de llegada no puede ser en el pasado.';
-      this.isError = true;
-      return;
-    }
-    if (this.checkOut <= this.checkIn) {
-      this.message = 'La fecha de salida debe ser posterior a la de llegada.';
-      this.isError = true;
-      return;
-    }
-
-
+    
     this.bookingBusy = true;
     this.message = '';
 
+    const foodOrders = [];
+    if (this.wantFood && this.foodType) {
+       foodOrders.push({
+          foodName: this.foodType === 'other' ? this.customFood : this.foodOptions.find(f => f.id === this.foodType)?.name,
+          price: 80000,
+          includesBreakfastCombo: this.breakfastCombo,
+          specialInstructions: this.foodType === 'other' ? 'Custom order' : ''
+       });
+    }
+
     this.api.post<any>('/bookings', {
-      suiteId: this.suite.id || this.suite._id,
-      suite: this.suite.id || this.suite._id,
+      suiteId: this.suite?.id || this.suite?._id,
       checkIn: this.checkIn,
       checkOut: this.checkOut,
       guests: Number(this.guests),
-      notes: this.notes
+      airportPickup: this.airportPickup,
+      foodOrders: foodOrders,
+      experiences: this.selectedExperiences.map(e => e.exp.id),
+      guestName: this.guestName,
+      guestEmail: this.guestEmail,
+      guestPhone: this.guestPhone
     }).subscribe({
-      next: () => {
+      next: (res) => {
         this.bookingBusy = false;
-        this.message = '¡Reserva creada con éxito!';
-        this.isError = false;
+        this.cdr.detectChanges();
+        if (res.data && (res.data.id || res.data._id)) {
+           this.router.navigate(['/checkout', res.data.id || res.data._id]);
+        } else {
+           this.router.navigate(['/mis-reservas']);
+        }
       },
       error: (err) => {
         this.bookingBusy = false;
-        this.message = err.error?.message || 'No se pudo crear la reserva.';
+        this.message = err.error?.message || 'Error al procesar la reserva.';
         this.isError = true;
+        this.cdr.detectChanges();
       }
     });
   }

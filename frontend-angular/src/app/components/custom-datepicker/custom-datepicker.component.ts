@@ -1,5 +1,6 @@
 import { Component, Input, Output, EventEmitter, ElementRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { format } from 'date-fns';
 
 @Component({
   selector: 'app-custom-datepicker',
@@ -24,6 +25,7 @@ import { CommonModule } from '@angular/common';
           <div class="cdp-day empty" *ngFor="let empty of emptyDays"></div>
           <div class="cdp-day" *ngFor="let day of daysInMonth" 
                [class.selected]="isSelected(day)"
+               [class.disabled]="isPastDate(day)"
                (click)="selectDate(day); $event.stopPropagation()">
             {{ day }}
           </div>
@@ -44,14 +46,16 @@ import { CommonModule } from '@angular/common';
     .cdp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
     .cdp-day-name { font-size: 0.8rem; color: #888; margin-bottom: 5px; }
     .cdp-day { padding: 6px 0; font-size: 0.9rem; color: #ddd; border-radius: 4px; cursor: pointer; }
-    .cdp-day:hover:not(.empty) { background: rgba(212,175,55,0.2); }
+    .cdp-day:not(.disabled):hover:not(.empty) { background: rgba(212,175,55,0.2); }
     .cdp-day.selected { background: var(--gold); color: #000; font-weight: bold; }
+    .cdp-day.disabled { color: #555; cursor: not-allowed; text-decoration: line-through; }
   `]
 })
 export class CustomDatepickerComponent {
   @Input() label = 'Fecha';
   @Input() subLabel = '';
-  @Input() date: string = new Date().toISOString().split('T')[0];
+  @Input() date: string = format(new Date(), 'yyyy-MM-dd');
+  @Input() minDate: string = ''; // Format yyyy-MM-dd
   @Output() dateChange = new EventEmitter<string>();
   
   isOpen = false;
@@ -99,16 +103,24 @@ export class CustomDatepickerComponent {
   changeMonth(dir: number) {
     this.currentDate = new Date(this.currentYear, this.currentDate.getMonth() + dir, 1);
   }
+
+  isPastDate(day: number): boolean {
+    if (!this.minDate) return false;
+    const d = new Date(this.currentYear, this.currentDate.getMonth(), day, 12);
+    return format(d, 'yyyy-MM-dd') < this.minDate;
+  }
   
   selectDate(day: number) {
+    if (this.isPastDate(day)) return;
     const d = new Date(this.currentYear, this.currentDate.getMonth(), day, 12);
-    this.date = d.toISOString().split('T')[0];
+    this.date = format(d, 'yyyy-MM-dd');
     this.dateChange.emit(this.date);
     this.isOpen = false;
   }
   
   isSelected(day: number): boolean {
-    const d = new Date(this.currentYear, this.currentDate.getMonth(), day, 12).toISOString().split('T')[0];
-    return d === this.date;
+    const d = new Date(this.currentYear, this.currentDate.getMonth(), day, 12);
+    return format(d, 'yyyy-MM-dd') === this.date;
   }
 }
+

@@ -27,7 +27,7 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
         </div>
 
         <div class="nav-right">
-          <ng-container *ngIf="auth.currentUser$ | async as user; else notLogged">
+          <ng-container *ngIf="auth.currentUser() as user; else notLogged">
             <div class="nav-user-menu" style="display: flex; align-items: center; gap: 10px;">
               <a routerLink="/mis-reservas" class="btn-outline nav-user-btn" style="padding: 6px 14px; text-decoration: none;">
                 {{ user.name ? user.name.split(' ')[0] : 'Huésped' }}

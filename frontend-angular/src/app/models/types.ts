@@ -10,6 +10,7 @@ export interface Branch {
   mainImage?: string;
   vibe?: string[];
   location?: any;
+  highlights?: any[];
 }
 
 export interface Suite {
@@ -60,15 +61,40 @@ export interface User {
   name: string;
   phone?: string;
   role: string;
+  profile?: {
+    phone?: string;
+    address?: any;
+    documentId?: string;
+    documentType?: string;
+    avatar?: string;
+  };
+}
+
+export interface ApiResponse<T> {
+  data?: T;
+  message?: string;
+  success?: boolean;
 }
 
 export interface AuthResponse {
-  token: string;
+  token?: string;
   user: User;
   data?: {
-    token: string;
+    token?: string;
     user: User;
   };
+}
+
+export interface LoginDTO {
+  email: string;
+  password?: string;
+}
+
+export interface RegisterDTO {
+  name: string;
+  email: string;
+  password?: string;
+  phone?: string;
 }
 
 export interface Booking {
@@ -98,3 +124,21 @@ export interface Booking {
   guestEmail?: string;
   guestPhone?: string;
 }
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface DashboardMetricsDTO {
+  activeBookings: number;
+  totalRevenue: number;
+  averageOccupancy: number; // e.g. 84 for 84%
+  pendingCheckins?: number; // mostly for host
+  newClubMembers?: number; // mostly for admin
+  totalBookings: number;
+}
+

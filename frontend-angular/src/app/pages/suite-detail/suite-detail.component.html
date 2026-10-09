@@ -1,0 +1,256 @@
+<div class="wizard-container">
+  <div *ngIf="loading" class="luxury-loader-container">
+    <div class="luxury-spinner"></div>
+    <p class="luxury-loader-text">Cargando...</p>
+  </div>
+
+  <div *ngIf="!loading && !suite" style="text-align: center; color: #ff4d4d; padding: 4rem;">
+    <h3>La suite que buscas no existe o no está disponible.</h3>
+    <a routerLink="/" style="color: var(--gold); text-decoration: none; margin-top: 1rem; display: inline-block;">← Volver al inicio</a>
+  </div>
+
+  <div *ngIf="!loading && suite">
+    <div class="step-indicator">
+      <div class="step-item" [class.active]="step === 1" [class.completed]="step > 1">1. Detalles</div>
+      <div class="step-item" [class.active]="step === 2" [class.completed]="step > 2">2. Experiencias</div>
+      <div class="step-item" [class.active]="step === 3" [class.completed]="step > 3">3. VIP & Comida</div>
+      <div class="step-item" [class.active]="step === 4">4. Pago</div>
+    </div>
+
+    <!-- PANEL 1: Suite Info -->
+    <div class="panel" *ngIf="step === 1">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2.5rem;">
+        <div>
+          <img [src]="suite.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" style="width: 100%; height: 380px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.2);">
+          <div *ngIf="suite.images && suite.images.length > 0" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; margin-top: 1rem;">
+            <img *ngFor="let img of suite.images.slice(0,4)" [src]="img" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2); cursor: pointer; opacity: 0.7;" (click)="suite.mainImage = img">
+          </div>
+          <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{ suite.name }}</h1>
+          <p style="color: var(--gold);">{{ suite.type }} · {{ suite.size || 45 }} m² · Máx {{ suite.maxGuests || 2 }} huéspedes</p>
+          <p style="color: #ccc; margin-top: 1rem;">{{ suite.description }}</p>
+
+          <div *ngIf="suite.branch?.highlights?.length" style="margin-top: 2rem;">
+            <h3 style="color: var(--gold);">Lugares Cercanos</h3>
+            <ul>
+              <li *ngFor="let h of suite.branch.highlights" style="margin-bottom: 0.5rem;">{{h.name}} ({{h.walkMinutes}} min)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="color: var(--gold); margin-top: 0;">Reserva</h3>
+          <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
+            <app-custom-datepicker label="Llegada" [date]="checkIn" [minDate]="today" (dateChange)="checkIn = $event; validateDates()"></app-custom-datepicker>
+            <app-custom-datepicker label="Salida" [date]="checkOut" [minDate]="checkIn" (dateChange)="checkOut = $event"></app-custom-datepicker>
+            <div>
+              <label style="color: var(--gold); font-size: 0.85rem;">Huéspedes</label>
+              <select [(ngModel)]="guests" class="form-control">
+                <option *ngFor="let i of [1,2,3,4,5,6,7,8].slice(0, suite.maxGuests || 2)" [value]="i">{{i}}</option>
+              </select>
+            </div>
+          </div>
+          <p class="flex-between"><span>Precio ({{nights}} noches):</span> <strong>$ {{totalRoomPrice | number:'1.0-0'}}</strong></p>
+          <button class="btn-primary" style="width: 100%; margin-top: 1rem; margin-bottom: 2rem;" (click)="nextStep()">Continuar →</button>
+          
+          <!-- Beneficios y Políticas -->
+          <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem;">
+            <h4 style="color: var(--gold); margin: 0 0 1rem 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px;">Beneficios Reserva Directa</h4>
+            <ul style="list-style: none; padding: 0; margin: 0; color: #ccc; font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.8rem;">
+              <li style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="color: #2ecc71;">✓</span> Mejor tarifa garantizada
+              </li>
+              <li style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="color: #2ecc71;">✓</span> Cóctel de bienvenida de cortesía
+              </li>
+              <li style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="color: #2ecc71;">✓</span> Acceso prioritario al Spa
+              </li>
+            </ul>
+
+            <h4 style="color: var(--gold); margin: 1.5rem 0 1rem 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px;">Información Útil</h4>
+            <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 6px; font-size: 0.85rem; color: #aaa; display: flex; flex-direction: column; gap: 0.5rem;">
+              <div class="flex-between">
+                <span>Check-in:</span>
+                <span style="color: #fff;">15:00</span>
+              </div>
+              <div class="flex-between">
+                <span>Check-out:</span>
+                <span style="color: #fff;">12:00</span>
+              </div>
+              <div class="flex-between">
+                <span>Cancelación:</span>
+                <span style="color: #fff;">Gratis hasta 48h antes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 2: Experiences -->
+    <div class="panel" *ngIf="step === 2">
+      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 2rem;">Mejora tu estancia con Experiencias</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem;">
+        <div *ngFor="let exp of experiences" class="exp-card" [class.selected]="isExperienceSelected(exp)" (click)="toggleExperience(exp)">
+          <div>
+            <img [src]="exp.mainImage || exp.image || 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=800'" style="width: 100%; height: 150px; object-fit: cover; border-radius: 6px; margin-bottom: 1rem;">
+            <h3 style="margin: 0 0 0.5rem 0; font-size: 1.1rem;">{{exp.name}}</h3>
+            <p style="font-size: 0.85rem; color: #aaa;">{{exp.description?.substring(0,60)}}...</p>
+          </div>
+          <div class="flex-between" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+            <strong style="color: var(--gold);">$ {{exp.price | number:'1.0-0'}}</strong>
+            <span *ngIf="isExperienceSelected(exp)" style="background: var(--gold); color: #000; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;">✓ Añadido</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex-between" style="margin-top: 3rem;">
+        <button class="btn-secondary" (click)="prevStep()">← Atrás</button>
+        <button class="btn-primary" (click)="nextStep()">Continuar →</button>
+      </div>
+    </div>
+
+    <!-- PANEL 3: VIP Services -->
+    <div class="panel" *ngIf="step === 3">
+      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 2rem;">Servicios VIP</h2>
+      
+      <div class="card" style="margin-bottom: 2rem;">
+        <div class="flex-between">
+          <div>
+            <h3 style="margin: 0 0 0.5rem 0;">🚗 Recogida en el Aeropuerto</h3>
+            <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Servicio de transporte privado desde el aeropuerto hasta tu suite.</p>
+          </div>
+          <div style="text-align: right;">
+            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ 150.000</div>
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" [(ngModel)]="airportPickup" style="width: 20px; height: 20px; accent-color: var(--gold);">
+              <span>Agregar</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between" style="margin-bottom: 1.5rem;">
+          <div>
+            <h3 style="margin: 0 0 0.5rem 0;">🍽️ Comida Personalizada</h3>
+            <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Selecciona tu almuerzo y disfruta de los mejores platillos.</p>
+          </div>
+          <div style="text-align: right;">
+            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ 80.000</div>
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" [(ngModel)]="wantFood" style="width: 20px; height: 20px; accent-color: var(--gold);">
+              <span>Agregar Comida</span>
+            </label>
+          </div>
+        </div>
+
+        <div *ngIf="wantFood" style="background: rgba(0,0,0,0.3); padding: 1.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+          <label style="display: block; color: var(--gold); margin-bottom: 0.5rem;">Elige tu platillo principal:</label>
+          <select [(ngModel)]="foodType" class="form-control" style="margin-bottom: 1rem;">
+            <option value="">-- Seleccionar --</option>
+            <option *ngFor="let opt of foodOptions" [value]="opt.id">{{opt.name}}</option>
+          </select>
+
+          <div *ngIf="foodType === 'other'" style="margin-bottom: 1rem;">
+            <textarea [(ngModel)]="customFood" placeholder="Escribe tu platillo detalladamente..." class="form-control" rows="3"></textarea>
+          </div>
+
+          <div *ngIf="foodType" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed rgba(212,175,55,0.3);">
+            <div class="flex-between">
+              <div>
+                <strong style="color: var(--gold);">☕ Combo Desayuno Incluido</strong>
+                <p style="font-size: 0.85rem; color: #aaa; margin: 0.3rem 0 0 0;">Estas comidas se sirven en el almuerzo. Agrega el desayuno completamente gratis por un monto extra mínimo.</p>
+              </div>
+              <div style="text-align: right;">
+                <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ 35.000</div>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; justify-content: flex-end;">
+                  <input type="checkbox" [(ngModel)]="breakfastCombo" style="width: 18px; height: 18px; accent-color: var(--gold);">
+                  <span>Añadir</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-between" style="margin-top: 3rem;">
+        <button class="btn-secondary" (click)="prevStep()">← Atrás</button>
+        <button class="btn-primary" (click)="nextStep()">Continuar →</button>
+      </div>
+    </div>
+
+    <!-- PANEL 4: Summary & Payment Redirect -->
+    <div class="panel" *ngIf="step === 4">
+      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 2rem;">Resumen de tu Reserva</h2>
+      
+      <div style="max-width: 800px; margin: 0 auto;">
+        
+        <!-- Minimal Summary -->
+        <div class="card" style="margin-bottom: 2rem; text-align: center;">
+          <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1rem;">Confirmación</h3>
+          <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 1.5rem;">Estás a un paso de confirmar tu estadía en <strong>{{suite.name}}</strong>.</p>
+          
+          <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem;">
+            <button class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 6px;" (click)="goToStep(1)">✏️ Editar Fechas</button>
+            <button class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 6px;" (click)="goToStep(2)">✏️ Editar Extras</button>
+          </div>
+
+          <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(212,175,55,0.3); font-size: 1.5rem; font-weight: bold;">
+            <span style="color: #fff; margin-right: 15px;">Total Estimado:</span>
+            <span style="color: var(--gold);">$ {{grandTotal | number:'1.0-0'}}</span>
+          </div>
+          <p style="color: #888; font-size: 0.85rem; margin-top: 1rem;">Podrás revisar el desglose detallado en el Centro de Pago.</p>
+        </div>
+
+        <!-- Auth Check & Redirect -->
+
+        <div class="card" style="text-align: center;">
+          <div *ngIf="!auth.isLoggedIn()">
+            <h3 style="margin-top: 0; color: #ff4d4d;">Requiere Iniciar Sesión</h3>
+            <p style="color: #ccc; font-size: 0.95rem; margin-bottom: 1.5rem;">Para confirmar tu reserva y proceder al pago, debes tener una cuenta.</p>
+            <button class="btn-primary" style="width: 100%; max-width: 300px;" (click)="openAuth()">Iniciar Sesión / Registrarse</button>
+          </div>
+          <div *ngIf="auth.isLoggedIn()">
+            <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1rem;">Confirmación</h3>
+            <p style="color: #ccc; font-size: 0.95rem; margin-bottom: 1.5rem;">Al continuar, se creará tu reserva y serás redirigido a nuestro Centro de Pago seguro para completarla.</p>
+            <p *ngIf="message" [style.color]="isError ? '#ff4d4d' : 'var(--gold)'" style="font-size: 0.9rem; margin-bottom: 1rem;">{{message}}</p>
+            <button class="btn-primary" style="width: 100%; max-width: 300px; font-size: 1.1rem; padding: 1rem;" (click)="createBooking()" [disabled]="bookingBusy">
+              {{ bookingBusy ? 'Creando Reserva...' : 'Pagar →' }}
+            </button>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 2rem;">
+           <button class="btn-secondary" (click)="prevStep()">← Atrás</button>
+        </div>
+
+        <!-- Trust Badges -->
+        <div style="margin-top: 3rem; text-align: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 2rem;">
+          <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; color: #888;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; max-width: 150px;">
+              <span style="font-size: 1.5rem;">🔒</span>
+              <span style="font-size: 0.8rem; font-weight: bold; color: #aaa;">PAGO 100% SEGURO</span>
+              <span style="font-size: 0.7rem;">Encriptación SSL de 256 bits</span>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; max-width: 150px;">
+              <span style="font-size: 1.5rem;">✨</span>
+              <span style="font-size: 0.8rem; font-weight: bold; color: #aaa;">RESERVA FLEXIBLE</span>
+              <span style="font-size: 0.7rem;">Modifica tus fechas sin costo adicional</span>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; max-width: 150px;">
+              <span style="font-size: 1.5rem;">🎧</span>
+              <span style="font-size: 0.8rem; font-weight: bold; color: #aaa;">SOPORTE 24/7</span>
+              <span style="font-size: 0.7rem;">Asistencia personalizada con nuestro Concierge</span>
+            </div>
+          </div>
+          <div style="margin-top: 1.5rem; display: flex; justify-content: center; gap: 1rem; opacity: 0.5;">
+            <span style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">VISA</span>
+            <span style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">MASTERCARD</span>
+            <span style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">AMEX</span>
+            <span style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">PSE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <app-auth-modal [isOpen]="authModalOpen" [initialMode]="authMode" (closeEvent)="onAuthClose()"></app-auth-modal>
+</div>
