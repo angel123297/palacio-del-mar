@@ -31,8 +31,8 @@ public class AdminService {
         private BigDecimal totalRevenue;
     }
 
-    public List<Booking> getAllBookings() {
-        return bookingRepository.findAll();
+    public org.springframework.data.domain.Page<Booking> getAllBookings(org.springframework.data.domain.Pageable pageable) {
+        return bookingRepository.findAll(pageable);
     }
 
     public Booking updateBookingStatus(String bookingId, String newStatus) {
@@ -71,6 +71,7 @@ public class AdminService {
         BigDecimal totalRevenue = bookingRepository.findAll().stream()
                 .filter(b -> "confirmed".equalsIgnoreCase(b.getStatus()) || "completed".equalsIgnoreCase(b.getStatus()))
                 .map(Booking::getTotalPrice)
+                .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return AdminDashboardStats.builder()

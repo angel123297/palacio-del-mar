@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -19,7 +20,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Document(collection = "suitenights")
 @CompoundIndexes({
-        @CompoundIndex(name = "suite_unit_date_idx", def = "{'suite': 1, 'unitSlot': 1, 'date': 1}", unique = true)
+        @CompoundIndex(name = "suite_unit_dates_idx", def = "{'suite': 1, 'unitSlot': 1, 'dates': 1}", unique = true)
 })
 public class SuiteNight {
 
@@ -33,7 +34,7 @@ public class SuiteNight {
     private String branch;
 
     private Integer unitSlot;
-    private LocalDate date;
+    private List<LocalDate> dates;
 
     @Indexed
     private String booking; // Booking ObjectId reference
@@ -41,6 +42,7 @@ public class SuiteNight {
     @Indexed
     private String status; // "blocked", "held", "maintenance"
 
+    @Indexed(expireAfterSeconds = 0)
     private Instant expiresAt;
 
     @Builder.Default

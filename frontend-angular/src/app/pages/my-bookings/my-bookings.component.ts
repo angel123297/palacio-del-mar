@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { LoyaltyService } from '../../services/loyalty.service';
 import { Booking } from '../../models/types';
 import { finalize } from 'rxjs';
 
@@ -25,6 +26,24 @@ import { finalize } from 'rxjs';
       </div>
 
       <div *ngIf="!loading && bookings.length > 0" style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Palace Club Summary -->
+        <div style="background: linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(0,0,0,0.8) 100%); border: 1px solid rgba(212,175,55,0.3); border-radius: 12px; padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-family: var(--font-title); font-size: 1.2rem; color: var(--gold); margin: 0 0 0.5rem 0; text-transform: uppercase;">The Palace Club</h2>
+            <p style="color: #ccc; font-size: 0.9rem; margin: 0;">Nivel Actual: <strong style="color: #fff;">{{ loyalty.status().tier }}</strong></p>
+          </div>
+          <div style="flex-grow: 1; max-width: 400px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #aaa; margin-bottom: 4px;">
+              <span>{{ loyalty.status().points | number }} pts</span>
+              <span>Faltan {{ loyalty.status().nextTierPoints - loyalty.status().points | number }} pts para el siguiente nivel</span>
+            </div>
+            <div style="background: rgba(255,255,255,0.1); border-radius: 20px; height: 8px; width: 100%; overflow: hidden;">
+              <div style="background: var(--gold); height: 100%; transition: width 1s ease-in-out;" [style.width.%]="loyalty.progressPercentage()"></div>
+            </div>
+          </div>
+        </div>
+
         <div *ngFor="let booking of bookings" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 1.5rem; display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: space-between; align-items: center;">
           <div>
             <h3 style="margin: 0 0 6px 0; color: #ffffff;">{{ booking.suite?.name || 'Suite Palacio del Mar' }}</h3>
@@ -64,7 +83,8 @@ export class MyBookingsComponent implements OnInit {
     private api: ApiService,
     private auth: AuthService,
     private cdr: ChangeDetectorRef,
-    private router: Router
+    private router: Router,
+    public loyalty: LoyaltyService
   ) {}
 
   printInvoice(booking: any) {

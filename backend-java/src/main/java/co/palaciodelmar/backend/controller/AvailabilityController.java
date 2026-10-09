@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.controller;
 
 import co.palaciodelmar.backend.dto.ApiResponse;
+import co.palaciodelmar.backend.dto.PromotionDTO;
 import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.service.AvailabilityService;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/availability")
@@ -47,12 +49,30 @@ public class AvailabilityController {
     }
 
     @GetMapping("/promotions")
-    public ResponseEntity<ApiResponse<List<Promotion>>> getMonthlyPromotions(
+    public ResponseEntity<ApiResponse<List<PromotionDTO>>> getMonthlyPromotions(
             @RequestParam int year,
             @RequestParam int month,
             @RequestParam(required = false) String branch
     ) {
-        List<Promotion> promotions = availabilityService.getMonthlyPromotions(year, month, branch);
+        List<PromotionDTO> promotions = availabilityService.getMonthlyPromotions(year, month, branch).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(ApiResponse.ok(promotions));
+    }
+
+    private PromotionDTO toDTO(Promotion promotion) {
+        if (promotion == null) return null;
+        return PromotionDTO.builder()
+                .id(promotion.getId())
+                .branch(promotion.getBranch())
+                .title(promotion.getTitle())
+                .discountPercent(promotion.getDiscountPercent())
+                .startDate(promotion.getStartDate())
+                .endDate(promotion.getEndDate())
+                .active(promotion.getActive())
+                .isSample(promotion.getIsSample())
+                .createdAt(promotion.getCreatedAt())
+                .updatedAt(promotion.getUpdatedAt())
+                .build();
     }
 }

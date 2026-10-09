@@ -12,4 +12,5 @@ public interface SuiteRepository extends MongoRepository<Suite, String> {
     Optional<Suite> findBySlug(String slug);
     List<Suite> findByBranchAndActiveTrue(String branchId);
     List<Suite> findByActiveTrue();
+    long countByBranchIn(List<String> branches);
 }

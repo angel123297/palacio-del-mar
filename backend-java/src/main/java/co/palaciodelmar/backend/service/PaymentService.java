@@ -72,9 +72,22 @@ public class PaymentService {
         String receiptNumber = "REC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         String transactionId = "TX-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
 
+        booking.setPaidAmount((booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO).add(amount));
+        booking.setBalanceDue(BigDecimal.ZERO);
+        booking.setPaymentStatus("paid");
+        booking.setStatus("confirmed");
+        booking.setUpdatedAt(Instant.now());
+
+        Booking updatedBooking;
+        try {
+            updatedBooking = bookingRepository.save(booking);
+        } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+            throw new IllegalStateException("Conflicto al procesar el pago. Posible pago concurrente.");
+        }
+
         Payment payment = Payment.builder()
-                .booking(booking.getId())
-                .user(userId != null ? userId : booking.getUser())
+                .booking(updatedBooking.getId())
+                .user(userId != null ? userId : updatedBooking.getUser())
                 .amount(amount)
                 .currency("COP")
                 .status("completed")
@@ -87,13 +100,6 @@ public class PaymentService {
                 .build();
 
         Payment savedPayment = paymentRepository.save(payment);
-
-        booking.setPaidAmount((booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO).add(amount));
-        booking.setBalanceDue(BigDecimal.ZERO);
-        booking.setPaymentStatus("paid");
-        booking.setStatus("confirmed");
-        booking.setUpdatedAt(Instant.now());
-        Booking updatedBooking = bookingRepository.save(booking);
 
         BookingDTO bookingDTO = bookingService.toDTO(updatedBooking);
 
@@ -127,22 +133,7 @@ public class PaymentService {
                 ? request.getAmount()
                 : balance;
 
-        Payment payment = Payment.builder()
-                .booking(booking.getId())
-                .user(userId)
-                .amount(amount)
-                .currency("COP")
-                .status(paymentStatus)
-                .provider("simulated")
-                .transactionId(transactionId)
-                .paymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "simulated")
-                .notes(isSuccess ? "Pago simulado exitoso (localhost)" : "Pago simulado fallido (localhost)")
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
-                .build();
-
-        Payment savedPayment = paymentRepository.save(payment);
-
+        Payment savedPayment = null;
         if (isSuccess) {
             BigDecimal currentPaid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
             BigDecimal newPaid = currentPaid.add(amount);
@@ -157,8 +148,28 @@ public class PaymentService {
                 booking.setPaymentStatus("partial");
             }
             booking.setUpdatedAt(Instant.now());
-            bookingRepository.save(booking);
+            try {
+                bookingRepository.save(booking);
+            } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+                throw new IllegalStateException("Conflicto al procesar el pago. Posible pago concurrente.");
+            }
         }
+
+        Payment payment = Payment.builder()
+                .booking(booking.getId())
+                .user(userId)
+                .amount(amount)
+                .currency("COP")
+                .status(paymentStatus)
+                .provider("simulated")
+                .transactionId(transactionId)
+                .paymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "simulated")
+                .notes(isSuccess ? "Pago simulado exitoso (localhost)" : "Pago simulado fallido (localhost)")
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        savedPayment = paymentRepository.save(payment);
 
         return toDTO(savedPayment);
     }

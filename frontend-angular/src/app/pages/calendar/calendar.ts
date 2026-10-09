@@ -14,7 +14,7 @@ import { finalize } from 'rxjs';
         <h1 style="font-family: var(--font-title); font-size: 2.2rem; color: var(--gold); text-align: center; margin-bottom: 2rem;">Calendario de Disponibilidad</h1>
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid rgba(212,175,55,0.2);">
-          <button (click)="changeMonth(-1)" class="btn-outline" style="padding: 8px 16px;">&larr; Anterior</button>
+          <button (click)="changeMonth(-1)" class="btn-outline" style="padding: 8px 16px;" [disabled]="isCurrentOrPastMonth" [style.opacity]="isCurrentOrPastMonth ? '0.5' : '1'" [style.cursor]="isCurrentOrPastMonth ? 'not-allowed' : 'pointer'">&larr; Anterior</button>
           <h2 style="margin: 0; color: #fff;">{{ monthName }} {{ year }}</h2>
           <button (click)="changeMonth(1)" class="btn-outline" style="padding: 8px 16px;">Siguiente &rarr;</button>
         </div>
@@ -33,10 +33,10 @@ import { finalize } from 'rxjs';
             <div *ngFor="let empty of emptyDays" style="border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); padding: 1.5rem; background: rgba(0,0,0,0.2);"></div>
             <div *ngFor="let day of calendarDays" 
                  style="border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); padding: 1.5rem; position: relative;"
-                 [style.background]="day.available ? 'rgba(46, 204, 113, 0.05)' : 'rgba(255, 77, 77, 0.05)'">
-              <span style="font-size: 1.2rem; font-weight: 600; color: #fff;">{{ day.date }}</span>
-              <div style="margin-top: 0.5rem; font-size: 0.75rem;" [style.color]="day.available ? '#2ecc71' : '#ff4d4d'">
-                {{ day.available ? 'Disponible' : 'Ocupado' }}
+                 [style.background]="day.isPast ? 'rgba(255, 255, 255, 0.02)' : (day.available ? 'rgba(46, 204, 113, 0.05)' : 'rgba(255, 77, 77, 0.05)')">
+              <span style="font-size: 1.2rem; font-weight: 600;" [style.color]="day.isPast ? '#666' : '#fff'">{{ day.date }}</span>
+              <div style="margin-top: 0.5rem; font-size: 0.75rem;" [style.color]="day.isPast ? '#666' : (day.available ? '#2ecc71' : '#ff4d4d')">
+                {{ day.isPast ? 'Pasado' : (day.available ? 'Disponible' : 'Ocupado') }}
               </div>
             </div>
           </div>
@@ -70,15 +70,29 @@ export class CalendarComponent implements OnInit {
     return Array(firstDay).fill(0);
   }
 
+  get isCurrentOrPastMonth(): boolean {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
+    if (this.year < currentYear) return true;
+    if (this.year === currentYear && this.month <= currentMonth) return true;
+    return false;
+  }
+
   get calendarDays(): any[] {
     const daysInMonth = new Date(this.year, this.month, 0).getDate();
     const days = [];
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
     for (let i = 1; i <= daysInMonth; i++) {
       const dateStr = `${this.year}-${String(this.month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      const isPast = dateStr < todayStr;
       days.push({
         date: i,
         dateStr,
-        available: this.availabilityData[dateStr] === true
+        available: isPast ? false : (this.availabilityData[dateStr] === true),
+        isPast: isPast
       });
     }
     return days;

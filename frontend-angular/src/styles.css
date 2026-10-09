@@ -1,4 +1,7 @@
-@charset "UTF-8";
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 :root {
   --gold: #c9a96e;
   --gold-light: #e8d5a3;
@@ -3226,4 +3229,93 @@ select option {
   background-color: var(--gold);
   color: var(--dark) !important;
   transform: scale(1.05);
+}
+
+/* --- PALACIO DEL MAR CALENDAR THEME --- */
+
+/* Override Material Datepicker variables if applicable */
+:root {
+  --mat-datepicker-calendar-container-background-color: var(--dark);
+  --mat-datepicker-calendar-container-text-color: var(--cream);
+  --mat-datepicker-calendar-header-text-color: var(--cream);
+  --mat-datepicker-calendar-header-divider-color: rgba(201, 169, 110, 0.2);
+  --mat-datepicker-calendar-header-navigation-icon-color: var(--gold);
+  --mat-datepicker-calendar-table-header-text-color: var(--gold-light);
+  --mat-datepicker-calendar-body-cell-text-color: var(--cream);
+  --mat-datepicker-calendar-body-cell-hover-background-color: rgba(201, 169, 110, 0.2);
+  --mat-datepicker-calendar-body-selected-cell-background-color: var(--gold);
+  --mat-datepicker-calendar-body-selected-cell-text-color: var(--dark);
+  --mat-datepicker-calendar-body-in-range-cell-background-color: rgba(201, 169, 110, 0.15);
+  --mat-datepicker-calendar-body-disabled-cell-text-color: rgba(245, 240, 232, 0.3);
+  --mat-datepicker-calendar-body-cell-today-outline-color: var(--gold);
+}
+
+/* Fallback direct classes for MDC / Legacy components */
+.mat-datepicker-content,
+.mat-mdc-datepicker-content,
+.mat-datepicker-content-container,
+.mat-mdc-datepicker-content-container {
+  background-color: var(--dark) !important;
+  color: var(--cream) !important;
+  border: 1px solid var(--gold) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
+}
+
+.mat-calendar, .mat-mdc-calendar {
+  background-color: transparent !important;
+  color: var(--cream) !important;
+}
+
+.mat-calendar-header, .mat-mdc-calendar-header {
+  color: var(--cream) !important;
+}
+
+.mat-calendar-controls .mat-mdc-button-base,
+.mat-calendar-controls .mat-icon-button,
+.mat-calendar-controls .mat-mdc-icon-button,
+.mat-calendar-controls .mdc-icon-button {
+  color: var(--gold) !important;
+}
+
+.mat-calendar-table-header th {
+  color: var(--gold-light) !important;
+}
+
+.mat-calendar-body-cell-content,
+.mat-mdc-calendar-body-cell-content {
+  color: var(--cream) !important;
+  border-color: transparent !important;
+}
+
+.mat-calendar-body-cell:hover .mat-calendar-body-cell-content:not(.mat-calendar-body-selected):not(.mat-calendar-body-disabled),
+.mat-calendar-body-cell:hover .mat-mdc-calendar-body-cell-content:not(.mat-calendar-body-selected):not(.mat-calendar-body-disabled) {
+  background-color: rgba(201, 169, 110, 0.2) !important;
+}
+
+.mat-calendar-body-selected,
+.mat-mdc-calendar-body-selected {
+  background-color: var(--gold) !important;
+  color: var(--dark) !important;
+  font-weight: bold !important;
+}
+
+.mat-calendar-body-in-range::before,
+.mat-mdc-calendar-body-in-range::before {
+  background-color: rgba(201, 169, 110, 0.15) !important;
+}
+
+.mat-calendar-body-cell-content.mat-calendar-body-in-range,
+.mat-mdc-calendar-body-cell-content.mat-mdc-calendar-body-in-range {
+  color: var(--gold-light) !important;
+}
+
+.mat-calendar-body-disabled > .mat-calendar-body-cell-content:not(.mat-calendar-body-selected),
+.mat-calendar-body-disabled > .mat-mdc-calendar-body-cell-content:not(.mat-calendar-body-selected) {
+  color: rgba(245, 240, 232, 0.25) !important;
+}
+
+.mat-calendar-body-today.mat-calendar-body-cell-content:not(.mat-calendar-body-selected),
+.mat-calendar-body-today.mat-mdc-calendar-body-cell-content:not(.mat-calendar-body-selected) {
+  border-color: var(--gold) !important;
 }

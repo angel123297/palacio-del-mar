@@ -9,7 +9,9 @@ import java.util.List;
 
 @Repository
 public interface SuiteNightRepository extends MongoRepository<SuiteNight, String> {
-    List<SuiteNight> findBySuiteAndDateBetween(String suiteId, LocalDate startDate, LocalDate endDate);
+    @org.springframework.data.mongodb.repository.Query("{ 'suite': ?0, 'dates': { $elemMatch: { $gte: ?1, $lte: ?2 } } }")
+    List<SuiteNight> findBySuiteAndDatesBetween(String suiteId, LocalDate startDate, LocalDate endDate);
     List<SuiteNight> findByBooking(String bookingId);
     void deleteByBooking(String bookingId);
+    List<SuiteNight> findByStatusAndExpiresAtBefore(String status, java.time.Instant expiresAt);
 }

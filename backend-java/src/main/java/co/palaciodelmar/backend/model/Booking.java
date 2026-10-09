@@ -48,8 +48,14 @@ public class Booking {
     @Builder.Default
     private Integer children = 0;
 
+    private BigDecimal subtotal;
+    private BigDecimal discount;
+    private BigDecimal taxes;
     private BigDecimal totalPrice;
-    private BigDecimal pricePerNight;
+    private BigDecimal pricePerNight; // Retained for backward compatibility
+    
+    @Builder.Default
+    private List<NightlyPrice> nightlyPrices = new ArrayList<>();
 
     @Builder.Default
     private BigDecimal paidAmount = BigDecimal.ZERO;
@@ -64,6 +70,9 @@ public class Booking {
     @Builder.Default
     private String status = "pending"; // "pending", "confirmed", "checked_in", "checked_out", "cancelled", "completed", "expired"
 
+    @Builder.Default
+    private List<StatusHistoryEntry> statusHistory = new ArrayList<>();
+
     @Indexed
     @Builder.Default
     private String paymentStatus = "pending"; // "pending", "paid", "failed", "refunded", "partial"
@@ -76,6 +85,11 @@ public class Booking {
     @Builder.Default
     private List<SelectedExperience> experiences = new ArrayList<>();
 
+    private Boolean airportPickup;
+
+    @Builder.Default
+    private List<FoodOrder> foodOrders = new ArrayList<>();
+
     private String cancellationReason;
 
     private Instant expiresAt;
@@ -85,6 +99,9 @@ public class Booking {
 
     @Builder.Default
     private Instant updatedAt = Instant.now();
+
+    @org.springframework.data.annotation.Version
+    private Long version;
 
     @Data
     @Builder
@@ -108,5 +125,36 @@ public class Booking {
         private String name;
         private BigDecimal price;
         private Integer quantity;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FoodOrder {
+        private String dishName;
+        private String type; // "typical", "normal", "custom"
+        private Boolean includesBreakfastCombo;
+        private BigDecimal price;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class NightlyPrice {
+        private LocalDate date;
+        private BigDecimal price;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class StatusHistoryEntry {
+        private String status;
+        private Instant timestamp;
+        private String changedBy;
+        private String reason;
     }
 }

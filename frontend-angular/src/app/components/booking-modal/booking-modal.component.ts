@@ -8,6 +8,7 @@ import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Suite } from '../../models/types';
 import { finalize } from 'rxjs';
+import { format } from 'date-fns';
 
 @Component({
   selector: 'app-booking-modal',
@@ -118,8 +119,8 @@ export class BookingModalComponent implements OnChanges {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 2);
-    this.checkIn = today.toISOString().split('T')[0];
-    this.checkOut = tomorrow.toISOString().split('T')[0];
+    this.checkIn = format(today, 'yyyy-MM-dd');
+    this.checkOut = format(tomorrow, 'yyyy-MM-dd');
   }
 
   get isLoggedIn(): boolean {
@@ -183,7 +184,7 @@ export class BookingModalComponent implements OnChanges {
     if (!this.isLoggedIn && !email) missing.push('correo electrónico');
     if (missing.length) return `Por favor completa: ${missing.join(', ')}.`;
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = format(new Date(), 'yyyy-MM-dd');
     if (this.checkIn < today) return 'La fecha de llegada no puede ser en el pasado.';
     if (this.checkOut <= this.checkIn) return 'La fecha de salida debe ser posterior a la de llegada.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Ingresa un correo electrónico válido.';

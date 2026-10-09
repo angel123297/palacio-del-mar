@@ -1,0 +1,115 @@
+.wizard-container {
+  min-height: 80vh;
+  background: #0d0d0d;
+  color: #ffffff;
+  padding: 2rem 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.step-indicator {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  padding-bottom: 1rem;
+}
+
+.step-item {
+  flex: 1;
+  text-align: center;
+  color: #666;
+  font-weight: bold;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.step-item.active {
+  color: var(--gold);
+}
+
+.step-item.completed {
+  color: #fff;
+}
+
+.panel {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: #0d0d0d;
+  font-weight: 700;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.3s;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  font-weight: 700;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: rgba(212, 175, 55, 0.1);
+}
+
+.card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(212,175,55,0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.exp-card {
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.exp-card:hover {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.exp-card.selected {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.1);
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(212,175,55,0.2);
+  color: #fff;
+  border-radius: 6px;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}

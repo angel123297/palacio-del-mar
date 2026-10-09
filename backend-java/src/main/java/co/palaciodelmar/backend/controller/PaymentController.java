@@ -3,7 +3,7 @@ package co.palaciodelmar.backend.controller;
 import co.palaciodelmar.backend.dto.ApiResponse;
 import co.palaciodelmar.backend.dto.PaymentDTO;
 import co.palaciodelmar.backend.dto.PaymentRequest;
-import co.palaciodelmar.backend.model.Payment;
+
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.PaymentService;
 import lombok.RequiredArgsConstructor;
