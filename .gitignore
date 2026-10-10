@@ -11,3 +11,13 @@ logs/
 frontend/playwright-report/
 frontend/test-results/
 .env
+
+# Backend
+backend-java/target/
+*.class
+
+# Frontend
+frontend-angular/.angular/
+frontend-angular/.vite/
+frontend-angular/dist/
+
