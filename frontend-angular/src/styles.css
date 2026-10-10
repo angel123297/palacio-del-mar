@@ -1,7 +1,4 @@
-@import '@angular/material/prebuilt-themes/indigo-pink.css';
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@charset "UTF-8";
 :root {
   --gold: #c9a96e;
   --gold-light: #e8d5a3;
@@ -196,8 +193,19 @@ nav {
   right: 0;
   bottom: 0;
   left: 0;
-  background: linear-gradient(to bottom, rgba(13, 13, 11, 0.55), rgba(13, 13, 11, 0.25) 40%, #0d0d0b);
-  transform: translateZ(0);
+  background:
+    linear-gradient(to bottom, #0d0d0b47, #0d0d0b14 40%, #0d0d0bc7),
+    url(https://images.unsplash.com/photo-1596436534822-06e8e5c6e0bc?w=1800&q=85)
+      center/cover no-repeat;
+  animation: heroZoom 20s ease-in-out infinite alternate;
+}
+@keyframes heroZoom {
+  0% {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
 }
 .hero-content {
   position: relative;
@@ -1120,8 +1128,10 @@ section {
   right: 0;
   bottom: 0;
   left: 0;
-  background-size: cover;
-  background-position: center;
+  background:
+    linear-gradient(to right, #0d0d0be6 40%, #0d0d0b38),
+    url(https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1400&q=80)
+      center/cover;
 }
 .spa-content {
   position: relative;
@@ -1961,8 +1971,7 @@ footer {
    oculto al hover (más usable, con botón y disponibilidad siempre
    visibles en vez de solo aparecer al pasar el mouse). ---------- */
 .room-card {
-  height: auto !important;
-  min-height: 420px;
+  height: auto;
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.02);
@@ -2095,11 +2104,6 @@ input, select, textarea {
   font-family: Jost, sans-serif;
   font-size: 0.9rem;
   width: 100%;
-}
-select option {
-  background-color: #121212 !important;
-  color: #f5e6c8 !important;
-  padding: 8px;
 }
 input:focus, select:focus, textarea:focus {
   outline: none;
@@ -3102,21 +3106,8 @@ input:focus, select:focus, textarea:focus {
   .detail-list { columns: 1; }
   .gallery-main { aspect-ratio: 4 / 3; }
 }
-.location-map {
-  min-height: 420px;
-  height: 420px;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(201, 169, 110, 0.25);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-.location-map .branch-map {
-  min-height: 420px;
-  height: 420px !important;
-  margin: 0;
-  border-radius: 12px;
-}
-.booking-modal .branch-map { height: 260px; }
+.location-map .branch-map { height: 100%; margin: 0; border-radius: 0; }
+.booking-modal .branch-map { height: 220px; }
 .stay-location { margin-bottom: 16px; }
 .stay-location-title { font-size: 1rem; margin: 0 0 4px; }
 
@@ -3136,186 +3127,4 @@ input:focus, select:focus, textarea:focus {
   .no-print { display: none !important; }
   .receipt-page { background: #fff; padding: 0; }
   .receipt { box-shadow: none; padding: 0; }
-}
-
-/* Luxury Loader */
-.luxury-loader-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem;
-  color: var(--gold);
-}
-
-.luxury-spinner {
-  width: 50px;
-  height: 50px;
-  border: 3px solid rgba(212, 175, 55, 0.2);
-  border-top-color: var(--gold);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.luxury-loader-text {
-  font-family: var(--font-title);
-  font-size: 1.2rem;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  animation: pulse 2s infinite ease-in-out;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
-}
-
-/* Select Inputs Styling */
-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4af37' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 16px;
-  background-color: #141414 !important;
-  color: #f5e6c8 !important;
-  border: 1px solid rgba(212,175,55,0.3) !important;
-  border-radius: 6px;
-  padding: 10px 30px 10px 10px;
-}
-select option {
-  background-color: #141414 !important;
-  color: #f5e6c8 !important;
-  padding: 10px;
-}
-
-/* Animations for Pro Max Feel */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.hero-content {
-  animation: fadeInUp 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
-.room-card, .exp-card, .branch-card {
-  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s ease, border-color 0.4s ease;
-}
-
-.room-card:hover, .exp-card:hover, .branch-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-  border-color: var(--gold) !important;
-}
-
-.btn-primary, .btn-outline {
-  transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
-}
-
-.btn-outline:hover {
-  background-color: var(--gold);
-  color: var(--dark) !important;
-  transform: scale(1.05);
-}
-
-/* --- PALACIO DEL MAR CALENDAR THEME --- */
-
-/* Override Material Datepicker variables if applicable */
-:root {
-  --mat-datepicker-calendar-container-background-color: var(--dark);
-  --mat-datepicker-calendar-container-text-color: var(--cream);
-  --mat-datepicker-calendar-header-text-color: var(--cream);
-  --mat-datepicker-calendar-header-divider-color: rgba(201, 169, 110, 0.2);
-  --mat-datepicker-calendar-header-navigation-icon-color: var(--gold);
-  --mat-datepicker-calendar-table-header-text-color: var(--gold-light);
-  --mat-datepicker-calendar-body-cell-text-color: var(--cream);
-  --mat-datepicker-calendar-body-cell-hover-background-color: rgba(201, 169, 110, 0.2);
-  --mat-datepicker-calendar-body-selected-cell-background-color: var(--gold);
-  --mat-datepicker-calendar-body-selected-cell-text-color: var(--dark);
-  --mat-datepicker-calendar-body-in-range-cell-background-color: rgba(201, 169, 110, 0.15);
-  --mat-datepicker-calendar-body-disabled-cell-text-color: rgba(245, 240, 232, 0.3);
-  --mat-datepicker-calendar-body-cell-today-outline-color: var(--gold);
-}
-
-/* Fallback direct classes for MDC / Legacy components */
-.mat-datepicker-content,
-.mat-mdc-datepicker-content,
-.mat-datepicker-content-container,
-.mat-mdc-datepicker-content-container {
-  background-color: var(--dark) !important;
-  color: var(--cream) !important;
-  border: 1px solid var(--gold) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
-}
-
-.mat-calendar, .mat-mdc-calendar {
-  background-color: transparent !important;
-  color: var(--cream) !important;
-}
-
-.mat-calendar-header, .mat-mdc-calendar-header {
-  color: var(--cream) !important;
-}
-
-.mat-calendar-controls .mat-mdc-button-base,
-.mat-calendar-controls .mat-icon-button,
-.mat-calendar-controls .mat-mdc-icon-button,
-.mat-calendar-controls .mdc-icon-button {
-  color: var(--gold) !important;
-}
-
-.mat-calendar-table-header th {
-  color: var(--gold-light) !important;
-}
-
-.mat-calendar-body-cell-content,
-.mat-mdc-calendar-body-cell-content {
-  color: var(--cream) !important;
-  border-color: transparent !important;
-}
-
-.mat-calendar-body-cell:hover .mat-calendar-body-cell-content:not(.mat-calendar-body-selected):not(.mat-calendar-body-disabled),
-.mat-calendar-body-cell:hover .mat-mdc-calendar-body-cell-content:not(.mat-calendar-body-selected):not(.mat-calendar-body-disabled) {
-  background-color: rgba(201, 169, 110, 0.2) !important;
-}
-
-.mat-calendar-body-selected,
-.mat-mdc-calendar-body-selected {
-  background-color: var(--gold) !important;
-  color: var(--dark) !important;
-  font-weight: bold !important;
-}
-
-.mat-calendar-body-in-range::before,
-.mat-mdc-calendar-body-in-range::before {
-  background-color: rgba(201, 169, 110, 0.15) !important;
-}
-
-.mat-calendar-body-cell-content.mat-calendar-body-in-range,
-.mat-mdc-calendar-body-cell-content.mat-mdc-calendar-body-in-range {
-  color: var(--gold-light) !important;
-}
-
-.mat-calendar-body-disabled > .mat-calendar-body-cell-content:not(.mat-calendar-body-selected),
-.mat-calendar-body-disabled > .mat-mdc-calendar-body-cell-content:not(.mat-calendar-body-selected) {
-  color: rgba(245, 240, 232, 0.25) !important;
-}
-
-.mat-calendar-body-today.mat-calendar-body-cell-content:not(.mat-calendar-body-selected),
-.mat-calendar-body-today.mat-mdc-calendar-body-cell-content:not(.mat-calendar-body-selected) {
-  border-color: var(--gold) !important;
 }

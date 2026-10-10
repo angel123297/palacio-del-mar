@@ -40,7 +40,7 @@ public class PricingService {
             longStayDiscountPercent = new BigDecimal("0.05"); // 5%
         }
 
-        BigDecimal promoPercent = branchPromotionPercent != null ? branchPromotionPercent.divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        BigDecimal promoPercent = branchPromotionPercent != null ? branchPromotionPercent.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP).min(BigDecimal.ONE) : BigDecimal.ZERO;
         BigDecimal appliedDiscountPercent = promoPercent.compareTo(longStayDiscountPercent) > 0 ? promoPercent : longStayDiscountPercent;
 
         BigDecimal discountAmount = subtotal.multiply(appliedDiscountPercent).setScale(2, RoundingMode.HALF_UP);

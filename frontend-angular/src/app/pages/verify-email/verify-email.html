@@ -1,0 +1,23 @@
+<div class="verify-container">
+  <div class="verify-card" [ngClass]="status()">
+    <div class="icon-container">
+      <i class="fa-solid" 
+         [ngClass]="{
+           'fa-spinner fa-spin': status() === 'loading',
+           'fa-check-circle': status() === 'success',
+           'fa-times-circle': status() === 'error'
+         }"></i>
+    </div>
+    
+    <h1 class="title">
+      {{ status() === 'loading' ? 'Verificando...' : 
+         status() === 'success' ? '¡Verificación Exitosa!' : 'Verificación Fallida' }}
+    </h1>
+    
+    <p class="message">{{ message() }}</p>
+    
+    <div class="actions" *ngIf="status() !== 'loading'">
+      <a routerLink="/" class="btn-gold">Volver al Inicio</a>
+    </div>
+  </div>
+</div>

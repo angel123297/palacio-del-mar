@@ -42,6 +42,12 @@ public class Payment {
 
     private String notes;
 
+    @Indexed(unique = true, sparse = true)
+    private String idempotencyKey;
+
+    @Indexed(unique = true, sparse = true)
+    private String intentId;
+
     @Builder.Default
     private Instant createdAt = Instant.now();
 

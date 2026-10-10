@@ -46,7 +46,10 @@ public class User {
     private String status = "active"; // "active", "inactive", "suspended", "pending_verification"
 
     @Builder.Default
-    private Boolean emailVerified = true;
+    private Boolean emailVerified = false;
+
+    private String verificationTokenHash;
+    private Instant verificationTokenExpiresAt;
 
     private Profile profile;
 

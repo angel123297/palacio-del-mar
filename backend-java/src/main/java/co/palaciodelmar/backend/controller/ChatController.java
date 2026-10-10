@@ -29,6 +29,17 @@ public class ChatController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping("/vibe-score")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> getVibeScore(@RequestBody Map<String, Object> body) {
+        String vibe = body != null && body.get("vibe") != null ? body.get("vibe").toString() : "";
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> suites = body != null && body.get("suites") instanceof List
+                ? (List<Map<String, Object>>) body.get("suites")
+                : List.of();
+                
+        return ResponseEntity.ok(ApiResponse.ok(chatService.scoreSuitesForVibe(vibe, suites)));
+    }
+
     @GetMapping("/status")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getStatus() {
         return ResponseEntity.ok(ApiResponse.ok(chatService.getStatus()));

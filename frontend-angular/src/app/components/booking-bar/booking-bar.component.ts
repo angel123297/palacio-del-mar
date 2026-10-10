@@ -1,51 +1,30 @@
 import { Component, OnInit, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormGroup, FormControl } from '@angular/forms';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatNativeDateModule } from '@angular/material/core';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { SearchStateService } from '../../services/search-state.service';
 import { Branch, ApiResponse } from '../../models/types';
+import { DateRangePickerComponent } from '../date-range-picker.component';
 
 @Component({
   selector: 'app-booking-bar',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatDatepickerModule, MatNativeDateModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, DateRangePickerComponent],
   template: `
     <div id="booking-bar" class="bg-[#161311] border-b-2 border-[rgba(201,169,110,0.3)] shadow-2xl sticky top-[57px] z-[190] px-4 md:px-12 relative">
       
       <form class="flex flex-col md:flex-row items-stretch w-full" (ngSubmit)="submit()">
         
-        <!-- Fechas (Datepicker Material Oculto, Custom Trigger) -->
-        <div class="flex-1 min-w-[240px] p-4 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] cursor-pointer hover:bg-[rgba(201,169,110,0.05)] transition relative flex flex-col justify-center group" (click)="picker.open()">
-          <label class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1">Fechas</label>
-          <div class="text-[#f5f0e8] font-serif text-lg md:text-xl font-medium select-none">
-            {{ dateRange.value.start ? (dateRange.value.start | date:'dd MMM yyyy') : 'Llegada' }} 
-            &nbsp;&mdash;&nbsp; 
-            {{ dateRange.value.end ? (dateRange.value.end | date:'dd MMM yyyy') : 'Salida' }}
-          </div>
-          <span class="text-[11px] text-[rgba(201,169,110,0.7)] mt-1" *ngIf="searchState.nights() > 0">
-            {{ searchState.nights() }} noche(s) de estancia
-          </span>
-          
-          <!-- Flexible Pricing Graph Overlay -->
-          <div class="absolute left-0 right-0 top-full mt-2 bg-[#161311] border border-[rgba(201,169,110,0.3)] rounded-lg p-3 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-            <p class="text-[10px] text-[#c9a96e] uppercase tracking-widest mb-2 text-center">Tendencia de Precios</p>
-            <div class="flex items-end justify-between h-12 gap-1">
-              <div *ngFor="let h of [40, 60, 30, 80, 50, 40, 90, 70, 40, 30, 50, 60, 40, 30]" 
-                   class="w-full bg-[rgba(201,169,110,0.4)] rounded-t-sm"
-                   [style.height.%]="h"></div>
-            </div>
-          </div>
-
-          <!-- Angular Material Datepicker -->
-          <mat-date-range-input [rangePicker]="picker" [formGroup]="dateRange" [min]="minDate" style="display: none; visibility: hidden; width: 0; height: 0;">
-            <input matStartDate formControlName="start">
-            <input matEndDate formControlName="end" (dateChange)="onDatesChanged()">
-          </mat-date-range-input>
-          <mat-date-range-picker #picker></mat-date-range-picker>
-        </div>
+        <!-- Fechas (DateRangePicker) -->
+        <app-date-range-picker
+          class="flex-[2] min-w-[240px] border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)]"
+          [checkIn]="searchState.filters().checkIn"
+          [checkOut]="searchState.filters().checkOut"
+          [guests]="searchState.filters().adults + searchState.filters().children"
+          [branch]="searchState.filters().branchSlug"
+          (rangeChange)="onRangeChange($event)">
+        </app-date-range-picker>
 
         <!-- Sucursal -->
         <div class="flex-1 min-w-[140px] p-4 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center" *ngIf="branches.length > 0">
@@ -100,24 +79,8 @@ export class BookingBarComponent implements OnInit {
   searchState = inject(SearchStateService);
 
   branches: Branch[] = [];
-  minDate = new Date();
-
-  dateRange = new FormGroup({
-    start: new FormControl<Date | null>(null),
-    end: new FormControl<Date | null>(null)
-  });
-
-  constructor() {
-    // Sync initial state from service using safe midday parsing
-    const f = this.searchState.filters();
-    this.dateRange.setValue({
-      start: this.searchState.parseToMidday(f.checkIn),
-      end: this.searchState.parseToMidday(f.checkOut)
-    }, { emitEvent: false });
-  }
 
   ngOnInit(): void {
-    // Strongly typed response
     this.api.get<ApiResponse<Branch[]> | Branch[]>('/branches').subscribe({
       next: (res) => {
         if (Array.isArray(res)) {
@@ -131,10 +94,15 @@ export class BookingBarComponent implements OnInit {
     });
   }
 
-  onDatesChanged(): void {
-    const { start, end } = this.dateRange.value;
-    if (start && end) {
-      this.searchState.updateDates(start, end);
+  onRangeChange(event: {checkIn: string, checkOut: string}) {
+    if (event.checkIn && event.checkOut) {
+      this.searchState.updateDates(
+        this.searchState.parseToMidday(event.checkIn),
+        this.searchState.parseToMidday(event.checkOut)
+      );
+    } else if (event.checkIn) {
+      // Solo actualizamos el checkIn para mantener el estado
+      this.searchState.updateRawDates(event.checkIn, '');
     }
   }
 

@@ -1,13 +1,14 @@
 import { Component, OnInit, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse } from '../../models/types';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="min-h-screen bg-[#0d0d0d] text-white pt-24 pb-16 px-6">
       <div class="max-w-[1400px] mx-auto">
@@ -16,16 +17,16 @@ import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse } from '..
         <!-- KPI Cards -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
-            <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Reservas Confirmadas</p>
-            <p class="font-serif text-4xl text-[#f5f0e8]">{{ metrics()?.activeBookings || 0 }}</p>
+            <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Total Usuarios</p>
+            <p class="font-serif text-4xl text-[#f5f0e8]">{{ metrics()?.totalUsers || 0 }}</p>
           </div>
           <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
             <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Ingresos Totales</p>
             <p class="font-serif text-4xl text-[#f5f0e8]">$ {{ metrics()?.totalRevenue || 0 | number:'1.0-0' }}</p>
           </div>
           <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
-            <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Ocupación Promedio</p>
-            <p class="font-serif text-4xl text-[#f5f0e8]">{{ metrics()?.averageOccupancy || 0 }}%</p>
+            <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Total Habitaciones</p>
+            <p class="font-serif text-4xl text-[#f5f0e8]">{{ metrics()?.totalSuites || 0 }}</p>
           </div>
           <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
             <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Total Reservas</p>
@@ -93,7 +94,7 @@ import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse } from '..
                     </span>
                   </td>
                   <td class="py-4 px-6 text-right">
-                    <button class="text-xs text-[#c9a96e] hover:text-white transition px-2">Ver</button>
+                    <button [routerLink]="['/reservas', b.id || b._id]" class="text-xs text-[#c9a96e] hover:text-white transition px-2">Ver</button>
                     <button *ngIf="b.status === 'pending' || b.status === 'PENDING'" class="text-xs text-[#2ecc71] hover:text-white transition px-2">Aprobar</button>
                   </td>
                 </tr>
@@ -141,7 +142,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   fetchMetrics() {
-    this.api.get<ApiResponse<DashboardMetricsDTO>>('/admin/metrics').subscribe({
+    this.api.get<ApiResponse<DashboardMetricsDTO>>('/admin/stats').subscribe({
       next: (res) => {
         if (res.data) {
           this.metrics.set(res.data);
@@ -161,21 +162,24 @@ export class AdminDashboardComponent implements OnInit {
 
     this.api.get<ApiResponse<PaginatedResponse<Booking>> | PaginatedResponse<Booking>>('/admin/bookings', params).subscribe({
       next: (res) => {
-        const payload = (res as ApiResponse<PaginatedResponse<Booking>>).data || (res as PaginatedResponse<Booking>);
-        if (payload && payload.data) {
+        const payload: any = (res as any).data || res;
+        
+        if (payload && payload.content) { // Spring Data Page format
+          this.bookings.set(payload.content);
+          this.currentPage.set((payload.number || 0) + 1);
+          this.totalPages.set(payload.totalPages || 1);
+          this.totalItems.set(payload.totalElements || 0);
+        } else if (payload && payload.data && !Array.isArray(payload)) { // Alternative custom paginated format
           this.bookings.set(payload.data);
           this.currentPage.set(payload.page || 1);
           this.totalPages.set(payload.totalPages || 1);
           this.totalItems.set(payload.total || 0);
-        } else if (Array.isArray(res)) {
-          // Fallback just in case backend isn't updated yet
-          this.bookings.set(res as any);
+        } else if (Array.isArray(payload)) { // Array fallback
+          this.bookings.set(payload);
           this.totalPages.set(1);
-          this.totalItems.set(res.length);
-        } else if ((res as any).data && Array.isArray((res as any).data)) {
-          this.bookings.set((res as any).data);
-          this.totalPages.set(1);
-          this.totalItems.set((res as any).data.length);
+          this.totalItems.set(payload.length);
+        } else {
+          this.bookings.set([]);
         }
         this.loading.set(false);
       },

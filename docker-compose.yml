@@ -31,9 +31,23 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en el archivo .env (copia .env.example)}
       JWT_EXPIRATION: "604800000"
       SERVER_PORT: "5000"
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       mongo:
         condition: service_healthy
+
+  # --- Mailpit (Servidor SMTP de pruebas) -------------------------------------
+  mailpit:
+    image: axllent/mailpit
+    container_name: palacio-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    environment:
+      MP_MAX_MESSAGES: 500
 
   # --- Frontend Angular 18 ----------------------------------------------------
   web-angular:

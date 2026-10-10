@@ -8,7 +8,7 @@ import { Experience } from '../../models/types';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <section id="experiences">
+    <section id="experiencias">
       <div class="rooms-header">
         <p class="sec-label">Vive Cartagena</p>
         <h2 class="sec-title">Experiencias exclusivas</h2>

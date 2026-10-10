@@ -10,3 +10,4 @@ logs/
 
 frontend/playwright-report/
 frontend/test-results/
+.env

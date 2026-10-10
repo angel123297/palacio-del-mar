@@ -53,6 +53,14 @@ export class SearchStateService {
     }));
   }
 
+  updateRawDates(checkIn: string, checkOut: string) {
+    this.state.update(s => ({
+      ...s,
+      checkIn,
+      checkOut
+    }));
+  }
+
   updateBranch(branchSlug: string) {
     this.state.update(s => ({ ...s, branchSlug }));
   }

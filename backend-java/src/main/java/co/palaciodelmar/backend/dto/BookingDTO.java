@@ -37,6 +37,9 @@ public class BookingDTO {
 
     private BigDecimal pricePerNight;
     private BigDecimal subtotal;
+    private BigDecimal discount;
+    private BigDecimal taxes;
+    private List<Booking.NightlyPrice> nightlyPrices;
     private BigDecimal totalPrice;
     private BigDecimal paidAmount;
     private BigDecimal refundedAmount;

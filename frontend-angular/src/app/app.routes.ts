@@ -10,10 +10,11 @@ export const routes: Routes = [
   { path: 'reservas/:id', loadComponent: () => import('./pages/booking-detail/booking-detail.component').then(m => m.BookingDetailComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },
   { path: 'reservas/:id/comprobante', loadComponent: () => import('./pages/receipt/receipt.component').then(m => m.ReceiptComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },
   { path: 'admin', loadComponent: () => import('./pages/admin-dashboard/admin-dashboard.component').then(m => m.AdminDashboardComponent), canMatch: [adminMatchGuard], canActivate: [adminGuard] },
-  { path: 'host', loadComponent: () => import('./pages/host-dashboard/host-dashboard.component').then(m => m.HostDashboardComponent), canMatch: [hostMatchGuard], canActivate: [hostGuard] },
+  { path: 'anfitrion', loadComponent: () => import('./pages/host-dashboard/host-dashboard.component').then(m => m.HostDashboardComponent), canMatch: [hostMatchGuard], canActivate: [hostGuard] },
   { path: 'checkout/:bookingId', loadComponent: () => import('./pages/checkout/checkout').then(m => m.CheckoutComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },
   { path: 'perfil', loadComponent: () => import('./pages/profile/profile').then(m => m.ProfileComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },
   { path: 'calendario', loadComponent: () => import('./pages/calendar/calendar').then(m => m.CalendarComponent) },
+  { path: 'verificar-email/:token', loadComponent: () => import('./pages/verify-email/verify-email').then(m => m.VerifyEmail) },
   { path: '**', loadComponent: () => import('./pages/not-found/not-found.component').then(m => m.NotFoundComponent) }
 ];
 

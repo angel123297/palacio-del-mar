@@ -79,6 +79,12 @@ export class AuthService {
     );
   }
 
+  verifyEmail(token: string) {
+    return this.http.post<{success?: boolean, message?: string}>(`${this.apiUrl}/verify-email`, { token }).pipe(
+      timeout(this.TIMEOUT_MS)
+    );
+  }
+
   logout() {
     return this.http.post(`${this.apiUrl}/logout`, {}).pipe(
       tap(() => {

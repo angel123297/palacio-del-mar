@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnChanges, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { CustomDatepickerComponent } from '../custom-datepicker/custom-datepicker.component';
+import { DateRangePickerComponent } from '../date-range-picker.component';
 import { CustomGuestpickerComponent } from '../custom-guestpicker/custom-guestpicker.component';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 @Component({
   selector: 'app-booking-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomDatepickerComponent, CustomGuestpickerComponent],
+  imports: [CommonModule, FormsModule, DateRangePickerComponent, CustomGuestpickerComponent],
   template: `
     <div class="modal-backdrop" *ngIf="isOpen" (click)="close()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
       <div class="modal-content" (click)="$event.stopPropagation()" style="background: var(--dark); border: 1px solid var(--gold); border-radius: 12px; max-width: 550px; width: 100%; padding: 2rem; color: var(--cream); position: relative; max-height: 90vh; overflow-y: auto;">
@@ -34,9 +34,8 @@ import { format } from 'date-fns';
           </div>
 
           <form (ngSubmit)="confirmBooking()" style="display: flex; flex-direction: column; gap: 1rem;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <app-custom-datepicker label="Llegada" [date]="checkIn" (dateChange)="checkIn = $event; recalculateNights()"></app-custom-datepicker>
-                <app-custom-datepicker label="Salida" [date]="checkOut" (dateChange)="checkOut = $event; recalculateNights()"></app-custom-datepicker>
+            <div style="display: block; margin-bottom: 1rem; border: 1px solid rgba(212,175,55,0.2); border-radius: 6px; background: rgba(0,0,0,0.5);">
+                <app-date-range-picker [checkIn]="checkIn" [checkOut]="checkOut" [guests]="guests" (rangeChange)="checkIn = $event.checkIn; checkOut = $event.checkOut; recalculateNights()"></app-date-range-picker>
             </div>
             <div style="margin-top: 1rem;">
                 <app-custom-guestpicker [adults]="guests" [maxGuests]="maxGuestsCount" (adultsChange)="guests = $event"></app-custom-guestpicker>

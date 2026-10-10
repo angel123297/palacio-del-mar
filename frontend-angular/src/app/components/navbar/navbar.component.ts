@@ -18,9 +18,9 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
         </a>
 
         <div class="nav-links">
-          <button class="nav-link-btn" (click)="scrollTo('#rooms')">Suites</button>
+          <button class="nav-link-btn" (click)="scrollTo('#habitaciones')">Suites</button>
           <a routerLink="/calendario" class="nav-link-btn" style="text-decoration: none;">Calendario</a>
-          <button class="nav-link-btn" (click)="scrollTo('#experiences')">Experiencias</button>
+          <button class="nav-link-btn" (click)="scrollTo('#experiencias')">Experiencias</button>
           <button class="nav-link-btn" (click)="scrollTo('#dining')">Gastronomía</button>
           <button class="nav-link-btn" (click)="scrollTo('#spa')">Spa</button>
           <button class="nav-link-btn" (click)="scrollTo('#location')">Ubicación</button>
@@ -30,12 +30,15 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
           <ng-container *ngIf="auth.currentUser() as user; else notLogged">
             <div class="nav-user-menu" style="display: flex; align-items: center; gap: 10px;">
               <a routerLink="/mis-reservas" class="btn-outline nav-user-btn" style="padding: 6px 14px; text-decoration: none;">
-                {{ user.name ? user.name.split(' ')[0] : 'Huésped' }}
+                Mis Reservas
               </a>
               <a routerLink="/perfil" class="btn-outline nav-user-btn" style="padding: 6px 14px; text-decoration: none;">
                 Perfil
               </a>
-              <a *ngIf="user.role === 'ADMIN' || user.role === 'admin'" routerLink="/admin" class="btn-outline" style="padding: 6px 14px; text-decoration: none;">
+              <a *ngIf="(user.role || '').toLowerCase() === 'admin' || (user.role || '').toLowerCase() === 'host'" routerLink="/anfitrion" class="btn-outline" style="padding: 6px 14px; text-decoration: none;">
+                Anfitrión
+              </a>
+              <a *ngIf="(user.role || '').toLowerCase() === 'admin'" routerLink="/admin" class="btn-outline" style="padding: 6px 14px; text-decoration: none;">
                 Admin
               </a>
               <button class="link-btn" (click)="logout()" style="background: none; border: none; color: #c9a96e; cursor: pointer;">

@@ -13,11 +13,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.mockito.Mockito;
+import co.palaciodelmar.backend.repository.SuiteNightRepository;
+
 class BookingStateMachineTest {
 
     private static final String CHANGED_BY = "unit-test";
     private static final String REASON = "status transition test";
-    private final BookingService service = new BookingService(null, null, null, null, null, null, null);
+    
+    private final SuiteNightRepository suiteNightRepository = Mockito.mock(SuiteNightRepository.class);
+    private final BookingService service = new BookingService(null, null, null, null, suiteNightRepository, null, null);
 
     @ParameterizedTest(name = "{0} -> {1} must be {2}")
     @MethodSource("allStatusTransitions")

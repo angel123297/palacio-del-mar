@@ -10,7 +10,7 @@ import { Router } from '@angular/router';
   standalone: true,
   imports: [CommonModule, RouterModule],
   template: `
-    <section id="rooms">
+    <section id="habitaciones">
       <div class="rooms-header">
         <p class="sec-label">Alojamiento</p>
         <h2 class="sec-title">Nuestras suites</h2>

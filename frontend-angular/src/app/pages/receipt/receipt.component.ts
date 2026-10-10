@@ -1,12 +1,12 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 
 @Component({
   selector: 'app-receipt',
   standalone: true,
-  imports: [CommonModule, RouterModule, CurrencyPipe, DatePipe],
+  imports: [CommonModule, RouterModule, DatePipe],
   template: `
     <div style="min-height: 100vh; background: #fff; color: #333; padding: 2rem; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
       
