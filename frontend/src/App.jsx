@@ -15,6 +15,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import AIChatWidget from './components/AIChatWidget.jsx';
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
           <AuthModals />
+          <AIChatWidget />
         </BookingCartProvider>
       </AuthProvider>
     </ToastProvider>

@@ -9,7 +9,6 @@ import DiningSection from '../components/DiningSection.jsx';
 import SpaSection from '../components/SpaSection.jsx';
 import LocationSection from '../components/LocationSection.jsx';
 import Footer from '../components/Footer.jsx';
-import AIChatWidget from '../components/AIChatWidget.jsx';
 import BookingModal from '../components/BookingModal.jsx';
 
 export default function HomePage() {
@@ -26,7 +25,6 @@ export default function HomePage() {
       <SpaSection />
       <LocationSection />
       <Footer />
-      <AIChatWidget />
       <BookingModal />
     </>
   );

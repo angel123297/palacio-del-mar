@@ -248,7 +248,7 @@ const callAIAPI = async (message, history, language) => {
       const response = await axios.post(
         'https://api.anthropic.com/v1/messages',
         {
-          model: 'claude-sonnet-5',
+          model: process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022',
           max_tokens: 300,
           system: HOTEL_CONTEXT,
           messages: [
@@ -276,7 +276,7 @@ const callAIAPI = async (message, history, language) => {
       const response = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
-          model: 'gpt-3.5-turbo',
+          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
           messages: [
             { role: 'system', content: HOTEL_CONTEXT },
             ...history,
