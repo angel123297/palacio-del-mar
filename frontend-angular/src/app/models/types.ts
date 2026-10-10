@@ -58,6 +58,7 @@ export interface User {
   id?: string;
   _id?: string;
   email: string;
+  emailVerified?: boolean;
   name: string;
   phone?: string;
   role: string;
@@ -140,5 +141,7 @@ export interface DashboardMetricsDTO {
   pendingCheckins?: number; // mostly for host
   newClubMembers?: number; // mostly for admin
   totalBookings: number;
+  totalUsers?: number;
+  totalSuites?: number;
 }
 

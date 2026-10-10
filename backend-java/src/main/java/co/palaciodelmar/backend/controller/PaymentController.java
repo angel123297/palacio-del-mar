@@ -27,24 +27,49 @@ public class PaymentController {
     }
 
     @PostMapping("/checkout")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> checkoutPayment(
+    public ResponseEntity<ApiResponse<co.palaciodelmar.backend.service.PaymentGateway.PaymentIntentResponse>> createIntent(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestBody Map<String, Object> body
+            @RequestBody Map<String, Object> body,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
         String bookingId = (String) body.get("bookingId");
         String method = (String) body.getOrDefault("method", "card");
         String userId = principal != null ? principal.getUser().getId() : null;
 
-        Map<String, Object> result = paymentService.checkoutPayment(userId, bookingId, method);
-        return ResponseEntity.ok(ApiResponse.ok("Pago procesado exitosamente (simulado)", result));
+        co.palaciodelmar.backend.service.PaymentGateway.PaymentIntentResponse result = paymentService.createPaymentIntent(userId, bookingId, method, idempotencyKey);
+        return ResponseEntity.ok(ApiResponse.ok("Payment intent created", result));
     }
 
     @PostMapping("/process")
-    public ResponseEntity<ApiResponse<PaymentDTO>> processPayment(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> processPayment(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestBody PaymentRequest request
+            @RequestBody Map<String, Object> body,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
-        PaymentDTO payment = paymentService.processPayment(principal.getUser().getId(), request);
-        return ResponseEntity.ok(ApiResponse.ok("Pago procesado exitosamente (simulado)", payment));
+        String bookingId = (String) body.get("bookingId");
+        String method = (String) body.getOrDefault("method", "card");
+        String userId = principal != null ? principal.getUser().getId() : null;
+
+        // Create intent
+        co.palaciodelmar.backend.service.PaymentGateway.PaymentIntentResponse intentResult = paymentService.createPaymentIntent(userId, bookingId, method, idempotencyKey);
+        
+        // Auto-confirm for simulated process
+        String paymentToken = body.containsKey("cardNumber") ? "tok_card" : "tok_test";
+        Map<String, Object> result = paymentService.confirmPayment(userId, intentResult.intentId(), paymentToken);
+        
+        return ResponseEntity.ok(ApiResponse.ok("Pago procesado exitosamente", result));
+    }
+
+    @PostMapping("/confirm")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> confirmPayment(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestBody Map<String, Object> body
+    ) {
+        String intentId = (String) body.get("intentId");
+        String paymentToken = (String) body.get("paymentToken"); // e.g., "tok_4242"
+        String userId = principal != null ? principal.getUser().getId() : null;
+
+        Map<String, Object> result = paymentService.confirmPayment(userId, intentId, paymentToken);
+        return ResponseEntity.ok(ApiResponse.ok("Pago confirmado exitosamente", result));
     }
 }

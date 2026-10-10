@@ -70,27 +70,31 @@ import { finalize } from 'rxjs';
 
                 <div style="margin-bottom: 1.2rem;">
                   <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Titular de la tarjeta</label>
-                  <input type="text" formControlName="cardName" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;" placeholder="Como aparece en la tarjeta">
+                  <input type="text" formControlName="cardName" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;" [style.border-color]="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="Como aparece en la tarjeta">
+                  <div *ngIf="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Campo requerido</div>
                 </div>
 
                 <div style="margin-bottom: 1.2rem;">
                   <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Número de Tarjeta</label>
-                  <input type="text" formControlName="cardNumber" maxlength="19" (input)="formatCardNumber($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; letter-spacing: 2px;" placeholder="0000 0000 0000 0000">
+                  <input type="text" formControlName="cardNumber" maxlength="19" (input)="formatCardNumber($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; letter-spacing: 2px;" [style.border-color]="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="0000 0000 0000 0000">
+                  <div *ngIf="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Número inválido</div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
                   <div>
                     <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Expiración</label>
-                    <input type="text" formControlName="expiry" maxlength="5" (input)="formatExpiry($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center;" placeholder="MM/AA">
+                    <input type="text" formControlName="expiry" maxlength="5" (input)="formatExpiry($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center;" [style.border-color]="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="MM/AA">
+                    <div *ngIf="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Formato MM/AA</div>
                   </div>
                   <div>
                     <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">CVV / CVC</label>
-                    <input type="password" formControlName="cvv" maxlength="4" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center; letter-spacing: 3px;" placeholder="•••">
+                    <input type="password" formControlName="cvv" maxlength="4" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center; letter-spacing: 3px;" [style.border-color]="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="•••">
+                    <div *ngIf="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">CVV inválido</div>
                   </div>
                 </div>
               </div>
 
-              <button type="submit" [disabled]="paymentForm.invalid || processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+              <button type="submit" [disabled]="processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                 <span *ngIf="!processing">Pagar $ {{ booking.totalPrice | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   Autorizando transacción... <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
@@ -333,7 +337,10 @@ export class CheckoutComponent implements OnInit {
   }
 
   processPayment() {
-    if (this.paymentForm.invalid || !this.booking) return;
+    if (this.paymentForm.invalid || !this.booking) {
+      this.paymentForm.markAllAsTouched();
+      return;
+    }
 
     this.processing = true;
     this.errorMsg = '';

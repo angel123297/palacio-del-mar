@@ -26,6 +26,7 @@ public class SuiteService {
     private final SuiteRepository suiteRepository;
     private final BranchRepository branchRepository;
     private final ExperienceRepository experienceRepository;
+    private final PricingService pricingService;
 
     private Map<String, Branch> getBranchMap() {
         return branchRepository.findAll().stream()
@@ -115,8 +116,9 @@ public class SuiteService {
             nights = 1;
         }
 
-        BigDecimal nightlyPrice = suite.getBasePrice();
-        BigDecimal subtotal = nightlyPrice.multiply(BigDecimal.valueOf(nights));
+        PricingService.PricingResult result = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), BigDecimal.ZERO);
+
+        BigDecimal subtotal = result.subtotal();
 
         BigDecimal experiencesTotal = BigDecimal.ZERO;
         if (Boolean.TRUE.equals(request.getIncludeExperiences()) && request.getExperienceIds() != null) {
@@ -130,7 +132,7 @@ public class SuiteService {
             }
         }
 
-        BigDecimal total = subtotal.add(experiencesTotal);
+        BigDecimal total = result.total().add(experiencesTotal);
 
         CalculatePriceResponseDTO.DatesInfo datesInfo = CalculatePriceResponseDTO.DatesInfo.builder()
                 .checkIn(request.getCheckIn())
@@ -139,20 +141,20 @@ public class SuiteService {
                 .build();
 
         CalculatePriceResponseDTO.LineItem lineItem = CalculatePriceResponseDTO.LineItem.builder()
-                .unitPrice(nightlyPrice)
+                .unitPrice(suite.getBasePrice())
                 .nights((int) nights)
                 .amount(subtotal)
-                .season("low")
+                .season("mixed")
                 .build();
 
         return CalculatePriceResponseDTO.builder()
                 .suiteId(suite.getId())
                 .dates(datesInfo)
-                .nightlyPrice(nightlyPrice)
+                .nightlyPrice(suite.getBasePrice())
                 .subtotal(subtotal)
                 .experiencesTotal(experiencesTotal)
-                .discount(BigDecimal.ZERO)
-                .discountReason(null)
+                .discount(result.discount())
+                .discountReason(result.discount().compareTo(BigDecimal.ZERO) > 0 ? "Promoción / Larga estadía" : null)
                 .total(total)
                 .lines(List.of(lineItem))
                 .build();

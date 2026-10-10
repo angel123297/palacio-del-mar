@@ -30,12 +30,13 @@
     "@angular/build": "^22.2.2",
     "@angular/cli": "^22.2.2",
     "@angular/compiler-cli": "^22.2.2",
+    "@vitest/browser": "^5.0.3",
     "autoprefixer": "^10.6.1",
     "jsdom": "^30.0.0",
     "postcss": "^8.5.29",
     "prettier": "^3.8.1",
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.3"
   }
 }

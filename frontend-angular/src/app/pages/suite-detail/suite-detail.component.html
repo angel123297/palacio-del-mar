@@ -39,8 +39,9 @@
         <div class="card">
           <h3 style="color: var(--gold); margin-top: 0;">Reserva</h3>
           <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
-            <app-custom-datepicker label="Llegada" [date]="checkIn" [minDate]="today" (dateChange)="checkIn = $event; validateDates()"></app-custom-datepicker>
-            <app-custom-datepicker label="Salida" [date]="checkOut" [minDate]="checkIn" (dateChange)="checkOut = $event"></app-custom-datepicker>
+            <div style="display: block; height: 60px; border: 1px solid rgba(212,175,55,0.2); border-radius: 6px; background: rgba(0,0,0,0.5);">
+              <app-date-range-picker [checkIn]="checkIn" [checkOut]="checkOut" [guests]="guests" (rangeChange)="checkIn = $event.checkIn; checkOut = $event.checkOut; validateDates()"></app-date-range-picker>
+            </div>
             <div>
               <label style="color: var(--gold); font-size: 0.85rem;">Huéspedes</label>
               <select [(ngModel)]="guests" class="form-control">

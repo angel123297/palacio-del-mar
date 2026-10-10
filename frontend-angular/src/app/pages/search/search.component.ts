@@ -60,7 +60,9 @@ import { Suite, ApiResponse } from '../../models/types';
               
               <div class="mt-auto flex justify-between items-end border-t border-[rgba(255,255,255,0.05)] pt-4">
                 <div>
-                  <p class="text-[10px] uppercase tracking-[0.2em] text-[#c9a96e] mb-1">Precio Total</p>
+                  <p class="text-[10px] uppercase tracking-[0.2em] text-[#c9a96e] mb-1">
+                    {{ suite.totalPrice ? 'Precio Total' : 'Precio desde' }}
+                  </p>
                   <p class="font-serif text-2xl text-[#f5f0e8]">$ {{ suite.totalPrice || suite.basePrice || 0 | number:'1.0-0' }}</p>
                 </div>
                 <button class="px-5 py-2 bg-[#c9a96e] text-[#0d0d0d] uppercase tracking-widest text-xs font-semibold hover:bg-[#e2c99b] transition">
@@ -110,53 +112,45 @@ export class SearchComponent implements OnInit {
           return s;
         });
         
-        this.suites.set(mappedSuites);
-        
-        // AI Vibe Sorting
         const vibe = this.searchState.filters().vibe;
-        if (vibe && this.suites().length > 0) {
-           const s = [...this.suites()];
-           s.sort((a, b) => this.getVibeScore(b, vibe) - this.getVibeScore(a, vibe));
-           this.suites.set(s);
+        if (vibe && mappedSuites.length > 0) {
+          // Send to Gemini AI via backend
+          const payload = {
+            vibe: vibe,
+            suites: mappedSuites.map((s: any) => ({
+              id: s.id || s._id,
+              name: s.name,
+              description: s.description
+            }))
+          };
+          this.api.post<ApiResponse<Record<string, number>>>('/chat/vibe-score', payload).subscribe({
+            next: (vibeRes) => {
+              const scores = vibeRes.data || {};
+              mappedSuites.sort((a: any, b: any) => {
+                const idA = a.id || a._id;
+                const idB = b.id || b._id;
+                const scoreA = scores[idA] || 50;
+                const scoreB = scores[idB] || 50;
+                return scoreB - scoreA;
+              });
+              this.suites.set(mappedSuites);
+              this.loading.set(false);
+            },
+            error: () => {
+              this.suites.set(mappedSuites);
+              this.loading.set(false);
+            }
+          });
+        } else {
+          this.suites.set(mappedSuites);
+          this.loading.set(false);
         }
-
-        this.loading.set(false);
       },
       error: () => {
         this.suites.set([]);
         this.loading.set(false);
       }
     });
-  }
-
-  getVibeScore(suite: any, vibe: string): number {
-    let score = 0;
-    const name = (suite.name || '').toLowerCase();
-    const type = (suite.type || '').toLowerCase();
-    const branch = suite.branch ? (suite.branch.name || '').toLowerCase() : '';
-    
-    if (vibe === 'romantico') {
-      if (name.includes('presidencial') || name.includes('bahía') || name.includes('bahia')) score += 10;
-      if (type.includes('suite')) score += 5;
-    } else if (vibe === 'aventura') {
-      if (branch.includes('getsemaní') || branch.includes('getsemani') || branch.includes('boquilla')) score += 10;
-      if (name.includes('patio')) score += 5;
-    } else if (vibe === 'relax') {
-      if (branch.includes('bocagrande') || name.includes('bahía') || name.includes('bahia')) score += 10;
-      if (name.includes('premium')) score += 5;
-    } else if (vibe === 'fiesta') {
-      if (branch.includes('getsemaní') || branch.includes('getsemani') || branch.includes('centro')) score += 10;
-      if (suite.maxGuests && suite.maxGuests > 2) score += 5;
-    }
-    
-    const hash = (str: string) => {
-      let h = 0;
-      for (let i = 0; i < str.length; i++) h = Math.imul(31, h) + str.charCodeAt(i) | 0;
-      return h;
-    };
-    
-    score += (Math.abs(hash(suite.id + vibe)) % 100) / 100;
-    return score;
   }
 }
 

@@ -10,4 +10,6 @@ import java.util.List;
 public interface PaymentRepository extends MongoRepository<Payment, String> {
     List<Payment> findByBooking(String bookingId);
     List<Payment> findByUser(String userId);
+    java.util.Optional<Payment> findByIdempotencyKey(String idempotencyKey);
+    java.util.Optional<Payment> findByIntentId(String intentId);
 }

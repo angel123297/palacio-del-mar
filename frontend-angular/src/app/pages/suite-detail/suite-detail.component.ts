@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { CustomDatepickerComponent } from '../../components/custom-datepicker/custom-datepicker.component';
+import { DateRangePickerComponent } from '../../components/date-range-picker.component';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { SearchStateService } from '../../services/search-state.service';
@@ -14,7 +14,7 @@ import { AuthModalComponent } from '../../components/auth-modal/auth-modal.compo
 @Component({
   selector: 'app-suite-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, CustomDatepickerComponent, AuthModalComponent],
+  imports: [CommonModule, RouterModule, FormsModule, DateRangePickerComponent, AuthModalComponent],
   templateUrl: './suite-detail.component.html',
   styleUrls: ['./suite-detail.component.css']
 })

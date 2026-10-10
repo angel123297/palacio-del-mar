@@ -65,6 +65,20 @@ public class AuthController {
         return ResponseEntity.ok(body);
     }
 
+    @PostMapping("/verify-email")
+    public ResponseEntity<Map<String, Object>> verifyEmail(@RequestBody Map<String, String> body) {
+        String token = body != null ? body.get("token") : null;
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token es requerido");
+        }
+        
+        authService.verifyEmail(token);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Correo verificado exitosamente");
+        return ResponseEntity.ok(response);
+    }
 
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal UserPrincipal principal) {

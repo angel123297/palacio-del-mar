@@ -14,7 +14,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +26,36 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final EmailService emailService;
+
+    private String generateSecureToken() {
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] randomBytes = new byte[32];
+        secureRandom.nextBytes(randomBytes);
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : randomBytes) {
+            String hex = Integer.toHexString(0xff & b);
+            if (hex.length() == 1) hexString.append('0');
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+
+    public String hashToken(String token) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("Error hashing token", e);
+        }
+    }
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail().toLowerCase())) {
@@ -33,6 +65,9 @@ public class AuthService {
             throw new IllegalArgumentException("El número de teléfono ya está registrado");
         }
 
+        String rawToken = generateSecureToken();
+        String hashedToken = hashToken(rawToken);
+
         User user = User.builder()
                 .name(request.getName())
                 .lastName(request.getLastName())
@@ -40,7 +75,9 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role("user")
                 .status("active")
-                .emailVerified(true)
+                .emailVerified(false)
+                .verificationTokenHash(hashedToken)
+                .verificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS))
                 .profile(User.Profile.builder()
                         .phone(request.getPhone())
                         .build())
@@ -49,6 +86,13 @@ public class AuthService {
                 .build();
 
         userRepository.save(user);
+        
+        try {
+            emailService.sendVerificationEmail(user.getEmail(), rawToken);
+        } catch (Exception e) {
+            // Log error, but don't fail registration
+            System.err.println("Failed to send verification email: " + e.getMessage());
+        }
 
         UserPrincipal userPrincipal = new UserPrincipal(user);
         String jwtToken = jwtService.generateToken(userPrincipal);
@@ -103,6 +147,22 @@ public class AuthService {
         }
         user.setUpdatedAt(Instant.now());
         return toDTO(userRepository.save(user));
+    }
+
+    public void verifyEmail(String token) {
+        String hashedToken = hashToken(token);
+        User user = userRepository.findByVerificationTokenHash(hashedToken)
+                .orElseThrow(() -> new IllegalArgumentException("Token inválido"));
+
+        if (user.getVerificationTokenExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("El token ha expirado");
+        }
+
+        user.setEmailVerified(true);
+        user.setVerificationTokenHash(null);
+        user.setVerificationTokenExpiresAt(null);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
     }
 
     public void changePassword(String userId, String currentPassword, String newPassword) {

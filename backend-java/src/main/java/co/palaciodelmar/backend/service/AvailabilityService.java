@@ -28,6 +28,7 @@ public class AvailabilityService {
     private final BookingRepository bookingRepository;
     private final PromotionRepository promotionRepository;
     private final BranchRepository branchRepository;
+    private final PricingService pricingService;
 
     @Data
     @Builder
@@ -59,6 +60,7 @@ public class AvailabilityService {
         private Integer availableSuites;
         private Boolean soldOut;
         private Double occupancyRate;
+        private java.math.BigDecimal startingPrice;
     }
 
     @Data
@@ -106,12 +108,25 @@ public class AvailabilityService {
             }
 
             List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), checkIn, checkOut.minusDays(1));
-            int occupiedUnits = occupiedNights.size();
             int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
-            int free = Math.max(0, totalCapacity - occupiedUnits);
+            
+            int maxOccupiedOnAnyDate = 0;
+            java.util.Map<java.time.LocalDate, Long> occupancyPerDate = occupiedNights.stream()
+                .flatMap(sn -> sn.getDates().stream())
+                .filter(d -> !d.isBefore(checkIn) && d.isBefore(checkOut))
+                .collect(java.util.stream.Collectors.groupingBy(d -> d, java.util.stream.Collectors.counting()));
+            
+            for (int i = 0; i < nights; i++) {
+                long occ = occupancyPerDate.getOrDefault(checkIn.plusDays(i), 0L);
+                if (occ > maxOccupiedOnAnyDate) {
+                    maxOccupiedOnAnyDate = (int) occ;
+                }
+            }
+            int free = Math.max(0, totalCapacity - maxOccupiedOnAnyDate);
 
-            BigDecimal totalPrice = suite.getBasePrice().multiply(BigDecimal.valueOf(nights));
-            BigDecimal pricePerNight = suite.getBasePrice();
+            co.palaciodelmar.backend.service.PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), checkIn, checkOut, java.math.BigDecimal.ZERO);
+            java.math.BigDecimal totalPrice = pricingResult.total();
+            java.math.BigDecimal pricePerNight = suite.getBasePrice();
 
             SuiteAvailabilityResult result = SuiteAvailabilityResult.builder()
                     .suite(suite)
@@ -191,6 +206,21 @@ public class AvailabilityService {
             double occupancyRate = totalSuites > 0 ? ((double) totalOccupiedOnDay / totalSuites) * 100.0 : 0.0;
             sumOccupancy += occupancyRate;
 
+            java.math.BigDecimal minPrice = null;
+            if (!soldOut) {
+                for (Suite s : filteredSuites) {
+                    List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(s.getId(), currentDay, currentDay);
+                    int totU = s.getTotalUnits() != null ? s.getTotalUnits() : 1;
+                    if (occupied.size() < totU) {
+                        co.palaciodelmar.backend.service.PricingService.PricingResult pr = pricingService.calculatePrice(s.getBasePrice(), currentDay, currentDay.plusDays(1), java.math.BigDecimal.ZERO);
+                        java.math.BigDecimal p = pr.nightlyPrices().get(0).price();
+                        if (minPrice == null || p.compareTo(minPrice) < 0) {
+                            minPrice = p;
+                        }
+                    }
+                }
+            }
+            
             calendar.add(CalendarDay.builder()
                     .date(dateStr)
                     .day(day)
@@ -198,6 +228,7 @@ public class AvailabilityService {
                     .availableSuites(available)
                     .soldOut(soldOut)
                     .occupancyRate(occupancyRate)
+                    .startingPrice(minPrice)
                     .build());
         }
 
