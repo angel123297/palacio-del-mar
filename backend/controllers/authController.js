@@ -530,13 +530,24 @@ export const resetPassword = async (req, res) => {
       });
     }
     
-    // Actualizar contraseña
+    // Actualizar contraseña y marcar el token como usado.
+    // ORDEN CRÍTICO: marcar el token ANTES de asignar la contraseña.
+    // usePasswordResetToken() hace internamente this.save(); si la contraseña
+    // ya estuviera asignada en ese momento, el pre-save hook la hashearía por
+    // primera vez. Luego el user.save() de abajo la hashearía de NUEVO sobre
+    // el hash ya generado, dejando la contraseña irrecuperable (BUG).
+    const recoveryToken = user.verifyPasswordResetToken(token);
+    recoveryToken.used = true;
+
+    // Vaciar las sesiones activas en memoria (sin save extra: lo hará el save final)
+    user.activeSessions = [];
+
+    // Asignar la nueva contraseña DESPUÉS de marcar el token: el pre-save hook
+    // la hasheará una única vez en el save final de abajo.
     user.password = newPassword;
-    await user.usePasswordResetToken(token);
+
+    // Un único save persiste todo: token marcado + sesiones borradas + contraseña hasheada.
     await user.save();
-    
-    // Invalidar todas las sesiones activas
-    await user.invalidateAllSessions();
     
     // Registrar actividad
     await user.logActivity('password_reset', { success: true }, req.ip, req.headers['user-agent']);

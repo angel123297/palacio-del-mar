@@ -574,7 +574,10 @@ export const modifyBookingDates = async (req, res) => {
     const { id } = req.params;
     const { newCheckIn, newCheckOut } = req.body;
     
-    const booking = await Booking.findById(id);
+    // Poblar suite para que calculateTotalPrice reciba el documento completo
+    // (booking.suite sería solo un ObjectId si se usa findById sin populate,
+    // lo que causaba un crash en quoteSuiteStay al leer basePrice y temporadas)
+    const booking = await Booking.findById(id).populate('suite');
     
     if (!booking) {
       return res.status(404).json({
@@ -608,11 +611,15 @@ export const modifyBookingDates = async (req, res) => {
         errors: dateValidation.errors
       });
     }
-    
+
+    // El ID de la suite (para consultas de disponibilidad y SuiteNight) se
+    // extrae del documento ya populado
+    const suiteId = booking.suite._id;
+
     // Verificar disponibilidad para las nuevas fechas
     const isAvailable = await isSuiteAvailable(
-      booking.suite, 
-      dateValidation.checkInDate, 
+      suiteId,
+      dateValidation.checkInDate,
       dateValidation.checkOutDate,
       booking._id // Excluir la reserva actual
     );
@@ -627,7 +634,7 @@ export const modifyBookingDates = async (req, res) => {
     // Recalcular precio (misma lógica de temporada y descuentos que al crear)
     const newNights = dateValidation.nights;
     const pricing = await calculateTotalPrice(
-      booking.suite,
+      booking.suite,        // documento completo con basePrice, seasonRates…
       dateValidation.checkInDate,
       dateValidation.checkOutDate,
       booking.experiences
@@ -663,17 +670,17 @@ export const modifyBookingDates = async (req, res) => {
     
     let acquiredNights;
     try {
-      acquiredNights = await SuiteNight.acquire(booking.suite, booking._id, nightsToAcquire, bookingSlot);
+      acquiredNights = await SuiteNight.acquire(suiteId, booking._id, nightsToAcquire, bookingSlot);
     } catch (err) {
       if (err instanceof NightsConflictError) {
         // El slot actual no puede cubrir las nuevas fechas.
         // Si hay otro slot libre para TODO el nuevo rango, reasignamos la reserva a ese slot.
-        const suiteDoc = await Suite.findById(booking.suite).select('totalUnits units available');
+        const suiteDoc = await Suite.findById(suiteId).select('totalUnits units available');
         const capacity = suiteDoc?.availableUnitsCount || 1;
-        const freeSlots = await SuiteNight.freeSlots(booking.suite, newNightList, capacity, booking._id);
+        const freeSlots = await SuiteNight.freeSlots(suiteId, newNightList, capacity, booking._id);
         const altSlot = freeSlots.find((s) => s !== bookingSlot);
         if (altSlot) {
-          acquiredNights = await SuiteNight.acquire(booking.suite, booking._id, newNightList, altSlot);
+          acquiredNights = await SuiteNight.acquire(suiteId, booking._id, newNightList, altSlot);
           bookingSlot = altSlot;
           booking.unitSlot = altSlot;
           nightsToRelease = heldNights.map((n) => new Date(n.date));
