@@ -478,6 +478,33 @@ export const forgotPassword = async (req, res) => {
 export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'El token de recuperación es requerido'
+      });
+    }
+
+    const passwordValidation = Joi.string()
+      .min(8)
+      .max(100)
+      .required()
+      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,100}$/)
+      .messages({
+        'string.pattern.base': 'La contraseña debe tener al menos 8 caracteres, incluyendo una mayúscula, una minúscula y un número',
+        'string.min': 'La contraseña debe tener al menos 8 caracteres',
+        'string.max': 'La contraseña no puede exceder 100 caracteres',
+        'any.required': 'La nueva contraseña es obligatoria'
+      })
+      .validate(newPassword);
+
+    if (passwordValidation.error) {
+      return res.status(400).json({
+        success: false,
+        message: passwordValidation.error.details[0].message
+      });
+    }
     
     // Buscar usuario con token válido
     const user = await User.findOne({
@@ -521,6 +548,12 @@ export const resetPassword = async (req, res) => {
     
   } catch (error) {
     console.error('[ResetPassword Error]:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Error al restablecer la contraseña'

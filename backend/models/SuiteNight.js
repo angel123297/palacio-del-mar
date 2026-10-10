@@ -130,10 +130,14 @@ suiteNightSchema.statics.acquireAny = async function (suiteId, bookingId, nights
  * Habitaciones físicas libres de una suite en las noches indicadas.
  * Es una consulta informativa (no reserva nada): la garantía es acquire().
  */
-suiteNightSchema.statics.freeSlots = async function (suiteId, nights, capacity = 1) {
+suiteNightSchema.statics.freeSlots = async function (suiteId, nights, capacity = 1, excludeBookingId = null) {
   const total = Math.max(0, Math.floor(Number(capacity)) || 0);
   if (!total || !nights.length) return Array.from({ length: total }, (_, i) => i + 1);
-  const taken = new Set(await this.distinct('slot', { suite: suiteId, date: { $in: nights } }));
+  const filter = { suite: suiteId, date: { $in: nights } };
+  if (excludeBookingId) {
+    filter.booking = { $ne: excludeBookingId };
+  }
+  const taken = new Set(await this.distinct('slot', filter));
   const free = [];
   for (let slot = 1; slot <= total; slot++) if (!taken.has(slot)) free.push(slot);
   return free;

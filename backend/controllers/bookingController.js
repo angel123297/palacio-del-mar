@@ -654,21 +654,35 @@ export const modifyBookingDates = async (req, res) => {
     // funciona con reservas anteriores a SuiteNight (aún sin bloqueos).
     const heldNights = await SuiteNight.find({ booking: booking._id }).select('date slot').lean();
     const heldTimes = new Set(heldNights.map((n) => n.date.getTime()));
-    // Las noches nuevas se piden en LA MISMA habitación física de la reserva.
-    const bookingSlot = heldNights[0]?.slot ?? booking.unitSlot ?? 1;
+    // Las noches nuevas se piden en LA MISMA habitación física si es posible.
+    let bookingSlot = heldNights[0]?.slot ?? booking.unitSlot ?? 1;
     const newNightList = eachNight(dateValidation.checkInDate, dateValidation.checkOutDate);
     const nightsToAcquire = newNightList.filter((d) => !heldTimes.has(d.getTime()));
     const newTimes = new Set(newNightList.map((d) => d.getTime()));
-    const nightsToRelease = [...heldTimes].filter((t) => !newTimes.has(t)).map((t) => new Date(t));
+    let nightsToRelease = [...heldTimes].filter((t) => !newTimes.has(t)).map((t) => new Date(t));
     
     let acquiredNights;
     try {
       acquiredNights = await SuiteNight.acquire(booking.suite, booking._id, nightsToAcquire, bookingSlot);
     } catch (err) {
       if (err instanceof NightsConflictError) {
-        return conflictResponse(res, 'La suite no está disponible para las nuevas fechas');
+        // El slot actual no puede cubrir las nuevas fechas.
+        // Si hay otro slot libre para TODO el nuevo rango, reasignamos la reserva a ese slot.
+        const suiteDoc = await Suite.findById(booking.suite).select('totalUnits units available');
+        const capacity = suiteDoc?.availableUnitsCount || 1;
+        const freeSlots = await SuiteNight.freeSlots(booking.suite, newNightList, capacity, booking._id);
+        const altSlot = freeSlots.find((s) => s !== bookingSlot);
+        if (altSlot) {
+          acquiredNights = await SuiteNight.acquire(booking.suite, booking._id, newNightList, altSlot);
+          bookingSlot = altSlot;
+          booking.unitSlot = altSlot;
+          nightsToRelease = heldNights.map((n) => new Date(n.date));
+        } else {
+          return conflictResponse(res, 'La suite no está disponible para las nuevas fechas');
+        }
+      } else {
+        throw err;
       }
-      throw err;
     }
 
     booking.checkIn = dateValidation.checkInDate;
@@ -1059,8 +1073,8 @@ export const addExperienceToBooking = async (req, res) => {
       });
     }
     
-    // Verificar que no esté ya agregada
-    if (booking.experiences.includes(experienceId)) {
+    // Verificar que no esté ya agregada (booking.experiences contiene ObjectIds)
+    if (booking.experiences.some((exp) => exp.toString() === String(experienceId))) {
       return res.status(400).json({
         success: false,
         message: 'La experiencia ya está agregada a esta reserva'

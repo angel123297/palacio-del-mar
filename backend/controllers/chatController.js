@@ -10,8 +10,18 @@ const MAX_MESSAGE_LENGTH = 500;
 const RATE_LIMIT_WINDOW = 60000; // 1 minuto
 const RATE_LIMIT_MAX = 10; // 10 mensajes por minuto
 
-// Almacenamiento en memoria para rate limiting (en producción usar Redis)
+// Almacenamiento en memoria para rate limiting con limpieza automática periódica
 const userRequestCounts = new Map();
+
+const sweepChatLimit = setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of userRequestCounts.entries()) {
+    if (now > val.resetTime) {
+      userRequestCounts.delete(key);
+    }
+  }
+}, RATE_LIMIT_WINDOW);
+sweepChatLimit.unref();
 
 // ============================================
 // CONTEXTO DEL HOTEL (MEJORADO)

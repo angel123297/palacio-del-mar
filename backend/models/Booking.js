@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { isValidEmail, EMAIL_MAX_LENGTH } from '../utils/validators.js';
 import SuiteNight from './SuiteNight.js';
 import { holdDeadline } from '../utils/bookingRules.js';
-import { toCalendarDate, todayCalendarDate, calculateNights } from '../utils/dates.js';
+import { toCalendarDate, todayCalendarDate, calculateNights, eachNight } from '../utils/dates.js';
 
 // ============================================
 // CONSTANTES
@@ -431,8 +431,8 @@ bookingSchema.virtual('paymentStatusLabel').get(function() {
  */
 bookingSchema.virtual('isModifiable').get(function() {
   const today = todayCalendarDate();
-  return (this.status === BOOKING_STATUS.PENDING || this.status === BOOKING_STATUS.CONFIRMED) &&
-         this.checkIn > today;
+  if (this.status === BOOKING_STATUS.PENDING) return true;
+  return this.status === BOOKING_STATUS.CONFIRMED && this.checkIn > today;
 });
 
 /**
@@ -440,9 +440,11 @@ bookingSchema.virtual('isModifiable').get(function() {
  */
 bookingSchema.virtual('isCancellable').get(function() {
   const today = todayCalendarDate();
-  return this.status !== BOOKING_STATUS.CANCELLED &&
-         this.status !== BOOKING_STATUS.COMPLETED &&
-         this.checkIn > today;
+  if ([BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW, BOOKING_STATUS.EXPIRED].includes(this.status)) {
+    return false;
+  }
+  if (this.status === BOOKING_STATUS.PENDING) return true;
+  return this.status === BOOKING_STATUS.CONFIRMED && this.checkIn > today;
 });
 
 // ============================================
@@ -457,26 +459,22 @@ bookingSchema.virtual('isCancellable').get(function() {
  * Verifica disponibilidad de suite para fechas
  */
 bookingSchema.statics.checkSuiteAvailability = async function(suiteId, checkIn, checkOut, excludeBookingId = null) {
-  // Solape estándar de intervalos [checkIn, checkOut): A solapa B si
-  // A.in < B.out && A.out > B.in. Es una comprobación amistosa (respuesta
-  // 409 rápida); la garantía real contra concurrencia es SuiteNight.
-  // Una suite con N habitaciones físicas admite hasta N reservas solapadas.
   const suite = await mongoose.model('Suite').findById(suiteId).select('totalUnits units available');
-  if (!suite) return false;
+  if (!suite || !suite.available) return false;
   const capacity = suite.availableUnitsCount;
+  if (capacity <= 0) return false;
 
-  const query = {
-    suite: suiteId,
-    status: { $in: BLOCKING_BOOKING_STATUSES },
-    checkIn: { $lt: normalizeDate(checkOut) },
-    checkOut: { $gt: normalizeDate(checkIn) }
-  };
+  const checkInDate = normalizeDate(checkIn);
+  const checkOutDate = normalizeDate(checkOut);
+  if (!checkInDate || !checkOutDate || checkOutDate <= checkInDate) return false;
 
-  if (excludeBookingId) {
-    query._id = { $ne: excludeBookingId };
-  }
+  const nights = eachNight(checkInDate, checkOutDate);
+  if (!nights.length) return false;
 
-  return (await this.countDocuments(query)) < capacity;
+  // Fuente de verdad: SuiteNight (bloqueos atómicos por habitación física).
+  // Valida que exista al menos una habitación física libre para todo el rango.
+  const free = await SuiteNight.freeSlots(suiteId, nights, capacity, excludeBookingId);
+  return free.length > 0;
 };
 
 // ============================================
@@ -495,7 +493,7 @@ bookingSchema.index({ bookingDate: -1 });
 // Índices adicionales para consultas comunes
 bookingSchema.index({ guestEmail: 1 });
 bookingSchema.index({ status: 1, checkIn: 1 });
-bookingSchema.index({ status: 1, holdExpiresAt: 1 }); // barrendero de vencidas
+bookingSchema.index({ status: 1, paymentStatus: 1, holdExpiresAt: 1 }); // barrendero de vencidas optimizado
 bookingSchema.index({ user: 1, status: 1, suite: 1, checkIn: 1 }); // reserva repetida
 bookingSchema.index({ user: 1, status: 1, checkOut: 1 });
 bookingSchema.index({ 'cancellationDetails.cancelledBy': 1 });

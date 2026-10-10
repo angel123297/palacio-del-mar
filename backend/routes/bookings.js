@@ -17,6 +17,7 @@ import {
 import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
 import { validateRequest } from '../middleware/validate.js';
 import { createRateLimiter } from '../middleware/rateLimit.js';
+import { toCalendarDate, todayCalendarDate, calculateNights } from '../utils/dates.js';
 
 // Crear reservas: 10 por usuario cada 10 minutos (evita ráfagas y bots)
 const createBookingLimiter = createRateLimiter({
@@ -39,11 +40,9 @@ const createBookingValidation = [
   body('checkIn')
     .notEmpty().withMessage('La fecha de check-in es obligatoria')
     .isISO8601().withMessage('Formato de fecha inválido (YYYY-MM-DD)')
-    .custom(value => {
-      const date = new Date(value);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (date < today) {
+    .custom((value) => {
+      const date = toCalendarDate(value);
+      if (!date || date < todayCalendarDate()) {
         throw new Error('La fecha de check-in no puede ser anterior a hoy');
       }
       return true;
@@ -53,14 +52,14 @@ const createBookingValidation = [
     .notEmpty().withMessage('La fecha de check-out es obligatoria')
     .isISO8601().withMessage('Formato de fecha inválido (YYYY-MM-DD)')
     .custom((value, { req }) => {
-      const checkIn = new Date(req.body.checkIn);
-      const checkOut = new Date(value);
-      if (checkOut <= checkIn) {
+      const checkInDate = toCalendarDate(req.body.checkIn);
+      const checkOutDate = toCalendarDate(value);
+      if (!checkInDate || !checkOutDate || checkOutDate <= checkInDate) {
         throw new Error('La fecha de check-out debe ser posterior al check-in');
       }
       
       const maxNights = 90;
-      const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+      const nights = calculateNights(checkInDate, checkOutDate);
       if (nights > maxNights) {
         throw new Error(`La estadía no puede exceder ${maxNights} noches`);
       }
@@ -134,15 +133,22 @@ const modifyDatesValidation = [
   
   body('newCheckIn')
     .notEmpty().withMessage('La nueva fecha de check-in es obligatoria')
-    .isISO8601().withMessage('Formato de fecha inválido'),
+    .isISO8601().withMessage('Formato de fecha inválido')
+    .custom((value) => {
+      const date = toCalendarDate(value);
+      if (!date || date < todayCalendarDate()) {
+        throw new Error('La fecha de check-in no puede ser anterior a hoy');
+      }
+      return true;
+    }),
   
   body('newCheckOut')
     .notEmpty().withMessage('La nueva fecha de check-out es obligatoria')
     .isISO8601().withMessage('Formato de fecha inválido')
     .custom((value, { req }) => {
-      const checkIn = new Date(req.body.newCheckIn);
-      const checkOut = new Date(value);
-      if (checkOut <= checkIn) {
+      const checkInDate = toCalendarDate(req.body.newCheckIn);
+      const checkOutDate = toCalendarDate(value);
+      if (!checkInDate || !checkOutDate || checkOutDate <= checkInDate) {
         throw new Error('La fecha de check-out debe ser posterior al check-in');
       }
       return true;
