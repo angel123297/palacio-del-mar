@@ -12,19 +12,21 @@ import { DateRangePickerComponent } from '../date-range-picker.component';
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, DateRangePickerComponent],
   template: `
-    <div id="booking-bar" class="bg-[#161311] border-b-2 border-[rgba(201,169,110,0.3)] shadow-2xl sticky top-[57px] z-[190] px-4 md:px-12 relative">
+    <div class="bg-[#161311] border-b-2 border-[rgba(201,169,110,0.3)] shadow-2xl sticky top-[57px] z-[190] px-4 md:px-12 relative w-full">
       
       <form class="flex flex-col md:flex-row items-stretch w-full" (ngSubmit)="submit()">
         
         <!-- Fechas (DateRangePicker) -->
-        <app-date-range-picker
-          class="flex-[2] min-w-[240px] border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)]"
-          [checkIn]="searchState.filters().checkIn"
-          [checkOut]="searchState.filters().checkOut"
-          [guests]="searchState.filters().adults + searchState.filters().children"
-          [branch]="searchState.filters().branchSlug"
-          (rangeChange)="onRangeChange($event)">
-        </app-date-range-picker>
+        <div class="flex-[2] flex min-w-[240px] border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)]">
+          <app-date-range-picker
+            class="w-full flex"
+            [checkIn]="searchState.filters().checkIn"
+            [checkOut]="searchState.filters().checkOut"
+            [guests]="searchState.filters().adults + searchState.filters().children"
+            [branch]="searchState.filters().branchSlug"
+            (rangeChange)="onRangeChange($event)">
+          </app-date-range-picker>
+        </div>
 
         <!-- Sucursal -->
         <div class="flex-1 min-w-[140px] p-4 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center" *ngIf="branches.length > 0">
