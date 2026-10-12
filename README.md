@@ -63,7 +63,9 @@ Diseñado para ofrecer una experiencia de usuario fluida, elegante y sin friccio
 La plataforma cuenta con una suite completa de pruebas automatizadas:
 
 ### Backend Java (Spring Boot):
-- **83 pruebas unitarias y de integración** aprobadas (`BUILD SUCCESS`):
+- **89 pruebas unitarias y de integración** aprobadas (`BUILD SUCCESS`):
+  - `BookingExpirySchedulerTest`: Validación de liberación automática de noches y expiración de reservas pendientes.
+  - `PaymentConcurrencyTest`: Verificación de rollback y compensación transaccional ante conflictos de bloqueo optimista (`@Version`).
   - `BookingMappingTest`: Verificación de mapeo `@Field("amountPaid")` y `@Field("amountRefunded")`.
   - `PromotionPricingTest`: Pruebas de promociones activas dinámicas por sucursal y manejo de expiración.
   - `AuthServiceTest`: Pruebas de registro, bloqueo de login sin verificación, expiración de tokens y bypass administrativo.
@@ -76,12 +78,18 @@ cd backend-java
 ./mvnw test
 ```
 
-### Frontend Angular 18:
-- Compilación de producción limpia sin advertencias de sintaxis o pipes no utilizados:
+### Frontend Angular:
+- Compilación de producción limpia con arquitectura modular SCSS (`npm run build`):
 ```bash
 cd frontend-angular
 npm run build
 ```
+
+---
+
+## 📝 Historial de Correcciones y Auditorías
+Para consultar la bitácora completa de correcciones, auditorías de calidad (incluyendo la certificación oficial de Jules) y resolución de hallazgos técnicos, consulta el documento:
+👉 **[CORRECCIONES.md](file:///home/angel19/Notas/palacio-del-mar/CORRECCIONES.md)**
 
 ---
 
