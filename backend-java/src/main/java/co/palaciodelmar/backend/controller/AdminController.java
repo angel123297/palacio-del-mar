@@ -63,7 +63,7 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok("Promoción eliminada exitosamente", null));
     }
 
-    @GetMapping("/stats")
+    @GetMapping({"/stats", "/metrics"})
     public ResponseEntity<ApiResponse<AdminService.AdminDashboardStats>> getStats() {
         AdminService.AdminDashboardStats stats = adminService.getDashboardStats();
         return ResponseEntity.ok(ApiResponse.ok(stats));

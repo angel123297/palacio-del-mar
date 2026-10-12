@@ -57,7 +57,7 @@ public class HostController {
         return ResponseEntity.ok(ApiResponse.ok(bookings));
     }
 
-    @GetMapping("/metrics")
+    @GetMapping({"/metrics", "/stats"})
     public ResponseEntity<ApiResponse<HostDashboardStats>> getHostMetrics(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         

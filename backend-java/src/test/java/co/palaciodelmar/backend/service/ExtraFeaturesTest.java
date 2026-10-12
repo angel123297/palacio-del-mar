@@ -38,7 +38,7 @@ class ExtraFeaturesTest {
                 .profile(User.Profile.builder().phone("+573001234567").build())
                 .build();
 
-        boolean sent = whatsAppService.sendBookingConfirmation(booking, guest, suite);
+        boolean sent = whatsAppService.sendBookingConfirmation(booking, guest, suite).join();
         assertTrue(sent, "WhatsApp simulator debe retornar true exitosamente");
     }
 
