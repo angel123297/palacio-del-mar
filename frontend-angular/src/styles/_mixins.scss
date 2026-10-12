@@ -1,0 +1,21 @@
+// Palacio del Mar - Design System Mixins
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin luxury-border($opacity: 0.2) {
+  border: 1px solid rgba(201, 169, 110, $opacity);
+}
+
+@mixin luxury-glow {
+  box-shadow: 0 0 15px rgba(201, 169, 110, 0.2);
+}
+
+@mixin glassmorphism($blur: 14px, $opacity: 0.85) {
+  background: rgba(13, 13, 11, $opacity);
+  -webkit-backdrop-filter: blur($blur);
+  backdrop-filter: blur($blur);
+}

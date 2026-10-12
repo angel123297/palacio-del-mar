@@ -1,18 +1,11 @@
 @charset "UTF-8";
+@use 'styles/variables' as *;
+@use 'styles/mixins' as *;
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --gold: #c9a96e;
-  --gold-light: #e8d5a3;
-  --dark: #0d0d0b;
-  --cream: #f5f0e8;
-  --warm: #2a1f14;
-  --warm2: #1a1208;
-  --green: #25d366;
-  --red: #c0392b;
-}
 * {
   margin: 0;
   padding: 0;

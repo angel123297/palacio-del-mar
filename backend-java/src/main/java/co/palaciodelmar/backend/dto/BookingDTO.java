@@ -58,6 +58,9 @@ public class BookingDTO {
     private List<Booking.FoodOrder> foodOrders;
 
     private String cancellationReason;
+    private String appliedPromotionId;
+    private String appliedPromotionName;
+    private BigDecimal appliedPromotionDiscountPercent;
     private String smartLockPin;
     private Boolean preCheckInCompleted;
     private Instant expiresAt;

@@ -120,10 +120,20 @@ export interface Booking {
   bookingCode?: string;
   isModifiable?: boolean;
   isCancelable?: boolean;
-  experiences?: Experience[];
+  experiences?: any[];
   guestName?: string;
   guestEmail?: string;
   guestPhone?: string;
+  airportPickup?: boolean;
+  foodOrders?: Array<{
+    dishName?: string;
+    type?: string;
+    includesBreakfastCombo?: boolean;
+    price?: number;
+  }>;
+  appliedPromotionId?: string;
+  appliedPromotionName?: string;
+  appliedPromotionDiscountPercent?: number;
 }
 
 export interface PaginatedResponse<T> {

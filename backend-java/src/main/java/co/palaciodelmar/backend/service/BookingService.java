@@ -63,7 +63,7 @@ public class BookingService {
                         .email(email)
                         .role("user")
                         .status("active")
-                        .emailVerified(true)
+                        .emailVerified(false)
                         .profile(User.Profile.builder().phone(request.getGuestPhone()).build())
                         .createdAt(Instant.now())
                         .updatedAt(Instant.now())
@@ -112,7 +112,10 @@ public class BookingService {
             throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
         }
 
-        BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+        Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+        BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null 
+                ? BigDecimal.valueOf(activePromo.getDiscountPercent()) 
+                : BigDecimal.ZERO;
         PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
         BigDecimal totalRoomPrice = pricingResult.total();
 
@@ -128,6 +131,12 @@ public class BookingService {
         String bookingCode = "PDM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         Booking.GuestDetails guestDetails = parseGuestDetails(request);
 
+        String promoId = activePromo != null ? activePromo.getId() : null;
+        String promoName = activePromo != null ? activePromo.getTitle() : (nights >= 30 ? "Estadía mensual (10%)" : (nights >= 7 ? "Estadía semanal (5%)" : null));
+        BigDecimal promoDiscountPercent = activePromo != null && activePromo.getDiscountPercent() != null 
+                ? BigDecimal.valueOf(activePromo.getDiscountPercent()) 
+                : (nights >= 30 ? BigDecimal.TEN : (nights >= 7 ? new BigDecimal("5") : BigDecimal.ZERO));
+
         Booking booking = Booking.builder()
                 .user(userId)
                 .suite(suite.getId())
@@ -142,6 +151,9 @@ public class BookingService {
                 .discount(pricingResult.discount())
                 .taxes(pricingResult.taxes())
                 .nightlyPrices(pricingResult.nightlyPrices().stream().map(np -> new Booking.NightlyPrice(np.date(), np.price())).toList())
+                .appliedPromotionId(promoId)
+                .appliedPromotionName(promoName)
+                .appliedPromotionDiscountPercent(promoDiscountPercent)
                 .totalPrice(totalPrice)
                 .paidAmount(BigDecimal.ZERO)
                 .balanceDue(totalPrice)
@@ -236,7 +248,10 @@ public class BookingService {
             throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
         }
 
-        BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+        Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+        BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null 
+                ? BigDecimal.valueOf(activePromo.getDiscountPercent()) 
+                : BigDecimal.ZERO;
         PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
         BigDecimal totalRoomPrice = pricingResult.total();
         List<Booking.SelectedExperience> selectedExpList = request.getExperiences() != null ? parseExperiences(request.getExperiences()) : booking.getExperiences();
@@ -260,6 +275,11 @@ public class BookingService {
         booking.setDiscount(pricingResult.discount());
         booking.setTaxes(pricingResult.taxes());
         booking.setNightlyPrices(pricingResult.nightlyPrices().stream().map(np -> new Booking.NightlyPrice(np.date(), np.price())).toList());
+        booking.setAppliedPromotionId(activePromo != null ? activePromo.getId() : null);
+        booking.setAppliedPromotionName(activePromo != null ? activePromo.getTitle() : (nights >= 30 ? "Estadía mensual (10%)" : (nights >= 7 ? "Estadía semanal (5%)" : null)));
+        booking.setAppliedPromotionDiscountPercent(activePromo != null && activePromo.getDiscountPercent() != null 
+                ? BigDecimal.valueOf(activePromo.getDiscountPercent()) 
+                : (nights >= 30 ? BigDecimal.TEN : (nights >= 7 ? new BigDecimal("5") : BigDecimal.ZERO)));
         booking.setTotalPrice(newTotalPrice);
 
         if (booking.getPaidAmount().compareTo(newTotalPrice) >= 0) {
@@ -540,6 +560,9 @@ public class BookingService {
                 .smartLockPin(booking.getSmartLockPin())
                 .preCheckInCompleted(booking.getPreCheckInCompleted())
                 .cancellationReason(booking.getCancellationReason())
+                .appliedPromotionId(booking.getAppliedPromotionId())
+                .appliedPromotionName(booking.getAppliedPromotionName())
+                .appliedPromotionDiscountPercent(booking.getAppliedPromotionDiscountPercent())
                 .expiresAt(booking.getExpiresAt())
                 .createdAt(booking.getCreatedAt())
                 .updatedAt(booking.getUpdatedAt())
@@ -637,17 +660,20 @@ public class BookingService {
         }
     }
 
-    private BigDecimal findActiveBranchPromotion(String branchId, LocalDate checkIn, LocalDate checkOut) {
-        if (branchId == null || checkIn == null || checkOut == null) return BigDecimal.ZERO;
+    private Promotion findActiveBranchPromotionEntity(String branchId, LocalDate checkIn, LocalDate checkOut) {
+        if (branchId == null || checkIn == null || checkOut == null) return null;
         List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(branchId);
-        Integer maxDiscount = promotions.stream()
+        return promotions.stream()
                 .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
                 .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut)) &&
                              (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
-                .map(Promotion::getDiscountPercent)
-                .max(Integer::compareTo)
-                .orElse(0);
-        return BigDecimal.valueOf(maxDiscount);
+                .max(java.util.Comparator.comparing(Promotion::getDiscountPercent))
+                .orElse(null);
+    }
+
+    private BigDecimal findActiveBranchPromotion(String branchId, LocalDate checkIn, LocalDate checkOut) {
+        Promotion promo = findActiveBranchPromotionEntity(branchId, checkIn, checkOut);
+        return promo != null && promo.getDiscountPercent() != null ? BigDecimal.valueOf(promo.getDiscountPercent()) : BigDecimal.ZERO;
     }
 
     public BookingDTO performPreCheckIn(String bookingId, String userId, String documentNumber, String companionGuests) {
