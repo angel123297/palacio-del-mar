@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -26,6 +27,7 @@ public class EmailNotificationService {
     private final SuiteRepository suiteRepository;
     private final co.palaciodelmar.backend.repository.UserRepository userRepository;
 
+    @Async
     public void sendBookingConfirmation(Booking booking) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
