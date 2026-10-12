@@ -41,6 +41,7 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
   @Input() checkOut: string = '';
   @Input() guests: number = 1;
   @Input() branch: string = '';
+  @Input() suiteId: string = '';
   @Output() rangeChange = new EventEmitter<{checkIn: string, checkOut: string}>();
 
   api = inject(ApiService);
@@ -53,6 +54,7 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
   step = signal<'in' | 'out'>('in');
   
   soldOut = signal<Record<string, boolean>>({});
+  dayAvailability = signal<Record<string, { soldOut: boolean, availableSuites: number, totalSuites: number, occupancyRate?: number }>>({});
   loaded = signal<Record<string, boolean>>({});
   peakRanges = signal<any[]>([]);
   holidays = signal<any[]>([]);
@@ -84,9 +86,10 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['guests'] || changes['branch']) {
+    if (changes['guests'] || changes['branch'] || changes['suiteId']) {
       this.reqId++;
       this.soldOut.set({});
+      this.dayAvailability.set({});
       this.loaded.set({});
       this.promoMonths.set({});
       if (this.open()) {
@@ -111,19 +114,30 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
 
   async loadMonth(year: number, month: number) {
     const currentReq = this.reqId;
-    const key = `${this.guests}:${this.branch}:${year}-${month}`;
+    const key = `${this.guests}:${this.branch}:${this.suiteId}:${year}-${month}`;
     if (this.loaded()[key]) return;
     this.loading.set(true);
     try {
       const params: any = { year, month, guests: this.guests };
       if (this.branch) params.branch = this.branch;
+      if (this.suiteId) params.suiteId = this.suiteId;
       this.api.get<any>('/availability/monthly', params).subscribe({
         next: (res) => {
           if (this.reqId !== currentReq) return;
           const days = res?.data?.calendar || res?.calendar || [];
-          const next = { ...this.soldOut() };
-          days.forEach((d: any) => { if (d.soldOut) next[d.date] = true; });
-          this.soldOut.set(next);
+          const nextSoldOut = { ...this.soldOut() };
+          const nextAvail = { ...this.dayAvailability() };
+          days.forEach((d: any) => {
+            if (d.soldOut) nextSoldOut[d.date] = true;
+            nextAvail[d.date] = {
+              soldOut: !!d.soldOut,
+              availableSuites: d.availableSuites,
+              totalSuites: d.totalSuites,
+              occupancyRate: d.occupancyRate
+            };
+          });
+          this.soldOut.set(nextSoldOut);
+          this.dayAvailability.set(nextAvail);
           this.loaded.set({ ...this.loaded(), [key]: true });
           this.loading.set(false);
         },
@@ -228,28 +242,46 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
     return items;
   });
 
-  canCheckOut(inISO: string, outISO: string) {
+  canCheckOut(inISO: string, outISO: string): boolean {
     if (outISO <= inISO) return false;
     const n = nightsBetween(inISO, outISO);
     if (n > MAX_NIGHTS) return false;
     for (let i = 0; i < n; i++) {
       const d = addDays(inISO, i);
-      const [y, m] = d.split('-').map(Number);
-      const key = `${this.guests}:${this.branch}:${y}-${m}`;
-      if (!this.loaded()[key]) return false;
       if (this.soldOut()[d]) return false;
     }
     return true;
   }
 
-  pick(iso: string) {
-    if (this.step() === 'out' && this.checkIn && this.canCheckOut(this.checkIn, iso)) {
-      this.rangeChange.emit({ checkIn: this.checkIn, checkOut: iso });
-      this.open.set(false);
-      this.step.set('in');
-      return;
+  isDayDisabled(iso: string): boolean {
+    if (iso < this.today) return true;
+    if (this.step() === 'in' || !this.checkIn) {
+      return !!this.soldOut()[iso];
     }
+    if (iso <= this.checkIn) {
+      // allow clicking to reset check-in date
+      return !!this.soldOut()[iso];
+    }
+    return !this.canCheckOut(this.checkIn, iso);
+  }
+
+  pick(iso: string) {
     if (this.soldOut()[iso] || iso < this.today) return;
+
+    if (this.step() === 'out' && this.checkIn) {
+      if (iso > this.checkIn && this.canCheckOut(this.checkIn, iso)) {
+        this.rangeChange.emit({ checkIn: this.checkIn, checkOut: iso });
+        this.open.set(false);
+        this.step.set('in');
+        return;
+      } else if (iso <= this.checkIn) {
+        // Change check-in date directly
+        this.rangeChange.emit({ checkIn: iso, checkOut: '' });
+        this.step.set('out');
+        return;
+      }
+    }
+
     this.rangeChange.emit({ checkIn: iso, checkOut: '' });
     this.step.set('out');
   }
@@ -291,11 +323,35 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
 
   dayTitle(iso: string, full: boolean) {
     const lines = [];
-    if (full) lines.push('Sin disponibilidad');
-    (this.promosByDay()[iso] || []).forEach(p => lines.push(`${p.discountPercent}% de descuento · ${p.title}${p.branch?.name ? ` (${p.branch.name})` : ''}`));
-    if (this.holidayByDay()[iso]) lines.push(this.holidayByDay()[iso]);
-    if (!full && this.isPeak(iso)) lines.push('Temporada alta');
-    return lines.length ? lines.join('\\n') : null;
+    if (iso < this.today) {
+      lines.push('Fecha pasada no disponible');
+      return lines.join('\n');
+    }
+    const info = this.dayAvailability()[iso];
+    if (full) {
+      lines.push('❌ Ocupado / Sin disponibilidad para estas fechas');
+    } else {
+      if (info && info.availableSuites !== undefined) {
+        lines.push(`✅ Disponible (${info.availableSuites} ${info.availableSuites === 1 ? 'habitación disponible' : 'habitaciones disponibles'})`);
+      } else {
+        lines.push('✅ Disponible para reserva');
+      }
+    }
+
+    if (this.step() === 'out' && this.checkIn) {
+      if (iso > this.checkIn && !this.canCheckOut(this.checkIn, iso)) {
+        lines.push('⚠️ No se puede seleccionar como salida: hay noches intermedias ocupadas.');
+      } else if (iso === this.checkIn) {
+        lines.push('📍 Día de llegada seleccionado (haz clic para cambiar)');
+      }
+    }
+
+    (this.promosByDay()[iso] || []).forEach(p =>
+      lines.push(`💎 Promoción: -${p.discountPercent}% · ${p.title}${p.branch?.name ? ` (${p.branch.name})` : ''}`)
+    );
+    if (this.holidayByDay()[iso]) lines.push(`⭐ Festivo: ${this.holidayByDay()[iso]}`);
+    if (!full && this.isPeak(iso)) lines.push('🔥 Temporada alta');
+    return lines.length ? lines.join('\n') : null;
   }
 
   prettyDate(iso: string) { return prettyDate(iso); }

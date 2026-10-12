@@ -11,11 +11,15 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
+import java.io.Serializable;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SuiteResponseDTO {
+public class SuiteResponseDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String id;
     private String _id;

@@ -154,6 +154,10 @@ public class AvailabilityService {
     }
 
     public MonthlyAvailabilityResponseData getMonthlyAvailability(int year, int month, Integer guests, String branchId, String suiteType) {
+        return getMonthlyAvailability(year, month, guests, branchId, suiteType, null);
+    }
+
+    public MonthlyAvailabilityResponseData getMonthlyAvailability(int year, int month, Integer guests, String branchId, String suiteType, String suiteId) {
         LocalDate startDate = LocalDate.of(year, month, 1);
         int daysInMonth = startDate.lengthOfMonth();
 
@@ -165,17 +169,27 @@ public class AvailabilityService {
         List<Suite> allSuites = suiteRepository.findByActiveTrue();
         List<Suite> filteredSuites = new ArrayList<>();
 
-        for (Suite suite : allSuites) {
-            if (resolvedBranchId != null && !resolvedBranchId.equals(suite.getBranch())) {
-                continue;
+        if (suiteId != null && !suiteId.isBlank()) {
+            Optional<Suite> specificSuite = suiteRepository.findById(suiteId)
+                    .or(() -> suiteRepository.findBySlug(suiteId.toLowerCase()));
+            if (specificSuite.isPresent()) {
+                filteredSuites.add(specificSuite.get());
             }
-            if (suiteType != null && !suiteType.isEmpty() && !"Todas las suites".equalsIgnoreCase(suiteType) && !suiteType.equalsIgnoreCase(suite.getType())) {
-                continue;
+        }
+
+        if (filteredSuites.isEmpty() && (suiteId == null || suiteId.isBlank())) {
+            for (Suite suite : allSuites) {
+                if (resolvedBranchId != null && !resolvedBranchId.equals(suite.getBranch())) {
+                    continue;
+                }
+                if (suiteType != null && !suiteType.isEmpty() && !"Todas las suites".equalsIgnoreCase(suiteType) && !suiteType.equalsIgnoreCase(suite.getType())) {
+                    continue;
+                }
+                if (guests != null && guests > 0 && suite.getMaxGuests() != null && suite.getMaxGuests() < guests) {
+                    continue;
+                }
+                filteredSuites.add(suite);
             }
-            if (guests != null && guests > 0 && suite.getMaxGuests() != null && suite.getMaxGuests() < guests) {
-                continue;
-            }
-            filteredSuites.add(suite);
         }
 
         int totalSuites = 0;

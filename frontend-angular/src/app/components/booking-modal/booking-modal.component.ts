@@ -35,7 +35,7 @@ import { format } from 'date-fns';
 
           <form (ngSubmit)="confirmBooking()" style="display: flex; flex-direction: column; gap: 1rem;">
             <div style="display: block; margin-bottom: 1rem; border: 1px solid rgba(212,175,55,0.2); border-radius: 6px; background: rgba(0,0,0,0.5);">
-                <app-date-range-picker [checkIn]="checkIn" [checkOut]="checkOut" [guests]="guests" (rangeChange)="checkIn = $event.checkIn; checkOut = $event.checkOut; recalculateNights()"></app-date-range-picker>
+                <app-date-range-picker [checkIn]="checkIn" [checkOut]="checkOut" [guests]="guests" [branch]="suite?.branch?.id || suite?.branch?._id || suite?.branch?.slug || ''" [suiteId]="suite?.id || suite?._id || ''" (rangeChange)="checkIn = $event.checkIn; checkOut = $event.checkOut; recalculateNights()"></app-date-range-picker>
             </div>
             <div style="margin-top: 1rem;">
                 <app-custom-guestpicker [adults]="guests" [maxGuests]="maxGuestsCount" (adultsChange)="guests = $event"></app-custom-guestpicker>

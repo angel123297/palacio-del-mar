@@ -14,12 +14,16 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.io.Serializable;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "suites")
-public class Suite {
+public class Suite implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     private String id;
@@ -102,7 +106,8 @@ public class Suite {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class BedConfig {
+    public static class BedConfig implements Serializable {
+        private static final long serialVersionUID = 1L;
         private String type; // "single", "double", "queen", "king"
         private Integer quantity;
         private String size;
