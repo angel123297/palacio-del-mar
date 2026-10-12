@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -57,9 +58,11 @@ public class Booking {
     @Builder.Default
     private List<NightlyPrice> nightlyPrices = new ArrayList<>();
 
+    @Field("amountPaid")
     @Builder.Default
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
+    @Field("amountRefunded")
     @Builder.Default
     private BigDecimal refundedAmount = BigDecimal.ZERO;
 

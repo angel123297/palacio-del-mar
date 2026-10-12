@@ -1,5 +1,5 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { CommonModule, CurrencyPipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { Booking } from '../../models/types';
@@ -7,7 +7,7 @@ import { Booking } from '../../models/types';
 @Component({
   selector: 'app-booking-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, CurrencyPipe],
+  imports: [CommonModule, RouterModule],
   template: `
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 3rem 1.5rem;">
       <div style="max-width: 900px; margin: 0 auto;">

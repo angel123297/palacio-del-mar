@@ -1,8 +1,8 @@
+@charset "UTF-8";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@charset "UTF-8";
 :root {
   --gold: #c9a96e;
   --gold-light: #e8d5a3;

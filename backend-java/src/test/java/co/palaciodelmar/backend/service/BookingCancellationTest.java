@@ -76,6 +76,6 @@ class BookingCancellationTest {
         when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        return new BookingService(bookingRepository, null, null, null, suiteNightRepository, null, null);
+        return new BookingService(bookingRepository, null, null, null, suiteNightRepository, null, null, null);
     }
 }

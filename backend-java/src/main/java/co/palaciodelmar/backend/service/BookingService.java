@@ -7,10 +7,12 @@ import co.palaciodelmar.backend.model.Branch;
 import co.palaciodelmar.backend.model.Experience;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.model.SuiteNight;
+import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.ExperienceRepository;
+import co.palaciodelmar.backend.repository.PromotionRepository;
 import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
@@ -40,6 +42,7 @@ public class BookingService {
     private final ExperienceRepository experienceRepository;
     private final SuiteNightRepository suiteNightRepository;
     private final UserRepository userRepository;
+    private final PromotionRepository promotionRepository;
     private final PricingService pricingService;
 
     public BookingDTO createBooking(String userId, BookingRequest request) {
@@ -109,7 +112,8 @@ public class BookingService {
             throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
         }
 
-        PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), BigDecimal.ZERO);
+        BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+        PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
         BigDecimal totalRoomPrice = pricingResult.total();
 
         List<Booking.SelectedExperience> selectedExpList = parseExperiences(request.getExperiences());
@@ -231,7 +235,8 @@ public class BookingService {
             throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
         }
 
-        PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), BigDecimal.ZERO);
+        BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+        PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
         BigDecimal totalRoomPrice = pricingResult.total();
         List<Booking.SelectedExperience> selectedExpList = request.getExperiences() != null ? parseExperiences(request.getExperiences()) : booking.getExperiences();
         BigDecimal experiencesTotal = BigDecimal.ZERO;
@@ -627,5 +632,18 @@ public class BookingService {
                 suiteNightRepository.save(sn);
             }
         }
+    }
+
+    private BigDecimal findActiveBranchPromotion(String branchId, LocalDate checkIn, LocalDate checkOut) {
+        if (branchId == null || checkIn == null || checkOut == null) return BigDecimal.ZERO;
+        List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(branchId);
+        Integer maxDiscount = promotions.stream()
+                .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
+                .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut)) &&
+                             (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
+                .map(Promotion::getDiscountPercent)
+                .max(Integer::compareTo)
+                .orElse(0);
+        return BigDecimal.valueOf(maxDiscount);
     }
 }

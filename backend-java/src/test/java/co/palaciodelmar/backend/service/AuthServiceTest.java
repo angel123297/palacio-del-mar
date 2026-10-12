@@ -1,0 +1,179 @@
+package co.palaciodelmar.backend.service;
+
+import co.palaciodelmar.backend.dto.AuthRequest;
+import co.palaciodelmar.backend.dto.AuthResponse;
+import co.palaciodelmar.backend.dto.RegisterRequest;
+import co.palaciodelmar.backend.model.User;
+import co.palaciodelmar.backend.repository.UserRepository;
+import co.palaciodelmar.backend.security.JwtService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class AuthServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtService jwtService;
+
+    @Mock
+    private AuthenticationManager authenticationManager;
+
+    @Mock
+    private EmailService emailService;
+
+    @InjectMocks
+    private AuthService authService;
+
+    private RegisterRequest registerRequest;
+    private User testUser;
+
+    @BeforeEach
+    void setUp() {
+        registerRequest = RegisterRequest.builder()
+                .name("Juan")
+                .lastName("Pérez")
+                .email("juan.perez@example.com")
+                .password("password123")
+                .phone("3001234567")
+                .build();
+
+        testUser = User.builder()
+                .id("user-123")
+                .name("Juan")
+                .lastName("Pérez")
+                .email("juan.perez@example.com")
+                .password("hashedPassword")
+                .role("user")
+                .emailVerified(false)
+                .build();
+    }
+
+    @Test
+    void registerSavesUserWithUnverifiedEmailAndDoesNotReturnToken() {
+        when(userRepository.existsByEmail("juan.perez@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("hashedPassword");
+
+        AuthResponse response = authService.register(registerRequest);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        User saved = captor.getValue();
+
+        assertNotNull(saved);
+        assertFalse(saved.getEmailVerified(), "El usuario recién registrado debe tener emailVerified en false");
+        assertNotNull(saved.getVerificationTokenHash(), "Debe guardarse el hash del token de verificación");
+        assertNotNull(saved.getVerificationTokenExpiresAt());
+        assertNull(response.getToken(), "No debe entregarse un token JWT hasta que se verifique el correo");
+        assertNotNull(response.getUser());
+        assertEquals("juan.perez@example.com", response.getUser().getEmail());
+        verify(emailService).sendVerificationEmail(eq("juan.perez@example.com"), any());
+    }
+
+    @Test
+    void loginThrowsIllegalStateExceptionIfEmailNotVerified() {
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+
+        AuthRequest loginRequest = AuthRequest.builder()
+                .email("juan.perez@example.com")
+                .password("password123")
+                .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> authService.login(loginRequest));
+        assertTrue(ex.getMessage().contains("verificar tu correo electrónico"));
+    }
+
+    @Test
+    void loginSucceedsWhenEmailIsVerified() {
+        testUser.setEmailVerified(true);
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+        when(jwtService.generateToken(any())).thenReturn("valid.jwt.token");
+
+        AuthRequest loginRequest = AuthRequest.builder()
+                .email("juan.perez@example.com")
+                .password("password123")
+                .build();
+
+        AuthResponse response = authService.login(loginRequest);
+
+        assertNotNull(response.getToken());
+        assertEquals("valid.jwt.token", response.getToken());
+        assertEquals("juan.perez@example.com", response.getUser().getEmail());
+    }
+
+    @Test
+    void loginAllowedForAdminEvenIfEmailNotExplicitlyVerified() {
+        testUser.setRole("admin");
+        testUser.setEmailVerified(false);
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+        when(jwtService.generateToken(any())).thenReturn("admin.jwt.token");
+
+        AuthRequest loginRequest = AuthRequest.builder()
+                .email("juan.perez@example.com")
+                .password("password123")
+                .build();
+
+        AuthResponse response = authService.login(loginRequest);
+        assertNotNull(response.getToken());
+    }
+
+    @Test
+    void verifyEmailSetsEmailVerifiedToTrueAndClearsToken() {
+        String token = "my-secret-token";
+        String hashedToken = authService.hashToken(token);
+
+        testUser.setVerificationTokenHash(hashedToken);
+        testUser.setVerificationTokenExpiresAt(Instant.now().plus(2, ChronoUnit.HOURS));
+
+        when(userRepository.findByVerificationTokenHash(hashedToken)).thenReturn(Optional.of(testUser));
+
+        authService.verifyEmail(token);
+
+        assertTrue(testUser.getEmailVerified());
+        assertNull(testUser.getVerificationTokenHash());
+        assertNull(testUser.getVerificationTokenExpiresAt());
+        verify(userRepository).save(testUser);
+    }
+
+    @Test
+    void verifyEmailFailsForExpiredToken() {
+        String token = "expired-token";
+        String hashedToken = authService.hashToken(token);
+
+        testUser.setVerificationTokenHash(hashedToken);
+        testUser.setVerificationTokenExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
+
+        when(userRepository.findByVerificationTokenHash(hashedToken)).thenReturn(Optional.of(testUser));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail(token));
+        assertTrue(ex.getMessage().contains("expirado"));
+    }
+
+    @Test
+    void verifyEmailFailsForInvalidToken() {
+        when(userRepository.findByVerificationTokenHash(any())).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail("invalid-token"));
+        assertTrue(ex.getMessage().contains("inválido"));
+    }
+}

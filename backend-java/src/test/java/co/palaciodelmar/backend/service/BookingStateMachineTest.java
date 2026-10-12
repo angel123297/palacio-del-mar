@@ -22,7 +22,7 @@ class BookingStateMachineTest {
     private static final String REASON = "status transition test";
     
     private final SuiteNightRepository suiteNightRepository = Mockito.mock(SuiteNightRepository.class);
-    private final BookingService service = new BookingService(null, null, null, null, suiteNightRepository, null, null);
+    private final BookingService service = new BookingService(null, null, null, null, suiteNightRepository, null, null, null);
 
     @ParameterizedTest(name = "{0} -> {1} must be {2}")
     @MethodSource("allStatusTransitions")
