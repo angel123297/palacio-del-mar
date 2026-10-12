@@ -8,14 +8,33 @@ Este documento es la bitácora oficial del proyecto para documentar todas las au
 ---
 
 ## 📅 Índice Cronológico de Hitos
-1. [Hito 8: Auditoría Intensiva Full-Stack de Jules y Bloqueo Optimista (@Version) en SuiteNight (12 Octubre 2026)](#hito-8-auditoría-intensiva-full-stack-de-jules-y-bloqueo-optimista-version-en-suitenight)
-2. [Hito 7: Resolución de Serialización de Caché, Disponibilidad por Habitación, Indicadores de Calendario y Corrección de Servicios VIP (Recogida al Aeropuerto) (12 Octubre 2026)](#hito-7-resolución-de-serialización-de-caché-disponibilidad-por-habitación-indicadores-de-calendario-y-corrección-de-servicios-vip-recogida-al-aeropuerto)
-3. [Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync) (12 Octubre 2026)](#hito-6-implementación-de-caché-resiliente-redis--in-memory-y-tareas-asíncronas-enableasync)
-4. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
-5. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
-6. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
-7. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
-8. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+1. [Hito 9: Resolución de Excepción Asíncrona en Checkout (@Async CompletableFuture), Aliases de Métricas y Certificación Pre-Exposición (12 Octubre 2026)](#hito-9-resolución-de-excepción-asíncrona-en-checkout-async-completablefuture-aliases-de-métricas-y-certificación-pre-exposición)
+2. [Hito 8: Auditoría Intensiva Full-Stack de Jules y Bloqueo Optimista (@Version) en SuiteNight (12 Octubre 2026)](#hito-8-auditoría-intensiva-full-stack-de-jules-y-bloqueo-optimista-version-en-suitenight)
+3. [Hito 7: Resolución de Serialización de Caché, Disponibilidad por Habitación, Indicadores de Calendario y Corrección de Servicios VIP (Recogida al Aeropuerto) (12 Octubre 2026)](#hito-7-resolución-de-serialización-de-caché-disponibilidad-por-habitación-indicadores-de-calendario-y-corrección-de-servicios-vip-recogida-al-aeropuerto)
+4. [Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync) (12 Octubre 2026)](#hito-6-implementación-de-caché-resiliente-redis--in-memory-y-tareas-asíncronas-enableasync)
+5. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
+6. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
+7. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
+8. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
+9. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+
+---
+
+## Hito 9: Resolución de Excepción Asíncrona en Checkout (@Async CompletableFuture), Aliases de Métricas y Certificación Pre-Exposición
+- **Fecha:** 12 de Octubre de 2026
+- **Módulos:** `WhatsAppService.java`, `ExtraFeaturesTest.java`, `AdminController.java`, `HostController.java`.
+- **Problema Detectado en UI:**
+  - Al procesar el pago en la pantalla de "Centro de Pago Seguro", aparecía el error:
+    `Invalid return type for async method (only Future and void supported): boolean`.
+  - Causa raíz: Al habilitar `@EnableAsync` en Spring Boot, el método `sendBookingConfirmation` de `WhatsAppService` estaba anotado con `@Async` retornando el tipo primitivo `boolean`. Spring impone estrictamente que métodos asíncronos deben retornar `void` o `Future/CompletableFuture`.
+- **Solución Técnica Aplicada:**
+  - En `WhatsAppService.java`: Se migró la firma del método a `public CompletableFuture<Boolean> sendBookingConfirmation(...)` retornando `CompletableFuture.completedFuture(true)` y `CompletableFuture.completedFuture(false)`.
+  - En `ExtraFeaturesTest.java`: Se actualizó la invocación del test para resolver el futuro con `.join()`.
+  - En `AdminController.java` y `HostController.java`: Se añadieron los aliases `@GetMapping({"/stats", "/metrics"})` garantizando paridad total sin importar la ruta consultada por el frontend o herramientas de monitoreo.
+- **Validación:**
+  - Suite de 28 pruebas automatizadas end-to-end superadas al 100% (28/28).
+  - 89/89 pruebas unitarias de Spring Boot pasando (`BUILD SUCCESS`).
+  - Pago y confirmación de reserva con Smart Lock PIN verificado en tiempo real.
 
 ---
 

@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClient;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -33,7 +34,7 @@ public class WhatsAppService {
      * En entorno local (enabled=false), simula el envío con formato de lujo en los logs.
      */
     @Async
-    public boolean sendBookingConfirmation(Booking booking, User guest, Suite suite) {
+    public CompletableFuture<Boolean> sendBookingConfirmation(Booking booking, User guest, Suite suite) {
         String phone = null;
         if (guest != null && guest.getProfile() != null && guest.getProfile().getPhone() != null) {
             phone = guest.getProfile().getPhone();
@@ -74,7 +75,7 @@ public class WhatsAppService {
                      "Mensaje:\n{}\n" +
                      "=======================================================",
                     phone != null ? phone : "+57 300 000 0000", messageText);
-            return true;
+            return CompletableFuture.completedFuture(true);
         }
 
         try {
@@ -97,10 +98,10 @@ public class WhatsAppService {
                     .toBodilessEntity();
 
             log.info("Mensaje oficial de WhatsApp enviado a {}", phone);
-            return true;
+            return CompletableFuture.completedFuture(true);
         } catch (Exception e) {
             log.error("Error al enviar mensaje por WhatsApp Cloud API: {}", e.getMessage());
-            return false;
+            return CompletableFuture.completedFuture(false);
         }
     }
 }
