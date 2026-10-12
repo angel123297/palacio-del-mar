@@ -58,6 +58,8 @@ public class BookingDTO {
     private List<Booking.FoodOrder> foodOrders;
 
     private String cancellationReason;
+    private String smartLockPin;
+    private Boolean preCheckInCompleted;
     private Instant expiresAt;
     private Instant createdAt;
     private Instant updatedAt;

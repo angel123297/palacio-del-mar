@@ -106,6 +106,15 @@ public class Booking {
     @org.springframework.data.annotation.Version
     private Long version;
 
+    private String smartLockPin;
+
+    @Builder.Default
+    private Boolean preCheckInCompleted = false;
+
+    private String documentNumber;
+
+    private String companionGuests;
+
     @Data
     @Builder
     @NoArgsConstructor

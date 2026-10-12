@@ -123,4 +123,33 @@ public class BookingController {
         BookingDTO booking = bookingService.cancelBooking(id, principal.getUser().getId(), reason);
         return ResponseEntity.ok(ApiResponse.ok("Reserva cancelada exitosamente", booking));
     }
+
+    @PostMapping("/{id}/pre-checkin")
+    public ResponseEntity<ApiResponse<BookingDTO>> preCheckIn(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String id,
+            @RequestBody Map<String, String> body
+    ) {
+        String doc = body != null ? body.get("documentNumber") : null;
+        String companions = body != null ? body.get("companionGuests") : null;
+        String userId = principal != null ? principal.getUser().getId() : null;
+        BookingDTO booking = bookingService.performPreCheckIn(id, userId, doc, companions);
+        return ResponseEntity.ok(ApiResponse.ok("Pre-check-in completado exitosamente. Llave digital activada.", booking));
+    }
+
+    @GetMapping("/{id}/smart-key")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getSmartKey(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String id
+    ) {
+        BookingDTO booking = bookingService.getBookingByIdSecure(id, principal != null ? principal.getUser() : null);
+        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+                "bookingId", booking.getId(),
+                "smartLockPin", booking.getSmartLockPin() != null ? booking.getSmartLockPin() : "PENDIENTE",
+                "suite", booking.getSuite() != null ? booking.getSuite().getName() : "Suite",
+                "validFrom", booking.getCheckIn() != null ? booking.getCheckIn().toString() + " 15:00" : "15:00",
+                "validUntil", booking.getCheckOut() != null ? booking.getCheckOut().toString() + " 11:00" : "11:00",
+                "preCheckInCompleted", Boolean.TRUE.equals(booking.getPreCheckInCompleted())
+        )));
+    }
 }

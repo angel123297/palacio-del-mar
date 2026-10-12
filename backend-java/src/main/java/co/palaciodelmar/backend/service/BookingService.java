@@ -150,6 +150,7 @@ public class BookingService {
                 .bookingCode(bookingCode)
                 .guestDetails(guestDetails)
                 .experiences(selectedExpList)
+                .smartLockPin(String.format("%06d", java.util.concurrent.ThreadLocalRandom.current().nextInt(100000, 999999)))
                 .expiresAt(Instant.now().plusSeconds(1800)) // 30 mins hold
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -536,6 +537,8 @@ public class BookingService {
                 .isCancellable(isCancelable)
                 .guestDetails(gd)
                 .experiences(booking.getExperiences())
+                .smartLockPin(booking.getSmartLockPin())
+                .preCheckInCompleted(booking.getPreCheckInCompleted())
                 .cancellationReason(booking.getCancellationReason())
                 .expiresAt(booking.getExpiresAt())
                 .createdAt(booking.getCreatedAt())
@@ -645,5 +648,24 @@ public class BookingService {
                 .max(Integer::compareTo)
                 .orElse(0);
         return BigDecimal.valueOf(maxDiscount);
+    }
+
+    public BookingDTO performPreCheckIn(String bookingId, String userId, String documentNumber, String companionGuests) {
+        Booking booking = getBookingEntityById(bookingId);
+        if (userId != null && !userId.equals(booking.getUser())) {
+            throw new IllegalArgumentException("No tienes permiso para gestionar esta reserva");
+        }
+        if (documentNumber == null || documentNumber.isBlank()) {
+            throw new IllegalArgumentException("El número de documento es obligatorio para el registro turístico");
+        }
+
+        booking.setDocumentNumber(documentNumber.trim());
+        booking.setCompanionGuests(companionGuests != null ? companionGuests.trim() : "");
+        booking.setPreCheckInCompleted(true);
+        if (booking.getSmartLockPin() == null) {
+            booking.setSmartLockPin(String.format("%06d", java.util.concurrent.ThreadLocalRandom.current().nextInt(100000, 999999)));
+        }
+        booking.setUpdatedAt(Instant.now());
+        return toDTO(bookingRepository.save(booking));
     }
 }
