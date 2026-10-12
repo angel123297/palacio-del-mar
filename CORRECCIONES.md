@@ -8,13 +8,32 @@ Este documento es la bitácora oficial del proyecto para documentar todas las au
 ---
 
 ## 📅 Índice Cronológico de Hitos
-1. [Hito 7: Resolución de Serialización de Caché, Disponibilidad por Habitación, Indicadores de Calendario y Corrección de Servicios VIP (Recogida al Aeropuerto) (12 Octubre 2026)](#hito-7-resolución-de-serialización-de-caché-disponibilidad-por-habitación-indicadores-de-calendario-y-corrección-de-servicios-vip-recogida-al-aeropuerto)
-2. [Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync) (12 Octubre 2026)](#hito-6-implementación-de-caché-resiliente-redis--in-memory-y-tareas-asíncronas-enableasync)
-3. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
-4. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
-5. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
-6. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
-7. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+1. [Hito 8: Auditoría Intensiva Full-Stack de Jules y Bloqueo Optimista (@Version) en SuiteNight (12 Octubre 2026)](#hito-8-auditoría-intensiva-full-stack-de-jules-y-bloqueo-optimista-version-en-suitenight)
+2. [Hito 7: Resolución de Serialización de Caché, Disponibilidad por Habitación, Indicadores de Calendario y Corrección de Servicios VIP (Recogida al Aeropuerto) (12 Octubre 2026)](#hito-7-resolución-de-serialización-de-caché-disponibilidad-por-habitación-indicadores-de-calendario-y-corrección-de-servicios-vip-recogida-al-aeropuerto)
+3. [Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync) (12 Octubre 2026)](#hito-6-implementación-de-caché-resiliente-redis--in-memory-y-tareas-asíncronas-enableasync)
+4. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
+5. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
+6. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
+7. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
+8. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+
+---
+
+## Hito 8: Auditoría Intensiva Full-Stack de Jules y Bloqueo Optimista (@Version) en SuiteNight
+- **Fecha:** 12 de Octubre de 2026
+- **Auditor:** Jules (Sesión `7721160277791786854`)
+- **Módulos Auditados:** Backend Spring Boot 3 / Java 21, Frontend Angular 18 Standalone, MongoDB, Redis, Concurrencia e Inventario.
+- **Resultados de la Auditoría:**
+  1. **Backend Tests:** 89/89 tests unitarios e integración pasando (`BUILD SUCCESS`).
+  2. **Frontend Angular:** Compilación AOT limpia con 0 errores (`npm run build`).
+  3. **Flujo de Reservas y Servicios VIP:** Verificación exitosa de cálculo de precios, recogida en aeropuerto ($150.000 COP) y comidas personalizadas sumando a `totalPrice` y `balanceDue`.
+  4. **Caché y Resiliencia:** Certificación de `CacheConfig` con fail-open y serialización en DTOs.
+  5. **DateRangePicker:** Certificación de Signals, bloqueo de fechas ocupadas y UX de rangos.
+- **Mejora Aplicada tras Auditoría:**
+  - **Bloqueo Optimista en `SuiteNight.java`:** Se implementó `@Version private Long version;` en la entidad MongoDB `SuiteNight` (recomendación Media de Jules) para añadir paridad de bloqueo optimista con `Booking.java`.
+- **Dictamen de Jules:**
+  > *"SE CERTIFICA EL CÓDIGO ACTUAL PARA PRODUCCIÓN."*
+- **Estado de Pruebas:** 89/89 tests Java pasando, Angular compila en ~6s.
 
 ---
 
