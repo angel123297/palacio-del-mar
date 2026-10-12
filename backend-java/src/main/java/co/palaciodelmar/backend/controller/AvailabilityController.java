@@ -40,10 +40,11 @@ public class AvailabilityController {
             @RequestParam int month,
             @RequestParam(required = false) Integer guests,
             @RequestParam(required = false) String branch,
-            @RequestParam(required = false) String suiteType
+            @RequestParam(required = false) String suiteType,
+            @RequestParam(required = false) String suiteId
     ) {
         AvailabilityService.MonthlyAvailabilityResponseData data = availabilityService.getMonthlyAvailability(
-                year, month, guests, branch, suiteType
+                year, month, guests, branch, suiteType, suiteId
         );
         return ResponseEntity.ok(ApiResponse.ok(data));
     }

@@ -112,8 +112,20 @@
 .drp-day {
   position: relative; isolation: isolate; background: transparent; border: none; color: rgba(245, 240, 232, 0.84); cursor: pointer;
   aspect-ratio: 1; font-family: 'Cinzel', 'Cormorant Garamond', serif; font-size: 0.92rem; font-weight: 500;
-  transition: color 0.2s, text-shadow 0.2s;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: color 0.2s, text-shadow 0.2s, background 0.2s;
 }
+.drp-day-num { line-height: 1; }
+.drp-day-dot {
+  position: absolute; bottom: 4px; display: inline-block;
+}
+.drp-day-dot.dot-occupied {
+  width: 4px; height: 4px; background: #e74c3c; box-shadow: 0 0 5px rgba(231, 76, 60, 0.95); transform: rotate(45deg);
+}
+.drp-day-dot.dot-free {
+  width: 3.5px; height: 3.5px; background: #2ecc71; box-shadow: 0 0 4px rgba(46, 204, 113, 0.85); border-radius: 50%;
+}
+
 .drp-day::before {
   content: ''; position: absolute; inset: 20%; z-index: -1; border: 1px solid transparent;
   transform: rotate(45deg) scale(0.6); opacity: 0;
@@ -123,9 +135,15 @@
 .drp-day:hover:not(:disabled)::before { opacity: 1; transform: rotate(45deg) scale(1); border-color: rgba(244, 236, 216, 0.7); }
 .drp-day:disabled { opacity: 0.22; cursor: not-allowed; }
 
+.drp-day.is-avail { color: #ffffff; }
+.drp-day.is-avail:hover:not(:disabled) { background: rgba(201, 169, 110, 0.15); border-radius: 4px; }
+
 .drp-day.is-peak { background: radial-gradient(circle at 50% 86%, var(--gold, #c9a96e) 0 1.6px, transparent 2.6px); }
-.drp-day.is-full { color: rgba(232, 160, 150, 0.6); text-decoration: line-through; text-decoration-color: rgba(192, 57, 43, 0.9); text-decoration-thickness: 1px; opacity: 0.7; }
-.drp-day.is-full:disabled { opacity: 0.3; }
+.drp-day.is-full {
+  color: #ff7675; text-decoration: line-through; text-decoration-color: #e74c3c; text-decoration-thickness: 1.5px;
+  background: rgba(231, 76, 60, 0.1); border-radius: 4px; cursor: not-allowed; opacity: 0.85;
+}
+.drp-day.is-full:disabled { opacity: 0.65; }
 .drp-day.is-sel.is-peak { background: none; }
 
 .drp-day.is-range { color: var(--gold-light, #e8d5a3); }
@@ -172,7 +190,8 @@
 
 .drp-legend { display: flex; justify-content: center; gap: 8px 16px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(201, 169, 110, 0.15); font-size: 0.55rem; font-family: 'Cinzel', 'Cormorant Garamond', serif; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.8; flex-wrap: wrap; position: relative; z-index: 2; color: #f4ecd8; }
 .drp-dot { display: inline-block; width: 6px; height: 6px; margin-right: 7px; transform: rotate(45deg); vertical-align: middle; }
-.dot-full { background: transparent; border: 1px solid rgba(192, 57, 43, 0.9); }
+.dot-avail { background: #2ecc71; box-shadow: 0 0 6px rgba(46, 204, 113, 0.85); }
+.dot-full { background: #e74c3c; box-shadow: 0 0 6px rgba(231, 76, 60, 0.85); }
 .dot-peak { background: var(--gold, #c9a96e); box-shadow: 0 0 6px rgba(201, 169, 110, 0.8); }
 .dot-promo { background: var(--soul); box-shadow: 0 0 6px rgba(154, 217, 207, 0.9); }
 .dot-holiday { background: var(--ember); box-shadow: 0 0 6px rgba(224, 169, 106, 0.85); }

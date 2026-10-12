@@ -13,12 +13,16 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.io.Serializable;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "branches")
-public class Branch {
+public class Branch implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     private String id;
@@ -72,7 +76,8 @@ public class Branch {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class GeoLocation {
+    public static class GeoLocation implements Serializable {
+        private static final long serialVersionUID = 1L;
         private Double lat;
         private Double lng;
     }
@@ -81,7 +86,8 @@ public class Branch {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class PointOfInterest {
+    public static class PointOfInterest implements Serializable {
+        private static final long serialVersionUID = 1L;
         private String name;
         private String type;
         private Integer walkMinutes;

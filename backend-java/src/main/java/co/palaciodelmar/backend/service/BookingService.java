@@ -127,7 +127,24 @@ public class BookingService {
             }
         }
 
-        BigDecimal totalPrice = totalRoomPrice.add(experiencesTotal);
+        BigDecimal vipExtrasTotal = BigDecimal.ZERO;
+        if (Boolean.TRUE.equals(request.getAirportPickup())) {
+            vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("150000"));
+        }
+        if (request.getFoodOrders() != null) {
+            for (Booking.FoodOrder fo : request.getFoodOrders()) {
+                if (fo.getPrice() != null) {
+                    vipExtrasTotal = vipExtrasTotal.add(fo.getPrice());
+                } else {
+                    vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
+                }
+                if (Boolean.TRUE.equals(fo.getIncludesBreakfastCombo())) {
+                    vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("35000"));
+                }
+            }
+        }
+
+        BigDecimal totalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal);
         String bookingCode = "PDM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         Booking.GuestDetails guestDetails = parseGuestDetails(request);
 
@@ -162,6 +179,8 @@ public class BookingService {
                 .bookingCode(bookingCode)
                 .guestDetails(guestDetails)
                 .experiences(selectedExpList)
+                .airportPickup(request.getAirportPickup())
+                .foodOrders(request.getFoodOrders() != null ? request.getFoodOrders() : new ArrayList<>())
                 .smartLockPin(String.format("%06d", java.util.concurrent.ThreadLocalRandom.current().nextInt(100000, 999999)))
                 .expiresAt(Instant.now().plusSeconds(1800)) // 30 mins hold
                 .createdAt(Instant.now())
@@ -557,6 +576,8 @@ public class BookingService {
                 .isCancellable(isCancelable)
                 .guestDetails(gd)
                 .experiences(booking.getExperiences())
+                .airportPickup(booking.getAirportPickup())
+                .foodOrders(booking.getFoodOrders())
                 .smartLockPin(booking.getSmartLockPin())
                 .preCheckInCompleted(booking.getPreCheckInCompleted())
                 .cancellationReason(booking.getCancellationReason())

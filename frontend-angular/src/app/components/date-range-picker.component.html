@@ -47,8 +47,8 @@
     <div class="drp-divider" aria-hidden="true"><i></i><span></span><i></i></div>
     
     <p class="drp-hint">
-      {{ step() === 'out' ? 'Ahora elige tu día de salida' : 'Elige tu día de llegada' }}
-      <ng-container *ngIf="loading()"> · cargando…</ng-container>
+      {{ step() === 'out' ? ('Ahora elige tu día de salida (desde ' + prettyDate(checkIn) + ')') : 'Elige tu día de llegada' }}
+      <ng-container *ngIf="loading()"> · consultando disponibilidad…</ng-container>
     </p>
     
     <div class="drp-grid">
@@ -56,16 +56,19 @@
       <ng-container *ngFor="let iso of cells; let i = index">
         <span *ngIf="!iso" [attr.key]="'e' + i"></span>
         <button *ngIf="iso" type="button" class="drp-day"
-                [class.is-full]="soldOut()[iso]"
+                [class.is-full]="soldOut()[iso] && iso >= today"
+                [class.is-avail]="!soldOut()[iso] && iso >= today"
                 [class.is-peak]="isPeak(iso) && !soldOut()[iso]"
                 [class.is-sel]="iso === checkIn || iso === checkOut"
                 [class.is-range]="checkIn && checkOut && iso > checkIn && iso < checkOut"
                 [class.is-start]="iso === checkIn && checkOut"
                 [class.is-end]="iso === checkOut"
-                [disabled]="iso < today || (step() === 'in' || !checkIn ? soldOut()[iso] : (iso > checkIn ? !canCheckOut(checkIn, iso) : soldOut()[iso]))"
+                [disabled]="isDayDisabled(iso)"
                 [title]="dayTitle(iso, !!soldOut()[iso])"
                 (click)="pick(iso)">
-          {{ iso | slice:8 }}
+          <span class="drp-day-num">{{ iso | slice:8 }}</span>
+          <span *ngIf="soldOut()[iso] && iso >= today" class="drp-day-dot dot-occupied" title="Ocupado"></span>
+          <span *ngIf="!soldOut()[iso] && iso >= today && iso !== checkIn && iso !== checkOut" class="drp-day-dot dot-free" title="Disponible"></span>
           <i class="drp-mark mk-promo" aria-hidden="true" *ngIf="promosByDay()[iso] && iso >= today"></i>
           <i class="drp-mark mk-holiday" aria-hidden="true" *ngIf="holidayByDay()[iso] && iso >= today"></i>
         </button>
@@ -88,7 +91,8 @@
     </div>
     
     <div class="drp-legend">
-      <span><i class="drp-dot dot-full"></i> Agotado</span>
+      <span><i class="drp-dot dot-avail"></i> Disponible</span>
+      <span><i class="drp-dot dot-full"></i> Ocupado</span>
       <span><i class="drp-dot dot-peak"></i> Temporada alta</span>
       <span><i class="drp-dot dot-promo"></i> Descuento</span>
       <span><i class="drp-dot dot-holiday"></i> Festivo</span>

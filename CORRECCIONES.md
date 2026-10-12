@@ -8,12 +8,35 @@ Este documento es la bitácora oficial del proyecto para documentar todas las au
 ---
 
 ## 📅 Índice Cronológico de Hitos
-1. [Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync) (12 Octubre 2026)](#hito-6-implementación-de-caché-resiliente-redis--in-memory-y-tareas-asíncronas-enableasync)
-2. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
-3. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
-4. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
-5. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
-6. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+1. [Hito 7: Resolución de Serialización de Caché, Disponibilidad por Habitación, Indicadores de Calendario y Corrección de Servicios VIP (Recogida al Aeropuerto) (12 Octubre 2026)](#hito-7-resolución-de-serialización-de-caché-disponibilidad-por-habitación-indicadores-de-calendario-y-corrección-de-servicios-vip-recogida-al-aeropuerto)
+2. [Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync) (12 Octubre 2026)](#hito-6-implementación-de-caché-resiliente-redis--in-memory-y-tareas-asíncronas-enableasync)
+3. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
+4. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
+5. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
+6. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
+7. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+
+---
+
+## Hito 7: Resolución de Serialización de Caché, Disponibilidad por Habitación, Indicadores de Calendario y Corrección de Servicios VIP (Recogida al Aeropuerto)
+- **Fecha:** 12 de Octubre de 2026
+- **Módulos:** 
+  - `backend-java`: `SuiteResponseDTO`, `SuiteTypeDTO`, `Branch`, `Suite`, `CacheConfig`, `AvailabilityController`, `AvailabilityService`, `BookingService`
+  - `frontend-angular`: `DateRangePickerComponent` (`.ts`, `.html`, `.css`), `SuiteDetailComponent`, `BookingModalComponent`
+- **Problemas Detectados y Soluciones Aplicadas:**
+  1. **Fallo de Serialización en Caché Redis (`NotSerializableException`):**
+     - *Problema:* Al conectar el backend a Redis en contenedor Docker, `getAllActiveSuites` retornaba HTTP 500 porque `SuiteResponseDTO` y sus sub-entidades (`Branch`, `GeoLocation`, `PointOfInterest`, `BedConfig`) no implementaban `Serializable`.
+     - *Solución:* Implementación de `java.io.Serializable` con `serialVersionUID = 1L` en todos los DTOs y modelos cacheados. Creación de `CacheConfig.java` con `CacheErrorHandler` para estrategia fail-open resiliente (si Redis tiene intermitencias, el sistema continúa consultando MongoDB sin afectar al usuario).
+  2. **Detección y Visualización de Fechas Ocupadas vs. Disponibles:**
+     - *Problema:* El usuario no visualizaba con claridad qué días estaban agotados y cuáles disponibles al seleccionar rangos de fecha; además, en la vista de detalle de una suite específica no se pasaba el ID de la habitación, por lo que la disponibilidad solo reportaba agotado si el 100% de las 13 habitaciones del hotel estaban llenas.
+     - *Solución:*
+       - Backend: Se extendió `/api/availability/monthly` en `AvailabilityController` y `AvailabilityService` para soportar el parámetro opcional `suiteId`, evaluando la disponibilidad exacta de la suite solicitada.
+       - Frontend: Se vinculó `[suiteId]` y `[branch]` en `SuiteDetailComponent` y `BookingModalComponent`.
+       - En `DateRangePickerComponent`, cada celda ahora muestra indicadores claros: punto rojo y tachado suave para días ocupados (`is-full`), indicador esmeralda para días disponibles (`is-avail`), tooltips detallados con número de unidades libres, y bloqueo automático de selección de salida que intente cruzar una noche intermedia ocupada. Actualización de la leyenda con estado "Disponible" y "Ocupado".
+  3. **Omisión de Cobro y Registro de Servicios VIP (Recogida en el Aeropuerto y Comidas):**
+     - *Problema:* Al seleccionar "Recogida en el Aeropuerto" (+ $150.000 COP) u órdenes de comida en la vista de detalle, el backend no sumaba estos conceptos al total de la reserva ni guardaba `airportPickup` en la entidad MongoDB, apareciendo sin registrar en el checkout.
+     - *Solución:* Se actualizó `BookingService.createBooking` para sumar la tarifa de recogida al aeropuerto y comidas a `totalPrice` y `balanceDue`, se asignaron los campos a la entidad `Booking`, y se mapearon en `toDTO(booking)`.
+- **Pruebas:** 89/89 pruebas unitarias e integración en backend pasando (`BUILD SUCCESS`), frontend compilando limpiamente sin errores (`npm run build`).
 
 ---
 
@@ -142,4 +165,5 @@ Este documento es la bitácora oficial del proyecto para documentar todas las au
 | 12/10/2026 | Backend Java | 88 | 88 exitosas (C1 Scheduler) | QA Bloque 1 |
 | 12/10/2026 | Backend Java | 89 | 89 exitosas (A1 Concurrencia) | QA Final |
 | 12/10/2026 | Backend Java | 89 | 89 exitosas (Caché + @Async) | Hito 6 |
-| 12/10/2026 | Frontend Angular | Build de Producción | 0 errores, 0 warnings | Build SCSS |
+| 12/10/2026 | Backend Java | 89 | 89 exitosas (Fix VIP Aeropuerto + SuiteId) | Hito 7 |
+| 12/10/2026 | Frontend Angular | Build de Producción | 0 errores, 0 warnings | Build SCSS + Cal |
