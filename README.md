@@ -1,67 +1,160 @@
-# Palacio del Mar - Enterprise Edition
+# 🏰 Palacio del Mar — Enterprise Luxury Hospitality Platform
 
-Bienvenido a la versión refactorizada de **Palacio del Mar**, un sistema de reservas hoteleras de lujo migrado completamente a un stack tecnológico de grado empresarial.
+Bienvenido al repositorio oficial de **Palacio del Mar**, una plataforma integral de reservas hoteleras de lujo de grado empresarial para Cartagena de Indias, diseñada bajo estándares de alta disponibilidad, concurrencia transaccional y experiencia de usuario premium (estilo Booking.com / Relais & Châteaux).
 
-Este repositorio contiene la entrega final del proyecto. La antigua arquitectura de Node/React ha sido reemplazada por una infraestructura mucho más robusta y escalable construida sobre **Java y Angular**.
+El proyecto fue completamente migrado y refactorizado a una arquitectura moderna y desacoplada: **Spring Boot 3 + Java 21** en el Backend y **Angular 18 (Standalone Components & Signals)** en el Frontend.
 
-## Tecnologías Utilizadas
+---
 
-- **Backend:** Java 21, Spring Boot 4.1, Spring Security, Spring Data MongoDB.
-- **Frontend:** Angular 18 (Standalone Components, Signals), RxJS.
-- **Base de Datos:** MongoDB 7.0.
-- **Infraestructura:** Docker & Docker Compose.
+## 🚀 Arquitectura y Tecnologías
 
-## Características Principales
+- **Backend:** Java 21 LTS, Spring Boot 3.4+, Spring Data MongoDB, Spring Security (JWT con algoritmo HMAC-SHA256), JavaMail (integrado con Mailpit).
+- **Frontend:** Angular 18+, TypeScript, Tailwind CSS, Angular Signals (programación reactiva sin Zone.js overhead), Componentes Standalone.
+- **Base de Datos:** MongoDB 7.0 (Índices únicos compuestos, control de concurrencia optimista `@Version`).
+- **Control de Correo / SMTP:** Mailpit para captura y verificación de correos en entornos de desarrollo y pruebas.
+- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, GitHub Copilot CLI QA Suite.
 
-- **Gestión Concurrente de Reservas:** Optimistic Locking y control transaccional para evitar race-conditions (dobles reservas) en fechas agotadas.
-- **Seguridad de Extremo a Extremo:** Autenticación por JWT, Guards de Angular para roles específicos (User, Admin, Host), validación de payloads y GlobalExceptionHandling para protección contra inyecciones.
-- **Panel Multi-Rol:** Dashboards exclusivos y protegidos para el Usuario (historial y estado de reservas), el Anfitrión (gestión de ocupación por sucursal) y el Administrador (control total del sistema).
-- **Tarifas Dinámicas y Fechas Pico:** Cálculos de precios según promociones y temporadas dinámicas integrados directamente en el DateRangePicker reactivo del frontend.
+---
 
-## Instalación y Ejecución Local
+## 👥 Funcionalidades por Rol
 
-El proyecto está dockerizado para garantizar que se ejecute en cualquier entorno con un solo comando. No necesitas tener Java, Maven, Node o MongoDB instalados localmente, solo Docker.
+### 👑 1. Administrador (`ADMIN`)
+El rol de administración posee control total del sistema y acceso al dashboard gerencial:
+- **Métricas Globales en Tiempo Real:** Total de ingresos generados, índice de ocupación global, conteo de reservas activas, completadas y canceladas.
+- **Gestión Paginada de Reservas:** Paginación real a nivel de base de datos (`Pageable` en MongoDB) sobre `/api/admin/bookings`, evitando sobrecarga de memoria.
+- **Control del Ciclo de Vida de Reservas:** Capacidad de confirmar, marcar check-in, check-out o cancelar reservas con motivo administrativo documentado en el historial de auditoría (`statusHistory`).
+- **Gestión de Tarifas y Promociones:** Configuración de promociones estacionales por sucursal con porcentajes de descuento dinámicos y ventanas de validez temporal.
+- **Control de Habitaciones y Sucursales:** Supervisión del inventario de suites en Centro Histórico y Getsemaní.
 
-1. Clona este repositorio y asegúrate de estar en la rama correcta.
-2. Copia el archivo `.env.example` a `.env` (si es necesario) para configurar los secretos.
-3. Levanta todos los servicios utilizando Docker Compose:
+### 🛎️ 2. Anfitrión (`HOST`)
+El anfitrión cuenta con una interfaz diseñada específicamente para la operación hotelera en sede:
+- **Métricas Aisladas por Sucursal:** Visualización filtrada exclusivamente para la sede asignada al anfitrión (Centro Histórico o Getsemaní).
+- **Control de Ocupación y Huéspedes:** Monitoreo de llegadas y salidas de huéspedes con acceso a nombres, teléfonos y estado de pago.
+- **Calendario Operativo:** Verificación visual de fechas agotadas y habitaciones disponibles para asignación de llaves y servicio a la habitación.
 
-   ```bash
-   docker compose up -d --build
-   ```
+### 🌴 3. Huésped / Usuario (`USER` / Invitado)
+Diseñado para ofrecer una experiencia de usuario fluida, elegante y sin fricciones:
+- **Autenticación Segura y Verificación de Correo:**
+  - Registro de cuenta con validación de fortaleza de credenciales.
+  - Generación de tokens criptográficos SHA-256 de un solo uso con expiración a 24 horas.
+  - Bloqueo de inicio de sesión hasta validar la cuenta mediante el enlace enviado al correo (abierto en `/verificar-email/:token`).
+- **Explorador y Buscador Dinámico:**
+  - Filtrado reactivo por sucursal (Centro Histórico vs. Getsemaní), tipo de suite y número de huéspedes.
+  - DateRangePicker personalizado de lujo con selección interactiva y bloqueo de fechas pasadas.
+- **Cálculo de Tarifas y Promociones Dinámicas:**
+  - Aplicación automática de descuentos activos por sucursal (`findActiveBranchPromotion`).
+  - Desglose transparente en el checkout: tarifa base, descuento promocional, impuestos y total a pagar.
+- **Experiencias de Lujo y Tour 360°:**
+  - Catálogo de experiencias exclusivas (paseos en yate a Islas del Rosario, cenas de alta cocina caribeña, catas de ron).
+  - Recorrido inmersivo 360° por Cartagena de Indias.
+- **Pasarela de Pagos Concurrente (Simulada):**
+  - Métodos disponibles: Tarjeta de Crédito, PSE y transferencia bancaria.
+  - Protección de concurrencia optimista (`@Version` en `Booking`) y transacciones compensatorias para evitar overbooking o dobles cobros en fechas concurrentes.
+  - Mapeo consistente de base de datos MongoDB: campos `amountPaid` y `amountRefunded` sincronizados.
+- **Panel "Mis Reservas":**
+  - Historial de reservas activas y pasadas.
+  - Vista detallada del voucher de reserva con desglose de costos y código QR.
+  - Cancelación de reservas por parte del usuario con políticas de reembolso transparentes.
 
-Esto levantará los siguientes servicios:
-- **Base de Datos MongoDB:** Puerto `27017`
-- **Backend (Spring Boot API):** `http://localhost:5000`
-- **Frontend (Angular):** `http://localhost:4200`
-- **Servidor de Correos de Prueba (Mailpit):** `http://localhost:8025`
+---
 
-La aplicación completa estará disponible de inmediato en tu navegador accediendo a `http://localhost:4200`.
+## 🧪 Pruebas de Calidad (QA) y Verificación
 
-## Cuentas de Prueba
+La plataforma cuenta con una suite completa de pruebas automatizadas:
 
-La base de datos se inicializa automáticamente (seed) con datos predeterminados, incluyendo sucursales, habitaciones y experiencias. Puedes usar las siguientes cuentas para probar los diferentes paneles:
+### Backend Java (Spring Boot):
+- **83 pruebas unitarias y de integración** aprobadas (`BUILD SUCCESS`):
+  - `BookingMappingTest`: Verificación de mapeo `@Field("amountPaid")` y `@Field("amountRefunded")`.
+  - `PromotionPricingTest`: Pruebas de promociones activas dinámicas por sucursal y manejo de expiración.
+  - `AuthServiceTest`: Pruebas de registro, bloqueo de login sin verificación, expiración de tokens y bypass administrativo.
+  - `BookingStateMachineTest`: Verificación exhaustiva de 49 transiciones válidas e inválidas de la máquina de estados de reservas.
+  - `BookingCancellationTest`: Pruebas de políticas de cancelación y liberación de noches (`SuiteNight`).
+  - `PricingServiceTest`: Cobertura completa de temporadas altas, cargos por huéspedes extra y descuentos.
 
-- **Administrador:** 
-  - Email: `admin@palaciodelmar.co`
-  - Contraseña: `Admin123456!`
-- **Anfitrión (Host):**
-  - Email: `anfitrion@palaciodelmar.co`
-  - Contraseña: `Host123456!`
-- **Usuario Invitado:**
-  - Puedes crear una cuenta directamente desde la aplicación.
-
-## Estructura del Repositorio
-
-- `/backend-java`: Código fuente de la API RESTFUL en Spring Boot. Arquitectura por capas (Controllers, Services, Repositories).
-- `/frontend-angular`: Proyecto SPA en Angular.
-- *Nota:* El código de la antigua versión Node/React se mantiene únicamente como referencia histórica bajo la rama `main` original o en la carpeta `referencia-node/`.
-
-## Pruebas de Calidad (QA)
-
-El backend cuenta con una suite de pruebas rigurosas utilizando JUnit y Mockito, garantizando la lógica transaccional de las reservas. Para ejecutarlas manualmente (requiere Java 21 y Maven instalados):
 ```bash
 cd backend-java
 ./mvnw test
 ```
-*(Tests aprobados: 72/72, 100% de cobertura en flujos de precios y cancelación).*
+
+### Frontend Angular 18:
+- Compilación de producción limpia sin advertencias de sintaxis o pipes no utilizados:
+```bash
+cd frontend-angular
+npm run build
+```
+
+---
+
+## 🛠️ Despliegue y Ejecución Local
+
+### Opción 1: Docker Compose (Recomendada)
+Para levantar la base de datos, backend, frontend y servidor de correos con un solo comando:
+```bash
+docker compose up -d --build
+```
+Servicios disponibles:
+- **Frontend Angular:** `http://localhost:4200`
+- **Backend Spring Boot:** `http://localhost:5000`
+- **Mailpit (Webmail de pruebas):** `http://localhost:8025`
+- **MongoDB:** `localhost:27017`
+
+### Opción 2: Ejecución Nativa
+1. **Backend:**
+   ```bash
+   cd backend-java
+   ./mvnw spring-boot:run
+   ```
+2. **Frontend:**
+   ```bash
+   cd frontend-angular
+   npm install
+   npm start
+   ```
+
+---
+
+## 🔑 Credenciales de Prueba Preconfiguradas
+
+| Rol | Correo Electrónico | Contraseña |
+| :--- | :--- | :--- |
+| **Administrador** | `admin@palaciodelmar.co` | `Admin123456!` |
+| **Anfitrión (Getsemaní)** | `anfitrion@palaciodelmar.co` | `Host123456!` |
+| **Huésped (Verificado)** | `huesped@palaciodelmar.co` | `User123456!` |
+
+---
+
+## 💡 Agregados Extras y Mejoras Futuras para la Plataforma
+
+Para elevar aún más el posicionamiento comercial y la propuesta de valor tecnológico de **Palacio del Mar**, se sugieren las siguientes funcionalidades de alto impacto:
+
+### 1. 🤖 Sofía AI Concierge 2.0 (Google Gemini / Vertex AI)
+- **Asistente Multimodal de Viaje:** Integrar Gemini 1.5 Pro para brindar asistencia en lenguaje natural sobre el clima en Cartagena, recomendaciones personalizadas de restaurantes según preferencias dietéticas del huésped y reservación de suites conversacional.
+- **Audio y Llamada en Tiempo Real:** Capacidad de interacción por voz dentro de la app para huéspedes internacionales en inglés, francés y español.
+
+### 2. 📈 Motor de Precios Dinámicos Predictivo (Yield Management)
+- Algoritmo de tarificación algorítmica estilo aerolíneas/hotelería moderna que ajuste el precio por noche automáticamente según:
+  - Tasa de ocupación proyectada de la sucursal.
+  - Calendario de eventos locales (Festival de Música de Cartagena, Hay Festival, fiestas de la Independencia).
+  - Tiempo restante previo al check-in (ofertas de última hora vs. reservas anticipadas).
+
+### 3. 💳 Integración con Pasarelas Reales de Pago (Stripe & Wompi)
+- Integración oficial de Wompi (Bancolombia, Nequi, PSE) y Stripe con soporte para Apple Pay y Google Pay.
+- Implementación de Webhooks con verificación de firma HMAC para actualización asíncrona segura de reservas.
+- Manejo de retención y liberación de depósitos de garantía (security deposit) para incidentes en las suites.
+
+### 4. 📲 Check-in Digital y Llaves Móviles (Smart Lock / QR Dinámico)
+- Flujo de auto-check-in 24 horas antes de la llegada con escaneo de documento de identidad (OCR) para cumplimiento con la Policía de Turismo.
+- Llave digital accesible desde el portal móvil del usuario mediante Código QR dinámico o integración NFC con cerraduras inteligentes (ej. Yale, Salto, August).
+
+### 5. 🌟 Programa de Lealtad "The Palace Club"
+- Niveles de membresía por noches acumuladas (Silver, Gold, Platinum).
+- Sistema de puntos canjeables por experiencias gastronómicas o noches gratis.
+- Beneficios automáticos: *Early check-in* o *Late check-out* gratuito sujeto a disponibilidad.
+
+### 6. 💬 Notificaciones Transaccionales por WhatsApp (Twilio / Meta API)
+- Envío automático del voucher de reserva y ubicación GPS con botón de Google Maps y Waze directo al WhatsApp del huésped tras confirmar el pago.
+- Mensaje de bienvenida automatizado a las 9:00 AM del día del check-in con código de acceso y contacto del anfitrión.
+
+### 7. ⭐ Sistema de Reseñas Verificadas y Análisis de Sentimiento
+- Módulo de calificación exclusivo para huéspedes que hayan completado su estadía (evita reseñas falsas).
+- Análisis de sentimiento automatizado con procesamiento de lenguaje natural (NLP) en el panel de administración para detectar oportunidades de mejora en el servicio.

@@ -6,14 +6,17 @@ import co.palaciodelmar.backend.dto.SuiteResponseDTO;
 import co.palaciodelmar.backend.dto.SuiteTypeDTO;
 import co.palaciodelmar.backend.model.Branch;
 import co.palaciodelmar.backend.model.Experience;
+import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.ExperienceRepository;
+import co.palaciodelmar.backend.repository.PromotionRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
@@ -26,6 +29,7 @@ public class SuiteService {
     private final SuiteRepository suiteRepository;
     private final BranchRepository branchRepository;
     private final ExperienceRepository experienceRepository;
+    private final PromotionRepository promotionRepository;
     private final PricingService pricingService;
 
     private Map<String, Branch> getBranchMap() {
@@ -116,7 +120,8 @@ public class SuiteService {
             nights = 1;
         }
 
-        PricingService.PricingResult result = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), BigDecimal.ZERO);
+        BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+        PricingService.PricingResult result = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
 
         BigDecimal subtotal = result.subtotal();
 
@@ -158,5 +163,18 @@ public class SuiteService {
                 .total(total)
                 .lines(List.of(lineItem))
                 .build();
+    }
+
+    private BigDecimal findActiveBranchPromotion(String branchId, LocalDate checkIn, LocalDate checkOut) {
+        if (branchId == null || checkIn == null || checkOut == null) return BigDecimal.ZERO;
+        List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(branchId);
+        Integer maxDiscount = promotions.stream()
+                .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
+                .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut)) &&
+                             (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
+                .map(Promotion::getDiscountPercent)
+                .max(Integer::compareTo)
+                .orElse(0);
+        return BigDecimal.valueOf(maxDiscount);
     }
 }

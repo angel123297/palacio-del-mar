@@ -94,11 +94,9 @@ public class AuthService {
             System.err.println("Failed to send verification email: " + e.getMessage());
         }
 
-        UserPrincipal userPrincipal = new UserPrincipal(user);
-        String jwtToken = jwtService.generateToken(userPrincipal);
-
+        // No se entrega token hasta verificar el correo
         return AuthResponse.builder()
-                .token(jwtToken)
+                .token(null)
                 .user(toDTO(user))
                 .build();
     }
@@ -113,6 +111,11 @@ public class AuthService {
 
         User user = userRepository.findByEmail(request.getEmail().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Email o contraseña inválidos"));
+
+        // Bloqueo de seguridad: exigir verificación de email (a menos que sea rol admin o host)
+        if (!Boolean.TRUE.equals(user.getEmailVerified()) && !"admin".equalsIgnoreCase(user.getRole()) && !"host".equalsIgnoreCase(user.getRole())) {
+            throw new IllegalStateException("Debes verificar tu correo electrónico antes de iniciar sesión. Por favor revisa tu bandeja de entrada.");
+        }
 
         UserPrincipal userPrincipal = new UserPrincipal(user);
         String jwtToken = jwtService.generateToken(userPrincipal);

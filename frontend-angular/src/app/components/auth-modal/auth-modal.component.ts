@@ -38,7 +38,7 @@ import { AuthService } from '../../services/auth.service';
             {{ busy ? 'Entrando…' : 'Iniciar sesión' }}
           </button>
 
-          <p *ngIf="message" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.9rem; font-weight: 500; background: rgba(255, 77, 77, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 77, 77, 0.3);">
+          <p *ngIf="message" [style.color]="isSuccess ? '#2ecc71' : '#ff4d4d'" [style.background]="isSuccess ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="isSuccess ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 8px 12px; border-radius: 6px; border-width: 1px; border-style: solid;">
             {{ message }}
           </p>
 
@@ -157,6 +157,7 @@ export class AuthModalComponent {
   phone = '';
   busy = false;
   message = '';
+  isSuccess = false;
   sentForgot = false;
 
   constructor(private auth: AuthService, private cdr: ChangeDetectorRef) {}
@@ -176,6 +177,7 @@ export class AuthModalComponent {
   submitLogin(): void {
     this.busy = true;
     this.message = '';
+    this.isSuccess = false;
     this.cdr.detectChanges();
 
     const payload = {
@@ -191,6 +193,7 @@ export class AuthModalComponent {
       },
       error: (err) => {
         this.busy = false;
+        this.isSuccess = false;
         this.message = err.error?.message || 'Credenciales inválidas.';
         this.cdr.detectChanges();
       }
@@ -199,16 +202,19 @@ export class AuthModalComponent {
 
   submitRegister(): void {
     if (this.password !== this.confirmPassword) {
+      this.isSuccess = false;
       this.message = 'Las contraseñas no coinciden.';
       return;
     }
     if (this.password.length < 8) {
+      this.isSuccess = false;
       this.message = 'La contraseña debe tener al menos 8 caracteres.';
       return;
     }
 
     this.busy = true;
     this.message = '';
+    this.isSuccess = false;
     this.cdr.detectChanges();
 
     const payload = {
@@ -221,11 +227,16 @@ export class AuthModalComponent {
     this.auth.register(payload).subscribe({
       next: () => {
         this.busy = false;
-        this.close();
+        this.mode = 'login';
+        this.isSuccess = true;
+        this.message = '¡Cuenta creada! Te hemos enviado un enlace a tu correo. Por favor verifícalo para iniciar sesión.';
+        this.password = '';
+        this.confirmPassword = '';
         this.cdr.detectChanges();
       },
       error: (err) => {
         this.busy = false;
+        this.isSuccess = false;
         const rawMsg = err.error?.message || '';
         if (rawMsg.toLowerCase().includes('registrado') || rawMsg.toLowerCase().includes('email')) {
           this.message = `El correo ${payload.email} ya está registrado. Por favor haz clic en "Inicia sesión".`;
