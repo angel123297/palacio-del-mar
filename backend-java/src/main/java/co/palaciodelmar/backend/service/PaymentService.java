@@ -137,7 +137,10 @@ public class PaymentService {
         try {
             updatedBooking = bookingRepository.save(booking);
         } catch (org.springframework.dao.OptimisticLockingFailureException e) {
-            throw new IllegalStateException("Conflicto al procesar el pago. Posible pago concurrente.");
+            payment.setStatus("failed");
+            payment.setNotes("Conflicto por concurrencia. La reserva fue modificada simultáneamente.");
+            paymentRepository.save(payment);
+            throw new IllegalStateException("Conflicto al procesar el pago. La reserva fue modificada o cancelada simultáneamente.");
         }
 
         payment.setStatus("completed");

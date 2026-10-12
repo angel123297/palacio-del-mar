@@ -95,6 +95,10 @@ public class Booking {
 
     private String cancellationReason;
 
+    private String appliedPromotionId;
+    private String appliedPromotionName;
+    private BigDecimal appliedPromotionDiscountPercent;
+
     private Instant expiresAt;
 
     @Builder.Default

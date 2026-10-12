@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { Booking } from '../../models/types';
 import { finalize } from 'rxjs';
 
 @Component({
@@ -237,7 +238,7 @@ import { finalize } from 'rxjs';
 })
 export class CheckoutComponent implements OnInit {
   bookingId: string | null = null;
-  booking: any = null;
+  booking: Booking | null = null;
   loading = true;
   processing = false;
   errorMsg = '';
@@ -274,7 +275,7 @@ export class CheckoutComponent implements OnInit {
   }
 
   loadBooking() {
-    this.api.get<any>('/bookings').pipe(
+    this.api.get<any>(`/bookings/${this.bookingId}`).pipe(
       finalize(() => {
         this.loading = false;
         this.cdr.detectChanges();
@@ -282,8 +283,7 @@ export class CheckoutComponent implements OnInit {
     ).subscribe({
       next: (res) => {
         const raw = res.data || res;
-        const bookings = Array.isArray(raw) ? raw : (raw.bookings || []);
-        this.booking = bookings.find((b: any) => (b.id === this.bookingId || b._id === this.bookingId));
+        this.booking = raw as Booking;
         if (this.booking && this.booking.status === 'confirmed') {
           this.booking = null; 
         } else if (this.booking && !this.booking.nights) {
@@ -294,19 +294,22 @@ export class CheckoutComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: () => {
+        this.booking = null;
         this.cdr.detectChanges();
       }
     });
   }
 
-  formatCardNumber(event: any) {
-    let input = event.target.value.replace(/\D/g, '').substring(0, 16);
+  formatCardNumber(event: Event) {
+    const inputEl = event.target as HTMLInputElement;
+    let input = (inputEl.value || '').replace(/\D/g, '').substring(0, 16);
     let formatted = input.match(/.{1,4}/g)?.join(' ') || '';
     this.paymentForm.get('cardNumber')?.setValue(formatted);
   }
 
-  formatExpiry(event: any) {
-    let input = event.target.value.replace(/\D/g, '').substring(0, 4);
+  formatExpiry(event: Event) {
+    const inputEl = event.target as HTMLInputElement;
+    let input = (inputEl.value || '').replace(/\D/g, '').substring(0, 4);
     if (input.length >= 2) {
       input = input.substring(0, 2) + '/' + input.substring(2, 4);
     }
@@ -361,9 +364,19 @@ export class CheckoutComponent implements OnInit {
   }
 
   private executePaymentPayload(methodPayload: any) {
+    if (!this.booking) {
+      this.errorMsg = 'No hay una reserva activa para procesar';
+      this.processing = false;
+      this.cdr.detectChanges();
+      return;
+    }
+
+    const currentBooking = this.booking;
+    const targetBookingId = currentBooking.id || currentBooking._id || this.bookingId;
+
     const payload = {
-      bookingId: this.booking.id || this.booking._id,
-      amount: this.booking.totalPrice,
+      bookingId: targetBookingId,
+      amount: currentBooking.totalPrice,
       ...methodPayload
     };
 
@@ -374,14 +387,10 @@ export class CheckoutComponent implements OnInit {
       })
     ).subscribe({
       next: () => {
-        this.router.navigate(['/reservas', this.booking.id || this.booking._id, 'comprobante']);
+        this.router.navigate(['/reservas', targetBookingId, 'comprobante']);
       },
       error: (err) => {
-        if (err.status === 404 || err.status === 200 || err.status === 201) {
-           this.router.navigate(['/reservas', this.booking.id || this.booking._id, 'comprobante']);
-        } else {
-           this.errorMsg = 'Transacción declinada por el banco simulado. Por favor intenta de nuevo.';
-        }
+        this.errorMsg = err?.error?.message || err?.message || 'Transacción declinada por el banco simulado. Por favor intenta de nuevo.';
         this.cdr.detectChanges();
       }
     });
