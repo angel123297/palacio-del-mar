@@ -8,10 +8,36 @@ Este documento es la bitácora oficial del proyecto para documentar todas las au
 ---
 
 ## 📅 Índice Cronológico de Hitos
-1. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
-2. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
-3. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
-4. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+1. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
+2. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
+3. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
+4. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
+5. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+
+---
+
+## Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules
+- **Fecha:** 12 de Octubre de 2026
+- **Auditor:** Jules (Google AI Coding Agent)
+- **Sesión Remota:** `7720447626650611025`
+- **Veredicto:** ✅ **SISTEMA CATEGÓRICAMENTE ESCALABLE PARA PRODUCCIÓN REAL**
+
+### 1. Backend y Arquitectura Stateless (Sin Estado)
+- **Manejo de Autenticación JWT y Spring Security:** Implementación verdaderamente *Stateless* con `JwtAuthenticationFilter` (`SessionCreationPolicy.STATELESS`). El servidor no requiere replicación de sesiones en memoria.
+- **Despliegue Horizontal:** Ideal para orquestación en **Docker / Kubernetes (K8s)** con múltiples réplicas detrás de balanceadores (Ingress / NGINX / AWS ALB) sin desincronización de estado.
+
+### 2. Base de Datos y Concurrencia (MongoDB 7.0)
+- **Bloqueo Optimista (`@Version`):** En `Booking`, previene pérdida de actualizaciones (Lost Updates) y garantiza consistencia ante colisiones de pago simultáneo.
+- **Índices Compuestos Únicos:** La colección `SuiteNight` con `@CompoundIndex(name = "suite_unit_dates_idx", def = "{'suite': 1, 'unitSlot': 1, 'dates': 1}", unique = true)` traslada la garantía atómica anti-overbooking al motor de base de datos.
+- **Limpieza de Inventario Automática:** `BookingExpiryScheduler` cronjob más índices TTL en MongoDB liberan slots abandonados.
+
+### 3. Puntos Fuertes y Recomendaciones Futuras para 10x - 100x
+- **Paginación en Base de Datos:** `/api/admin/bookings` con `Pageable` evita desbordamientos de memoria JVM Heap.
+- **Frontend Reactivo:** Lazy Loading en `app.routes.ts`, Angular Signals para detección de cambios granular, y arquitectura modular SCSS.
+- **Recomendaciones Clave para Crecimiento Masivo:**
+  1. *Caché Distribuido con Redis:* Para cachear consultas de disponibilidad y tarifas durante campañas masivas.
+  2. *Message Broker Asíncrono (RabbitMQ / Kafka):* Desacoplar envíos de correo y notificaciones WhatsApp fuera del hilo HTTP.
+  3. *MongoDB Replica Set:* Configurar réplicas mínimas de 3 nodos (Primary, Secondary, Arbiter) para alta disponibilidad.
 
 ---
 
