@@ -8,11 +8,11 @@ El proyecto fue completamente migrado y refactorizado a una arquitectura moderna
 
 ## 🚀 Arquitectura y Tecnologías
 
-- **Backend:** Java 21 LTS, Spring Boot 3.4+, Spring Data MongoDB, Spring Security (JWT con algoritmo HMAC-SHA256), JavaMail (integrado con Mailpit).
+- **Backend:** Java 21 LTS, Spring Boot 3.4+, Spring Data MongoDB, Spring Data Redis & In-Memory Cache (`@EnableCaching`), Tareas Asíncronas (`@EnableAsync`), Spring Security (JWT con algoritmo HMAC-SHA256), JavaMail (integrado con Mailpit).
 - **Frontend:** Angular 18+, TypeScript, Tailwind CSS, Angular Signals (programación reactiva sin Zone.js overhead), Componentes Standalone.
-- **Base de Datos:** MongoDB 7.0 (Índices únicos compuestos, control de concurrencia optimista `@Version`).
+- **Base de Datos & Caché:** MongoDB 7.0 (Índices únicos compuestos, control de concurrencia optimista `@Version`), Redis 7 Alpine (con fallback en memoria para desarrollo ágil).
 - **Control de Correo / SMTP:** Mailpit para captura y verificación de correos en entornos de desarrollo y pruebas.
-- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, GitHub Copilot CLI QA Suite.
+- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, GitHub Copilot CLI QA Suite (89 pruebas unitarias e integración pasando).
 
 ---
 

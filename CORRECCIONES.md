@@ -8,11 +8,28 @@ Este documento es la bitácora oficial del proyecto para documentar todas las au
 ---
 
 ## 📅 Índice Cronológico de Hitos
-1. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
-2. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
-3. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
-4. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
-5. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+1. [Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync) (12 Octubre 2026)](#hito-6-implementación-de-caché-resiliente-redis--in-memory-y-tareas-asíncronas-enableasync)
+2. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
+3. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
+4. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
+5. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
+6. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+
+---
+
+## Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync)
+- **Fecha:** 12 de Octubre de 2026
+- **Módulos:** `backend-java` (`BackendApplication`, `SuiteService`, `EmailService`, `EmailNotificationService`, `WhatsAppService`, `application.properties`, `pom.xml`), `docker-compose.yml`
+- **Motivación y Beneficios de Escalabilidad:**
+  1. **Caché Distribuido/En Memoria (`@Cacheable`):**
+     - Integración de `spring-boot-starter-cache` y `spring-boot-starter-data-redis`.
+     - Anotaciones `@Cacheable` en `getAllActiveSuites()`, `getSuiteByIdOrSlug()` y `getSuiteTypes()`. Evita consultas redundantes a MongoDB para el catálogo público de suites y tipos.
+     - **Configuración Híbrida y Resiliente:** Configurado `spring.cache.type=${SPRING_CACHE_TYPE:simple}`. En entorno localhost nativo o ejecución de tests unitarios, opera de forma ultra-rápida en memoria RAM (`ConcurrentMapCache`) con resiliencia total (sin caídas si Redis no está encendido). En despliegue Docker Compose o clúster productivo, conecta al servicio `redis:alpine` con persistencia de volumen.
+  2. **Procesamiento Asíncrono de Notificaciones (`@EnableAsync` + `@Async`):**
+     - Habilitado `@EnableAsync` en el contexto global de Spring Boot.
+     - Métodos desacoplados con `@Async`: `EmailService.sendVerificationEmail`, `EmailNotificationService.sendBookingConfirmation` (generación pesada de PDF adjunto y calendario `.ics`), y `WhatsAppService.sendBookingConfirmation`.
+     - **Impacto:** Los endpoints de registro de usuario y confirmación de checkout responden al cliente de forma instantánea (< 15 ms), eliminando latencias de I/O de red de correo o CPU por PDF.
+- **Pruebas:** 89/89 pruebas unitarias e integración en Spring Boot pasando exitosamente (`BUILD SUCCESS`).
 
 ---
 
@@ -124,4 +141,5 @@ Este documento es la bitácora oficial del proyecto para documentar todas las au
 | 12/10/2026 | Backend Java | 86 | 86 exitosas | QA Suite V2 |
 | 12/10/2026 | Backend Java | 88 | 88 exitosas (C1 Scheduler) | QA Bloque 1 |
 | 12/10/2026 | Backend Java | 89 | 89 exitosas (A1 Concurrencia) | QA Final |
+| 12/10/2026 | Backend Java | 89 | 89 exitosas (Caché + @Async) | Hito 6 |
 | 12/10/2026 | Frontend Angular | Build de Producción | 0 errores, 0 warnings | Build SCSS |

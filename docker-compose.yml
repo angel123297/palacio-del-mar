@@ -34,9 +34,29 @@ services:
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: 1025
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      SPRING_CACHE_TYPE: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     depends_on:
       mongo:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # --- Servidor de Caché Redis -----------------------------------------------
+  redis:
+    image: redis:alpine
+    container_name: palacio-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # --- Mailpit (Servidor SMTP de pruebas) -------------------------------------
   mailpit:
@@ -49,7 +69,7 @@ services:
     environment:
       MP_MAX_MESSAGES: 500
 
-  # --- Frontend Angular 18 ----------------------------------------------------
+  # --- Frontend Angular -------------------------------------------------------
   web-angular:
     build: ./frontend-angular
     container_name: palacio-web-angular
@@ -61,3 +81,4 @@ services:
 
 volumes:
   mongo-data:
+  redis-data:

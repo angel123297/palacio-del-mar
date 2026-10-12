@@ -5,6 +5,7 @@ import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.model.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -31,6 +32,7 @@ public class WhatsAppService {
      * Envía confirmación de reserva al WhatsApp del huésped.
      * En entorno local (enabled=false), simula el envío con formato de lujo en los logs.
      */
+    @Async
     public boolean sendBookingConfirmation(Booking booking, User guest, Suite suite) {
         String phone = null;
         if (guest != null && guest.getProfile() != null && guest.getProfile().getPhone() != null) {

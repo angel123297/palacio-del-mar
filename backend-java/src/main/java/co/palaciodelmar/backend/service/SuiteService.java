@@ -13,6 +13,8 @@ import co.palaciodelmar.backend.repository.ExperienceRepository;
 import co.palaciodelmar.backend.repository.PromotionRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -37,6 +39,7 @@ public class SuiteService {
                 .collect(Collectors.toMap(Branch::getId, Function.identity(), (a, b) -> a));
     }
 
+    @Cacheable(value = "suites", key = "#branchFilter != null ? #branchFilter : 'all'")
     public List<SuiteResponseDTO> getAllActiveSuites(String branchFilter) {
         Map<String, Branch> branchMap = getBranchMap();
         List<Suite> suites = suiteRepository.findAll().stream()
@@ -73,6 +76,7 @@ public class SuiteService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(value = "suite_detail", key = "#idOrSlug.toLowerCase()")
     public SuiteResponseDTO getSuiteByIdOrSlug(String idOrSlug) {
         Suite suite = suiteRepository.findById(idOrSlug)
                 .or(() -> suiteRepository.findBySlug(idOrSlug.toLowerCase()))
@@ -81,6 +85,7 @@ public class SuiteService {
         return SuiteResponseDTO.from(suite, branch);
     }
 
+    @Cacheable(value = "suite_types")
     public List<SuiteTypeDTO> getSuiteTypes() {
         List<Suite> activeSuites = suiteRepository.findByActiveTrue();
         Map<String, List<Suite>> grouped = activeSuites.stream()
