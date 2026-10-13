@@ -12,8 +12,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 public class BackendApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(BackendApplication.class, args);
-	}
+    private static org.springframework.context.ApplicationContext context;
+
+    public static void main(String[] args) {
+        context = SpringApplication.run(BackendApplication.class, args);
+    }
+
+    public static org.springframework.context.ApplicationContext getContext() {
+        return context;
+    }
 
 }

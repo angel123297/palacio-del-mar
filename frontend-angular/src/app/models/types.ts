@@ -125,6 +125,10 @@ export interface Booking {
   guestEmail?: string;
   guestPhone?: string;
   airportPickup?: boolean;
+  petFriendly?: boolean;
+  needsCrib?: boolean;
+  guaranteeDeposit?: number;
+  guaranteeRefunded?: boolean;
   foodOrders?: Array<{
     dishName?: string;
     type?: string;
