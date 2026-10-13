@@ -217,7 +217,7 @@ public class HostController {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
-        booking.setStatus("checked_in");
+        bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_IN, userPrincipal.getUser().getId(), "Check-in by host");
         bookingRepository.save(booking);
         return ResponseEntity.ok(ApiResponse.ok("Check-in registrado", null));
     }
@@ -236,8 +236,7 @@ public class HostController {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
-        booking.setStatus("completed");
-        booking.setStatus("completed");
+        bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT, userPrincipal.getUser().getId(), "Check-out by host");
         bookingRepository.save(booking);
         return ResponseEntity.ok(ApiResponse.ok("Check-out registrado", null));
     }
