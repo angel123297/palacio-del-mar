@@ -81,6 +81,21 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/force-verify")
+    public ResponseEntity<Map<String, Object>> forceVerify(@RequestBody Map<String, String> body) {
+        String email = body != null ? body.get("email") : null;
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email es requerido");
+        }
+
+        authService.forceVerify(email);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Correo verificado manualmente");
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal UserPrincipal principal) {
         if (principal == null) {
