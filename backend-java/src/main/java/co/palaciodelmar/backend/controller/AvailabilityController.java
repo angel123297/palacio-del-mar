@@ -61,6 +61,15 @@ public class AvailabilityController {
         return ResponseEntity.ok(ApiResponse.ok(promotions));
     }
 
+    @GetMapping("/peak-dates")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getPeakDates(
+            @RequestParam(required = false) Integer year
+    ) {
+        int targetYear = year != null ? year : LocalDate.now().getYear();
+        java.util.Map<String, Object> data = availabilityService.getPeakDates(targetYear);
+        return ResponseEntity.ok(ApiResponse.ok(data));
+    }
+
     private PromotionDTO toDTO(Promotion promotion) {
         if (promotion == null) return null;
         return PromotionDTO.builder()

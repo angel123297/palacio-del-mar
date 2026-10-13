@@ -32,6 +32,34 @@ public class AdminService {
     }
 
     public org.springframework.data.domain.Page<Booking> getAllBookings(org.springframework.data.domain.Pageable pageable) {
+        return getAllBookings(null, null, pageable);
+    }
+
+    public org.springframework.data.domain.Page<Booking> getAllBookings(String status, String search, org.springframework.data.domain.Pageable pageable) {
+        if ((status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) || (search != null && !search.isBlank())) {
+            List<Booking> all = bookingRepository.findAll();
+            List<Booking> filtered = all.stream()
+                    .filter(b -> {
+                        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) {
+                            if (b.getStatus() == null || !b.getStatus().equalsIgnoreCase(status)) return false;
+                        }
+                        if (search != null && !search.isBlank()) {
+                            String q = search.toLowerCase();
+                            boolean codeMatch = b.getBookingCode() != null && b.getBookingCode().toLowerCase().contains(q);
+                            boolean guestMatch = b.getGuestDetails() != null && (
+                                    (b.getGuestDetails().getFullName() != null && b.getGuestDetails().getFullName().toLowerCase().contains(q)) ||
+                                    (b.getGuestDetails().getEmail() != null && b.getGuestDetails().getEmail().toLowerCase().contains(q))
+                            );
+                            if (!codeMatch && !guestMatch) return false;
+                        }
+                        return true;
+                    })
+                    .toList();
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), filtered.size());
+            List<Booking> subList = start <= end && start < filtered.size() ? filtered.subList(start, end) : java.util.Collections.emptyList();
+            return new org.springframework.data.domain.PageImpl<>(subList, pageable, filtered.size());
+        }
         return bookingRepository.findAll(pageable);
     }
 
@@ -39,10 +67,17 @@ public class AdminService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
 
-        booking.setStatus(newStatus);
+        booking.setStatus(newStatus != null ? newStatus.toLowerCase() : "pending");
         booking.setUpdatedAt(Instant.now());
 
-        if ("cancelled".equalsIgnoreCase(newStatus) || "completed".equalsIgnoreCase(newStatus)) {
+        if ("confirmed".equalsIgnoreCase(newStatus)) {
+            List<co.palaciodelmar.backend.model.SuiteNight> nights = suiteNightRepository.findByBooking(bookingId);
+            for (co.palaciodelmar.backend.model.SuiteNight sn : nights) {
+                sn.setExpiresAt(null);
+                sn.setStatus("confirmed");
+                suiteNightRepository.save(sn);
+            }
+        } else if ("cancelled".equalsIgnoreCase(newStatus) || "completed".equalsIgnoreCase(newStatus)) {
             suiteNightRepository.deleteByBooking(bookingId);
         }
 

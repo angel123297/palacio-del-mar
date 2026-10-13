@@ -149,9 +149,22 @@ public class Booking {
     @AllArgsConstructor
     public static class FoodOrder {
         private String dishName;
+        private String foodName;
         private String type; // "typical", "normal", "custom"
         private Boolean includesBreakfastCombo;
         private BigDecimal price;
+        private String specialInstructions;
+
+        public String getDishName() {
+            return dishName != null ? dishName : foodName;
+        }
+
+        public void setFoodName(String foodName) {
+            this.foodName = foodName;
+            if (this.dishName == null) {
+                this.dishName = foodName;
+            }
+        }
     }
 
     @Data

@@ -136,21 +136,21 @@ export class HostDashboardComponent implements OnInit {
 
     this.api.get<ApiResponse<PaginatedResponse<Booking>> | PaginatedResponse<Booking>>('/host/bookings', params).subscribe({
       next: (res) => {
-        const payload = (res as ApiResponse<PaginatedResponse<Booking>>).data || (res as PaginatedResponse<Booking>);
-        if (payload && payload.data) {
+        const payload: any = (res as any)?.data ?? res;
+        if (payload?.content && Array.isArray(payload.content)) {
+          this.bookings.set(payload.content);
+          this.currentPage.set((payload.number ?? 0) + 1);
+          this.totalPages.set(payload.totalPages ?? 1);
+          this.totalItems.set(payload.totalElements ?? payload.content.length);
+        } else if (payload?.data && Array.isArray(payload.data)) {
           this.bookings.set(payload.data);
           this.currentPage.set(payload.page || 1);
           this.totalPages.set(payload.totalPages || 1);
-          this.totalItems.set(payload.total || 0);
-        } else if (Array.isArray(res)) {
-          // Fallback just in case backend isn't updated yet
-          this.bookings.set(res as any);
+          this.totalItems.set(payload.total || payload.data.length);
+        } else if (Array.isArray(payload)) {
+          this.bookings.set(payload);
           this.totalPages.set(1);
-          this.totalItems.set(res.length);
-        } else if ((res as any).data && Array.isArray((res as any).data)) {
-          this.bookings.set((res as any).data);
-          this.totalPages.set(1);
-          this.totalItems.set((res as any).data.length);
+          this.totalItems.set(payload.length);
         }
         this.loading.set(false);
       },

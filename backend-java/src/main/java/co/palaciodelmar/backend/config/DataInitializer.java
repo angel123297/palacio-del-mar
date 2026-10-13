@@ -591,5 +591,37 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
             userRepository.save(admin);
         }
+
+        if (userRepository.findByEmail("anfitrion@palaciodelmar.co").isEmpty()) {
+            List<String> branchIds = branchRepository.findAll().stream().map(Branch::getId).toList();
+            User host = User.builder()
+                    .name("Anfitrión")
+                    .lastName("Palacio")
+                    .email("anfitrion@palaciodelmar.co")
+                    .password(passwordEncoder.encode("Host123456!"))
+                    .role("host")
+                    .status("active")
+                    .branches(branchIds)
+                    .emailVerified(true)
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+            userRepository.save(host);
+        }
+
+        if (userRepository.findByEmail("huesped@palaciodelmar.co").isEmpty()) {
+            User guest = User.builder()
+                    .name("Huésped")
+                    .lastName("Verificado")
+                    .email("huesped@palaciodelmar.co")
+                    .password(passwordEncoder.encode("User123456!"))
+                    .role("user")
+                    .status("active")
+                    .emailVerified(true)
+                    .createdAt(Instant.now())
+                    .updatedAt(Instant.now())
+                    .build();
+            userRepository.save(guest);
+        }
     }
 }
