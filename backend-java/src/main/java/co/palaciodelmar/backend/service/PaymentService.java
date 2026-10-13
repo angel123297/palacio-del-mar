@@ -119,6 +119,11 @@ public class PaymentService {
             }
         }
 
+
+        if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0 && "paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+            throw new IllegalStateException("La reserva ya ha sido pagada en su totalidad.");
+        }
+
         if (!"pending".equalsIgnoreCase(booking.getStatus()) && !"confirmed".equalsIgnoreCase(booking.getStatus())) {
             throw new IllegalStateException("No se puede confirmar el pago para una reserva en estado " + booking.getStatus());
         }
@@ -174,10 +179,10 @@ public class PaymentService {
              whatsAppService.sendBookingConfirmation(updatedBooking, guest, suite);
         }
 
-        return Map.of(
-            "payment", toDTO(savedPayment),
-            "booking", bookingService.toDTO(updatedBooking)
-        );
+        java.util.Map<String, Object> returnMap = new java.util.HashMap<>();
+        returnMap.put("payment", toDTO(savedPayment));
+        returnMap.put("booking", bookingService.toDTO(updatedBooking));
+        return returnMap;
     }
 
     public PaymentDTO toDTO(Payment payment) {
