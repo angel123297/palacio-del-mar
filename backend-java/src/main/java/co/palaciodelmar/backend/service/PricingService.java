@@ -33,12 +33,7 @@ public class PricingService {
         }
 
         // Descuentos: se aplica el mayor entre promoción y larga estadía
-        BigDecimal longStayDiscountPercent = BigDecimal.ZERO;
-        if (nights >= 7) {
-            longStayDiscountPercent = new BigDecimal("0.05"); // 5%
-        } else if (nights >= 5) {
-            longStayDiscountPercent = new BigDecimal("0.05"); // 5%
-        }
+        BigDecimal longStayDiscountPercent = longStayPercent(nights).divide(new BigDecimal("100"));
 
         BigDecimal promoPercent = branchPromotionPercent != null ? branchPromotionPercent.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP).min(BigDecimal.ONE) : BigDecimal.ZERO;
         BigDecimal appliedDiscountPercent = promoPercent.compareTo(longStayDiscountPercent) > 0 ? promoPercent : longStayDiscountPercent;
@@ -50,6 +45,14 @@ public class PricingService {
         BigDecimal total = subtotalAfterDiscount.add(taxes).setScale(2, RoundingMode.HALF_UP);
 
         return new PricingResult(subtotal.setScale(2, RoundingMode.HALF_UP), discountAmount, taxes, total, nightlyPrices);
+    }
+
+    /**
+     * Descuento por estadía larga (en puntos porcentuales): única fuente de verdad.
+     * 5% desde 5 noches. BookingService la usa también para la etiqueta que ve el huésped.
+     */
+    public static BigDecimal longStayPercent(long nights) {
+        return nights >= 5 ? new BigDecimal("5") : BigDecimal.ZERO;
     }
 
     private BigDecimal getSeasonMultiplier(LocalDate date) {

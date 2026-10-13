@@ -40,7 +40,7 @@ class BookingExpirySchedulerTest {
                 .status("held")
                 .build();
 
-        when(bookingRepository.findByStatusAndExpiresAtBeforeAndPaidAmount(eq("pending"), any(Instant.class), eq(java.math.BigDecimal.ZERO)))
+        when(bookingRepository.findByStatusAndExpiresAtBefore(eq("pending"), any(Instant.class)))
                 .thenReturn(List.of(expiredBooking));
         when(suiteNightRepository.findByBooking("B-EXPIRED-1"))
                 .thenReturn(List.of(heldNight));
@@ -69,7 +69,7 @@ class BookingExpirySchedulerTest {
 
         BookingExpiryScheduler scheduler = new BookingExpiryScheduler(bookingRepository, suiteNightRepository, bookingService);
 
-        when(bookingRepository.findByStatusAndExpiresAtBeforeAndPaidAmount(eq("pending"), any(Instant.class), eq(java.math.BigDecimal.ZERO)))
+        when(bookingRepository.findByStatusAndExpiresAtBefore(eq("pending"), any(Instant.class)))
                 .thenReturn(List.of());
 
         scheduler.cleanupExpiredBookings();

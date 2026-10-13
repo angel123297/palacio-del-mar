@@ -124,9 +124,7 @@ public class HostController {
         long totalBookings = hostBookings.size();
 
         BigDecimal totalRevenue = hostBookings.stream()
-                .filter(b -> "confirmed".equalsIgnoreCase(b.getStatus()) || "completed".equalsIgnoreCase(b.getStatus()))
-                .map(Booking::getTotalPrice)
-                .filter(java.util.Objects::nonNull)
+                .map(co.palaciodelmar.backend.service.AdminService::netCollected)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         long pendingCheckins = hostBookings.stream()
@@ -134,7 +132,7 @@ public class HostController {
                 .count();
 
         long activeBookings = hostBookings.stream()
-                .filter(b -> "confirmed".equalsIgnoreCase(b.getStatus()) || "pending".equalsIgnoreCase(b.getStatus()))
+                .filter(b -> co.palaciodelmar.backend.service.AdminService.isActiveStatus(b.getStatus()))
                 .count();
 
         HostDashboardStats stats = HostDashboardStats.builder()
@@ -236,13 +234,31 @@ public class HostController {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
-        java.time.LocalTime nowTime = java.time.LocalTime.now(java.time.ZoneId.of("America/Bogota"));
-        if (nowTime.isAfter(java.time.LocalTime.of(11, 0))) {
-            java.math.BigDecimal recargo = booking.getPricePerNight() != null ? booking.getPricePerNight().multiply(new java.math.BigDecimal("0.50")).setScale(2, java.math.RoundingMode.HALF_UP) : new java.math.BigDecimal("50000");
-            booking.setTotalPrice(booking.getTotalPrice().add(recargo));
-            booking.setBalanceDue(booking.getBalanceDue().add(recargo));
+        // Late check-out: el check-out oficial es a las 12:00 (ver FAQ y Branch.checkOutTime).
+        java.time.ZoneId bogota = java.time.ZoneId.of("America/Bogota");
+        java.time.LocalDate today = java.time.LocalDate.now(bogota);
+        java.time.LocalTime nowTime = java.time.LocalTime.now(bogota);
+        boolean lateCheckout = booking.getCheckOut() != null
+                && (today.isAfter(booking.getCheckOut())
+                    || (today.isEqual(booking.getCheckOut()) && nowTime.isAfter(java.time.LocalTime.NOON)));
+        BigDecimal currentTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
+        BigDecimal currentBalance = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
+        if (lateCheckout && booking.getPricePerNight() != null) {
+            BigDecimal recargo = booking.getPricePerNight().multiply(new BigDecimal("0.50")).setScale(2, java.math.RoundingMode.HALF_UP);
+            booking.setTotalPrice(currentTotal.add(recargo));
+            booking.setBalanceDue(currentBalance.add(recargo));
             booking.setPaymentStatus("partial");
             booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Recargo Late Check-out aplicado: $" + recargo);
+        }
+        // Depósito de garantía: se devuelve al hacer check-out (se refleja en lo devuelto, no como ingreso).
+        BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
+        if (deposit.signum() > 0 && !Boolean.TRUE.equals(booking.getGuaranteeRefunded())) {
+            BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+            BigDecimal refundable = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
+            booking.setRefundedAmount(refunded.add(refundable));
+            booking.setGuaranteeRefunded(true);
+            booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto: $" + refundable);
         }
         bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT, userPrincipal.getUser().getId(), "Check-out by host");
         bookingRepository.save(booking);

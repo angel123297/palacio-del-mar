@@ -166,8 +166,17 @@ export class SuiteDetailComponent implements OnInit {
     return total;
   }
 
+  // Mismas reglas que BookingService: $120.000 por huésped adicional (sobre 2) y noche.
+  get extraGuestsFee(): number {
+    const guests = Number(this.guests) || 0;
+    return guests > 2 ? (guests - 2) * 120000 * this.nights : 0;
+  }
+
+  // Depósito de garantía reembolsable que el backend suma al total.
+  readonly guaranteeDeposit = 100000;
+
   get grandTotal(): number {
-    return this.totalRoomPrice + this.totalExperiencesPrice + this.totalVipPrice;
+    return this.totalRoomPrice + this.totalExperiencesPrice + this.totalVipPrice + this.extraGuestsFee + this.guaranteeDeposit;
   }
 
   toggleExperience(exp: Experience) {

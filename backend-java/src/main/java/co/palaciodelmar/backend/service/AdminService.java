@@ -107,21 +107,31 @@ public class AdminService {
         promotionRepository.deleteById(promotionId);
     }
 
+    /** Estados "vivos": el flujo real es pending → confirmed → checked_in → checked_out (no existe "completed"). */
+    public static boolean isActiveStatus(String status) {
+        return "pending".equalsIgnoreCase(status) || "confirmed".equalsIgnoreCase(status) || "checked_in".equalsIgnoreCase(status);
+    }
+
+    /** Ingreso real de una reserva: lo cobrado menos lo devuelto (incluye retenciones por cancelación). */
+    public static BigDecimal netCollected(Booking b) {
+        BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
+        return paid.subtract(refunded).max(BigDecimal.ZERO);
+    }
+
     public AdminDashboardStats getDashboardStats() {
         long totalSuites = suiteRepository.count();
         long totalBookings = bookingRepository.count();
         long totalUsers = userRepository.count();
 
         long activeBookings = bookingRepository.findAll().stream()
-                .filter(b -> "confirmed".equalsIgnoreCase(b.getStatus()) || "pending".equalsIgnoreCase(b.getStatus()))
+                .filter(b -> isActiveStatus(b.getStatus()))
                 .count();
 
         double averageOccupancy = totalSuites > 0 ? Math.min(100.0, Math.round((double) activeBookings / totalSuites * 100.0)) : 0.0;
 
         BigDecimal totalRevenue = bookingRepository.findAll().stream()
-                .filter(b -> "confirmed".equalsIgnoreCase(b.getStatus()) || "completed".equalsIgnoreCase(b.getStatus()))
-                .map(Booking::getTotalPrice)
-                .filter(java.util.Objects::nonNull)
+                .map(AdminService::netCollected)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return AdminDashboardStats.builder()

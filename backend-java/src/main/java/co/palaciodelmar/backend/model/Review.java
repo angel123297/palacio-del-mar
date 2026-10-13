@@ -27,7 +27,9 @@ public class Review {
     @Indexed
     private String user; // User ObjectId reference
 
-    @Indexed(unique = true, sparse = true)
+    // Antes era unique+sparse y chocaba con el índice "bookingId" ya existente (IndexKeySpecsConflict) y tumbaba el arranque.
+    // La unicidad se garantiza en ReviewService (existsByBookingId).
+    @Indexed
     private String bookingId; // Booking ObjectId reference for verified stay
 
     private String userName;
