@@ -36,6 +36,7 @@ public class BookingRequest {
 
     @Min(value = 0, message = "El número de niños no puede ser negativo")
     private Integer children;
+    private Boolean needsCrib;
 
     private String guestName;
     private String guestEmail;
@@ -46,6 +47,7 @@ public class BookingRequest {
     private List<Object> experiences;
 
     private Boolean airportPickup;
+    private Boolean petFriendly;
     private List<Booking.FoodOrder> foodOrders;
 
     public LocalDate getCheckIn() {

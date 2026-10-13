@@ -97,6 +97,17 @@ public class BookingService {
         }
 
         List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
+        if (Boolean.TRUE.equals(request.getNeedsCrib())) {
+            // Validar stock global de cunas (ej. Max 5 en toda la app)
+            long cribsInUse = bookingRepository.findByStatusIn(List.of("confirmed", "checked_in", "pending")).stream()
+                    .filter(b -> Boolean.TRUE.equals(b.getNeedsCrib()) &&
+                            !b.getCheckOut().isBefore(request.getCheckIn()) &&
+                            !b.getCheckIn().isAfter(request.getCheckOut()))
+                    .count();
+            if (cribsInUse >= 5) {
+                throw new IllegalArgumentException("Lo sentimos, no hay stock físico de cunas disponible para estas fechas.");
+            }
+        }
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
         int assignedSlot = -1;
@@ -137,6 +148,9 @@ public class BookingService {
         }
 
         BigDecimal vipExtrasTotal = BigDecimal.ZERO;
+        if (Boolean.TRUE.equals(request.getPetFriendly())) {
+            vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
+        }
         if (Boolean.TRUE.equals(request.getAirportPickup())) {
             vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("150000"));
         }
@@ -153,7 +167,16 @@ public class BookingService {
             }
         }
 
-        BigDecimal totalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal);
+        BigDecimal extraGuestTotal = BigDecimal.ZERO;
+        if (request.getGuests() != null && request.getGuests() > 2) {
+            int extraGuests = request.getGuests() - 2;
+            extraGuestTotal = new BigDecimal("120000").multiply(BigDecimal.valueOf(extraGuests)).multiply(BigDecimal.valueOf(nights));
+        }
+
+        BigDecimal totalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal).add(extraGuestTotal);
+        // RN-F01: Deposito de Garantia Simulado
+        BigDecimal guarantee = new BigDecimal("100000");
+        totalPrice = totalPrice.add(guarantee);
         String bookingCode = "PDM-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         Booking.GuestDetails guestDetails = parseGuestDetails(request);
 
@@ -172,6 +195,7 @@ public class BookingService {
                 .nights((int) nights)
                 .guests(request.getGuests() != null ? request.getGuests() : 1)
                 .children(request.getChildren() != null ? request.getChildren() : 0)
+                .needsCrib(request.getNeedsCrib())
                 .pricePerNight(suite.getBasePrice())
                 .subtotal(pricingResult.subtotal())
                 .discount(pricingResult.discount())
@@ -184,14 +208,17 @@ public class BookingService {
                 .paidAmount(BigDecimal.ZERO)
                 .balanceDue(totalPrice)
                 .status("pending")
+                .guaranteeDeposit(guarantee)
+                .guaranteeRefunded(false)
                 .paymentStatus("pending")
                 .bookingCode(bookingCode)
                 .guestDetails(guestDetails)
                 .experiences(selectedExpList)
+                .petFriendly(request.getPetFriendly())
                 .airportPickup(request.getAirportPickup())
                 .foodOrders(request.getFoodOrders() != null ? request.getFoodOrders() : new ArrayList<>())
                 .smartLockPin(String.format("%06d", java.util.concurrent.ThreadLocalRandom.current().nextInt(100000, 999999)))
-                .expiresAt(Instant.now().plusSeconds(1800)) // 30 mins hold
+                .expiresAt(Instant.now().plusSeconds(900)) // 15 mins hold
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
@@ -251,6 +278,17 @@ public class BookingService {
         }
 
         List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
+        if (Boolean.TRUE.equals(request.getNeedsCrib())) {
+            // Validar stock global de cunas (ej. Max 5 en toda la app)
+            long cribsInUse = bookingRepository.findByStatusIn(List.of("confirmed", "checked_in", "pending")).stream()
+                    .filter(b -> Boolean.TRUE.equals(b.getNeedsCrib()) &&
+                            !b.getCheckOut().isBefore(request.getCheckIn()) &&
+                            !b.getCheckIn().isAfter(request.getCheckOut()))
+                    .count();
+            if (cribsInUse >= 5) {
+                throw new IllegalArgumentException("Lo sentimos, no hay stock físico de cunas disponible para estas fechas.");
+            }
+        }
         occupiedNights.removeIf(sn -> bookingId.equals(sn.getBooking()));
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
@@ -336,7 +374,7 @@ public class BookingService {
                         .dates(java.util.Collections.singletonList(date))
                         .booking(booking.getId())
                         .status("pending".equalsIgnoreCase(booking.getStatus()) ? "held" : "blocked")
-                        .expiresAt("pending".equalsIgnoreCase(booking.getStatus()) ? Instant.now().plusSeconds(1800) : null)
+                        .expiresAt("pending".equalsIgnoreCase(booking.getStatus()) ? Instant.now().plusSeconds(900) : null)
                         .createdAt(Instant.now())
                         .build();
                 insertedNights.add(suiteNightRepository.save(suiteNight));
@@ -442,10 +480,14 @@ public class BookingService {
                 ? booking.getPaidAmount().max(BigDecimal.ZERO)
                 : BigDecimal.ZERO;
         BigDecimal retention = BigDecimal.ZERO;
-        if (daysUntilCheckIn < 7) {
-            if (booking.getTotalPrice() == null || booking.getTotalPrice().signum() < 0) {
-                throw new IllegalStateException("La reserva no tiene un precio total válido para calcular la retención");
-            }
+        if (booking.getTotalPrice() == null || booking.getTotalPrice().signum() < 0) {
+            throw new IllegalStateException("La reserva no tiene un precio total válido para calcular la retención");
+        }
+        if (daysUntilCheckIn < 2) {
+            // RN-F03 (No-Show estricto < 48 horas): Cancelación tardía con penalidad del 100%.
+            retention = booking.getTotalPrice();
+        } else if (daysUntilCheckIn < 7) {
+            // Penalidad del 10% si cancela dentro de los 7 días
             retention = booking.getTotalPrice().multiply(new BigDecimal("0.10")).setScale(2, RoundingMode.HALF_UP);
         }
         BigDecimal refundAmount = paidAmount.subtract(retention).max(BigDecimal.ZERO).min(paidAmount);
@@ -622,6 +664,7 @@ public class BookingService {
                 .nights(nights)
                 .guests(booking.getGuests())
                 .children(booking.getChildren())
+                .needsCrib(booking.getNeedsCrib())
                 .guestName(guestName)
                 .guestEmail(guestEmail)
                 .guestPhone(guestPhone)
@@ -636,6 +679,8 @@ public class BookingService {
                 .refundedAmount(booking.getRefundedAmount())
                 .balanceDue(booking.getBalanceDue())
                 .status(status)
+                .guaranteeDeposit(booking.getGuaranteeDeposit())
+                .guaranteeRefunded(booking.getGuaranteeRefunded())
                 .paymentStatus(booking.getPaymentStatus())
                 .bookingCode(code)
                 .isModifiable(isModifiable)
@@ -643,10 +688,12 @@ public class BookingService {
                 .isCancellable(isCancelable)
                 .guestDetails(gd)
                 .experiences(booking.getExperiences())
+                .petFriendly(booking.getPetFriendly())
                 .airportPickup(booking.getAirportPickup())
                 .foodOrders(booking.getFoodOrders())
                 .smartLockPin(("confirmed".equalsIgnoreCase(status) || "checked_in".equalsIgnoreCase(status) || "completed".equalsIgnoreCase(status)) ? booking.getSmartLockPin() : null)
                 .preCheckInCompleted(booking.getPreCheckInCompleted())
+                .notes(booking.getNotes())
                 .cancellationReason(booking.getCancellationReason())
                 .appliedPromotionId(booking.getAppliedPromotionId())
                 .appliedPromotionName(booking.getAppliedPromotionName())

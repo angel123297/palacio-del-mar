@@ -25,12 +25,12 @@ public class BookingExpiryScheduler {
 
     /**
      * Limpia periódicamente las reservas en estado "pending" que no completaron el pago
-     * dentro del tiempo límite de 30 minutos (expiresAt < now), liberando el inventario de suites.
+     * dentro del tiempo límite de 15 minutos (expiresAt < now), liberando el inventario de suites.
      */
     @Scheduled(fixedRateString = "${booking.expiry.check.interval.ms:60000}")
     public void cleanupExpiredBookings() {
         Instant now = Instant.now();
-        List<Booking> expiredBookings = bookingRepository.findByStatusAndExpiresAtBefore("pending", now);
+        List<Booking> expiredBookings = bookingRepository.findByStatusAndExpiresAtBeforeAndPaidAmount("pending", now, java.math.BigDecimal.ZERO);
 
         if (expiredBookings.isEmpty()) {
             return;
@@ -52,7 +52,7 @@ public class BookingExpiryScheduler {
                         booking,
                         BookingStatus.EXPIRED,
                         "System-Scheduler",
-                        "Tiempo límite de pago expirado (30 minutos)"
+                        "Tiempo límite de pago expirado (15 minutos)"
                 );
                 bookingRepository.save(booking);
 

@@ -236,6 +236,14 @@ public class HostController {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
+        java.time.LocalTime nowTime = java.time.LocalTime.now(java.time.ZoneId.of("America/Bogota"));
+        if (nowTime.isAfter(java.time.LocalTime.of(11, 0))) {
+            java.math.BigDecimal recargo = booking.getPricePerNight() != null ? booking.getPricePerNight().multiply(new java.math.BigDecimal("0.50")).setScale(2, java.math.RoundingMode.HALF_UP) : new java.math.BigDecimal("50000");
+            booking.setTotalPrice(booking.getTotalPrice().add(recargo));
+            booking.setBalanceDue(booking.getBalanceDue().add(recargo));
+            booking.setPaymentStatus("partial");
+            booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Recargo Late Check-out aplicado: $" + recargo);
+        }
         bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT, userPrincipal.getUser().getId(), "Check-out by host");
         bookingRepository.save(booking);
         return ResponseEntity.ok(ApiResponse.ok("Check-out registrado", null));

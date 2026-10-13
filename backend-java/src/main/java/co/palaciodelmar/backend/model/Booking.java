@@ -48,6 +48,8 @@ public class Booking {
 
     @Builder.Default
     private Integer children = 0;
+    @Builder.Default
+    private Boolean needsCrib = false;
 
     private BigDecimal subtotal;
     private BigDecimal discount;
@@ -80,6 +82,12 @@ public class Booking {
     @Builder.Default
     private String paymentStatus = "pending"; // "pending", "paid", "failed", "refunded", "partial"
 
+    @Builder.Default
+    private BigDecimal guaranteeDeposit = BigDecimal.ZERO;
+
+    @Builder.Default
+    private Boolean guaranteeRefunded = false;
+
     @Indexed(unique = true, sparse = true)
     private String bookingCode;
 
@@ -91,9 +99,13 @@ public class Booking {
     private Boolean airportPickup;
 
     @Builder.Default
+    private Boolean petFriendly = false;
+
+    @Builder.Default
     private List<FoodOrder> foodOrders = new ArrayList<>();
 
     private String cancellationReason;
+    private String notes;
 
     private String appliedPromotionId;
     private String appliedPromotionName;

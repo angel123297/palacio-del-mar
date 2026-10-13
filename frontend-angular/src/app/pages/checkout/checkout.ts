@@ -247,6 +247,11 @@ import { finalize } from 'rxjs';
                  <span style="font-size: 1rem; color: #ccc;">Impuestos (19%)</span>
                  <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice * 0.19) | number:'1.0-0' }}</span>
                </div>
+               <div *ngIf="booking.guaranteeDeposit && booking.guaranteeDeposit > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                 <span style="font-size: 1rem; color: #ccc;">Depósito Garantía (Reembolsable)</span>
+                 <span style="font-size: 1rem; color: #fff;">$ {{ booking.guaranteeDeposit | number:'1.0-0' }}</span>
+                 <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice * 0.19) | number:'1.0-0' }}</span>
+               </div>
              </div>
 
              <div *ngIf="booking.paidAmount && booking.paidAmount > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.95rem;">
