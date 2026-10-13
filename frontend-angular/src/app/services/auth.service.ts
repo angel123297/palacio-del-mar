@@ -79,6 +79,12 @@ export class AuthService {
     );
   }
 
+  forceVerify(email: string) {
+    return this.http.post<{success?: boolean, message?: string}>(`${this.apiUrl}/force-verify`, { email }).pipe(
+      timeout(this.TIMEOUT_MS)
+    );
+  }
+
   logout() {
     return this.http.post(`${this.apiUrl}/logout`, {}).pipe(
       tap(() => {
