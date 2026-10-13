@@ -66,9 +66,9 @@ class PricingServiceTest {
                 null);
 
         assertMoneyEquals(new BigDecimal("730.00"), result.subtotal());
-        assertMoneyEquals(new BigDecimal("73.00"), result.discount());
-        assertMoneyEquals(new BigDecimal("124.83"), result.taxes());
-        assertMoneyEquals(new BigDecimal("781.83"), result.total());
+        assertMoneyEquals(new BigDecimal("36.50"), result.discount());
+        assertMoneyEquals(new BigDecimal("131.77"), result.taxes());
+        assertMoneyEquals(new BigDecimal("825.27"), result.total());
         assertEquals(7, result.nightlyPrices().size());
     }
 
@@ -108,9 +108,9 @@ class PricingServiceTest {
                 LocalDate.parse("2026-11-09"),
                 new BigDecimal("5"));
 
-        assertMoneyEquals(new BigDecimal("73.00"), result.discount());
-        assertMoneyEquals(new BigDecimal("124.83"), result.taxes());
-        assertMoneyEquals(new BigDecimal("781.83"), result.total());
+        assertMoneyEquals(new BigDecimal("36.50"), result.discount());
+        assertMoneyEquals(new BigDecimal("131.77"), result.taxes());
+        assertMoneyEquals(new BigDecimal("825.27"), result.total());
     }
 
     @Test

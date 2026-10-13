@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import co.palaciodelmar.backend.repository.BookingRepository;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 public class AdminController {
 
     private final AdminService adminService;
+    private final BookingRepository bookingRepository;
     private final BookingService bookingService;
 
     @GetMapping("/bookings")
