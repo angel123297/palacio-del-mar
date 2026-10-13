@@ -9,7 +9,6 @@
     "test": "ng test"
   },
   "private": true,
-  "packageManager": "npm@12.2.0",
   "dependencies": {
     "@angular/animations": "^22.2.2",
     "@angular/cdk": "^22.2.2",

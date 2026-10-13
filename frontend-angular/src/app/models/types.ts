@@ -134,6 +134,10 @@ export interface Booking {
   appliedPromotionId?: string;
   appliedPromotionName?: string;
   appliedPromotionDiscountPercent?: number;
+  checkedIn?: boolean;
+  checkedOut?: boolean;
+  smartLockPin?: string;
+  expiresAt?: string;
 }
 
 export interface PaginatedResponse<T> {
