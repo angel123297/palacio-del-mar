@@ -19,10 +19,17 @@ public class ChatController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> chat(@RequestBody Map<String, Object> body) {
         String message = body != null && body.get("message") != null ? body.get("message").toString() : "";
+        if (message.length() > 1000) {
+            message = message.substring(0, 1000);
+        }
         @SuppressWarnings("unchecked")
         List<Map<String, String>> history = body != null && body.get("history") instanceof List
                 ? (List<Map<String, String>>) body.get("history")
                 : List.of();
+
+        if (history.size() > 10) {
+            history = history.subList(history.size() - 10, history.size());
+        }
 
         Map<String, Object> result = chatService.processChat(message, history);
         result.put("success", true);

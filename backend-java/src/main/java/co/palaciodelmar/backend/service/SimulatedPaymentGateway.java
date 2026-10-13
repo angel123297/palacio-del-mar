@@ -36,6 +36,9 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         if (record == null) {
             return new PaymentConfirmResponse(false, null, "failed", "Intent not found");
         }
+        if ("completed".equalsIgnoreCase(record.status())) {
+            return new PaymentConfirmResponse(true, "ch_" + intentId, "succeeded", null);
+        }
 
         if (paymentToken == null) paymentToken = "";
 
@@ -49,7 +52,14 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         }
 
         String txId = "ch_" + UUID.randomUUID().toString().replace("-", "");
+        intents.put(intentId, new IntentRecord(record.id(), record.amount(), "completed", record.idempotencyKey(), record.clientSecret()));
         return new PaymentConfirmResponse(true, txId, "succeeded", null);
+    }
+
+    @Override
+    public PaymentRefundResponse refund(String transactionId, BigDecimal amount) {
+        String refundId = "re_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        return new PaymentRefundResponse(true, refundId, "refunded", null);
     }
 
     private record IntentRecord(String id, BigDecimal amount, String status, String idempotencyKey, String clientSecret) {}

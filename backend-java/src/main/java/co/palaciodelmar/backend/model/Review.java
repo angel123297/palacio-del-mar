@@ -27,7 +27,7 @@ public class Review {
     @Indexed
     private String user; // User ObjectId reference
 
-    @Indexed
+    @Indexed(unique = true, sparse = true)
     private String bookingId; // Booking ObjectId reference for verified stay
 
     private String userName;

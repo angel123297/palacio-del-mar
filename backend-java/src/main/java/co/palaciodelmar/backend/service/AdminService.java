@@ -21,6 +21,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final PromotionRepository promotionRepository;
     private final SuiteNightRepository suiteNightRepository;
+    private final BookingService bookingService;
 
     @Data
     @Builder
@@ -29,6 +30,8 @@ public class AdminService {
         private long totalBookings;
         private long totalUsers;
         private BigDecimal totalRevenue;
+        private long activeBookings;
+        private double averageOccupancy;
     }
 
     public org.springframework.data.domain.Page<Booking> getAllBookings(org.springframework.data.domain.Pageable pageable) {
@@ -36,6 +39,10 @@ public class AdminService {
     }
 
     public org.springframework.data.domain.Page<Booking> getAllBookings(String status, String search, org.springframework.data.domain.Pageable pageable) {
+        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all") && (search == null || search.isBlank())) {
+            return bookingRepository.findByStatusIgnoreCase(status, pageable);
+        }
+
         if ((status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) || (search != null && !search.isBlank())) {
             List<Booking> all = bookingRepository.findAll();
             List<Booking> filtered = all.stream()
@@ -67,17 +74,19 @@ public class AdminService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
 
-        booking.setStatus(newStatus != null ? newStatus.toLowerCase() : "pending");
-        booking.setUpdatedAt(Instant.now());
+        if (newStatus == null || newStatus.isBlank()) {
+            throw new IllegalArgumentException("El nuevo estado no puede ser nulo o vacío");
+        }
 
-        if ("confirmed".equalsIgnoreCase(newStatus)) {
-            List<co.palaciodelmar.backend.model.SuiteNight> nights = suiteNightRepository.findByBooking(bookingId);
-            for (co.palaciodelmar.backend.model.SuiteNight sn : nights) {
-                sn.setExpiresAt(null);
-                sn.setStatus("confirmed");
-                suiteNightRepository.save(sn);
-            }
-        } else if ("cancelled".equalsIgnoreCase(newStatus) || "completed".equalsIgnoreCase(newStatus)) {
+        co.palaciodelmar.backend.model.BookingStatus targetStatus;
+        try {
+            targetStatus = co.palaciodelmar.backend.model.BookingStatus.valueOf(newStatus.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Estado no válido: " + newStatus);
+        }
+
+        bookingService.changeBookingStatus(booking, targetStatus, "ADMIN", "Cambio administrativo de estado");
+        if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
             suiteNightRepository.deleteByBooking(bookingId);
         }
 
@@ -103,6 +112,12 @@ public class AdminService {
         long totalBookings = bookingRepository.count();
         long totalUsers = userRepository.count();
 
+        long activeBookings = bookingRepository.findAll().stream()
+                .filter(b -> "confirmed".equalsIgnoreCase(b.getStatus()) || "pending".equalsIgnoreCase(b.getStatus()))
+                .count();
+
+        double averageOccupancy = totalSuites > 0 ? Math.min(100.0, Math.round((double) activeBookings / totalSuites * 100.0)) : 0.0;
+
         BigDecimal totalRevenue = bookingRepository.findAll().stream()
                 .filter(b -> "confirmed".equalsIgnoreCase(b.getStatus()) || "completed".equalsIgnoreCase(b.getStatus()))
                 .map(Booking::getTotalPrice)
@@ -113,6 +128,8 @@ public class AdminService {
                 .totalSuites(totalSuites)
                 .totalBookings(totalBookings)
                 .totalUsers(totalUsers)
+                .activeBookings(activeBookings)
+                .averageOccupancy(averageOccupancy)
                 .totalRevenue(totalRevenue)
                 .build();
     }

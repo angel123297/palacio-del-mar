@@ -77,6 +77,10 @@ public class ReviewService {
             throw new IllegalArgumentException("Solo el huésped titular puede calificar esta reserva");
         }
 
+        if (booking.getStatus() != null && "cancelled".equalsIgnoreCase(booking.getStatus())) {
+            throw new IllegalStateException("No se pueden enviar reseñas para reservas canceladas");
+        }
+
         if (reviewRepository.existsByBookingId(bookingId)) {
             throw new IllegalStateException("Ya has enviado una reseña para esta reserva");
         }
