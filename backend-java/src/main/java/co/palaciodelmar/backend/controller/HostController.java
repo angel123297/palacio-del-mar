@@ -54,8 +54,15 @@ public class HostController {
         }
 
         int pageIndex = Math.max(0, page - 1);
-        Pageable pageable = PageRequest.of(pageIndex, limit);
+        int safeLimit = Math.min(Math.max(1, limit), 100);
+        Pageable pageable = PageRequest.of(pageIndex, safeLimit);
         
+        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all") && (search == null || search.isBlank())) {
+            Page<BookingDTO> statusPage = bookingRepository.findByBranchInAndStatusIgnoreCase(branches, status, pageable)
+                    .map(bookingService::toDTO);
+            return ResponseEntity.ok(ApiResponse.ok(statusPage));
+        }
+
         List<Booking> allHostBookings = bookingRepository.findByBranchIn(branches);
         if ((status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) || (search != null && !search.isBlank())) {
             List<BookingDTO> filtered = allHostBookings.stream()

@@ -23,16 +23,23 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@RequestBody RegisterRequest request, jakarta.servlet.http.HttpServletResponse httpResponse) {
-        AuthResponse response = authService.register(request);
-        
-        jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie("jwt", response.getToken());
+    @org.springframework.beans.factory.annotation.Value("${security.cookie.secure:false}")
+    private boolean cookieSecure;
+
+    private void addJwtCookie(jakarta.servlet.http.HttpServletResponse response, String token, jakarta.servlet.http.HttpServletRequest request) {
+        boolean isSecure = cookieSecure || (request != null && (request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"))));
+        jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie("jwt", token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(false); // Should be true in production with HTTPS
+        cookie.setSecure(isSecure);
         cookie.setPath("/");
         cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
-        httpResponse.addCookie(cookie);
+        response.addCookie(cookie);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, Object>> register(@RequestBody RegisterRequest request, jakarta.servlet.http.HttpServletResponse httpResponse, jakarta.servlet.http.HttpServletRequest httpRequest) {
+        AuthResponse response = authService.register(request);
+        addJwtCookie(httpResponse, response.getToken(), httpRequest);
 
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
@@ -46,15 +53,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody AuthRequest request, jakarta.servlet.http.HttpServletResponse httpResponse) {
+    public ResponseEntity<Map<String, Object>> login(@RequestBody AuthRequest request, jakarta.servlet.http.HttpServletResponse httpResponse, jakarta.servlet.http.HttpServletRequest httpRequest) {
         AuthResponse response = authService.login(request);
-        
-        jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie("jwt", response.getToken());
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false); // Should be true in production with HTTPS
-        cookie.setPath("/");
-        cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
-        httpResponse.addCookie(cookie);
+        addJwtCookie(httpResponse, response.getToken(), httpRequest);
 
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);

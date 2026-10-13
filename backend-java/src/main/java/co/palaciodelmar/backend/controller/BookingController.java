@@ -79,6 +79,18 @@ public class BookingController {
             @PathVariable String id,
             @RequestBody BookingRequest request
     ) {
+        if (request == null) {
+            throw new IllegalArgumentException("El cuerpo de la solicitud no puede estar vacío");
+        }
+        if (request.getCheckIn() == null || request.getCheckOut() == null) {
+            throw new IllegalArgumentException("Las fechas de check-in y check-out son obligatorias");
+        }
+        if (!request.getCheckOut().isAfter(request.getCheckIn())) {
+            throw new IllegalArgumentException("La fecha de salida debe ser posterior a la fecha de llegada");
+        }
+        if (request.getChildren() != null && request.getChildren() < 0) {
+            throw new IllegalArgumentException("El número de niños no puede ser negativo");
+        }
         BookingDTO booking = bookingService.modifyBooking(id, principal.getUser().getId(), request);
         return ResponseEntity.ok(ApiResponse.ok("Reserva modificada exitosamente", booking));
     }

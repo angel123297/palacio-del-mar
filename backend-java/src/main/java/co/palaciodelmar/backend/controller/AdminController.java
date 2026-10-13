@@ -30,7 +30,8 @@ public class AdminController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search) {
         int pageIndex = Math.max(0, page - 1);
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(pageIndex, limit);
+        int safeLimit = Math.min(Math.max(1, limit), 100);
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(pageIndex, safeLimit);
         org.springframework.data.domain.Page<BookingDTO> bookings = adminService.getAllBookings(status, search, pageable)
                 .map(bookingService::toDTO);
         return ResponseEntity.ok(ApiResponse.ok(bookings));

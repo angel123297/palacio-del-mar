@@ -96,7 +96,7 @@ import { finalize } from 'rxjs';
               </div>
 
               <button type="submit" [disabled]="processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                <span *ngIf="!processing">Pagar $ {{ booking.totalPrice | number:'1.0-0' }}</span>
+                <span *ngIf="!processing">Pagar $ {{ (booking.balanceDue != null ? booking.balanceDue : booking.totalPrice) | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   Autorizando transacción... <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
                 </span>
@@ -125,7 +125,7 @@ import { finalize } from 'rxjs';
               </div>
 
               <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                <span *ngIf="!processing">Ir al Banco a pagar $ {{ booking.totalPrice | number:'1.0-0' }}</span>
+                <span *ngIf="!processing">Ir al Banco a pagar $ {{ (booking.balanceDue != null ? booking.balanceDue : booking.totalPrice) | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   Conectando con el banco... <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
                 </span>

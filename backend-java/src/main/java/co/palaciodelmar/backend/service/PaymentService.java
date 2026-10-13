@@ -50,7 +50,8 @@ public class PaymentService {
             if (existingPayment != null && existingPayment.getIntentId() != null) {
                 if (userId != null && !existingPayment.getUser().equals(userId)) throw new IllegalArgumentException("Idempotency key mismatch");
                 if (!existingPayment.getBooking().equals(bookingId)) throw new IllegalArgumentException("Idempotency key mismatch");
-                return new PaymentGateway.PaymentIntentResponse(existingPayment.getIntentId(), "secret_" + existingPayment.getIntentId(), existingPayment.getAmount(), existingPayment.getCurrency(), existingPayment.getStatus());
+                String secret = existingPayment.getClientSecret() != null ? existingPayment.getClientSecret() : "secret_" + existingPayment.getIntentId();
+                return new PaymentGateway.PaymentIntentResponse(existingPayment.getIntentId(), secret, existingPayment.getAmount(), existingPayment.getCurrency(), existingPayment.getStatus());
             }
         }
 
@@ -90,6 +91,7 @@ public class PaymentService {
                 .paymentMethod(method != null ? method : "card")
                 .idempotencyKey(idempotencyKey)
                 .intentId(intentResponse.intentId())
+                .clientSecret(intentResponse.clientSecret())
                 .notes("Intención de pago creada")
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())

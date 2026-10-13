@@ -48,6 +48,8 @@ public class Payment {
     @Indexed(unique = true, sparse = true)
     private String intentId;
 
+    private String clientSecret;
+
     @Builder.Default
     private Instant createdAt = Instant.now();
 
