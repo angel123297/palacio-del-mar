@@ -200,6 +200,17 @@ public class AuthService {
         userRepository.save(user);
     }
 
+    public void forceVerify(String email) {
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+
+        user.setEmailVerified(true);
+        user.setVerificationTokenHash(null);
+        user.setVerificationTokenExpiresAt(null);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+    }
+
     public void changePassword(String userId, String currentPassword, String newPassword) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
