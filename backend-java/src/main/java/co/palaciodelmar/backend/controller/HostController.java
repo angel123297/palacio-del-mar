@@ -36,13 +36,17 @@ public class HostController {
         private long totalSuites;
         private long totalBookings;
         private BigDecimal totalRevenue;
+        private long pendingCheckins;
+        private long activeBookings;
     }
 
     @GetMapping("/bookings")
     public ResponseEntity<ApiResponse<Page<BookingDTO>>> getHostBookings(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int limit) {
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search) {
         
         List<String> branches = userPrincipal.getUser().getBranches();
         if (branches == null || branches.isEmpty()) {
@@ -51,6 +55,33 @@ public class HostController {
 
         int pageIndex = Math.max(0, page - 1);
         Pageable pageable = PageRequest.of(pageIndex, limit);
+        
+        List<Booking> allHostBookings = bookingRepository.findByBranchIn(branches);
+        if ((status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) || (search != null && !search.isBlank())) {
+            List<BookingDTO> filtered = allHostBookings.stream()
+                    .filter(b -> {
+                        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) {
+                            if (b.getStatus() == null || !b.getStatus().equalsIgnoreCase(status)) return false;
+                        }
+                        if (search != null && !search.isBlank()) {
+                            String q = search.toLowerCase();
+                            boolean codeMatch = b.getBookingCode() != null && b.getBookingCode().toLowerCase().contains(q);
+                            boolean guestMatch = b.getGuestDetails() != null && (
+                                    (b.getGuestDetails().getFullName() != null && b.getGuestDetails().getFullName().toLowerCase().contains(q)) ||
+                                    (b.getGuestDetails().getEmail() != null && b.getGuestDetails().getEmail().toLowerCase().contains(q))
+                            );
+                            if (!codeMatch && !guestMatch) return false;
+                        }
+                        return true;
+                    })
+                    .map(bookingService::toDTO)
+                    .toList();
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), filtered.size());
+            List<BookingDTO> subList = start <= end && start < filtered.size() ? filtered.subList(start, end) : java.util.Collections.emptyList();
+            return ResponseEntity.ok(ApiResponse.ok(new org.springframework.data.domain.PageImpl<>(subList, pageable, filtered.size())));
+        }
+
         Page<BookingDTO> bookings = bookingRepository.findByBranchIn(branches, pageable)
                 .map(bookingService::toDTO);
         
@@ -68,6 +99,8 @@ public class HostController {
                             .totalSuites(0)
                             .totalBookings(0)
                             .totalRevenue(BigDecimal.ZERO)
+                            .pendingCheckins(0)
+                            .activeBookings(0)
                             .build()
             ));
         }
@@ -83,10 +116,20 @@ public class HostController {
                 .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        long pendingCheckins = hostBookings.stream()
+                .filter(b -> "confirmed".equalsIgnoreCase(b.getStatus()) && (b.getPreCheckInCompleted() == null || !b.getPreCheckInCompleted()))
+                .count();
+
+        long activeBookings = hostBookings.stream()
+                .filter(b -> "confirmed".equalsIgnoreCase(b.getStatus()) || "pending".equalsIgnoreCase(b.getStatus()))
+                .count();
+
         HostDashboardStats stats = HostDashboardStats.builder()
                 .totalSuites(totalSuites)
                 .totalBookings(totalBookings)
                 .totalRevenue(totalRevenue)
+                .pendingCheckins(pendingCheckins)
+                .activeBookings(activeBookings)
                 .build();
 
         return ResponseEntity.ok(ApiResponse.ok(stats));

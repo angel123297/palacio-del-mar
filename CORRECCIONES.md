@@ -8,15 +8,40 @@ Este documento es la bitácora oficial del proyecto para documentar todas las au
 ---
 
 ## 📅 Índice Cronológico de Hitos
-1. [Hito 9: Resolución de Excepción Asíncrona en Checkout (@Async CompletableFuture), Aliases de Métricas y Certificación Pre-Exposición (12 Octubre 2026)](#hito-9-resolución-de-excepción-asíncrona-en-checkout-async-completablefuture-aliases-de-métricas-y-certificación-pre-exposición)
-2. [Hito 8: Auditoría Intensiva Full-Stack de Jules y Bloqueo Optimista (@Version) en SuiteNight (12 Octubre 2026)](#hito-8-auditoría-intensiva-full-stack-de-jules-y-bloqueo-optimista-version-en-suitenight)
-3. [Hito 7: Resolución de Serialización de Caché, Disponibilidad por Habitación, Indicadores de Calendario y Corrección de Servicios VIP (Recogida al Aeropuerto) (12 Octubre 2026)](#hito-7-resolución-de-serialización-de-caché-disponibilidad-por-habitación-indicadores-de-calendario-y-corrección-de-servicios-vip-recogida-al-aeropuerto)
-4. [Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync) (12 Octubre 2026)](#hito-6-implementación-de-caché-resiliente-redis--in-memory-y-tareas-asíncronas-enableasync)
-5. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
-6. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
-7. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
-8. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
-9. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+1. [Hito 10: Depuración y Resolución Exhaustiva de Auditoría GitHub Copilot CLI (12 Octubre 2026)](#hito-10-depuración-y-resolución-exhaustiva-de-auditoría-github-copilot-cli)
+2. [Hito 9: Resolución de Excepción Asíncrona en Checkout (@Async CompletableFuture), Aliases de Métricas y Certificación Pre-Exposición (12 Octubre 2026)](#hito-9-resolución-de-excepción-asíncrona-en-checkout-async-completablefuture-aliases-de-métricas-y-certificación-pre-exposición)
+3. [Hito 8: Auditoría Intensiva Full-Stack de Jules y Bloqueo Optimista (@Version) en SuiteNight (12 Octubre 2026)](#hito-8-auditoría-intensiva-full-stack-de-jules-y-bloqueo-optimista-version-en-suitenight)
+4. [Hito 7: Resolución de Serialización de Caché, Disponibilidad por Habitación, Indicadores de Calendario y Corrección de Servicios VIP (Recogida al Aeropuerto) (12 Octubre 2026)](#hito-7-resolución-de-serialización-de-caché-disponibilidad-por-habitación-indicadores-de-calendario-y-corrección-de-servicios-vip-recogida-al-aeropuerto)
+5. [Hito 6: Implementación de Caché Resiliente (Redis / In-Memory) y Tareas Asíncronas (@EnableAsync) (12 Octubre 2026)](#hito-6-implementación-de-caché-resiliente-redis--in-memory-y-tareas-asíncronas-enableasync)
+6. [Hito 5: Evaluación de Escalabilidad Arquitectónica por Jules (12 Octubre 2026)](#hito-5-evaluación-de-escalabilidad-arquitectónica-por-jules)
+7. [Hito 4: Verificación Formal y Certificación por Jules (12 Octubre 2026)](#hito-4-verificación-formal-y-certificación-por-jules)
+8. [Hito 3: Resolución de Hallazgos Críticos, Altos, Medios y Migración SCSS](#hito-3-resolución-integral-de-hallazgos-y-migración-scss)
+9. [Hito 2: Informe de Auditoría Riguroso Jules (INFORME_AUDITORIA_FINAL)](#hito-2-informe-de-auditoría-riguroso-jules)
+10. [Hito 1: Auditoría Técnica Inicial y Recuperación de Reglas de Negocio (AUDITORIA / Plan V2)](#hito-1-auditoría-técnica-inicial-y-plan-v2)
+
+---
+
+## Hito 10: Depuración y Resolución Exhaustiva de Auditoría GitHub Copilot CLI
+- **Fecha:** 12 de Octubre de 2026
+- **Auditor:** GitHub Copilot CLI
+- **Alcance:** Auditoría profunda estática y dinámica del código full-stack (Backend Java Spring Boot 3 y Frontend Angular 18).
+- **Incidencias Resueltas:**
+  1. **Seguridad y Control de Acceso:** Se restringió `/api/admin/**` estrictamente al rol `ADMIN` en `SecurityConfig.java`. Las rutas de `/api/host/**` se aislaron para `HOST` y `ADMIN`.
+  2. **Blindaje de Pagos y Verificación de Usuario:** `PaymentService` ahora valida que una reserva perteneciente a un usuario registrado no pueda ser pagada ni confirmada por usuarios anónimos o no autorizados.
+  3. **Reclamación de Cuentas Invitadas:** `AuthService.register` permite que huéspedes que hayan reservado como invitados reclamen su cuenta asignándole contraseña y verificación por correo sin colisión de email.
+  4. **Paginación y Filtrado en Dashboards:** `AdminController` y `HostController` admiten filtros por `status` y `search`. En el frontend de host (`host-dashboard.component.ts`), se adaptó la lectura para el formato `content` de Spring Data Page y se implementaron los contadores de `pendingCheckins` y `activeBookings`.
+  5. **Ciclo de Vida de Reservas:** `AdminService.updateBookingStatus` a `"confirmed"` actualiza las noches `SuiteNight` removiendo su fecha de expiración TTL.
+  6. **Validación de Fechas y Suites Activas:** `BookingService` rechaza check-in con fechas pasadas e impide reservar habitaciones inactivas o deshabilitadas.
+  7. **Recálculo Integral de Extras:** Modificación de reservas (`modifyBooking`) y adición/remoción de experiencias ahora preservan y suman traslados VIP al aeropuerto ($150.000 COP) y órdenes de alimentos.
+  8. **Mapeo Bidireccional de Alimentos:** `Booking.FoodOrder` soporta `dishName`, `foodName` e instrucciones especiales (`specialInstructions`).
+  9. **Temporadas Altas y Promociones en Calendario:** Creación del endpoint `/api/availability/peak-dates` y corrección de deserialización en `date-range-picker.component.ts`.
+  10. **Seeder de Credenciales:** `DataInitializer` preconfigura los accesos para `anfitrion@palaciodelmar.co` y `huesped@palaciodelmar.co` verificados.
+  11. **Estado de Sesión Angular:** `isLoggedIn()` exige que el usuario esté verificado y que exista sesión válida; el registro no fija sesión falsa.
+  12. **Desempaquetado de DTOs:** Servicios Angular (`BranchService`, `ExperienceService`, `BookingService`) adaptados para desenvolver `ApiResponse<T>` de forma consistente.
+- **Validación:**
+  - 89/89 pruebas unitarias y de integración de Spring Boot aprobadas (`BUILD SUCCESS`).
+  - Compilación de producción en Angular limpia (`5.3s`).
+  - Suite de 28 pruebas automatizadas de integración aprobadas al 100% (28/28).
 
 ---
 

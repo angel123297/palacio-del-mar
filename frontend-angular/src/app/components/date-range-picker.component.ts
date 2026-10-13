@@ -182,7 +182,7 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
     this.api.get<any>('/availability/promotions', params).subscribe({
       next: (res) => {
         if (this.reqId !== currentReq) return;
-        const p = res?.data?.promotions || res?.promotions || [];
+        const p = Array.isArray(res?.data) ? res.data : (res?.data?.promotions || res?.promotions || (Array.isArray(res) ? res : []));
         this.promoMonths.set({ ...this.promoMonths(), [key]: p });
       },
       error: () => {

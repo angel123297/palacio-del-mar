@@ -26,10 +26,12 @@ public class AdminController {
     @GetMapping("/bookings")
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<BookingDTO>>> getAllBookings(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int limit) {
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search) {
         int pageIndex = Math.max(0, page - 1);
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(pageIndex, limit);
-        org.springframework.data.domain.Page<BookingDTO> bookings = adminService.getAllBookings(pageable)
+        org.springframework.data.domain.Page<BookingDTO> bookings = adminService.getAllBookings(status, search, pageable)
                 .map(bookingService::toDTO);
         return ResponseEntity.ok(ApiResponse.ok(bookings));
     }

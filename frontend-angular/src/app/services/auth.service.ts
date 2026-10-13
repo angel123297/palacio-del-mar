@@ -16,7 +16,8 @@ export class AuthService {
   }
 
   isLoggedIn(): boolean {
-    return !!this.currentUserSignal();
+    const user = this.currentUserSignal();
+    return !!user && user.emailVerified !== false;
   }
 
   constructor(private http: HttpClient) {
@@ -68,14 +69,7 @@ export class AuthService {
 
   register(data: RegisterDTO) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data).pipe(
-      timeout(this.TIMEOUT_MS),
-      tap(res => {
-        const user = res.user || res.data?.user;
-        if (user) {
-          localStorage.setItem('user', JSON.stringify(user));
-          this.currentUserSignal.set(user);
-        }
-      })
+      timeout(this.TIMEOUT_MS)
     );
   }
 

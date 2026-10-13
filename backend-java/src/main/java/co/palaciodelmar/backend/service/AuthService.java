@@ -58,8 +58,40 @@ public class AuthService {
     }
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail().toLowerCase())) {
-            throw new IllegalArgumentException("El email ya está registrado");
+        String normalizedEmail = request.getEmail().toLowerCase();
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            User existing = userRepository.findByEmail(normalizedEmail).orElse(null);
+            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank())) {
+                String rawToken = generateSecureToken();
+                String hashedToken = hashToken(rawToken);
+
+                existing.setName(request.getName());
+                existing.setLastName(request.getLastName());
+                existing.setPassword(passwordEncoder.encode(request.getPassword()));
+                existing.setEmailVerified(false);
+                existing.setVerificationTokenHash(hashedToken);
+                existing.setVerificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS));
+                if (existing.getProfile() == null) {
+                    existing.setProfile(User.Profile.builder().phone(request.getPhone()).build());
+                } else if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
+                    existing.getProfile().setPhone(request.getPhone());
+                }
+                existing.setUpdatedAt(Instant.now());
+                userRepository.save(existing);
+
+                try {
+                    emailService.sendVerificationEmail(existing.getEmail(), rawToken);
+                } catch (Exception e) {
+                    System.err.println("Failed to send verification email: " + e.getMessage());
+                }
+
+                return AuthResponse.builder()
+                        .token(null)
+                        .user(toDTO(existing))
+                        .build();
+            } else {
+                throw new IllegalArgumentException("El email ya está registrado");
+            }
         }
         if (request.getPhone() != null && !request.getPhone().trim().isEmpty() && userRepository.existsByProfilePhone(request.getPhone())) {
             throw new IllegalArgumentException("El número de teléfono ya está registrado");

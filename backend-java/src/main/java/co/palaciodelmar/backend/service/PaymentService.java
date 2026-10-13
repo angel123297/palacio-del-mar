@@ -61,8 +61,17 @@ public class PaymentService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
 
-        if (userId != null && !booking.getUser().equals(userId)) {
-            throw new IllegalArgumentException("No tienes permiso para pagar esta reserva");
+        if (booking.getUser() != null) {
+            if (userId != null && !booking.getUser().equals(userId)) {
+                throw new IllegalArgumentException("No tienes permiso para pagar esta reserva");
+            }
+            if (userId == null) {
+                userRepository.findById(booking.getUser()).ifPresent(u -> {
+                    if (u.getPassword() != null && !u.getPassword().isBlank()) {
+                        throw new IllegalArgumentException("Esta reserva pertenece a un usuario registrado. Inicia sesión para continuar con el pago.");
+                    }
+                });
+            }
         }
 
         if ("cancelled".equalsIgnoreCase(booking.getStatus()) || "expired".equalsIgnoreCase(booking.getStatus())) {
@@ -97,8 +106,17 @@ public class PaymentService {
         Booking booking = bookingRepository.findById(payment.getBooking())
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
 
-        if (userId != null && !booking.getUser().equals(userId)) {
-            throw new IllegalArgumentException("No tienes permiso para confirmar este pago");
+        if (booking.getUser() != null) {
+            if (userId != null && !booking.getUser().equals(userId)) {
+                throw new IllegalArgumentException("No tienes permiso para confirmar este pago");
+            }
+            if (userId == null) {
+                userRepository.findById(booking.getUser()).ifPresent(u -> {
+                    if (u.getPassword() != null && !u.getPassword().isBlank()) {
+                        throw new IllegalArgumentException("Esta reserva pertenece a un usuario registrado. Inicia sesión para continuar con el pago.");
+                    }
+                });
+            }
         }
 
         if (!"pending".equalsIgnoreCase(booking.getStatus()) && !"confirmed".equalsIgnoreCase(booking.getStatus())) {

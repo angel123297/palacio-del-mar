@@ -349,11 +349,13 @@ export class CheckoutComponent implements OnInit {
     this.errorMsg = '';
     this.cdr.detectChanges();
 
+    const rawNumber = (this.paymentForm.value.cardNumber || '').replace(/\s+/g, '');
     const payload = {
       method: 'CREDIT_CARD',
+      cardNumber: rawNumber,
       cardDetails: {
          name: this.paymentForm.value.cardName,
-         last4: this.paymentForm.value.cardNumber.slice(-4)
+         last4: rawNumber.slice(-4)
       }
     };
     

@@ -77,9 +77,17 @@ public class BookingService {
                 .or(() -> suiteRepository.findBySlug(request.getSuiteId().toLowerCase()))
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: esta habitación no existe o ya no está disponible"));
 
+        if ((suite.getActive() != null && !suite.getActive()) || (suite.getAvailable() != null && !suite.getAvailable())) {
+            throw new IllegalArgumentException("Esta habitación no está disponible para reservas actualmente");
+        }
+
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
         if (request.getGuests() != null && (request.getGuests() < 1 || request.getGuests() > maxGuests)) {
             throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
+        }
+
+        if (request.getCheckIn().isBefore(LocalDate.now(BOGOTA_ZONE))) {
+            throw new IllegalArgumentException("La fecha de check-in no puede ser anterior a la fecha actual");
         }
 
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
@@ -281,7 +289,8 @@ public class BookingService {
             }
         }
 
-        BigDecimal newTotalPrice = totalRoomPrice.add(experiencesTotal);
+        BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
+        BigDecimal newTotalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal);
         booking.setCheckIn(request.getCheckIn());
         booking.setCheckOut(request.getCheckOut());
         booking.setNights((int) nights);
@@ -365,8 +374,17 @@ public class BookingService {
 
     public BookingDTO getBookingByIdSecure(String id, User user) {
         Booking booking = getBookingEntityById(id);
-        if (user == null || (!booking.getUser().equals(user.getId()) && !"ADMIN".equalsIgnoreCase(user.getRole()) && !"HOST".equalsIgnoreCase(user.getRole()))) {
-            throw new IllegalArgumentException("No tienes permiso para acceder a esta reserva");
+        if (user != null) {
+            if (!booking.getUser().equals(user.getId()) && !"ADMIN".equalsIgnoreCase(user.getRole()) && !"HOST".equalsIgnoreCase(user.getRole())) {
+                throw new IllegalArgumentException("No tienes permiso para acceder a esta reserva");
+            }
+        } else {
+            boolean isGuestBooking = userRepository.findById(booking.getUser())
+                    .map(u -> u.getPassword() == null || u.getPassword().isBlank())
+                    .orElse(true);
+            if (!isGuestBooking) {
+                throw new IllegalArgumentException("Esta reserva pertenece a una cuenta registrada. Inicia sesión para ver los detalles.");
+            }
         }
         return toDTO(booking);
     }
@@ -374,8 +392,17 @@ public class BookingService {
     public BookingDTO getBookingByCodeSecure(String bookingCode, User user) {
         Booking booking = bookingRepository.findByBookingCode(bookingCode)
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada con código: " + bookingCode));
-        if (user == null || (!booking.getUser().equals(user.getId()) && !"ADMIN".equalsIgnoreCase(user.getRole()) && !"HOST".equalsIgnoreCase(user.getRole()))) {
-            throw new IllegalArgumentException("No tienes permiso para acceder a esta reserva");
+        if (user != null) {
+            if (!booking.getUser().equals(user.getId()) && !"ADMIN".equalsIgnoreCase(user.getRole()) && !"HOST".equalsIgnoreCase(user.getRole())) {
+                throw new IllegalArgumentException("No tienes permiso para acceder a esta reserva");
+            }
+        } else {
+            boolean isGuestBooking = userRepository.findById(booking.getUser())
+                    .map(u -> u.getPassword() == null || u.getPassword().isBlank())
+                    .orElse(true);
+            if (!isGuestBooking) {
+                throw new IllegalArgumentException("Esta reserva pertenece a una cuenta registrada. Inicia sesión para ver los detalles.");
+            }
         }
         return toDTO(booking);
     }
@@ -461,7 +488,8 @@ public class BookingService {
             }
         }
         BigDecimal roomTotal = booking.getSubtotal() != null ? booking.getSubtotal().add(booking.getTaxes() != null ? booking.getTaxes() : BigDecimal.ZERO).subtract(booking.getDiscount() != null ? booking.getDiscount() : BigDecimal.ZERO) : BigDecimal.ZERO;
-        BigDecimal newTotal = roomTotal.add(expTotal);
+        BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
+        BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal);
         booking.setTotalPrice(newTotal);
         if (booking.getPaidAmount().compareTo(newTotal) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
@@ -494,7 +522,8 @@ public class BookingService {
             }
         }
         BigDecimal roomTotal = booking.getSubtotal() != null ? booking.getSubtotal().add(booking.getTaxes() != null ? booking.getTaxes() : BigDecimal.ZERO).subtract(booking.getDiscount() != null ? booking.getDiscount() : BigDecimal.ZERO) : BigDecimal.ZERO;
-        BigDecimal newTotal = roomTotal.add(expTotal);
+        BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
+        BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal);
         booking.setTotalPrice(newTotal);
         if (booking.getPaidAmount().compareTo(newTotal) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
@@ -505,6 +534,26 @@ public class BookingService {
         }
         booking.setUpdatedAt(Instant.now());
         return toDTO(bookingRepository.save(booking));
+    }
+
+    private BigDecimal calculateVipExtrasTotal(Booking booking) {
+        BigDecimal vipExtrasTotal = BigDecimal.ZERO;
+        if (Boolean.TRUE.equals(booking.getAirportPickup())) {
+            vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("150000"));
+        }
+        if (booking.getFoodOrders() != null) {
+            for (Booking.FoodOrder fo : booking.getFoodOrders()) {
+                if (fo.getPrice() != null) {
+                    vipExtrasTotal = vipExtrasTotal.add(fo.getPrice());
+                } else {
+                    vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
+                }
+                if (Boolean.TRUE.equals(fo.getIncludesBreakfastCombo())) {
+                    vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("35000"));
+                }
+            }
+        }
+        return vipExtrasTotal;
     }
 
     public BookingDTO toDTO(Booking booking) {

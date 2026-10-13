@@ -54,7 +54,12 @@ public class PaymentController {
         co.palaciodelmar.backend.service.PaymentGateway.PaymentIntentResponse intentResult = paymentService.createPaymentIntent(userId, bookingId, method, idempotencyKey);
         
         // Auto-confirm for simulated process
-        String paymentToken = body.containsKey("cardNumber") ? "tok_card" : "tok_test";
+        String rawCard = (String) body.get("cardNumber");
+        if (rawCard == null && body.get("cardDetails") instanceof Map<?, ?> cd) {
+            rawCard = (String) ((Map<?, ?>) cd).get("cardNumber");
+            if (rawCard == null) rawCard = (String) ((Map<?, ?>) cd).get("last4");
+        }
+        String paymentToken = rawCard != null ? ("tok_" + rawCard.trim()) : "tok_test";
         Map<String, Object> result = paymentService.confirmPayment(userId, intentResult.intentId(), paymentToken);
         
         return ResponseEntity.ok(ApiResponse.ok("Pago procesado exitosamente", result));

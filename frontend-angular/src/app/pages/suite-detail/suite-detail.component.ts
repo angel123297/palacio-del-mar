@@ -144,7 +144,9 @@ export class SuiteDetailComponent implements OnInit {
   }
 
   get totalRoomPrice(): number {
-    return (this.suite?.basePrice || 0) * this.nights;
+    const base = (this.suite?.basePrice || 0) * this.nights;
+    const taxes = Math.round(base * 0.19);
+    return base + taxes;
   }
 
   get totalExperiencesPrice(): number {
@@ -205,11 +207,13 @@ export class SuiteDetailComponent implements OnInit {
 
     const foodOrders = [];
     if (this.wantFood && this.foodType) {
+       const selectedDish = this.foodType === 'other' ? this.customFood : this.foodOptions.find(f => f.id === this.foodType)?.name;
        foodOrders.push({
-          foodName: this.foodType === 'other' ? this.customFood : this.foodOptions.find(f => f.id === this.foodType)?.name,
+          dishName: selectedDish,
+          foodName: selectedDish,
           price: 80000,
           includesBreakfastCombo: this.breakfastCombo,
-          specialInstructions: this.foodType === 'other' ? 'Custom order' : ''
+          specialInstructions: this.foodType === 'other' ? (this.customFood || 'Pedido personalizado') : ''
        });
     }
 

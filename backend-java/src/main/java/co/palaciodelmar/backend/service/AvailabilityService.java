@@ -264,11 +264,34 @@ public class AvailabilityService {
     public List<Promotion> getMonthlyPromotions(int year, int month, String branchId) {
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
-        String resolvedBranchId = null;
         if (branchId != null && !branchId.isEmpty()) {
-            resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
-            return promotionRepository.findByBranchAndActiveTrue(resolvedBranchId);
+            String resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
+            return promotionRepository.findByBranchAndActiveTrue(resolvedBranchId).stream()
+                    .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(endDate)) &&
+                                 (p.getEndDate() == null || !p.getEndDate().isBefore(startDate)))
+                    .toList();
         }
         return promotionRepository.findByActiveTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqual(endDate, startDate);
+    }
+
+    public java.util.Map<String, Object> getPeakDates(int year) {
+        java.util.Map<String, Object> res = new java.util.HashMap<>();
+        List<java.util.Map<String, String>> highSeason = List.of(
+                java.util.Map.of("startDate", year + "-04-01", "endDate", year + "-04-10", "label", "Semana Santa"),
+                java.util.Map.of("startDate", year + "-06-01", "endDate", year + "-08-31", "label", "Vacaciones de Mitad de Año")
+        );
+        List<java.util.Map<String, String>> peakSeason = List.of(
+                java.util.Map.of("startDate", year + "-12-21", "endDate", (year + 1) + "-01-10", "label", "Temporada Pico Fin de Año")
+        );
+        List<String> holidays = List.of(
+                year + "-01-01", year + "-01-06", year + "-03-23", year + "-04-09", year + "-04-10",
+                year + "-05-01", year + "-05-25", year + "-06-15", year + "-06-22", year + "-06-29",
+                year + "-07-20", year + "-08-07", year + "-08-17", year + "-10-12", year + "-11-02",
+                year + "-11-16", year + "-12-08", year + "-12-25"
+        );
+        res.put("highSeason", highSeason);
+        res.put("peakSeason", peakSeason);
+        res.put("holidays", holidays);
+        return res;
     }
 }
