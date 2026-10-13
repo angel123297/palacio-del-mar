@@ -202,10 +202,13 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
     const map: Record<string, any[]> = {};
     const seen = new Set();
     Object.values(this.promoMonths()).flat().forEach(p => {
-      if (seen.has(p.id)) return;
+      if (!p || seen.has(p.id)) return;
       seen.add(p.id);
-      for (let d = p.startDate; d <= p.endDate; d = addDays(d, 1)) {
+      if (!p.startDate || !p.endDate || p.startDate > p.endDate) return;
+      let count = 0;
+      for (let d = p.startDate; d <= p.endDate && count < 366; d = addDays(d, 1)) {
         (map[d] = map[d] || []).push(p);
+        count++;
       }
     });
     return map;

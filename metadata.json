@@ -1,0 +1,7 @@
+{
+  "name": "Palacio del Mar",
+  "description": "Hotel Boutique & Resort 5★ en Cartagena. Reserva de suites de lujo, experiencias exclusivas y atención personalizada con concierge virtual.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

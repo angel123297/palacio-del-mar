@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -29,6 +29,34 @@ import { finalize } from 'rxjs';
           </div>
 
           <div *ngIf="!loading && booking" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 2rem;">
+            
+            <!-- 15-Minute Guaranteed Reservation TTL Countdown -->
+            <div style="background: rgba(201,169,110,0.1); border: 1px solid rgba(201,169,110,0.4); border-radius: 8px; padding: 12px 18px; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.9rem; color: #f5f0e8;">⏱️ <strong>Tiempo restante para pagar tu reserva:</strong></span>
+              <span style="font-family: monospace; font-size: 1.2rem; font-weight: bold; color: var(--gold); letter-spacing: 2px;">{{ timerText }}</span>
+            </div>
+
+            <!-- Partial / Instalment Payment Plan Selection -->
+            <div *ngIf="balanceDue > 0" style="margin-bottom: 1.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(201,169,110,0.3); border-radius: 8px; padding: 1.2rem;">
+              <label style="display: block; color: var(--gold); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.8rem; font-weight: 600;">Plan de Pago</label>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <button type="button" (click)="paymentMode = 'full'" 
+                  [style.border-color]="paymentMode === 'full' ? 'var(--gold)' : 'rgba(255,255,255,0.15)'"
+                  [style.background]="paymentMode === 'full' ? 'rgba(201,169,110,0.15)' : 'rgba(255,255,255,0.02)'"
+                  style="padding: 12px; border-width: 2px; border-style: solid; border-radius: 8px; color: #fff; cursor: pointer; text-align: left; transition: all 0.2s;">
+                  <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 4px;">Pago Total</div>
+                  <div style="color: var(--gold); font-size: 1.1rem; font-weight: 700;">$ {{ balanceDue | number:'1.0-0' }}</div>
+                </button>
+                <button type="button" (click)="paymentMode = 'partial'" 
+                  [style.border-color]="paymentMode === 'partial' ? 'var(--gold)' : 'rgba(255,255,255,0.15)'"
+                  [style.background]="paymentMode === 'partial' ? 'rgba(201,169,110,0.15)' : 'rgba(255,255,255,0.02)'"
+                  style="padding: 12px; border-width: 2px; border-style: solid; border-radius: 8px; color: #fff; cursor: pointer; text-align: left; transition: all 0.2s;">
+                  <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 4px;">Anticipo 50%</div>
+                  <div style="color: var(--gold); font-size: 1.1rem; font-weight: 700;">$ {{ Math.round(balanceDue / 2) | number:'1.0-0' }}</div>
+                </button>
+              </div>
+            </div>
+
             <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.3rem; border-bottom: 1px solid rgba(212,175,55,0.2); padding-bottom: 0.5rem;">Elige tu método de pago</h3>
 
             <!-- Payment Method Selector -->
@@ -96,7 +124,7 @@ import { finalize } from 'rxjs';
               </div>
 
               <button type="submit" [disabled]="processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                <span *ngIf="!processing">Pagar $ {{ (booking.balanceDue != null ? booking.balanceDue : booking.totalPrice) | number:'1.0-0' }}</span>
+                <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   Autorizando transacción... <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
                 </span>
@@ -125,7 +153,7 @@ import { finalize } from 'rxjs';
               </div>
 
               <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                <span *ngIf="!processing">Ir al Banco a pagar $ {{ (booking.balanceDue != null ? booking.balanceDue : booking.totalPrice) | number:'1.0-0' }}</span>
+                <span *ngIf="!processing">Ir al Banco a pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   Conectando con el banco... <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
                 </span>
@@ -139,7 +167,7 @@ import { finalize } from 'rxjs';
                 <p style="color: #ccc; margin-bottom: 2rem;">Paga de forma rápida y segura con tu cuenta de PayPal.</p>
                 
                 <button type="button" (click)="processPayPal()" [disabled]="processing" style="background: #ffc439; color: #000; border: none; border-radius: 24px; padding: 12px 30px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 250px;">
-                  <span *ngIf="!processing">Pagar con PayPal</span>
+                  <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }} con PayPal</span>
                   <span *ngIf="processing">Abriendo PayPal...</span>
                 </button>
               </div>
@@ -221,9 +249,13 @@ import { finalize } from 'rxjs';
                </div>
              </div>
 
+             <div *ngIf="booking.paidAmount && booking.paidAmount > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.95rem;">
+               <span style="color: #2ecc71;">Abonado previamente</span>
+               <span style="color: #2ecc71; font-weight: bold;">-$ {{ booking.paidAmount | number:'1.0-0' }}</span>
+             </div>
              <div style="border-top: 2px solid rgba(212,175,55,0.3); padding-top: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-               <span style="font-size: 1.2rem; color: #fff; font-weight: bold;">Total a Pagar</span>
-               <span style="font-size: 1.8rem; font-weight: 800; color: var(--gold);">$ {{ booking.totalPrice | number:'1.0-0' }}</span>
+               <span style="font-size: 1.2rem; color: #fff; font-weight: bold;">Total a Pagar Ahora</span>
+               <span style="font-size: 1.8rem; font-weight: 800; color: var(--gold);">$ {{ paymentAmount | number:'1.0-0' }}</span>
              </div>
              
              <div style="margin-top: 2rem; text-align: center; color: #666; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -236,7 +268,8 @@ import { finalize } from 'rxjs';
     </div>
   `
 })
-export class CheckoutComponent implements OnInit {
+export class CheckoutComponent implements OnInit, OnDestroy {
+  Math = Math;
   bookingId: string | null = null;
   booking: Booking | null = null;
   loading = true;
@@ -246,7 +279,25 @@ export class CheckoutComponent implements OnInit {
   selectedMethod: 'CARD' | 'PSE' | 'PAYPAL' = 'CARD';
   pseBank: string = '';
 
+  paymentMode: 'full' | 'partial' = 'full';
+  timerText: string = '15:00';
+  timerSeconds: number = 900;
+  timerInterval: any = null;
+
   paymentForm: FormGroup;
+
+  get balanceDue(): number {
+    if (!this.booking) return 0;
+    if (this.booking.balanceDue !== undefined) return this.booking.balanceDue;
+    return Math.max(0, this.booking.totalPrice - (this.booking.paidAmount || 0));
+  }
+
+  get paymentAmount(): number {
+    if (this.paymentMode === 'partial') {
+      return Math.round(this.balanceDue / 2);
+    }
+    return this.balanceDue;
+  }
 
   constructor(
     private route: ActivatedRoute,
@@ -284,12 +335,15 @@ export class CheckoutComponent implements OnInit {
       next: (res) => {
         const raw = res.data || res;
         this.booking = raw as Booking;
-        if (this.booking && this.booking.status === 'confirmed') {
+        if (this.booking && (this.booking.balanceDue === 0 || this.booking.paymentStatus === 'paid')) {
           this.booking = null; 
-        } else if (this.booking && !this.booking.nights) {
-           const d1 = new Date(this.booking.checkIn);
-           const d2 = new Date(this.booking.checkOut);
-           this.booking.nights = Math.max(1, Math.ceil((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24)));
+        } else if (this.booking) {
+          if (!this.booking.nights) {
+            const d1 = new Date(this.booking.checkIn);
+            const d2 = new Date(this.booking.checkOut);
+            this.booking.nights = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24)));
+          }
+          this.initTimer();
         }
         this.cdr.detectChanges();
       },
@@ -298,6 +352,40 @@ export class CheckoutComponent implements OnInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  initTimer() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    if (this.booking?.expiresAt) {
+      const exp = new Date(this.booking.expiresAt).getTime();
+      const diff = Math.floor((exp - Date.now()) / 1000);
+      this.timerSeconds = diff > 0 ? diff : 0;
+    } else {
+      this.timerSeconds = 900;
+    }
+    this.updateTimerText();
+
+    this.timerInterval = setInterval(() => {
+      if (this.timerSeconds > 0) {
+        this.timerSeconds--;
+        this.updateTimerText();
+        this.cdr.detectChanges();
+      } else {
+        clearInterval(this.timerInterval);
+        this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+        this.cdr.detectChanges();
+      }
+    }, 1000);
+  }
+
+  updateTimerText() {
+    const mins = Math.floor(this.timerSeconds / 60);
+    const secs = this.timerSeconds % 60;
+    this.timerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  ngOnDestroy() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
   }
 
   formatCardNumber(event: Event) {
@@ -378,7 +466,8 @@ export class CheckoutComponent implements OnInit {
 
     const payload = {
       bookingId: targetBookingId,
-      amount: currentBooking.totalPrice,
+      amount: this.paymentAmount,
+      paymentMode: this.paymentMode,
       ...methodPayload
     };
 

@@ -171,7 +171,8 @@ export class RoomsSectionComponent implements OnInit {
   get visibleSuites(): Suite[] {
     return this.suites.filter(s => {
       if (this.selectedBranch) {
-        const bSlug = s.branch?.slug || '';
+        const branchObj = typeof s.branch === 'object' && s.branch ? s.branch : this.branches.find(b => b.id === (s.branchId || s.branch) || b.slug === (s.branchId || s.branch));
+        const bSlug = branchObj?.slug || (typeof s.branch === 'string' ? s.branch : '') || '';
         if (bSlug !== this.selectedBranch) return false;
       }
       if (this.selectedType) {
@@ -181,7 +182,8 @@ export class RoomsSectionComponent implements OnInit {
     });
   }
 
-  getShortBranch(name: string): string {
+  getShortBranch(name?: string): string {
+    if (!name || typeof name !== 'string') return '';
     return name.replace(/^Palacio del Mar\s*·\s*/i, '');
   }
 }

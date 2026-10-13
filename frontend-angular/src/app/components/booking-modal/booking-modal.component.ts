@@ -158,7 +158,7 @@ export class BookingModalComponent implements OnChanges {
     const d1 = new Date(this.checkIn);
     const d2 = new Date(this.checkOut);
     const diffTime = Math.abs(d2.getTime() - d1.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     this.nights = diffDays > 0 ? diffDays : 1;
 
     const base = this.suite?.basePrice || this.suite?.pricePerNight || 450000;
@@ -220,19 +220,21 @@ export class BookingModalComponent implements OnChanges {
     this.api.post<any>('/bookings', payload).pipe(
       finalize(() => {
         this.submitting = false;
+        this.cdr.detectChanges();
       })
     ).subscribe({
       next: (res) => {
-        if (this.auth.isLoggedIn()) {
-          this.close();
+        const targetId = res?.data?.id || res?.data?._id;
+        this.close();
+        if (targetId) {
+          this.router.navigate(['/checkout', targetId]);
+        } else if (this.auth.isLoggedIn()) {
           this.router.navigate(['/mis-reservas']);
-          return;
         }
-        const code = res?.data?.bookingCode;
-        this.successMessage = `¡Reserva creada!${code ? ' Código: ' + code + '.' : ''} Guarda este código para consultar tu reserva.`;
       },
       error: (err) => {
         this.errorMessage = this.friendlyError(err);
+        this.cdr.detectChanges();
       }
     });
   }

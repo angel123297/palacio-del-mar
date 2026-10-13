@@ -65,8 +65,34 @@ import { finalize } from 'rxjs';
               <a [routerLink]="['/reservas', booking.id || booking._id]" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Ver Detalles</a>
               <a *ngIf="booking.status === 'pending'" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Pagar</a>
               <a *ngIf="booking.status === 'confirmed'" [routerLink]="['/reservas', booking.id || booking._id, 'comprobante']" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #2ecc71; color: #2ecc71; text-decoration: none;">Ver Factura</a>
+              <button *ngIf="booking.status === 'confirmed' || booking.status === 'pending'" (click)="openCancelModal(booking)" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #e74c3c; color: #e74c3c; background: transparent; cursor: pointer;">Cancelar</button>
             </div>
             <p *ngIf="payError && (payingId === booking.id || payingId === booking._id)" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">{{ payError }}</p>
+          </div>
+        </div>
+
+        <!-- Cancellation Policy Modal -->
+        <div *ngIf="selectedCancelBooking" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
+          <div style="background: #111; border: 1px solid #c9a96e; border-radius: 12px; max-width: 500px; width: 100%; padding: 2rem; color: #f5f0e8;">
+            <h3 style="font-family: var(--font-title); font-size: 1.5rem; color: #c9a96e; margin-top: 0; margin-bottom: 1rem;">Confirmar Cancelación</h3>
+            <p style="font-size: 0.95rem; line-height: 1.5; color: #ccc; margin-bottom: 1.2rem;">
+              Estás a punto de cancelar tu reserva en <strong>{{ selectedCancelBooking.suite?.name || 'Palacio del Mar' }}</strong> (Código: {{ selectedCancelBooking.bookingCode }}).
+            </p>
+            <div style="background: rgba(201,169,110,0.08); border: 1px solid rgba(201,169,110,0.3); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.9rem;">
+              <p style="margin: 0 0 6px 0; color: #c9a96e; font-weight: 600;">Política de Devolución Aplicable:</p>
+              <p style="margin: 0 0 8px 0; color: #ddd;">{{ cancelRefundInfo }}</p>
+              <div style="display: flex; justify-content: space-between; font-size: 1rem; font-weight: 700; color: #fff; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+                <span>Monto a Reembolsar:</span>
+                <span style="color: #2ecc71;">$ {{ cancelRefundAmount | number:'1.0-0' }} COP</span>
+              </div>
+            </div>
+            <p *ngIf="cancelError" style="color: #ff4d4d; font-size: 0.85rem; margin-bottom: 1rem; background: rgba(231,76,60,0.1); padding: 8px; border-radius: 6px;">{{ cancelError }}</p>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+              <button (click)="closeCancelModal()" [disabled]="cancelling" style="padding: 10px 18px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #ccc; border-radius: 6px; cursor: pointer;">Volver</button>
+              <button (click)="confirmCancellation()" [disabled]="cancelling" style="padding: 10px 18px; background: #e74c3c; border: none; color: #fff; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                {{ cancelling ? 'Cancelando...' : 'Confirmar Cancelación' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -79,6 +105,11 @@ export class MyBookingsComponent implements OnInit {
   payingId: string | null = null;
   payError: string = '';
 
+  selectedCancelBooking: Booking | null = null;
+  cancelling = false;
+  cancelRefundInfo = '';
+  cancelRefundAmount = 0;
+
   constructor(
     private api: ApiService,
     private auth: AuthService,
@@ -87,66 +118,52 @@ export class MyBookingsComponent implements OnInit {
     public loyalty: LoyaltyService
   ) {}
 
-  printInvoice(booking: any) {
-    const w = window.open('', '_blank');
-    if (w) {
-      w.document.write(`
-        <html>
-        <head>
-          <title>Factura - ${booking.bookingCode || booking.id}</title>
-          <style>
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; padding: 40px; }
-            .header { text-align: center; margin-bottom: 40px; }
-            h1 { color: #d4af37; margin: 0; }
-            .details { margin-bottom: 30px; }
-            .details table { width: 100%; border-collapse: collapse; }
-            .details th, .details td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
-            .total { text-align: right; font-size: 1.5em; font-weight: bold; margin-top: 30px; color: #d4af37; }
-            @media print {
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="no-print" style="margin-bottom: 20px;">
-            <button onclick="window.print()" style="padding: 10px 20px; background: #d4af37; color: white; border: none; cursor: pointer; font-size: 16px;">Imprimir PDF</button>
-          </div>
-          <div class="header">
-            <h1>Palacio del Mar</h1>
-            <p>Factura de Reserva</p>
-          </div>
-          <div class="details">
-            <table>
-              <tr><th>Reserva ID</th><td>${booking.bookingCode || booking.id || booking._id}</td></tr>
-              <tr><th>Suite</th><td>${booking.suite?.name || 'Suite de Lujo'}</td></tr>
-              <tr><th>Llegada</th><td>${new Date(booking.checkIn).toLocaleDateString()}</td></tr>
-              <tr><th>Salida</th><td>${new Date(booking.checkOut).toLocaleDateString()}</td></tr>
-              <tr><th>Estado</th><td>Pagado (Confirmada)</td></tr>
-            </table>
-          </div>
-          <div class="total">
-            Total Pagado: $ ${booking.totalPrice.toLocaleString('es-CO')}
-          </div>
-          <p style="margin-top: 50px; text-align: center; color: #888; font-size: 0.9em;">Gracias por su preferencia.</p>
-        </body>
-        </html>
-      `);
-      w.document.close();
+  openCancelModal(b: Booking): void {
+    this.selectedCancelBooking = b;
+    const now = Date.now();
+    const cIn = new Date(b.checkIn).getTime();
+    const diffDays = (cIn - now) / (1000 * 60 * 60 * 24);
+    const paid = b.paidAmount || b.totalPrice || 0;
+
+    if (diffDays > 7) {
+      this.cancelRefundAmount = paid;
+      this.cancelRefundInfo = 'Reembolso total del 100% sin retención por anticipación superior a 7 días.';
+    } else {
+      this.cancelRefundAmount = Math.round(paid * 0.9);
+      this.cancelRefundInfo = 'Reembolso del 90% con 10% de retención por gastos operativos al cancelar con 7 días o menos.';
     }
   }
 
-  payBooking(booking: any): void {
-    const id = booking.id || booking._id;
-    this.router.navigate(['/checkout', id]);
+  cancelError = '';
+
+  closeCancelModal(): void {
+    this.selectedCancelBooking = null;
+    this.cancelling = false;
+    this.cancelError = '';
   }
 
-  ngOnInit(): void {
-    if (!this.auth.isLoggedIn()) {
-      this.loading = false;
-      this.cdr.detectChanges();
-      return;
-    }
+  confirmCancellation(): void {
+    if (!this.selectedCancelBooking) return;
+    this.cancelling = true;
+    this.cancelError = '';
+    const id = this.selectedCancelBooking.id || this.selectedCancelBooking._id;
 
+    this.api.post<any>(`/bookings/${id}/cancel`, { reason: 'Cancelación voluntaria del huésped' }).subscribe({
+      next: () => {
+        this.cancelling = false;
+        this.selectedCancelBooking = null;
+        this.fetchMyBookings();
+      },
+      error: (err) => {
+        this.cancelling = false;
+        this.cancelError = err?.error?.message || 'Error al cancelar la reserva';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  fetchMyBookings(): void {
+    this.loading = true;
     this.api.get<any>('/bookings').pipe(
       finalize(() => {
         this.loading = false;
@@ -162,5 +179,32 @@ export class MyBookingsComponent implements OnInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  printInvoice(booking: any) {
+    const id = booking?.id || booking?._id;
+    if (id) {
+      this.router.navigate(['/reservas', id, 'comprobante']);
+    } else {
+      window.print();
+    }
+  }
+
+  payBooking(booking: any): void {
+    const id = booking.id || booking._id;
+    this.router.navigate(['/checkout', id]);
+  }
+
+  ngOnInit(): void {
+    if (!this.auth.isLoggedIn()) {
+      this.loading = false;
+      this.cdr.detectChanges();
+      return;
+    }
+    this.fetchMyMyBookings();
+  }
+
+  private fetchMyMyBookings(): void {
+    this.fetchMyBookings();
   }
 }
