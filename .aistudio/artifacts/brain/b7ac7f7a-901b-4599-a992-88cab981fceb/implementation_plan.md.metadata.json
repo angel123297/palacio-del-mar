@@ -1,6 +1,0 @@
-{
-  "summary": "Validación de negocio y plan para el Módulo de Promociones Temporales por Rango de Fechas (Admin & Host):\n- Validación de lógica de negocio: Confirmación formal de que las promociones por rango de fechas son la herramienta principal de Revenue Management hotelero para contrarrestar valles de ocupación.\n- Gobernanza de roles: El Administrador puede crear promociones globales o por sede; el Anfitrión puede crear promociones específicas para las sedes que gestiona.\n- Estructura de la promoción: Título atractivo/descriptivo, rango de fechas (`startDate` a `endDate`), porcentaje de descuento (5% a 50%) y sede asignada.\n- Reflejo automático: Impacto inmediato en el selector de fechas (`date-range-picker`) con badge de promoción y descuento automático en el checkout.\n- Hoja de ruta técnica de integración en backend y frontend.",
-  "updatedAt": "2026-10-13T02:06:17.370761666Z",
-  "requestFeedback": true,
-  "userFacing": true
-}
