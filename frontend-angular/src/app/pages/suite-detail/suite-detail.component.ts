@@ -35,6 +35,8 @@ export class SuiteDetailComponent implements OnInit {
 
   // Step 3: VIP Services
   airportPickup = false;
+  petFriendly = false;
+  needsCrib = false;
   wantFood = false;
   foodType = '';
   customFood = '';
@@ -156,6 +158,7 @@ export class SuiteDetailComponent implements OnInit {
   get totalVipPrice(): number {
     let total = 0;
     if (this.airportPickup) total += 150000;
+    if (this.petFriendly) total += 80000;
     if (this.wantFood && this.foodType) {
       total += 80000;
       if (this.breakfastCombo) total += 35000;
@@ -223,6 +226,8 @@ export class SuiteDetailComponent implements OnInit {
       checkOut: this.checkOut,
       guests: Number(this.guests),
       airportPickup: this.airportPickup,
+      petFriendly: this.petFriendly,
+      needsCrib: this.needsCrib,
       foodOrders: foodOrders,
       experiences: this.selectedExperiences.map(e => e.exp.id),
       guestName: this.guestName,

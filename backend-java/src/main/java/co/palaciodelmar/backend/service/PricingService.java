@@ -35,7 +35,7 @@ public class PricingService {
         // Descuentos: se aplica el mayor entre promoción y larga estadía
         BigDecimal longStayDiscountPercent = BigDecimal.ZERO;
         if (nights >= 7) {
-            longStayDiscountPercent = new BigDecimal("0.10"); // 10%
+            longStayDiscountPercent = new BigDecimal("0.05"); // 5%
         } else if (nights >= 5) {
             longStayDiscountPercent = new BigDecimal("0.05"); // 5%
         }

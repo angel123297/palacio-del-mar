@@ -29,6 +29,7 @@ public class BookingDTO {
     private Integer nights;
     private Integer guests;
     private Integer children;
+    private Boolean needsCrib;
 
     private String guestName;
     private String guestEmail;
@@ -47,6 +48,8 @@ public class BookingDTO {
 
     private String status;
     private String paymentStatus;
+    private BigDecimal guaranteeDeposit;
+    private Boolean guaranteeRefunded;
     private String bookingCode;
     private Boolean isModifiable;
     private Boolean isCancelable;
@@ -55,9 +58,11 @@ public class BookingDTO {
     private Booking.GuestDetails guestDetails;
     private List<Booking.SelectedExperience> experiences;
     private Boolean airportPickup;
+    private Boolean petFriendly;
     private List<Booking.FoodOrder> foodOrders;
 
     private String cancellationReason;
+    private String notes;
     private String appliedPromotionId;
     private String appliedPromotionName;
     private BigDecimal appliedPromotionDiscountPercent;
