@@ -1,0 +1,41 @@
+
+> palacio-del-mar-web@0.0.0 start
+> ng serve
+
+❯ Building...
+✔ Building...
+Initial chunk files | Names                     |  Raw size
+styles.css          | styles                    | 104.91 kB |
+chunk-NYA5RIXU.js   | -                         |  36.84 kB |
+main.js             | main                      |  29.05 kB |
+chunk-JC5VB6WM.js   | -                         |   3.27 kB |
+chunk-EVSPGG2W.js   | -                         |   1.69 kB |
+chunk-DWQLAT27.js   | -                         | 215 bytes |
+polyfills.js        | polyfills                 | 144 bytes |
+
+                    | Initial total             | 176.12 kB
+
+Lazy chunk files    | Names                     |  Raw size
+chunk-AR7LR6AJ.js   | home-component            | 147.72 kB |
+chunk-YKCMZO2L.js   | checkout                  |  73.23 kB |
+chunk-UMUKYKIZ.js   | -                         |  73.01 kB |
+chunk-4LUY467S.js   | suite-detail-component    |  72.75 kB |
+chunk-UTWFOQZS.js   | admin-dashboard-component |  65.69 kB |
+chunk-6TJUADOK.js   | host-dashboard-component  |  64.05 kB |
+chunk-OORKE4EJ.js   | my-bookings-component     |  32.21 kB |
+chunk-TKLGLWCC.js   | booking-detail-component  |  30.89 kB |
+chunk-IUK5E4UN.js   | profile                   |  25.38 kB |
+chunk-XDBLYRQ2.js   | receipt-component         |  23.39 kB |
+chunk-IRXMGQUX.js   | search-component          |  17.67 kB |
+chunk-FQZ7STQN.js   | calendar                  |  15.40 kB |
+chunk-EG56CTPJ.js   | verify-email              |  11.76 kB |
+chunk-RX3LJR6L.js   | not-found-component       |   4.24 kB |
+chunk-Q37SOG5D.js   | -                         |   3.63 kB |
+...and 2 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [6.281 seconds] - 2026-10-13T23:08:09.899Z
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+  ➜  Local:   http://localhost:4200/
+11:08:11 PM [vite] (client) [optimizer] bundling dependencies...
