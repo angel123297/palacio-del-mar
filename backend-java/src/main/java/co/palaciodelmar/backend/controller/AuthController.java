@@ -26,6 +26,10 @@ public class AuthController {
     @org.springframework.beans.factory.annotation.Value("${security.cookie.secure:false}")
     private boolean cookieSecure;
 
+    // SOLO DESARROLLO: permite verificar un correo sin el enlace. Apagado por defecto.
+    @org.springframework.beans.factory.annotation.Value("${app.dev.force-verify.enabled:false}")
+    private boolean forceVerifyEnabled;
+
     private void addJwtCookie(jakarta.servlet.http.HttpServletResponse response, String token, jakarta.servlet.http.HttpServletRequest request) {
         boolean isSecure = cookieSecure || (request != null && (request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"))));
         jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie("jwt", token);
@@ -83,6 +87,12 @@ public class AuthController {
 
     @PostMapping("/force-verify")
     public ResponseEntity<Map<String, Object>> forceVerify(@RequestBody Map<String, String> body) {
+        if (!forceVerifyEnabled) {
+            Map<String, Object> notFound = new HashMap<>();
+            notFound.put("success", false);
+            notFound.put("message", "No encontrado");
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND).body(notFound);
+        }
         String email = body != null ? body.get("email") : null;
         if (email == null || email.trim().isEmpty()) {
             throw new IllegalArgumentException("Email es requerido");
