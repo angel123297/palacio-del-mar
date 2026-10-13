@@ -30,7 +30,10 @@ public class BookingExpiryScheduler {
     @Scheduled(fixedRateString = "${booking.expiry.check.interval.ms:60000}")
     public void cleanupExpiredBookings() {
         Instant now = Instant.now();
-        List<Booking> expiredBookings = bookingRepository.findByStatusAndExpiresAtBeforeAndPaidAmount("pending", now, java.math.BigDecimal.ZERO);
+        // Se filtra en Java: una consulta por paidAmount == 0 no encuentra documentos con paidAmount nulo o con otra escala (0.00).
+        List<Booking> expiredBookings = bookingRepository.findByStatusAndExpiresAtBefore("pending", now).stream()
+                .filter(b -> b.getPaidAmount() == null || b.getPaidAmount().signum() <= 0)
+                .toList();
 
         if (expiredBookings.isEmpty()) {
             return;

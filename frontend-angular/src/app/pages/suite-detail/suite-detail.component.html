@@ -199,7 +199,8 @@
             <span style="color: #fff; margin-right: 15px;">Total Estimado:</span>
             <span style="color: var(--gold);">$ {{grandTotal | number:'1.0-0'}}</span>
           </div>
-          <p style="color: #888; font-size: 0.85rem; margin-top: 1rem;">Podrás revisar el desglose detallado en el Centro de Pago.</p>
+          <p style="color: #888; font-size: 0.85rem; margin-top: 1rem;">Incluye un depósito de garantía reembolsable de $ {{guaranteeDeposit | number:'1.0-0'}}<span *ngIf="extraGuestsFee > 0"> y $ {{extraGuestsFee | number:'1.0-0'}} por huéspedes adicionales</span>.</p>
+          <p style="color: #888; font-size: 0.85rem; margin-top: 0.5rem;">Podrás revisar el desglose detallado en el Centro de Pago.</p>
         </div>
 
         <!-- Auth Check & Redirect -->

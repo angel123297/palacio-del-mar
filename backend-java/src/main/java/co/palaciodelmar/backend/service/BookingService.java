@@ -97,17 +97,7 @@ public class BookingService {
         }
 
         List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
-        if (Boolean.TRUE.equals(request.getNeedsCrib())) {
-            // Validar stock global de cunas (ej. Max 5 en toda la app)
-            long cribsInUse = bookingRepository.findByStatusIn(List.of("confirmed", "checked_in", "pending")).stream()
-                    .filter(b -> Boolean.TRUE.equals(b.getNeedsCrib()) &&
-                            !b.getCheckOut().isBefore(request.getCheckIn()) &&
-                            !b.getCheckIn().isAfter(request.getCheckOut()))
-                    .count();
-            if (cribsInUse >= 5) {
-                throw new IllegalArgumentException("Lo sentimos, no hay stock físico de cunas disponible para estas fechas.");
-            }
-        }
+        assertCribAvailable(request, null);
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
         int assignedSlot = -1;
@@ -149,7 +139,7 @@ public class BookingService {
 
         BigDecimal vipExtrasTotal = BigDecimal.ZERO;
         if (Boolean.TRUE.equals(request.getPetFriendly())) {
-            vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
+            vipExtrasTotal = vipExtrasTotal.add(PET_FEE);
         }
         if (Boolean.TRUE.equals(request.getAirportPickup())) {
             vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("150000"));
@@ -167,24 +157,19 @@ public class BookingService {
             }
         }
 
-        BigDecimal extraGuestTotal = BigDecimal.ZERO;
-        if (request.getGuests() != null && request.getGuests() > 2) {
-            int extraGuests = request.getGuests() - 2;
-            extraGuestTotal = new BigDecimal("120000").multiply(BigDecimal.valueOf(extraGuests)).multiply(BigDecimal.valueOf(nights));
-        }
+        BigDecimal extraGuestTotal = extraGuestFee(request.getGuests(), nights);
 
         BigDecimal totalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal).add(extraGuestTotal);
         // RN-F01: Deposito de Garantia Simulado
-        BigDecimal guarantee = new BigDecimal("100000");
+        BigDecimal guarantee = GUARANTEE_DEPOSIT;
         totalPrice = totalPrice.add(guarantee);
         String bookingCode = "PDM-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         Booking.GuestDetails guestDetails = parseGuestDetails(request);
 
-        String promoId = activePromo != null ? activePromo.getId() : null;
-        String promoName = activePromo != null ? activePromo.getTitle() : (nights >= 30 ? "Estadía mensual (10%)" : (nights >= 7 ? "Estadía semanal (5%)" : null));
-        BigDecimal promoDiscountPercent = activePromo != null && activePromo.getDiscountPercent() != null
-                ? BigDecimal.valueOf(activePromo.getDiscountPercent())
-                : (nights >= 30 ? BigDecimal.TEN : (nights >= 7 ? new BigDecimal("5") : BigDecimal.ZERO));
+        AppliedDiscount appliedDiscount = resolveAppliedDiscount(activePromo, nights);
+        String promoId = appliedDiscount.id();
+        String promoName = appliedDiscount.name();
+        BigDecimal promoDiscountPercent = appliedDiscount.percent();
 
         Booking booking = Booking.builder()
                 .user(userId)
@@ -278,17 +263,7 @@ public class BookingService {
         }
 
         List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
-        if (Boolean.TRUE.equals(request.getNeedsCrib())) {
-            // Validar stock global de cunas (ej. Max 5 en toda la app)
-            long cribsInUse = bookingRepository.findByStatusIn(List.of("confirmed", "checked_in", "pending")).stream()
-                    .filter(b -> Boolean.TRUE.equals(b.getNeedsCrib()) &&
-                            !b.getCheckOut().isBefore(request.getCheckIn()) &&
-                            !b.getCheckIn().isAfter(request.getCheckOut()))
-                    .count();
-            if (cribsInUse >= 5) {
-                throw new IllegalArgumentException("Lo sentimos, no hay stock físico de cunas disponible para estas fechas.");
-            }
-        }
+        assertCribAvailable(request, bookingId);
         occupiedNights.removeIf(sn -> bookingId.equals(sn.getBooking()));
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
@@ -329,7 +304,10 @@ public class BookingService {
         }
 
         BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
-        BigDecimal newTotalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal);
+        int effectiveGuests = request.getGuests() != null ? request.getGuests() : (booking.getGuests() != null ? booking.getGuests() : 1);
+        BigDecimal currentDeposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
+        BigDecimal newTotalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal)
+                .add(extraGuestFee(effectiveGuests, nights)).add(currentDeposit);
         booking.setCheckIn(request.getCheckIn());
         booking.setCheckOut(request.getCheckOut());
         booking.setNights((int) nights);
@@ -342,11 +320,10 @@ public class BookingService {
         booking.setDiscount(pricingResult.discount());
         booking.setTaxes(pricingResult.taxes());
         booking.setNightlyPrices(pricingResult.nightlyPrices().stream().map(np -> new Booking.NightlyPrice(np.date(), np.price())).toList());
-        booking.setAppliedPromotionId(activePromo != null ? activePromo.getId() : null);
-        booking.setAppliedPromotionName(activePromo != null ? activePromo.getTitle() : (nights >= 30 ? "Estadía mensual (10%)" : (nights >= 7 ? "Estadía semanal (5%)" : null)));
-        booking.setAppliedPromotionDiscountPercent(activePromo != null && activePromo.getDiscountPercent() != null
-                ? BigDecimal.valueOf(activePromo.getDiscountPercent())
-                : (nights >= 30 ? BigDecimal.TEN : (nights >= 7 ? new BigDecimal("5") : BigDecimal.ZERO)));
+        AppliedDiscount appliedDiscount = resolveAppliedDiscount(activePromo, nights);
+        booking.setAppliedPromotionId(appliedDiscount.id());
+        booking.setAppliedPromotionName(appliedDiscount.name());
+        booking.setAppliedPromotionDiscountPercent(appliedDiscount.percent());
         booking.setTotalPrice(newTotalPrice);
 
         if (booking.getPaidAmount().compareTo(newTotalPrice) >= 0) {
@@ -483,12 +460,15 @@ public class BookingService {
         if (booking.getTotalPrice() == null || booking.getTotalPrice().signum() < 0) {
             throw new IllegalStateException("La reserva no tiene un precio total válido para calcular la retención");
         }
+        // El depósito de garantía no es ingreso: la penalidad se calcula sobre el total sin él.
+        BigDecimal cancelDeposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
+        BigDecimal retentionBase = booking.getTotalPrice().subtract(cancelDeposit).max(BigDecimal.ZERO);
         if (daysUntilCheckIn < 2) {
             // RN-F03 (No-Show estricto < 48 horas): Cancelación tardía con penalidad del 100%.
-            retention = booking.getTotalPrice();
+            retention = retentionBase;
         } else if (daysUntilCheckIn < 7) {
             // Penalidad del 10% si cancela dentro de los 7 días
-            retention = booking.getTotalPrice().multiply(new BigDecimal("0.10")).setScale(2, RoundingMode.HALF_UP);
+            retention = retentionBase.multiply(new BigDecimal("0.10")).setScale(2, RoundingMode.HALF_UP);
         }
         BigDecimal refundAmount = paidAmount.subtract(retention).max(BigDecimal.ZERO).min(paidAmount);
 
@@ -549,7 +529,7 @@ public class BookingService {
         }
         BigDecimal roomTotal = booking.getSubtotal() != null ? booking.getSubtotal().add(booking.getTaxes() != null ? booking.getTaxes() : BigDecimal.ZERO).subtract(booking.getDiscount() != null ? booking.getDiscount() : BigDecimal.ZERO) : BigDecimal.ZERO;
         BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
-        BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal);
+        BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal).add(fixedCharges(booking));
         booking.setTotalPrice(newTotal);
         if (booking.getPaidAmount().compareTo(newTotal) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
@@ -583,7 +563,7 @@ public class BookingService {
         }
         BigDecimal roomTotal = booking.getSubtotal() != null ? booking.getSubtotal().add(booking.getTaxes() != null ? booking.getTaxes() : BigDecimal.ZERO).subtract(booking.getDiscount() != null ? booking.getDiscount() : BigDecimal.ZERO) : BigDecimal.ZERO;
         BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
-        BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal);
+        BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal).add(fixedCharges(booking));
         booking.setTotalPrice(newTotal);
         if (booking.getPaidAmount().compareTo(newTotal) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
@@ -596,8 +576,64 @@ public class BookingService {
         return toDTO(bookingRepository.save(booking));
     }
 
+    private static final int MAX_CRIBS = 5;
+    private static final BigDecimal EXTRA_GUEST_FEE = new BigDecimal("120000");
+    private static final BigDecimal GUARANTEE_DEPOSIT = new BigDecimal("100000");
+    private static final BigDecimal PET_FEE = new BigDecimal("80000");
+
+    private record AppliedDiscount(String id, String name, BigDecimal percent) {}
+
+    /** Misma regla que PricingService: gana el mayor entre la promoción de la sede y la estadía larga. */
+    private AppliedDiscount resolveAppliedDiscount(Promotion promo, long nights) {
+        BigDecimal promoPercent = promo != null && promo.getDiscountPercent() != null
+                ? BigDecimal.valueOf(promo.getDiscountPercent())
+                : BigDecimal.ZERO;
+        BigDecimal longStay = PricingService.longStayPercent(nights);
+        if (promo != null && promoPercent.compareTo(longStay) > 0) {
+            return new AppliedDiscount(promo.getId(), promo.getTitle(), promoPercent);
+        }
+        if (longStay.signum() > 0) {
+            return new AppliedDiscount(null, "Estadía larga (" + longStay.stripTrailingZeros().toPlainString() + "%)", longStay);
+        }
+        return new AppliedDiscount(null, null, BigDecimal.ZERO);
+    }
+
+    private BigDecimal extraGuestFee(Integer guests, long nights) {
+        if (guests == null || guests <= 2 || nights <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return EXTRA_GUEST_FEE.multiply(BigDecimal.valueOf(guests - 2)).multiply(BigDecimal.valueOf(nights));
+    }
+
+    /** Cargos fijos de una reserva ya creada: huéspedes extra + depósito de garantía. */
+    private BigDecimal fixedCharges(Booking booking) {
+        BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
+        long nights = booking.getNights() != null ? booking.getNights() : 0;
+        return extraGuestFee(booking.getGuests(), nights).add(deposit);
+    }
+
+    /** Cunas: tope global de 5. Solapamiento estricto (check-out = check-in no cuenta) y excluye la propia reserva. */
+    private void assertCribAvailable(BookingRequest request, String excludeBookingId) {
+        if (!Boolean.TRUE.equals(request.getNeedsCrib())) {
+            return;
+        }
+        long cribsInUse = bookingRepository.findByStatusIn(List.of("confirmed", "checked_in", "pending")).stream()
+                .filter(b -> Boolean.TRUE.equals(b.getNeedsCrib())
+                        && (excludeBookingId == null || !excludeBookingId.equals(b.getId()))
+                        && b.getCheckIn() != null && b.getCheckOut() != null
+                        && b.getCheckIn().isBefore(request.getCheckOut())
+                        && b.getCheckOut().isAfter(request.getCheckIn()))
+                .count();
+        if (cribsInUse >= MAX_CRIBS) {
+            throw new IllegalArgumentException("Lo sentimos, no hay stock físico de cunas disponible para estas fechas.");
+        }
+    }
+
     private BigDecimal calculateVipExtrasTotal(Booking booking) {
         BigDecimal vipExtrasTotal = BigDecimal.ZERO;
+        if (Boolean.TRUE.equals(booking.getPetFriendly())) {
+            vipExtrasTotal = vipExtrasTotal.add(PET_FEE);
+        }
         if (Boolean.TRUE.equals(booking.getAirportPickup())) {
             vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("150000"));
         }
