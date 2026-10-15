@@ -43,7 +43,7 @@ class PaymentWebhookServiceTest {
         bookingService = mock(BookingService.class);
         processedWebhookEventRepository = mock(ProcessedWebhookEventRepository.class);
         emailService = mock(EmailService.class);
-        objectMapper = new ObjectMapper();
+        objectMapper = new ObjectMapper().findAndRegisterModules();
 
         webhookService = new PaymentWebhookService(
                 paymentRepository,

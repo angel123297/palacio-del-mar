@@ -28,7 +28,7 @@ class SimulatedPaymentGatewayTest {
     void setUp() {
         paymentIntentRepository = mock(PaymentIntentRepository.class);
         paymentWebhookService = mock(PaymentWebhookService.class);
-        objectMapper = new ObjectMapper();
+        objectMapper = new ObjectMapper().findAndRegisterModules();
 
         gateway = new SimulatedPaymentGateway(
                 paymentIntentRepository,

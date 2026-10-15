@@ -7,7 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 
 @Data
 @Builder
@@ -18,7 +17,7 @@ public class PaymentWebhookPayload {
 
     private String eventId;
     private String eventType;
-    private Instant timestamp;
+    private String timestamp;
     private PaymentWebhookData data;
 
     @Data
