@@ -38,10 +38,11 @@ public class WebhookDispatcher {
     @Value("${palacio.webhooks.retry.backoff-attempt-3:1800}")
     private long backoffAttempt3Seconds = 1800; // 30 minutos por defecto
 
+    @org.springframework.beans.factory.annotation.Autowired
     public WebhookDispatcher(
             WebhookSubscriptionRepository subscriptionRepository,
             WebhookDeliveryRepository deliveryRepository,
-            ObjectMapper objectMapper
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper
     ) {
         this(subscriptionRepository, deliveryRepository, objectMapper, null);
     }
