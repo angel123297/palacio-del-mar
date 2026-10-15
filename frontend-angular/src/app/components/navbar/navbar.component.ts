@@ -20,9 +20,6 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
         <div class="nav-links">
           <button class="nav-link-btn" (click)="scrollTo('#habitaciones')">Suites</button>
           <a routerLink="/calendario" class="nav-link-btn" style="text-decoration: none;">Calendario</a>
-          <button class="nav-link-btn" (click)="scrollTo('#experiencias')">Experiencias</button>
-          <button class="nav-link-btn" (click)="scrollTo('#dining')">Gastronomía</button>
-          <button class="nav-link-btn" (click)="scrollTo('#spa')">Spa</button>
           <button class="nav-link-btn" (click)="scrollTo('#location')">Ubicación</button>
         </div>
 

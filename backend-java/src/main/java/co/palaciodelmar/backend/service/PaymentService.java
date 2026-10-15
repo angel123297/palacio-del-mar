@@ -5,11 +5,8 @@ import co.palaciodelmar.backend.dto.PaymentDTO;
 import co.palaciodelmar.backend.dto.PaymentRequest;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Payment;
-import co.palaciodelmar.backend.model.Suite;
-import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.repository.PaymentRepository;
-import co.palaciodelmar.backend.repository.SuiteRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,9 +24,7 @@ public class PaymentService {
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
     private final PaymentGateway paymentGateway;
-    private final EmailNotificationService emailNotificationService;
-    private final WhatsAppService whatsAppService;
-    private final SuiteRepository suiteRepository;
+    private final EmailService emailService;
     private final UserRepository userRepository;
 
     public Map<String, Object> getPaymentConfig() {
@@ -173,10 +168,7 @@ public class PaymentService {
         Payment savedPayment = paymentRepository.save(payment);
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
-             emailNotificationService.sendBookingConfirmation(updatedBooking);
-             Suite suite = updatedBooking.getSuite() != null ? suiteRepository.findById(updatedBooking.getSuite()).orElse(null) : null;
-             User guest = updatedBooking.getUser() != null ? userRepository.findById(updatedBooking.getUser()).orElse(null) : null;
-             whatsAppService.sendBookingConfirmation(updatedBooking, guest, suite);
+             emailService.sendBookingConfirmation(updatedBooking);
         }
 
         java.util.Map<String, Object> returnMap = new java.util.HashMap<>();

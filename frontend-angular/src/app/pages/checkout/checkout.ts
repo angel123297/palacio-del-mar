@@ -3,8 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
-import { Booking } from '../../models/types';
-import { finalize } from 'rxjs';
+import { finalize, switchMap } from 'rxjs';
 
 @Component({
   selector: 'app-checkout',
@@ -469,14 +468,23 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const currentBooking = this.booking;
     const targetBookingId = currentBooking.id || currentBooking._id || this.bookingId;
 
-    const payload = {
+    const rawNumber = methodPayload.cardNumber || '';
+    const paymentToken = rawNumber ? `tok_${rawNumber.trim()}` : 'tok_test';
+
+    const checkoutPayload = {
       bookingId: targetBookingId,
-      amount: this.paymentAmount,
-      paymentMode: this.paymentMode,
-      ...methodPayload
+      method: (methodPayload.method === 'CREDIT_CARD' || !methodPayload.method) ? 'card' : methodPayload.method.toLowerCase()
     };
 
-    this.api.post<any>('/payments/process', payload).pipe(
+    this.api.post<any>('/payments/checkout', checkoutPayload).pipe(
+      switchMap((intentRes: any) => {
+        const intentData = intentRes.data || intentRes;
+        const intentId = intentData.intentId || intentData.id;
+        return this.api.post<any>('/payments/confirm', {
+          intentId,
+          paymentToken
+        });
+      }),
       finalize(() => {
         this.processing = false;
         this.cdr.detectChanges();
