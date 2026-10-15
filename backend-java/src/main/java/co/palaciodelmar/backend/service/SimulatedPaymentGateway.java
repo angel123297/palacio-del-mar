@@ -51,7 +51,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     ) {
         this.paymentIntentRepository = paymentIntentRepository;
         this.paymentWebhookService = paymentWebhookService;
-        this.objectMapper = objectMapper;
+        this.objectMapper = objectMapper != null ? objectMapper.copy().findAndRegisterModules() : new ObjectMapper().findAndRegisterModules();
         this.scheduler = Executors.newScheduledThreadPool(2);
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(3))
@@ -163,7 +163,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
             PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
                     .eventId(eventId)
                     .eventType(eventType)
-                    .timestamp(Instant.now())
+                    .timestamp(Instant.now().toString())
                     .data(PaymentWebhookPayload.PaymentWebhookData.builder()
                             .intentId(intentId)
                             .bookingId(intent.getBookingId())
@@ -252,7 +252,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
                 .eventId(eventId)
                 .eventType("refund.processed")
-                .timestamp(Instant.now())
+                .timestamp(Instant.now().toString())
                 .data(PaymentWebhookPayload.PaymentWebhookData.builder()
                         .intentId(intent.getId())
                         .bookingId(intent.getBookingId())
