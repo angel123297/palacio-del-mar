@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/force-verify").permitAll()
                         .requestMatchers("/api/auth/profile", "/api/auth/change-password").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/branches/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/suites/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/suites/calculate-price").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/experiences/**").permitAll()
