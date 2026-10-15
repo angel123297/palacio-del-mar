@@ -192,3 +192,36 @@ export interface DashboardMetricsDTO {
   totalSuites?: number;
 }
 
+export interface WebhookSubscription {
+  id: string;
+  propertyId: string;
+  ownerId?: string;
+  url: string;
+  secret: string;
+  events: string[];
+  active: boolean;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  subscriptionId: string;
+  propertyId: string;
+  eventId: string;
+  eventType: string;
+  targetUrl: string;
+  payload: string;
+  attempts: number;
+  maxAttempts: number;
+  status: string; // PENDING, SUCCESS, FAILED
+  responseCode?: number;
+  responseBody?: string;
+  errorMessage?: string;
+  nextRetryAt?: string;
+  createdAt?: string;
+  deliveredAt?: string;
+}
+
+
