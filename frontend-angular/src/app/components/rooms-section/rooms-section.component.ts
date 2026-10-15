@@ -171,9 +171,9 @@ export class RoomsSectionComponent implements OnInit {
   get visibleSuites(): Suite[] {
     return this.suites.filter(s => {
       if (this.selectedBranch) {
-        const branchObj = typeof s.branch === 'object' && s.branch ? s.branch : this.branches.find(b => b.id === (s.branchId || s.branch) || b.slug === (s.branchId || s.branch));
-        const bSlug = branchObj?.slug || (typeof s.branch === 'string' ? s.branch : '') || '';
-        if (bSlug !== this.selectedBranch) return false;
+        const branchObj = typeof s.branch === 'object' && s.branch ? s.branch : this.branches.find(b => b.id === (s.branchId || s.branch || s.propertyId) || b.slug === (s.branchId || s.branch || s.propertyId));
+        const bSlug = branchObj?.slug || (typeof s.branch === 'string' ? s.branch : '') || (s.propertyId === this.selectedBranch ? this.selectedBranch : '') || '';
+        if (bSlug !== this.selectedBranch && s.propertyId !== this.selectedBranch) return false;
       }
       if (this.selectedType) {
         if (s.type !== this.selectedType) return false;
