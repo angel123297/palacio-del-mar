@@ -89,7 +89,7 @@ npm run build
 
 ## 📝 Historial de Correcciones y Auditorías
 Para consultar la bitácora completa de correcciones, auditorías de calidad (incluyendo la certificación oficial de Jules) y resolución de hallazgos técnicos, consulta el documento:
-👉 **[CORRECCIONES.md](file:///home/angel19/Notas/palacio-del-mar/CORRECCIONES.md)**
+👉 **[CORRECCIONES.md](docs/CORRECCIONES.md)**
 
 ---
 
