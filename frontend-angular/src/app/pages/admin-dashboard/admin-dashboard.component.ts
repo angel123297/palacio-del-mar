@@ -1,9 +1,9 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
-import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse } from '../../models/types';
+import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property } from '../../models/types';
 
 export interface PromotionItem {
   id: string;
@@ -43,6 +43,14 @@ export interface PromotionItem {
                     [ngClass]="activeTab() === 'promotions' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Promociones & Ofertas
+            </button>
+            <button (click)="activeTab.set('properties')" 
+                    [ngClass]="activeTab() === 'properties' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-2">
+              Alojamientos / Marketplace
+              <span *ngIf="pendingPropertiesCount() > 0" class="bg-[#f1c40f] text-[#0d0d0d] text-[10px] px-2 py-0.5 rounded-full font-bold">
+                {{ pendingPropertiesCount() }}
+              </span>
             </button>
           </div>
         </div>
@@ -274,6 +282,137 @@ export interface PromotionItem {
           </div>
         </ng-container>
 
+        <!-- ==================== TAB 3: ALOJAMIENTOS / MARKETPLACE ==================== -->
+        <ng-container *ngIf="activeTab() === 'properties'">
+          <!-- KPI Cards for Properties -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
+              <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Total Alojamientos</p>
+              <p class="font-serif text-4xl text-[#f5f0e8]">{{ properties().length }}</p>
+            </div>
+            <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
+              <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">En Revisión (Pendientes)</p>
+              <p class="font-serif text-4xl" [ngClass]="pendingPropertiesCount() > 0 ? 'text-[#f1c40f]' : 'text-[#f5f0e8]'">
+                {{ pendingPropertiesCount() }}
+              </p>
+            </div>
+            <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
+              <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Aprobados / En Vivo</p>
+              <p class="font-serif text-4xl text-[#2ecc71]">{{ approvedPropertiesCount() }}</p>
+            </div>
+            <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
+              <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Comisión Plataforma</p>
+              <p class="font-serif text-4xl text-[#c9a96e]">8%</p>
+            </div>
+          </div>
+
+          <!-- Filters & Actions -->
+          <div class="flex flex-wrap gap-4 justify-between items-end mb-6 p-4 bg-[rgba(255,255,255,0.02)] border border-[rgba(201,169,110,0.1)] rounded-lg">
+            <div class="flex flex-wrap gap-4 items-center">
+              <div class="flex flex-col">
+                <label class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Estado de Aprobación</label>
+                <select [ngModel]="propertyStatusFilter()" (ngModelChange)="propertyStatusFilter.set($event)" class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none">
+                  <option value="">Todos los alojamientos</option>
+                  <option value="PENDING">Pendientes de Revisión (Requieren Aprobación)</option>
+                  <option value="APPROVED">Aprobados (Visibles al Público)</option>
+                  <option value="REJECTED">Rechazados</option>
+                </select>
+              </div>
+              <div class="flex flex-col">
+                <label class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Buscar</label>
+                <input type="text" [ngModel]="propertySearch()" (ngModelChange)="propertySearch.set($event)" placeholder="Nombre, ciudad o dirección..." class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none w-72 placeholder-[rgba(255,255,255,0.2)]">
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button (click)="fetchProperties()" class="bg-[#111] hover:bg-[rgba(201,169,110,0.2)] text-[#c9a96e] hover:text-white transition px-4 py-2.5 rounded-md text-xs font-semibold tracking-widest uppercase border border-[rgba(201,169,110,0.4)] flex items-center gap-2">
+                <span>🔄</span> Actualizar
+              </button>
+              <a routerLink="/simulador-hotel-externo" target="_blank" class="bg-[rgba(201,169,110,0.15)] hover:bg-[rgba(201,169,110,0.3)] text-[#c9a96e] hover:text-white transition px-4 py-2.5 rounded-md text-xs font-semibold tracking-widest uppercase border border-[#c9a96e] flex items-center gap-2">
+                <span>🏨</span> Simulador PMS
+              </a>
+            </div>
+          </div>
+
+          <!-- Properties Table -->
+          <div class="border border-[rgba(201,169,110,0.2)] rounded-xl bg-[#111] overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-[rgba(201,169,110,0.1)] border-b border-[rgba(201,169,110,0.2)]">
+                    <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Alojamiento / Propiedad</th>
+                    <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Ubicación</th>
+                    <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Tipo</th>
+                    <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Habitaciones</th>
+                    <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Comisión</th>
+                    <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Estado</th>
+                    <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold text-right">Moderación</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let p of filteredProperties()" class="border-b border-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.02)] transition-colors">
+                    <td class="py-4 px-6">
+                      <div class="flex items-center gap-3">
+                        <div *ngIf="p.mainImage" class="w-10 h-10 rounded-lg bg-cover bg-center shrink-0 border border-[rgba(201,169,110,0.2)]" [style.background-image]="'url(' + p.mainImage + ')'"></div>
+                        <div>
+                          <p class="text-sm font-semibold text-[#f5f0e8]">{{ p.name }}</p>
+                          <p class="text-[10px] text-[#f5f0e8] opacity-50 font-mono">ID: {{ p.id || p._id }}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="py-4 px-6 text-sm text-[#f5f0e8] opacity-80">
+                      <p>{{ p.city || 'Cartagena' }}</p>
+                      <p class="text-[10px] opacity-60">{{ p.address }}</p>
+                    </td>
+                    <td class="py-4 px-6">
+                      <span class="px-2 py-0.5 rounded text-[10px] uppercase font-mono tracking-wider bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[#c9a96e]">
+                        {{ p.type || 'HOTEL' }}
+                      </span>
+                    </td>
+                    <td class="py-4 px-6 font-mono text-sm text-[#f5f0e8]">
+                      {{ p.suitesCount || 0 }} suites
+                    </td>
+                    <td class="py-4 px-6 font-serif text-sm text-[#c9a96e]">
+                      {{ p.commissionRate ? (p.commissionRate * 100 | number:'1.0-0') + '%' : '8%' }}
+                    </td>
+                    <td class="py-4 px-6">
+                      <span class="px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold"
+                            [ngClass]="{
+                              'bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border border-[#2ecc71]': p.status === 'APPROVED',
+                              'bg-[rgba(241,196,15,0.15)] text-[#f1c40f] border border-[#f1c40f]': p.status === 'PENDING',
+                              'bg-[rgba(231,76,60,0.15)] text-[#e74c3c] border border-[#e74c3c]': p.status === 'REJECTED'
+                            }">
+                        {{ p.status === 'APPROVED' ? 'Aprobado / En Vivo' : (p.status === 'PENDING' ? 'En Revisión' : 'Rechazado') }}
+                      </span>
+                    </td>
+                    <td class="py-4 px-6 text-right">
+                      <div class="flex items-center justify-end gap-2">
+                        <!-- Action to Approve -->
+                        <button *ngIf="p.status !== 'APPROVED'"
+                                (click)="updatePropertyStatus(p.id || p._id || '', 'APPROVED')"
+                                class="px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wider bg-[rgba(46,204,113,0.15)] hover:bg-[#2ecc71] text-[#2ecc71] hover:text-[#0d0d0d] border border-[#2ecc71] transition">
+                          ✔ Aprobar
+                        </button>
+                        <!-- Action to Reject -->
+                        <button *ngIf="p.status !== 'REJECTED'"
+                                (click)="updatePropertyStatus(p.id || p._id || '', 'REJECTED')"
+                                class="px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wider bg-[rgba(231,76,60,0.15)] hover:bg-[#e74c3c] text-[#e74c3c] hover:text-white border border-[#e74c3c] transition">
+                          ✖ Rechazar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr *ngIf="filteredProperties().length === 0">
+                    <td colspan="7" class="py-12 text-center text-[#f5f0e8] opacity-50 text-sm">
+                      No hay alojamientos que coincidan con los filtros seleccionados.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </ng-container>
+
       </div>
     </div>
   `
@@ -281,7 +420,7 @@ export interface PromotionItem {
 export class AdminDashboardComponent implements OnInit {
   api = inject(ApiService);
   
-  activeTab = signal<'bookings' | 'promotions'>('bookings');
+  activeTab = signal<'bookings' | 'promotions' | 'properties'>('bookings');
 
   metrics = signal<DashboardMetricsDTO | null>(null);
   bookings = signal<Booking[]>([]);
@@ -312,10 +451,36 @@ export class AdminDashboardComponent implements OnInit {
   promoError = '';
   promoSuccess = '';
 
+  // Properties / Marketplace state
+  properties = signal<Property[]>([]);
+  propertyStatusFilter = signal<string>('');
+  propertySearch = signal<string>('');
+  
+  pendingPropertiesCount = computed(() => this.properties().filter(p => p.status === 'PENDING').length);
+  approvedPropertiesCount = computed(() => this.properties().filter(p => p.status === 'APPROVED').length);
+
+  filteredProperties = computed(() => {
+    let list = this.properties();
+    const status = this.propertyStatusFilter();
+    const query = this.propertySearch().toLowerCase().trim();
+    if (status) {
+      list = list.filter(p => p.status === status);
+    }
+    if (query) {
+      list = list.filter(p => 
+        (p.name || '').toLowerCase().includes(query) ||
+        (p.city || '').toLowerCase().includes(query) ||
+        (p.address || '').toLowerCase().includes(query)
+      );
+    }
+    return list;
+  });
+
   ngOnInit(): void {
     this.fetchMetrics();
     this.fetchBookings();
     this.fetchPromotions();
+    this.fetchProperties();
   }
 
   fetchMetrics() {
@@ -473,5 +638,34 @@ export class AdminDashboardComponent implements OnInit {
       this.currentPage.set(page);
       this.fetchBookings();
     }
+  }
+
+  fetchProperties() {
+    this.api.get<ApiResponse<Property[]>>('/admin/properties').subscribe({
+      next: (res) => {
+        const list = res.data || (res as any) || [];
+        this.properties.set(Array.isArray(list) ? list : []);
+      },
+      error: () => {
+        this.properties.set([]);
+      }
+    });
+  }
+
+  updatePropertyStatus(propertyId: string, status: 'APPROVED' | 'REJECTED') {
+    if (!propertyId) return;
+    this.api.put<ApiResponse<any>>(`/admin/properties/${propertyId}/status`, { status }).subscribe({
+      next: () => {
+        const actionText = status === 'APPROVED' ? 'aprobado y publicado en el marketplace' : 'rechazado';
+        this.actionMessage.set(`Alojamiento ${actionText} exitosamente.`);
+        setTimeout(() => this.actionMessage.set(''), 4000);
+        this.fetchProperties();
+        this.fetchMetrics();
+      },
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al actualizar estado del alojamiento');
+        setTimeout(() => this.actionError.set(''), 5000);
+      }
+    });
   }
 }
