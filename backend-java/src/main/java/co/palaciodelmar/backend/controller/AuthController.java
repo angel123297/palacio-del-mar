@@ -32,12 +32,14 @@ public class AuthController {
 
     private void addJwtCookie(jakarta.servlet.http.HttpServletResponse response, String token, jakarta.servlet.http.HttpServletRequest request) {
         boolean isSecure = cookieSecure || (request != null && (request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"))));
-        jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie("jwt", token);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(isSecure);
-        cookie.setPath("/");
-        cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
-        response.addCookie(cookie);
+        org.springframework.http.ResponseCookie springCookie = org.springframework.http.ResponseCookie.from("jwt", token)
+                .httpOnly(true)
+                .secure(isSecure)
+                .path("/")
+                .maxAge(java.time.Duration.ofDays(7))
+                .sameSite("Lax")
+                .build();
+        response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, springCookie.toString());
     }
 
     @PostMapping("/register")
@@ -126,12 +128,14 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(jakarta.servlet.http.HttpServletResponse httpResponse) {
-        jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie("jwt", null);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(false);
-        cookie.setPath("/");
-        cookie.setMaxAge(0); // Clear cookie
-        httpResponse.addCookie(cookie);
+        org.springframework.http.ResponseCookie springCookie = org.springframework.http.ResponseCookie.from("jwt", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(java.time.Duration.ZERO)
+                .sameSite("Lax")
+                .build();
+        httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, springCookie.toString());
 
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
