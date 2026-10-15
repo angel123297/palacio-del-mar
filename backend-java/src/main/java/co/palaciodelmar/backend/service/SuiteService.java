@@ -6,10 +6,12 @@ import co.palaciodelmar.backend.dto.SuiteResponseDTO;
 import co.palaciodelmar.backend.dto.SuiteTypeDTO;
 import co.palaciodelmar.backend.model.Branch;
 import co.palaciodelmar.backend.model.Experience;
+import co.palaciodelmar.backend.model.Property;
 import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.ExperienceRepository;
+import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.PromotionRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ public class SuiteService {
 
     private final SuiteRepository suiteRepository;
     private final BranchRepository branchRepository;
+    private final PropertyRepository propertyRepository;
     private final ExperienceRepository experienceRepository;
     private final PromotionRepository promotionRepository;
     private final PricingService pricingService;
@@ -42,6 +45,9 @@ public class SuiteService {
     @Cacheable(value = "suites", key = "#branchFilter != null ? #branchFilter : 'all'")
     public List<SuiteResponseDTO> getAllActiveSuites(String branchFilter) {
         Map<String, Branch> branchMap = getBranchMap();
+        Map<String, Property> propMap = propertyRepository.findAll().stream()
+                .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
+
         List<Suite> suites = suiteRepository.findAll().stream()
                 .filter(s -> !Boolean.FALSE.equals(s.getActive()))
                 .toList();
@@ -50,17 +56,39 @@ public class SuiteService {
             String lower = branchFilter.trim().toLowerCase();
             Optional<Branch> targetBranch = branchRepository.findById(branchFilter)
                     .or(() -> branchRepository.findBySlug(lower));
+            Optional<Property> targetProp = propertyRepository.findById(branchFilter)
+                    .or(() -> propertyRepository.findBySlug(lower));
 
-            if (targetBranch.isPresent()) {
-                String targetId = targetBranch.get().getId();
-                suites = suites.stream()
-                        .filter(s -> targetId.equals(s.getBranch()))
-                        .toList();
-            }
+            suites = suites.stream()
+                    .filter(s -> {
+                        if (targetBranch.isPresent() && targetBranch.get().getId().equals(s.getBranch())) {
+                            return true;
+                        }
+                        if (targetProp.isPresent() && targetProp.get().getId().equals(s.getPropertyId())) {
+                            return true;
+                        }
+                        return false;
+                    })
+                    .toList();
         }
 
         return suites.stream()
-                .map(s -> SuiteResponseDTO.from(s, branchMap.get(s.getBranch())))
+                .map(s -> {
+                    Branch b = branchMap.get(s.getBranch());
+                    if (b == null && s.getPropertyId() != null && propMap.containsKey(s.getPropertyId())) {
+                        Property p = propMap.get(s.getPropertyId());
+                        b = Branch.builder()
+                                .id(p.getId())
+                                .name(p.getName())
+                                .slug(p.getSlug())
+                                .zone(p.getCity())
+                                .address(p.getAddress())
+                                .mainImage(p.getMainImage())
+                                .active(true)
+                                .build();
+                    }
+                    return SuiteResponseDTO.from(s, b);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -82,6 +110,19 @@ public class SuiteService {
                 .or(() -> suiteRepository.findBySlug(idOrSlug.toLowerCase()))
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada con identificador: " + idOrSlug));
         Branch branch = suite.getBranch() != null ? branchRepository.findById(suite.getBranch()).orElse(null) : null;
+        if (branch == null && suite.getPropertyId() != null) {
+            branch = propertyRepository.findById(suite.getPropertyId())
+                    .map(p -> Branch.builder()
+                            .id(p.getId())
+                            .name(p.getName())
+                            .slug(p.getSlug())
+                            .zone(p.getCity())
+                            .address(p.getAddress())
+                            .mainImage(p.getMainImage())
+                            .active(true)
+                            .build()
+                    ).orElse(null);
+        }
         return SuiteResponseDTO.from(suite, branch);
     }
 

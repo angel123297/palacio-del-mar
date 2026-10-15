@@ -43,6 +43,9 @@ class PromotionPricingTest {
     @Mock
     private PromotionRepository promotionRepository;
 
+    @Mock
+    private co.palaciodelmar.backend.repository.PropertyRepository propertyRepository;
+
     @Spy
     private PricingService pricingService = new PricingService();
 
