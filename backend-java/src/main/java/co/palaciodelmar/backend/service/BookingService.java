@@ -171,10 +171,16 @@ public class BookingService {
         String promoName = appliedDiscount.name();
         BigDecimal promoDiscountPercent = appliedDiscount.percent();
 
+        BigDecimal platformFee = totalRoomPrice.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal hostPayout = totalRoomPrice.subtract(platformFee);
+
         Booking booking = Booking.builder()
                 .user(userId)
                 .suite(suite.getId())
                 .branch(suite.getBranch())
+                .propertyId(suite.getPropertyId())
+                .platformFee(platformFee)
+                .hostPayout(hostPayout)
                 .checkIn(request.getCheckIn())
                 .checkOut(request.getCheckOut())
                 .nights((int) nights)
@@ -325,6 +331,9 @@ public class BookingService {
         booking.setAppliedPromotionName(appliedDiscount.name());
         booking.setAppliedPromotionDiscountPercent(appliedDiscount.percent());
         booking.setTotalPrice(newTotalPrice);
+        BigDecimal modPlatformFee = pricingResult.total().multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+        booking.setPlatformFee(modPlatformFee);
+        booking.setHostPayout(pricingResult.total().subtract(modPlatformFee));
 
         if (booking.getPaidAmount().compareTo(newTotalPrice) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
@@ -694,6 +703,9 @@ public class BookingService {
                 .user(booking.getUser())
                 .suite(suite)
                 .branch(branch)
+                .propertyId(booking.getPropertyId() != null ? booking.getPropertyId() : (suite != null ? suite.getPropertyId() : null))
+                .platformFee(booking.getPlatformFee())
+                .hostPayout(booking.getHostPayout())
                 .unitSlot(booking.getUnitSlot())
                 .checkIn(booking.getCheckIn())
                 .checkOut(booking.getCheckOut())
