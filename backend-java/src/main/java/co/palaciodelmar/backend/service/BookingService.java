@@ -46,6 +46,9 @@ public class BookingService {
     private final PricingService pricingService;
     private final PaymentGateway paymentGateway;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     public BookingDTO createBooking(String userId, BookingRequest request) {
 
         if (userId == null || userId.isBlank()) {
@@ -241,7 +244,17 @@ public class BookingService {
             throw new IllegalStateException("Hubo una colisión concurrente. Las fechas ya no están disponibles.");
         }
 
-        return toDTO(savedBooking);
+        BookingDTO dto = toDTO(savedBooking);
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                    "booking.created",
+                    savedBooking.getId(),
+                    savedBooking.getPropertyId(),
+                    dto,
+                    Instant.now()
+            ));
+        }
+        return dto;
     }
 
     public BookingDTO modifyBooking(String bookingId, String userId, BookingRequest request) {
@@ -839,6 +852,25 @@ public class BookingService {
                 sn.setExpiresAt(null);
                 sn.setStatus("confirmed");
                 suiteNightRepository.save(sn);
+            }
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.confirmed",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
+        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.cancelled",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
             }
         }
     }
