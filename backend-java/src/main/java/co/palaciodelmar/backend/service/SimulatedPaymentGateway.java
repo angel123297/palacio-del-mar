@@ -46,7 +46,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
 
     public SimulatedPaymentGateway(
             PaymentIntentRepository paymentIntentRepository,
-            PaymentWebhookService paymentWebhookService,
+            @org.springframework.context.annotation.Lazy PaymentWebhookService paymentWebhookService,
             ObjectMapper objectMapper
     ) {
         this.paymentIntentRepository = paymentIntentRepository;
