@@ -21,7 +21,6 @@ import java.util.Map;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PaymentWebhookService {
 
     private final PaymentRepository paymentRepository;
@@ -30,6 +29,22 @@ public class PaymentWebhookService {
     private final ProcessedWebhookEventRepository processedWebhookEventRepository;
     private final EmailService emailService;
     private final ObjectMapper objectMapper;
+
+    public PaymentWebhookService(
+            PaymentRepository paymentRepository,
+            BookingRepository bookingRepository,
+            @org.springframework.context.annotation.Lazy BookingService bookingService,
+            ProcessedWebhookEventRepository processedWebhookEventRepository,
+            EmailService emailService,
+            ObjectMapper objectMapper
+    ) {
+        this.paymentRepository = paymentRepository;
+        this.bookingRepository = bookingRepository;
+        this.bookingService = bookingService;
+        this.processedWebhookEventRepository = processedWebhookEventRepository;
+        this.emailService = emailService;
+        this.objectMapper = objectMapper;
+    }
 
     @Value("${palacio.webhooks.payments.secret:whsec_simulated_secret_key_palacio_2026}")
     private String webhookSecret;
