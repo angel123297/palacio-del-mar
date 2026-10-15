@@ -126,7 +126,7 @@ import { finalize, switchMap } from 'rxjs';
               <button type="submit" [disabled]="processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                 <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                  Autorizando transacción... <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                  {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
                 </span>
               </button>
             </form>
@@ -155,7 +155,7 @@ import { finalize, switchMap } from 'rxjs';
               <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                 <span *ngIf="!processing">Ir al Banco a pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                  Conectando con el banco... <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                  {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
                 </span>
               </button>
             </div>
@@ -279,6 +279,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   booking: Booking | null = null;
   loading = true;
   processing = false;
+  processingMessage = 'Autorizando transacción...';
+  pollingInterval: any = null;
   errorMsg = '';
 
   selectedMethod: 'CARD' | 'PSE' | 'PAYPAL' = 'CARD';
@@ -391,6 +393,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     if (this.timerInterval) clearInterval(this.timerInterval);
+    if (this.pollingInterval) clearInterval(this.pollingInterval);
   }
 
   formatCardNumber(event: Event) {
@@ -412,6 +415,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   processPSE() {
     if (!this.pseBank) return;
     this.processing = true;
+    this.processingMessage = 'Conectando con el banco...';
     this.errorMsg = '';
     this.cdr.detectChanges();
     
@@ -423,6 +427,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   processPayPal() {
     this.processing = true;
+    this.processingMessage = 'Abriendo PayPal...';
     this.errorMsg = '';
     this.cdr.detectChanges();
     
@@ -439,6 +444,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     }
 
     this.processing = true;
+    this.processingMessage = 'Autorizando transacción...';
     this.errorMsg = '';
     this.cdr.detectChanges();
 
@@ -477,28 +483,88 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       method: (methodPayload.method === 'CREDIT_CARD' || !methodPayload.method) ? 'card' : methodPayload.method.toLowerCase()
     };
 
+    let createdIntentId = '';
+
     this.api.post<any>('/payments/checkout', checkoutPayload).pipe(
       switchMap((intentRes: any) => {
         const intentData = intentRes.data || intentRes;
-        const intentId = intentData.intentId || intentData.id;
+        createdIntentId = intentData.intentId || intentData.id;
+        this.processingMessage = 'Procesando pago con entidad financiera...';
+        this.cdr.detectChanges();
         return this.api.post<any>('/payments/confirm', {
-          intentId,
+          intentId: createdIntentId,
           paymentToken
         });
-      }),
-      finalize(() => {
-        this.processing = false;
-        this.cdr.detectChanges();
       })
     ).subscribe({
-      next: () => {
-        this.router.navigate(['/reservas', targetBookingId, 'comprobante']);
+      next: (confirmRes: any) => {
+        const data = confirmRes.data || confirmRes;
+        const status = data.status || '';
+
+        if (status === 'processing' || !data.transactionId) {
+          // Asynchronous flow with webhook: start polling payment status
+          this.processingMessage = 'Esperando confirmación de pasarela via webhook...';
+          this.cdr.detectChanges();
+          this.pollPaymentStatus(createdIntentId, targetBookingId!);
+        } else {
+          // Synchronous confirmation completed
+          this.processing = false;
+          this.router.navigate(['/reservas', targetBookingId, 'comprobante']);
+        }
       },
       error: (err) => {
+        this.processing = false;
         this.errorMsg = err?.error?.message || err?.message || 'Transacción declinada por el banco simulado. Por favor intenta de nuevo.';
         this.cdr.detectChanges();
       }
     });
+  }
+
+  private pollPaymentStatus(intentId: string, bookingId: string) {
+    if (this.pollingInterval) clearInterval(this.pollingInterval);
+
+    let attempts = 0;
+    const maxAttempts = 15; // 15 attempts * 1.5s = 22.5s
+
+    this.pollingInterval = setInterval(() => {
+      attempts++;
+      this.api.get<any>(`/payments/status/${intentId}`).subscribe({
+        next: (res: any) => {
+          const statusData = res.data || res;
+          const paymentStatus = statusData.status;
+          const bookingPaymentStatus = statusData.paymentStatus;
+          const bookingStatus = statusData.bookingStatus;
+
+          if (paymentStatus === 'completed' || bookingPaymentStatus === 'paid' || bookingStatus === 'confirmed') {
+            clearInterval(this.pollingInterval);
+            this.processingMessage = '¡Pago aprobado! Redirigiendo a comprobante...';
+            this.cdr.detectChanges();
+            setTimeout(() => {
+              this.processing = false;
+              this.router.navigate(['/reservas', bookingId, 'comprobante']);
+            }, 600);
+          } else if (paymentStatus === 'failed' || bookingPaymentStatus === 'failed') {
+            clearInterval(this.pollingInterval);
+            this.processing = false;
+            this.errorMsg = statusData.notes || 'El pago fue rechazado por la entidad bancaria.';
+            this.cdr.detectChanges();
+          } else if (attempts >= maxAttempts) {
+            clearInterval(this.pollingInterval);
+            this.processing = false;
+            this.errorMsg = 'El pago está tomando más tiempo del esperado en procesarse. Por favor revisa el estado de tu reserva.';
+            this.cdr.detectChanges();
+          }
+        },
+        error: () => {
+          if (attempts >= maxAttempts) {
+            clearInterval(this.pollingInterval);
+            this.processing = false;
+            this.errorMsg = 'No pudimos verificar el estado del pago. Por favor contacta a soporte.';
+            this.cdr.detectChanges();
+          }
+        }
+      });
+    }, 1500);
   }
 }
 

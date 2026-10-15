@@ -139,6 +139,19 @@ public class PaymentService {
             throw new IllegalStateException("Pago fallido: " + confirmResponse.errorMessage());
         }
 
+        if ("processing".equalsIgnoreCase(confirmResponse.status())) {
+            payment.setStatus("processing");
+            payment.setNotes("Procesando pago con pasarela");
+            payment.setUpdatedAt(Instant.now());
+            Payment savedPayment = paymentRepository.save(payment);
+
+            java.util.Map<String, Object> returnMap = new java.util.HashMap<>();
+            returnMap.put("payment", toDTO(savedPayment));
+            returnMap.put("booking", bookingService.toDTO(booking));
+            returnMap.put("status", "processing");
+            return returnMap;
+        }
+
         booking.setPaidAmount((booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO).add(payment.getAmount()));
 
         BigDecimal balance = booking.getTotalPrice().subtract(booking.getPaidAmount());
@@ -175,6 +188,30 @@ public class PaymentService {
         returnMap.put("payment", toDTO(savedPayment));
         returnMap.put("booking", bookingService.toDTO(updatedBooking));
         return returnMap;
+    }
+
+    public java.util.Map<String, Object> getPaymentStatus(String intentId, String userId) {
+        Payment payment = paymentRepository.findByIntentId(intentId)
+                .orElseThrow(() -> new IllegalArgumentException("Intención de pago no encontrada: " + intentId));
+
+        Booking booking = bookingRepository.findById(payment.getBooking())
+                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
+
+        if (booking.getUser() != null && userId != null && !booking.getUser().equals(userId)) {
+            throw new IllegalArgumentException("No tienes permiso para consultar este pago");
+        }
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("intentId", intentId);
+        result.put("status", payment.getStatus());
+        result.put("paymentMethod", payment.getPaymentMethod());
+        result.put("amount", payment.getAmount());
+        result.put("transactionId", payment.getTransactionId());
+        result.put("bookingId", booking.getId());
+        result.put("bookingStatus", booking.getStatus());
+        result.put("paymentStatus", booking.getPaymentStatus());
+        result.put("notes", payment.getNotes());
+        return result;
     }
 
     public PaymentDTO toDTO(Payment payment) {

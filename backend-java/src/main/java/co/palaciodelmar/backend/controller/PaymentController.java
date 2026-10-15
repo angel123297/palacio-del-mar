@@ -52,4 +52,14 @@ public class PaymentController {
         Map<String, Object> result = paymentService.confirmPayment(userId, intentId, paymentToken);
         return ResponseEntity.ok(ApiResponse.ok("Pago confirmado exitosamente", result));
     }
+
+    @GetMapping("/status/{intentId}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getPaymentStatus(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String intentId
+    ) {
+        String userId = principal != null ? principal.getUser().getId() : null;
+        Map<String, Object> status = paymentService.getPaymentStatus(intentId, userId);
+        return ResponseEntity.ok(ApiResponse.ok(status));
+    }
 }
