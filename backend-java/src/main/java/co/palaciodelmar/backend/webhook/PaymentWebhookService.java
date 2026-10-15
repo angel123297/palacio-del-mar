@@ -36,14 +36,14 @@ public class PaymentWebhookService {
             @org.springframework.context.annotation.Lazy BookingService bookingService,
             ProcessedWebhookEventRepository processedWebhookEventRepository,
             EmailService emailService,
-            ObjectMapper objectMapper
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper
     ) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.bookingService = bookingService;
         this.processedWebhookEventRepository = processedWebhookEventRepository;
         this.emailService = emailService;
-        this.objectMapper = objectMapper;
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper().findAndRegisterModules();
     }
 
     @Value("${palacio.webhooks.payments.secret:whsec_simulated_secret_key_palacio_2026}")
