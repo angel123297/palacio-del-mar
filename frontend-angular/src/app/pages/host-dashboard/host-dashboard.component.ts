@@ -593,7 +593,7 @@ export interface HostPromotionItem {
                 Permite a tus aplicaciones o PMS sincronizar habitaciones (<code>POST /api/integration/rooms</code>) y bloquear disponibilidad contra sobreventa (<code>PUT /api/integration/availability</code>) usando autenticación por API Key (<code>X-Palacio-Api-Key</code>).
               </p>
             </div>
-            <a href="http://localhost:5000/demo/external-hotel" target="_blank" class="px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-lg text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg">
+            <a routerLink="/demo/external-hotel" target="_blank" class="px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-lg text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg">
               <span>🌐 Abrir Portal del Hotel Aliado</span>
               <span>&rarr;</span>
             </a>
