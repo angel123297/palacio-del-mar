@@ -368,7 +368,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   fetchPromotions() {
-    this.api.get<any>('/promotions').subscribe({
+    this.api.get<any>('/admin/promotions').subscribe({
       next: (res) => {
         const list = res.data || res || [];
         this.promotions.set(Array.isArray(list) ? list : []);

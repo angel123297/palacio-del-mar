@@ -146,6 +146,31 @@ public class HostController {
         return ResponseEntity.ok(ApiResponse.ok(stats));
     }
 
+    @GetMapping("/promotions")
+    public ResponseEntity<ApiResponse<List<PromotionDTO>>> getPromotions(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<String> branches = userPrincipal.getUser().getBranches();
+        if (branches == null || branches.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.ok(java.util.Collections.emptyList()));
+        }
+
+        List<PromotionDTO> promotions = branches.stream()
+                .flatMap(branch -> promotionRepository.findByBranchAndActiveTrue(branch).stream())
+                .map(promo -> PromotionDTO.builder()
+                        .id(promo.getId())
+                        .branch(promo.getBranch())
+                        .title(promo.getTitle())
+                        .discountPercent(promo.getDiscountPercent())
+                        .startDate(promo.getStartDate())
+                        .endDate(promo.getEndDate())
+                        .active(promo.getActive())
+                        .build())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ApiResponse.ok(promotions));
+    }
+
     @PostMapping("/promotions")
     public ResponseEntity<ApiResponse<PromotionDTO>> createPromotion(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
