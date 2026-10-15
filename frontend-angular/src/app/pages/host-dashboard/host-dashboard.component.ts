@@ -47,12 +47,12 @@ export interface HostPromotionItem {
             <button (click)="activeTab.set('webhooks'); fetchSubscriptions(); fetchDeliveries();" 
                     [ngClass]="activeTab() === 'webhooks' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
-              Webhooks
+              Notificaciones en Vivo
             </button>
             <button (click)="activeTab.set('apikeys'); fetchApiKeys();" 
                     [ngClass]="activeTab() === 'apikeys' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
-              API Keys
+              Conexión PMS / Integración
             </button>
             <button (click)="activeTab.set('promotions')" 
                     [ngClass]="activeTab() === 'promotions' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
@@ -377,12 +377,12 @@ export interface HostPromotionItem {
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
             <!-- Left: Register Webhook Form -->
             <div class="bg-[#111] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 shadow-xl">
-              <h2 class="font-serif text-2xl text-[#c9a96e] mb-2">Registrar Webhook Saliente</h2>
-              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Recibe eventos en tiempo real con firma criptográfica HMAC-SHA256 en tu propio servidor.</p>
+              <h2 class="font-serif text-2xl text-[#c9a96e] mb-2">Canal de Notificaciones de Reservas</h2>
+              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Recibe avisos inmediatos en tu sistema o página web cada vez que un huésped reserve, confirme su pago o cancele.</p>
 
               <form (ngSubmit)="submitWebhook()" class="space-y-4">
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Alojamiento / Propiedad *</label>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Alojamiento a Conectar *</label>
                   <select [(ngModel)]="newWebhook.propertyId" name="whPropId" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                     <option value="">-- Selecciona un Alojamiento --</option>
                     <option *ngFor="let prop of properties()" [value]="prop.id || prop._id">
@@ -392,31 +392,31 @@ export interface HostPromotionItem {
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">URL de Destino (Endpoint HTTP/S) *</label>
-                  <input type="url" [(ngModel)]="newWebhook.url" name="whUrl" placeholder="http://tu-servidor.com/webhook" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Dirección de tu Sistema o Web (URL de recepción) *</label>
+                  <input type="url" [(ngModel)]="newWebhook.url" name="whUrl" placeholder="https://mi-sistema-hotel.com/reservas-notificaciones" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-2">Eventos Suscritos</label>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-2">Eventos Notificados</label>
                   <div class="space-y-2 bg-[rgba(255,255,255,0.02)] p-3 rounded border border-[rgba(255,255,255,0.08)] text-xs">
                     <label class="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" [(ngModel)]="newWebhook.eventCreated" name="evCreated" class="accent-[#c9a96e]">
-                      <span>booking.created (Nueva reserva iniciada)</span>
+                      <span>Nueva reserva iniciada (El huésped comenzó el proceso)</span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" [(ngModel)]="newWebhook.eventConfirmed" name="evConfirmed" class="accent-[#c9a96e]">
-                      <span>booking.confirmed (Pago aprobado y reserva confirmada)</span>
+                      <span>Reserva confirmada (Pago aprobado con éxito)</span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" [(ngModel)]="newWebhook.eventCancelled" name="evCancelled" class="accent-[#c9a96e]">
-                      <span>booking.cancelled (Reserva cancelada)</span>
+                      <span>Reserva cancelada (Fechas liberadas para la venta)</span>
                     </label>
                   </div>
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Descripción / Notas</label>
-                  <input type="text" [(ngModel)]="newWebhook.description" name="whDesc" placeholder="Ej: Integración con motor PMS propio" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Nombre de la Conexión o Notas</label>
+                  <input type="text" [(ngModel)]="newWebhook.description" name="whDesc" placeholder="Ej: Sincronización con mi sistema de recepción" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                 </div>
 
                 <div *ngIf="webhookError" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
@@ -427,12 +427,12 @@ export interface HostPromotionItem {
                 </div>
 
                 <button type="submit" [disabled]="submittingWebhook" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2">
-                  {{ submittingWebhook ? 'Guardando...' : 'Crear Suscripción de Webhook' }}
+                  {{ submittingWebhook ? 'Guardando...' : 'Activar Canal de Notificaciones' }}
                 </button>
 
                 <!-- Demo helper shortcut -->
                 <button type="button" (click)="useDemoReceiver()" class="w-full py-2 bg-transparent border border-[rgba(201,169,110,0.4)] text-[#c9a96e] hover:bg-[rgba(201,169,110,0.1)] rounded-md uppercase tracking-wider text-[11px] transition duration-200">
-                  ⚡ Auto-rellenar con Receptor Demo Local
+                  ⚡ Probar con Simulador de Recepción
                 </button>
               </form>
             </div>
@@ -440,12 +440,12 @@ export interface HostPromotionItem {
             <!-- Right: Subscriptions List -->
             <div class="lg:col-span-2 space-y-4">
               <div class="flex justify-between items-center mb-2">
-                <h2 class="font-serif text-2xl text-[#c9a96e]">Endpoints Registrados ({{ subscriptions().length }})</h2>
+                <h2 class="font-serif text-2xl text-[#c9a96e]">Canales de Notificación Activos ({{ subscriptions().length }})</h2>
                 <button (click)="fetchSubscriptions(); fetchDeliveries();" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Refrescar</button>
               </div>
 
               <div *ngIf="subscriptions().length === 0" class="border border-[rgba(201,169,110,0.2)] rounded-xl bg-[#111] p-12 text-center text-[#f5f0e8] opacity-60 text-sm">
-                No tienes webhooks registrados. Agrega una URL a la izquierda para comenzar a recibir notificaciones automáticas.
+                No tienes canales de notificación registrados. Conecta una dirección a la izquierda para empezar a recibir avisos automáticos de tus reservas.
               </div>
 
               <div class="space-y-4" *ngIf="subscriptions().length > 0">
@@ -507,12 +507,12 @@ export interface HostPromotionItem {
               <table class="w-full text-left text-xs">
                 <thead>
                   <tr class="border-b border-[rgba(255,255,255,0.1)] text-[#c9a96e] uppercase tracking-wider text-[10px]">
-                    <th class="pb-3">Event ID</th>
-                    <th class="pb-3">Tipo</th>
+                    <th class="pb-3">ID Evento</th>
+                    <th class="pb-3">Tipo de Aviso</th>
                     <th class="pb-3">Destino</th>
                     <th class="pb-3 text-center">Estado</th>
                     <th class="pb-3 text-center">Intentos</th>
-                    <th class="pb-3 text-center">HTTP</th>
+                    <th class="pb-3 text-center">Código HTTP</th>
                     <th class="pb-3">Fecha</th>
                     <th class="pb-3 text-right">Acción</th>
                   </tr>
@@ -534,7 +534,7 @@ export interface HostPromotionItem {
                     <td class="py-3 text-[#f5f0e8] opacity-60">{{ del.createdAt | date:'short' }}</td>
                     <td class="py-3 text-right">
                       <button (click)="redeliver(del.id)" class="px-2.5 py-1 bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded text-[10px] uppercase tracking-wider font-semibold transition">
-                        Reenviar
+                        Reintentar Envío
                       </button>
                     </td>
                   </tr>
@@ -548,23 +548,23 @@ export interface HostPromotionItem {
             <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
               <div>
                 <h3 class="font-serif text-xl text-[#c9a96e] flex items-center gap-2">
-                  <span>📡 Receptor Demo para la Sustentación</span>
-                  <span class="text-xs bg-[rgba(201,169,110,0.2)] px-2 py-0.5 rounded text-[#c9a96e] font-sans font-normal">/api/demo/webhook-receiver</span>
+                  <span>📡 Simulador de Recepción Externa en Tiempo Real</span>
+                  <span class="text-xs bg-[rgba(201,169,110,0.2)] px-2 py-0.5 rounded text-[#c9a96e] font-sans font-normal">Demostración en vivo</span>
                 </h3>
-                <p class="text-xs text-[#f5f0e8] opacity-75 mt-1">Este receptor emula el servidor de un anfitrión externo para verificar la firma HMAC-SHA256 y probar la tolerancia a fallos.</p>
+                <p class="text-xs text-[#f5f0e8] opacity-75 mt-1">Este simulador emula la recepción de un hotel o sistema externo para comprobar la llegada de alertas automáticas y la tolerancia a fallos.</p>
               </div>
               <div class="flex items-center gap-3">
                 <button (click)="toggleDemoFailure()" [ngClass]="demoSimulateFailure() ? 'bg-[#e74c3c] text-white' : 'bg-[rgba(255,255,255,0.08)] text-[#f5f0e8] hover:bg-[rgba(255,255,255,0.15)]'" class="px-4 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition border border-[rgba(255,255,255,0.2)]">
-                  {{ demoSimulateFailure() ? '🔴 Fallo 500 Activo (Simulando Caída)' : '🟢 Receptor Saludable (HTTP 200)' }}
+                  {{ demoSimulateFailure() ? '🔴 Simulación de Fallo Activa (Prueba de Reintentos)' : '🟢 Sistema Receptor Saludable (HTTP 200)' }}
                 </button>
                 <button (click)="fetchDemoEvents()" class="px-3 py-2 bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded text-xs font-semibold uppercase tracking-wider transition">
-                  Refrescar Bandeja
+                  Actualizar Bandeja de Alertas
                 </button>
               </div>
             </div>
 
             <div *ngIf="demoEvents().length === 0" class="p-6 text-center text-[#f5f0e8] opacity-50 text-xs border border-dashed border-[rgba(201,169,110,0.2)] rounded-lg">
-              El receptor demo está a la espera de eventos. Registra un webhook apuntando a este receptor y confirma una reserva para ver el evento firmado aquí.
+              El simulador está a la espera de avisos. Activa un canal apuntando a este simulador y confirma una reserva para ver el aviso reflejado aquí.
             </div>
 
             <div class="space-y-3" *ngIf="demoEvents().length > 0">
@@ -582,19 +582,19 @@ export interface HostPromotionItem {
           </div>
         </ng-container>
 
-        <!-- ==================== TAB 5: API KEYS (INTEGRACIÓN) ==================== -->
+        <!-- ==================== TAB 5: CONEXIÓN PMS / CANAL EXTERNO ==================== -->
         <ng-container *ngIf="activeTab() === 'apikeys'">
           <!-- Top info banner with demo external hotel link -->
           <div class="bg-gradient-to-r from-[#111] via-[#1c1813] to-[#111] border border-[rgba(201,169,110,0.4)] rounded-xl p-6 shadow-xl mb-8 flex flex-wrap justify-between items-center gap-4">
             <div>
-              <span class="text-[10px] font-mono uppercase tracking-widest text-[#2ecc71] bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] px-2.5 py-0.5 rounded">Dirección B: Integración PMS / Web Propia</span>
-              <h2 class="font-serif text-2xl text-[#c9a96e] mt-2">API Keys para Hoteles y Anfitriones Aliados</h2>
+              <span class="text-[10px] font-mono uppercase tracking-widest text-[#2ecc71] bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] px-2.5 py-0.5 rounded">Sincronización Hotelera Bidireccional</span>
+              <h2 class="font-serif text-2xl text-[#c9a96e] mt-2">Conexión con Software Hotelero y Channel Managers</h2>
               <p class="text-xs text-[#f5f0e8] opacity-75 mt-1 max-w-2xl">
-                Permite a tus aplicaciones o PMS sincronizar habitaciones (<code>POST /api/integration/rooms</code>) y bloquear disponibilidad contra sobreventa (<code>PUT /api/integration/availability</code>) usando autenticación por API Key (<code>X-Palacio-Api-Key</code>).
+                Conecta tu sistema de administración hotelera (PMS como Cloudbeds, Sirvoy o tu web propia) para publicar habitaciones y bloquear fechas automáticamente, evitando cualquier sobreventa en tus alojamientos.
               </p>
             </div>
             <a routerLink="/demo/external-hotel" target="_blank" class="px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-lg text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg">
-              <span>🌐 Abrir Portal del Hotel Aliado</span>
+              <span>🏨 Abrir Simulador de Hotel Aliado (PMS)</span>
               <span>&rarr;</span>
             </a>
           </div>
@@ -604,10 +604,10 @@ export interface HostPromotionItem {
             <div class="flex justify-between items-start gap-4">
               <div class="flex-1">
                 <p class="text-xs font-bold uppercase tracking-wider text-[#c9a96e] flex items-center gap-2">
-                  <span>⚠️ ¡Guarda tu clave de API ahora!</span>
+                  <span>⚠️ ¡Guarda tu clave de conexión ahora!</span>
                 </p>
                 <p class="text-xs text-[#f5f0e8] opacity-80 mt-1">
-                  Por motivos de seguridad, esta es la <strong>única vez</strong> que podrás ver la clave completa en texto plano:
+                  Por seguridad de tu alojamiento, esta es la <strong>única vez</strong> que se mostrará la clave completa. Cópiala y configúrala en tu sistema hotelero:
                 </p>
                 <div class="mt-3 flex items-center gap-3">
                   <input type="text" readonly [value]="recentlyCreatedKey()" class="bg-[#000] border border-[rgba(201,169,110,0.5)] text-[#2ecc71] font-mono text-sm px-4 py-2 rounded-md w-full max-w-lg select-all">
@@ -623,12 +623,12 @@ export interface HostPromotionItem {
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Left: Create API Key Form -->
             <div class="bg-[#111] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 shadow-xl">
-              <h3 class="font-serif text-xl text-[#c9a96e] mb-2">Generar Nueva API Key</h3>
-              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Genera un token seguro con prefijo <code>pdm_live_</code> vinculado a una de tus propiedades.</p>
+              <h3 class="font-serif text-xl text-[#c9a96e] mb-2">Generar Clave de Sincronización</h3>
+              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Crea una credencial cifrada exclusiva para autorizar a tu software hotelero a sincronizar calendarios y habitaciones.</p>
 
               <form (ngSubmit)="submitApiKey()" class="space-y-4">
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Alojamiento / Propiedad *</label>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Alojamiento a Vincular *</label>
                   <select [(ngModel)]="newApiKey.propertyId" name="keyPropId" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                     <option value="">-- Selecciona un Alojamiento --</option>
                     <option *ngFor="let prop of properties()" [value]="prop.id || prop._id">
@@ -638,8 +638,8 @@ export interface HostPromotionItem {
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Nombre / Identificador de la Clave *</label>
-                  <input type="text" [(ngModel)]="newApiKey.name" name="keyName" placeholder="Ej: Motor PMS Hotel Aliado" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Nombre del Sistema o Uso *</label>
+                  <input type="text" [(ngModel)]="newApiKey.name" name="keyName" placeholder="Ej: Conexión PMS Recepción Principal" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                 </div>
 
                 <div *ngIf="apiKeyError" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
@@ -650,7 +650,7 @@ export interface HostPromotionItem {
                 </div>
 
                 <button type="submit" [disabled]="submittingApiKey" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2">
-                  {{ submittingApiKey ? 'Generando...' : 'Crear API Key' }}
+                  {{ submittingApiKey ? 'Generando...' : 'Generar Clave de Conexión' }}
                 </button>
               </form>
             </div>
@@ -658,12 +658,12 @@ export interface HostPromotionItem {
             <!-- Right: Active API Keys List -->
             <div class="lg:col-span-2 space-y-4">
               <div class="flex justify-between items-center mb-2">
-                <h3 class="font-serif text-2xl text-[#c9a96e]">Claves Registradas ({{ apiKeys().length }})</h3>
+                <h3 class="font-serif text-2xl text-[#c9a96e]">Claves de Conexión Activas ({{ apiKeys().length }})</h3>
                 <button (click)="fetchApiKeys()" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Refrescar</button>
               </div>
 
               <div *ngIf="apiKeys().length === 0" class="border border-[rgba(201,169,110,0.2)] rounded-xl bg-[#111] p-12 text-center text-[#f5f0e8] opacity-60 text-sm">
-                No tienes API Keys activas todavía. Genera una en el formulario para conectar tu software externo o PMS.
+                No tienes claves de sincronización creadas todavía. Genera una en el formulario para vincular tu software hotelero o channel manager.
               </div>
 
               <div class="space-y-4" *ngIf="apiKeys().length > 0">

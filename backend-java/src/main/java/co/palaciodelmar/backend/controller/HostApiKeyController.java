@@ -4,6 +4,7 @@ import co.palaciodelmar.backend.dto.ApiResponse;
 import co.palaciodelmar.backend.dto.ApiKeyDTO;
 import co.palaciodelmar.backend.dto.CreateApiKeyRequest;
 import co.palaciodelmar.backend.model.User;
+import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.ApiKeyService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,27 +26,30 @@ public class HostApiKeyController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<ApiKeyDTO>>> list(
-            @AuthenticationPrincipal User currentUser,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false) String propertyId
     ) {
+        User currentUser = principal != null ? principal.getUser() : null;
         List<ApiKeyDTO> keys = apiKeyService.listApiKeys(currentUser, propertyId);
         return ResponseEntity.ok(ApiResponse.success(keys));
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<ApiKeyDTO>> create(
-            @AuthenticationPrincipal User currentUser,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CreateApiKeyRequest request
     ) {
+        User currentUser = principal != null ? principal.getUser() : null;
         ApiKeyDTO created = apiKeyService.createApiKey(currentUser, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(created));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> revoke(
-            @AuthenticationPrincipal User currentUser,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id
     ) {
+        User currentUser = principal != null ? principal.getUser() : null;
         apiKeyService.revokeApiKey(currentUser, id);
         return ResponseEntity.ok(ApiResponse.success(null));
     }

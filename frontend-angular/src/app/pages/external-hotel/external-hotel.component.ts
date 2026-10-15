@@ -15,9 +15,9 @@ import { HttpClient } from '@angular/common/http';
         <!-- Header -->
         <header class="border-b border-slate-800 pb-6 flex flex-wrap justify-between items-center gap-4">
           <div>
-            <span class="text-xs font-mono uppercase tracking-widest text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2.5 py-1 rounded">Sistema Externo PMS / Web Aliada</span>
+            <span class="text-xs font-mono uppercase tracking-widest text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2.5 py-1 rounded">Simulador de Software Hotelero (PMS Aliado)</span>
             <h1 class="text-3xl font-bold text-white mt-2">Cartagena Luxury Beach Resort</h1>
-            <p class="text-sm text-slate-400">Demostración de Integración Bidireccional (Dirección B vía API Key) con Palacio del Mar</p>
+            <p class="text-sm text-slate-400">Demostración de Sincronización Automática e Inventario en Tiempo Real con Palacio del Mar</p>
           </div>
           <a routerLink="/anfitrion" class="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-lg hover:bg-amber-500/20 transition">
             &larr; Volver al Panel de Anfitrión
@@ -26,18 +26,18 @@ import { HttpClient } from '@angular/common/http';
 
         <!-- Configuration Bar -->
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-3">
-          <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Credenciales de Integración</h2>
+          <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Configuración de la Conexión</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs text-slate-400 mb-1">API Endpoint Base de Palacio del Mar</label>
+              <label class="block text-xs text-slate-400 mb-1">Servidor Central de Palacio del Mar</label>
               <input [(ngModel)]="apiBase" type="text" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500">
             </div>
             <div>
-              <label class="block text-xs text-slate-400 mb-1">API Key de Propiedad (<code>X-Palacio-Api-Key</code>)</label>
+              <label class="block text-xs text-slate-400 mb-1">Clave de Conexión del Hotel (Clave de Sincronización)</label>
               <input [(ngModel)]="apiKey" type="text" placeholder="pdm_live_..." class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-amber-300 focus:outline-none focus:border-amber-400">
             </div>
           </div>
-          <p class="text-xs text-slate-500">Copia tu API Key desde el Panel del Anfitrión (Pestaña "API Keys").</p>
+          <p class="text-xs text-slate-500">Copia tu clave desde el Panel del Anfitrión (Pestaña "Conexión PMS / Integración").</p>
         </div>
 
         <!-- Main Actions Grid -->
@@ -48,15 +48,14 @@ import { HttpClient } from '@angular/common/http';
             <div>
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                  <span>🏨 Sincronizar Habitación</span>
-                  <span class="text-[10px] bg-sky-950 text-sky-300 border border-sky-800 px-2 py-0.5 rounded font-mono">POST /rooms</span>
+                  <span>🏨 Sincronizar Tipo de Habitación</span>
                 </h3>
               </div>
-              <p class="text-xs text-slate-400 mb-4">Envía una habitación desde tu sistema propio hacia Palacio del Mar con origen <code>source=EXTERNAL</code>.</p>
+              <p class="text-xs text-slate-400 mb-4">Publica o actualiza una habitación desde tu sistema propio hacia el marketplace de Palacio del Mar.</p>
 
               <form (ngSubmit)="syncRoom()" class="space-y-3 text-xs">
                 <div>
-                  <label class="block text-slate-400 mb-1">External ID en tu PMS *</label>
+                  <label class="block text-slate-400 mb-1">Código de Habitación en tu Sistema (ID) *</label>
                   <input [(ngModel)]="room.externalId" name="rExtId" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
                 </div>
                 <div>
@@ -92,15 +91,14 @@ import { HttpClient } from '@angular/common/http';
             <div>
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                  <span>🔒 Bloqueo Anti-Overbooking</span>
-                  <span class="text-[10px] bg-purple-950 text-purple-300 border border-purple-800 px-2 py-0.5 rounded font-mono">PUT /availability</span>
+                  <span>🔒 Bloqueo de Calendario (Protección Anti-Sobreventa)</span>
                 </h3>
               </div>
-              <p class="text-xs text-slate-400 mb-4">Bloquea fechas vendidas en tu web externa para que <code>SuiteNight</code> impida reservas nativas simultáneas.</p>
+              <p class="text-xs text-slate-400 mb-4">Cierra o abre fechas vendidas en tu sistema hotelero para evitar sobreventas en Palacio del Mar.</p>
 
               <form (ngSubmit)="syncAvailability()" class="space-y-3 text-xs">
                 <div>
-                  <label class="block text-slate-400 mb-1">External ID de Habitación *</label>
+                  <label class="block text-slate-400 mb-1">Código de Habitación (ID) *</label>
                   <input [(ngModel)]="avail.externalId" name="aExtId" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
                 </div>
                 <div class="grid grid-cols-2 gap-3">

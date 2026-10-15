@@ -4,6 +4,7 @@ import co.palaciodelmar.backend.dto.ApiResponse;
 import co.palaciodelmar.backend.dto.WebhookDeliveryDTO;
 import co.palaciodelmar.backend.dto.WebhookSubscriptionDTO;
 import co.palaciodelmar.backend.dto.WebhookSubscriptionRequest;
+import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.webhook.HostWebhookService;
 import jakarta.validation.Valid;
@@ -21,40 +22,44 @@ public class HostWebhookController {
 
     private final HostWebhookService hostWebhookService;
 
-    @GetMapping("/subscriptions")
+    @GetMapping({"", "/subscriptions"})
     public ResponseEntity<ApiResponse<List<WebhookSubscriptionDTO>>> getSubscriptions(
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false) String propertyId
     ) {
-        List<WebhookSubscriptionDTO> list = hostWebhookService.getSubscriptions(principal.getUser(), propertyId);
+        User user = principal != null ? principal.getUser() : null;
+        List<WebhookSubscriptionDTO> list = hostWebhookService.getSubscriptions(user, propertyId);
         return ResponseEntity.ok(ApiResponse.ok(list));
     }
 
-    @PostMapping("/subscriptions")
+    @PostMapping({"", "/subscriptions"})
     public ResponseEntity<ApiResponse<WebhookSubscriptionDTO>> createSubscription(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody WebhookSubscriptionRequest request
     ) {
-        WebhookSubscriptionDTO created = hostWebhookService.createSubscription(principal.getUser(), request);
+        User user = principal != null ? principal.getUser() : null;
+        WebhookSubscriptionDTO created = hostWebhookService.createSubscription(user, request);
         return ResponseEntity.ok(ApiResponse.ok("Suscripción de webhook creada exitosamente", created));
     }
 
-    @PutMapping("/subscriptions/{id}")
+    @PutMapping({"/{id}", "/subscriptions/{id}"})
     public ResponseEntity<ApiResponse<WebhookSubscriptionDTO>> updateSubscription(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id,
             @RequestBody WebhookSubscriptionRequest request
     ) {
-        WebhookSubscriptionDTO updated = hostWebhookService.updateSubscription(principal.getUser(), id, request);
+        User user = principal != null ? principal.getUser() : null;
+        WebhookSubscriptionDTO updated = hostWebhookService.updateSubscription(user, id, request);
         return ResponseEntity.ok(ApiResponse.ok("Suscripción de webhook actualizada exitosamente", updated));
     }
 
-    @DeleteMapping("/subscriptions/{id}")
+    @DeleteMapping({"/{id}", "/subscriptions/{id}"})
     public ResponseEntity<ApiResponse<Void>> deleteSubscription(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id
     ) {
-        hostWebhookService.deleteSubscription(principal.getUser(), id);
+        User user = principal != null ? principal.getUser() : null;
+        hostWebhookService.deleteSubscription(user, id);
         return ResponseEntity.ok(ApiResponse.ok("Suscripción de webhook eliminada exitosamente", null));
     }
 
@@ -77,12 +82,13 @@ public class HostWebhookController {
         return ResponseEntity.ok(ApiResponse.ok("Entrega de webhook reenviada exitosamente", delivery));
     }
 
-    @PostMapping("/subscriptions/{id}/test")
+    @PostMapping({"/{id}/test", "/subscriptions/{id}/test"})
     public ResponseEntity<ApiResponse<WebhookDeliveryDTO>> sendTestEvent(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id
     ) {
-        WebhookDeliveryDTO delivery = hostWebhookService.sendTestEvent(principal.getUser(), id);
+        User user = principal != null ? principal.getUser() : null;
+        WebhookDeliveryDTO delivery = hostWebhookService.sendTestEvent(user, id);
         return ResponseEntity.ok(ApiResponse.ok("Evento de prueba emitido exitosamente", delivery));
     }
 }
