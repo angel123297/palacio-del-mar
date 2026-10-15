@@ -224,4 +224,18 @@ export interface WebhookDelivery {
   deliveredAt?: string;
 }
 
+export interface ApiKeyItem {
+  id: string;
+  propertyId: string;
+  ownerId?: string;
+  name: string;
+  keyPrefix: string;
+  rawKey?: string;
+  active: boolean;
+  createdAt?: string;
+  lastUsedAt?: string;
+  revokedAt?: string;
+}
+
+
 

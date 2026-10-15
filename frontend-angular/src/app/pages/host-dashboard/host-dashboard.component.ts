@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
-import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property, WebhookSubscription, WebhookDelivery } from '../../models/types';
+import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property, WebhookSubscription, WebhookDelivery, ApiKeyItem } from '../../models/types';
 
 export interface HostPromotionItem {
   id: string;
@@ -48,6 +48,11 @@ export interface HostPromotionItem {
                     [ngClass]="activeTab() === 'webhooks' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Webhooks
+            </button>
+            <button (click)="activeTab.set('apikeys'); fetchApiKeys();" 
+                    [ngClass]="activeTab() === 'apikeys' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
+              API Keys
             </button>
             <button (click)="activeTab.set('promotions')" 
                     [ngClass]="activeTab() === 'promotions' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
@@ -577,6 +582,125 @@ export interface HostPromotionItem {
           </div>
         </ng-container>
 
+        <!-- ==================== TAB 5: API KEYS (INTEGRACIÓN) ==================== -->
+        <ng-container *ngIf="activeTab() === 'apikeys'">
+          <!-- Top info banner with demo external hotel link -->
+          <div class="bg-gradient-to-r from-[#111] via-[#1c1813] to-[#111] border border-[rgba(201,169,110,0.4)] rounded-xl p-6 shadow-xl mb-8 flex flex-wrap justify-between items-center gap-4">
+            <div>
+              <span class="text-[10px] font-mono uppercase tracking-widest text-[#2ecc71] bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] px-2.5 py-0.5 rounded">Dirección B: Integración PMS / Web Propia</span>
+              <h2 class="font-serif text-2xl text-[#c9a96e] mt-2">API Keys para Hoteles y Anfitriones Aliados</h2>
+              <p class="text-xs text-[#f5f0e8] opacity-75 mt-1 max-w-2xl">
+                Permite a tus aplicaciones o PMS sincronizar habitaciones (<code>POST /api/integration/rooms</code>) y bloquear disponibilidad contra sobreventa (<code>PUT /api/integration/availability</code>) usando autenticación por API Key (<code>X-Palacio-Api-Key</code>).
+              </p>
+            </div>
+            <a href="http://localhost:5000/demo/external-hotel" target="_blank" class="px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-lg text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg">
+              <span>🌐 Abrir Portal del Hotel Aliado</span>
+              <span>&rarr;</span>
+            </a>
+          </div>
+
+          <!-- Newly Created Key Alert Box -->
+          <div *ngIf="recentlyCreatedKey()" class="mb-8 p-5 bg-[rgba(201,169,110,0.1)] border-2 border-[#c9a96e] rounded-xl shadow-2xl">
+            <div class="flex justify-between items-start gap-4">
+              <div class="flex-1">
+                <p class="text-xs font-bold uppercase tracking-wider text-[#c9a96e] flex items-center gap-2">
+                  <span>⚠️ ¡Guarda tu clave de API ahora!</span>
+                </p>
+                <p class="text-xs text-[#f5f0e8] opacity-80 mt-1">
+                  Por motivos de seguridad, esta es la <strong>única vez</strong> que podrás ver la clave completa en texto plano:
+                </p>
+                <div class="mt-3 flex items-center gap-3">
+                  <input type="text" readonly [value]="recentlyCreatedKey()" class="bg-[#000] border border-[rgba(201,169,110,0.5)] text-[#2ecc71] font-mono text-sm px-4 py-2 rounded-md w-full max-w-lg select-all">
+                  <button (click)="copyRecentlyCreatedKey()" class="px-4 py-2 bg-[rgba(201,169,110,0.3)] hover:bg-[#c9a96e] hover:text-[#0d0d0d] text-[#c9a96e] rounded-md text-xs font-bold uppercase tracking-wider transition">
+                    Copiar
+                  </button>
+                </div>
+              </div>
+              <button (click)="recentlyCreatedKey.set('')" class="text-[#f5f0e8] opacity-60 hover:opacity-100 text-sm">✕</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left: Create API Key Form -->
+            <div class="bg-[#111] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 shadow-xl">
+              <h3 class="font-serif text-xl text-[#c9a96e] mb-2">Generar Nueva API Key</h3>
+              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Genera un token seguro con prefijo <code>pdm_live_</code> vinculado a una de tus propiedades.</p>
+
+              <form (ngSubmit)="submitApiKey()" class="space-y-4">
+                <div>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Alojamiento / Propiedad *</label>
+                  <select [(ngModel)]="newApiKey.propertyId" name="keyPropId" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <option value="">-- Selecciona un Alojamiento --</option>
+                    <option *ngFor="let prop of properties()" [value]="prop.id || prop._id">
+                      {{ prop.name }} ({{ prop.city }})
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Nombre / Identificador de la Clave *</label>
+                  <input type="text" [(ngModel)]="newApiKey.name" name="keyName" placeholder="Ej: Motor PMS Hotel Aliado" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                </div>
+
+                <div *ngIf="apiKeyError" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
+                  {{ apiKeyError }}
+                </div>
+                <div *ngIf="apiKeySuccess" class="p-3 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded text-xs">
+                  {{ apiKeySuccess }}
+                </div>
+
+                <button type="submit" [disabled]="submittingApiKey" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2">
+                  {{ submittingApiKey ? 'Generando...' : 'Crear API Key' }}
+                </button>
+              </form>
+            </div>
+
+            <!-- Right: Active API Keys List -->
+            <div class="lg:col-span-2 space-y-4">
+              <div class="flex justify-between items-center mb-2">
+                <h3 class="font-serif text-2xl text-[#c9a96e]">Claves Registradas ({{ apiKeys().length }})</h3>
+                <button (click)="fetchApiKeys()" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Refrescar</button>
+              </div>
+
+              <div *ngIf="apiKeys().length === 0" class="border border-[rgba(201,169,110,0.2)] rounded-xl bg-[#111] p-12 text-center text-[#f5f0e8] opacity-60 text-sm">
+                No tienes API Keys activas todavía. Genera una en el formulario para conectar tu software externo o PMS.
+              </div>
+
+              <div class="space-y-4" *ngIf="apiKeys().length > 0">
+                <div *ngFor="let k of apiKeys()" class="bg-[#111] border border-[rgba(201,169,110,0.25)] rounded-xl p-5 flex flex-col justify-between">
+                  <div>
+                    <div class="flex justify-between items-start gap-4 mb-2">
+                      <div>
+                        <h4 class="font-semibold text-base text-[#f5f0e8]">{{ k.name }}</h4>
+                        <p class="text-xs text-[#c9a96e] mt-0.5">Propiedad ID: {{ k.propertyId }}</p>
+                      </div>
+                      <span [ngClass]="k.active ? 'bg-[rgba(46,204,113,0.2)] text-[#2ecc71]' : 'bg-[rgba(231,76,60,0.2)] text-[#e74c3c]'" class="px-2.5 py-0.5 font-bold text-[10px] tracking-wider uppercase rounded-full whitespace-nowrap">
+                        {{ k.active ? '● Activa' : '○ Revocada' }}
+                      </span>
+                    </div>
+
+                    <div class="bg-[rgba(0,0,0,0.4)] border border-[rgba(255,255,255,0.06)] rounded p-2.5 mb-3 flex flex-wrap justify-between items-center text-xs">
+                      <div class="flex items-center gap-2">
+                        <span class="text-[#c9a96e] font-semibold uppercase text-[10px]">Prefijo:</span>
+                        <code class="text-[#2ecc71] font-mono bg-[rgba(255,255,255,0.05)] px-2 py-0.5 rounded">{{ k.keyPrefix }}</code>
+                      </div>
+                      <div class="text-[10px] text-[#f5f0e8] opacity-60 mt-1 md:mt-0">
+                        Último uso: {{ k.lastUsedAt ? (k.lastUsedAt | date:'short') : 'Nunca' }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="pt-3 border-t border-[rgba(255,255,255,0.08)] flex justify-end gap-3 text-xs">
+                    <button *ngIf="k.active" (click)="revokeApiKey(k.id)" class="px-3 py-1.5 bg-[rgba(231,76,60,0.15)] hover:bg-[rgba(231,76,60,0.3)] text-[#e74c3c] rounded text-xs font-semibold uppercase tracking-wider transition">
+                      Revocar Clave
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
       </div>
     </div>
   `
@@ -584,7 +708,7 @@ export interface HostPromotionItem {
 export class HostDashboardComponent implements OnInit {
   api = inject(ApiService);
   
-  activeTab = signal<'bookings' | 'promotions' | 'properties' | 'webhooks'>('bookings');
+  activeTab = signal<'bookings' | 'promotions' | 'properties' | 'webhooks' | 'apikeys'>('bookings');
 
   metrics = signal<DashboardMetricsDTO | null>(null);
   bookings = signal<Booking[]>([]);
@@ -646,6 +770,17 @@ export class HostDashboardComponent implements OnInit {
   webhookError = '';
   webhookSuccess = '';
 
+  // Host API Keys State
+  apiKeys = signal<ApiKeyItem[]>([]);
+  recentlyCreatedKey = signal<string>('');
+  newApiKey = {
+    propertyId: '',
+    name: ''
+  };
+  submittingApiKey = false;
+  apiKeyError = '';
+  apiKeySuccess = '';
+
   ngOnInit(): void {
     this.fetchMetrics();
     this.fetchBookings();
@@ -654,6 +789,66 @@ export class HostDashboardComponent implements OnInit {
     this.fetchSubscriptions();
     this.fetchDeliveries();
     this.fetchDemoFailureStatus();
+    this.fetchApiKeys();
+  }
+
+  fetchApiKeys() {
+    this.api.get<ApiResponse<ApiKeyItem[]>>('/host/api-keys').subscribe({
+      next: (res) => {
+        const list = res?.data || (res as any) || [];
+        this.apiKeys.set(Array.isArray(list) ? list : []);
+      }
+    });
+  }
+
+  submitApiKey() {
+    this.apiKeyError = '';
+    this.apiKeySuccess = '';
+
+    if (!this.newApiKey.propertyId || !this.newApiKey.name) {
+      this.apiKeyError = 'Por favor selecciona la propiedad e indica un nombre identificador';
+      return;
+    }
+
+    this.submittingApiKey = true;
+    this.api.post<ApiResponse<ApiKeyItem>>('/host/api-keys', this.newApiKey).subscribe({
+      next: (res) => {
+        this.submittingApiKey = false;
+        this.apiKeySuccess = '¡API Key generada exitosamente!';
+        if (res?.data?.rawKey) {
+          this.recentlyCreatedKey.set(res.data.rawKey);
+        }
+        this.newApiKey = { propertyId: '', name: '' };
+        this.fetchApiKeys();
+      },
+      error: (err) => {
+        this.submittingApiKey = false;
+        this.apiKeyError = err?.error?.message || 'Error al generar la API Key';
+      }
+    });
+  }
+
+  revokeApiKey(id: string) {
+    if (!id || !confirm('¿Estás seguro de revocar esta API Key? Los sistemas externos que la utilicen dejarán de tener acceso.')) return;
+    this.api.delete<ApiResponse<void>>(`/host/api-keys/${id}`).subscribe({
+      next: () => {
+        this.actionMessage.set('API Key revocada.');
+        setTimeout(() => this.actionMessage.set(''), 3000);
+        this.fetchApiKeys();
+      },
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al revocar API Key');
+        setTimeout(() => this.actionError.set(''), 4000);
+      }
+    });
+  }
+
+  copyRecentlyCreatedKey() {
+    if (this.recentlyCreatedKey()) {
+      navigator.clipboard.writeText(this.recentlyCreatedKey());
+      this.actionMessage.set('Clave copiada al portapapeles');
+      setTimeout(() => this.actionMessage.set(''), 3000);
+    }
   }
 
   fetchSubscriptions() {
