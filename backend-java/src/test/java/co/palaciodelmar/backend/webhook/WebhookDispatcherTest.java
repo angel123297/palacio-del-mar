@@ -65,7 +65,7 @@ class WebhookDispatcherTest {
         HttpResponse<String> mockResponse = mock(HttpResponse.class);
         when(mockResponse.statusCode()).thenReturn(200);
         when(mockResponse.body()).thenReturn("{\"ok\":true}");
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(mockResponse);
+        doReturn(mockResponse).when(httpClient).send(any(HttpRequest.class), any());
 
         co.palaciodelmar.backend.dto.BookingDTO booking = co.palaciodelmar.backend.dto.BookingDTO.builder()
                 .id("b_123")
@@ -142,7 +142,7 @@ class WebhookDispatcherTest {
         HttpResponse<String> mockResponse = mock(HttpResponse.class);
         when(mockResponse.statusCode()).thenReturn(500);
         when(mockResponse.body()).thenReturn("Internal Server Error");
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(mockResponse);
+        doReturn(mockResponse).when(httpClient).send(any(HttpRequest.class), any());
 
         BookingDomainEvent event = BookingDomainEvent.builder()
                 .eventType("booking.created")
@@ -167,6 +167,8 @@ class WebhookDispatcherTest {
     void testDeliveryFailsPermanentlyAfterMaxAttemptsExhausted() throws IOException, InterruptedException {
         WebhookDelivery delivery = WebhookDelivery.builder()
                 .id("del_exhausted")
+                .eventId("evt_ex_1")
+                .eventType("test.exhausted")
                 .subscriptionId("sub_01")
                 .propertyId("prop_01")
                 .ownerId("host_01")
@@ -180,7 +182,7 @@ class WebhookDispatcherTest {
         HttpResponse<String> mockResponse = mock(HttpResponse.class);
         when(mockResponse.statusCode()).thenReturn(502);
         when(mockResponse.body()).thenReturn("Bad Gateway");
-        when(httpClient.send(any(HttpRequest.class), any())).thenReturn(mockResponse);
+        doReturn(mockResponse).when(httpClient).send(any(HttpRequest.class), any());
 
         dispatcher.executeDelivery(delivery, "mysecret");
 

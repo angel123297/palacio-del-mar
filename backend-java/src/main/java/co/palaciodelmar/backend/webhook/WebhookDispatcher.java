@@ -119,11 +119,11 @@ public class WebhookDispatcher {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(delivery.getTargetUrl()))
                 .header("Content-Type", "application/json")
-                .header("X-Palacio-Signature", signature)
-                .header("X-Palacio-Event-Id", delivery.getEventId())
-                .header("X-Palacio-Event-Type", delivery.getEventType())
+                .header("X-Palacio-Signature", signature != null ? signature : "")
+                .header("X-Palacio-Event-Id", delivery.getEventId() != null ? delivery.getEventId() : "")
+                .header("X-Palacio-Event-Type", delivery.getEventType() != null ? delivery.getEventType() : "")
                 .header("X-Palacio-Timestamp", timestamp)
-                .POST(HttpRequest.BodyPublishers.ofString(delivery.getPayload()))
+                .POST(HttpRequest.BodyPublishers.ofString(delivery.getPayload() != null ? delivery.getPayload() : "{}"))
                 .timeout(Duration.ofSeconds(4))
                 .build();
 
