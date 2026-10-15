@@ -32,7 +32,7 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
               <a routerLink="/perfil" class="btn-outline nav-user-btn" style="padding: 6px 14px; text-decoration: none;">
                 Perfil
               </a>
-              <a *ngIf="(user.role || '').toLowerCase() === 'admin' || (user.role || '').toLowerCase() === 'host'" routerLink="/anfitrion" class="btn-outline" style="padding: 6px 14px; text-decoration: none;">
+              <a *ngIf="(user.role || '').toLowerCase() === 'host'" routerLink="/anfitrion" class="btn-outline" style="padding: 6px 14px; text-decoration: none;">
                 Anfitrión
               </a>
               <a *ngIf="(user.role || '').toLowerCase() === 'admin'" routerLink="/admin" class="btn-outline" style="padding: 6px 14px; text-decoration: none;">
