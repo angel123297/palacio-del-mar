@@ -19,6 +19,17 @@ public class DemoWebhookReceiverController {
     private final List<Map<String, Object>> receivedEvents = new CopyOnWriteArrayList<>();
     private volatile boolean simulateFailure = false;
 
+    @GetMapping
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getInfo() {
+        return ResponseEntity.ok(ApiResponse.ok("Receptor Demo de Webhooks Palacio del Mar", Map.of(
+                "status", "ONLINE",
+                "simulateFailure", simulateFailure,
+                "receivedEventsCount", receivedEvents.size(),
+                "recentEvents", receivedEvents,
+                "usage", "Este endpoint recibe peticiones POST con cabecera X-Palacio-Signature para registrar entregas de webhooks en vivo."
+        )));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> receiveWebhook(
             @RequestHeader(value = "X-Palacio-Signature", required = false) String signature,
