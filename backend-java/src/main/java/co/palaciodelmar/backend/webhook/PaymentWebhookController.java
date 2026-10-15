@@ -26,7 +26,7 @@ public class PaymentWebhookController {
     ) {
         if (rawBody == null || rawBody.isBlank()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.badRequest("Cuerpo del webhook no puede estar vacío"));
+                    .body(ApiResponse.error("Cuerpo del webhook no puede estar vacío"));
         }
 
         try {
@@ -35,15 +35,15 @@ public class PaymentWebhookController {
         } catch (SecurityException e) {
             log.warn("Firma inválida o no autorizada en webhook: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error(e.getMessage(), HttpStatus.UNAUTHORIZED.value()));
+                    .body(ApiResponse.error(e.getMessage()));
         } catch (IllegalArgumentException e) {
             log.warn("Error de validación en webhook: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.badRequest(e.getMessage()));
+                    .body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
             log.error("Error inesperado procesando webhook de pago: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error interno al procesar webhook: " + e.getMessage(), 500));
+                    .body(ApiResponse.error("Error interno al procesar webhook: " + e.getMessage()));
         }
     }
 }
