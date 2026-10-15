@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
-import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse } from '../../models/types';
+import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property } from '../../models/types';
 
 export interface HostPromotionItem {
   id: string;
@@ -30,7 +30,7 @@ export interface HostPromotionItem {
         <div class="flex flex-wrap justify-between items-center mb-8 gap-4">
           <div>
             <h1 class="font-serif text-4xl text-[#c9a96e]">Panel del Anfitrión</h1>
-            <p class="text-[#f5f0e8] opacity-70 text-xs tracking-widest uppercase mt-1">Gestión Operativa de Sucursal</p>
+            <p class="text-[#f5f0e8] opacity-70 text-xs tracking-widest uppercase mt-1">Marketplace de Hospedaje</p>
           </div>
           <!-- Tabs Switcher -->
           <div class="flex gap-2 bg-[#111] p-1.5 rounded-lg border border-[rgba(201,169,110,0.3)]">
@@ -39,10 +39,15 @@ export interface HostPromotionItem {
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Reservas & Recepción
             </button>
+            <button (click)="activeTab.set('properties')" 
+                    [ngClass]="activeTab() === 'properties' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
+              Mis Alojamientos
+            </button>
             <button (click)="activeTab.set('promotions')" 
                     [ngClass]="activeTab() === 'promotions' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
-              Promociones de mi Sede
+              Promociones
             </button>
           </div>
         </div>
@@ -257,6 +262,105 @@ export interface HostPromotionItem {
           </div>
         </ng-container>
 
+        <!-- ==================== TAB 3: MIS ALOJAMIENTOS ==================== -->
+        <ng-container *ngIf="activeTab() === 'properties'">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Register Property Form -->
+            <div class="bg-[#111] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 h-fit">
+              <h2 class="font-serif text-2xl text-[#c9a96e] mb-1">Publicar Alojamiento</h2>
+              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Registra tu hotel, suite o habitación con comisión baja (8%)</p>
+
+              <form (ngSubmit)="submitProperty()" class="space-y-4">
+                <div>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Nombre del Alojamiento *</label>
+                  <input type="text" [(ngModel)]="newProperty.name" name="propName" required placeholder="Ej: Cabaña Las Olas" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Tipo *</label>
+                    <select [(ngModel)]="newProperty.type" name="propType" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                      <option value="HOTEL">Hotel</option>
+                      <option value="ROOM">Habitación</option>
+                      <option value="APARTMENT">Apartamento</option>
+                      <option value="VILLA">Villa</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Ciudad *</label>
+                    <input type="text" [(ngModel)]="newProperty.city" name="propCity" required placeholder="Cartagena" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Dirección *</label>
+                  <input type="text" [(ngModel)]="newProperty.address" name="propAddress" required placeholder="Calle 30 # 8B-25, Getsemaní" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                </div>
+
+                <div>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Descripción</label>
+                  <textarea [(ngModel)]="newProperty.description" name="propDesc" rows="2" placeholder="Hermoso espacio frente al mar..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]"></textarea>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">URL Imagen Principal</label>
+                  <input type="url" [(ngModel)]="newProperty.mainImage" name="propImg" placeholder="https://..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                </div>
+
+                <div *ngIf="propertyError" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
+                  {{ propertyError }}
+                </div>
+                <div *ngIf="propertySuccess" class="p-3 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded text-xs">
+                  {{ propertySuccess }}
+                </div>
+
+                <button type="submit" [disabled]="submittingProperty" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2">
+                  {{ submittingProperty ? 'Guardando...' : 'Publicar Alojamiento' }}
+                </button>
+              </form>
+            </div>
+
+            <!-- List of My Properties -->
+            <div class="lg:col-span-2 space-y-4">
+              <div class="flex justify-between items-center mb-2">
+                <h2 class="font-serif text-2xl text-[#c9a96e]">Mis Alojamientos ({{ properties().length }})</h2>
+                <button (click)="fetchProperties()" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Refrescar</button>
+              </div>
+
+              <div *ngIf="properties().length === 0" class="border border-[rgba(201,169,110,0.2)] rounded-xl bg-[#111] p-12 text-center text-[#f5f0e8] opacity-60 text-sm">
+                No tienes alojamientos registrados todavía. ¡Publica tu primer hotel o habitación en el formulario de la izquierda!
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div *ngFor="let prop of properties()" class="bg-[#111] border border-[rgba(201,169,110,0.25)] hover:border-[#c9a96e] rounded-xl overflow-hidden transition flex flex-col justify-between">
+                  <div *ngIf="prop.mainImage" class="h-36 w-full overflow-hidden bg-[#222]">
+                    <img [src]="prop.mainImage" [alt]="prop.name" class="w-full h-full object-cover">
+                  </div>
+                  <div class="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div class="flex justify-between items-start gap-2 mb-2">
+                        <h3 class="font-semibold text-lg text-[#f5f0e8]">{{ prop.name }}</h3>
+                        <span [ngClass]="prop.status === 'APPROVED' ? 'bg-[rgba(46,204,113,0.2)] text-[#2ecc71]' : 'bg-[rgba(241,196,15,0.2)] text-[#f1c40f]'" class="px-2.5 py-0.5 font-bold text-[10px] tracking-wider uppercase rounded-full">
+                          {{ prop.status === 'APPROVED' ? '● Aprobado' : '⏳ Pendiente' }}
+                        </span>
+                      </div>
+                      <p class="text-xs text-[#c9a96e] mb-1">📍 {{ prop.city }} &bull; {{ prop.address }}</p>
+                      <p *ngIf="prop.description" class="text-xs text-[#f5f0e8] opacity-75 line-clamp-2 mb-3">{{ prop.description }}</p>
+                    </div>
+
+                    <div class="pt-3 border-t border-[rgba(255,255,255,0.08)] flex justify-between items-center text-xs">
+                      <span class="text-[#f5f0e8] opacity-60">Comisión: <strong class="text-[#c9a96e]">8%</strong></span>
+                      <span class="text-[#f5f0e8] opacity-60">{{ prop.suitesCount || 0 }} habitacion(es)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </ng-container>
+
       </div>
     </div>
   `
@@ -264,11 +368,12 @@ export interface HostPromotionItem {
 export class HostDashboardComponent implements OnInit {
   api = inject(ApiService);
   
-  activeTab = signal<'bookings' | 'promotions'>('bookings');
+  activeTab = signal<'bookings' | 'promotions' | 'properties'>('bookings');
 
   metrics = signal<DashboardMetricsDTO | null>(null);
   bookings = signal<Booking[]>([]);
   promotions = signal<HostPromotionItem[]>([]);
+  properties = signal<Property[]>([]);
   loading = signal(true);
   actionMessage = signal<string>('');
   actionError = signal<string>('');
@@ -294,10 +399,66 @@ export class HostDashboardComponent implements OnInit {
   promoError = '';
   promoSuccess = '';
 
+  // Host Property Form
+  newProperty = {
+    name: '',
+    type: 'HOTEL',
+    city: 'Cartagena',
+    address: '',
+    description: '',
+    phone: '',
+    mainImage: ''
+  };
+  submittingProperty = false;
+  propertyError = '';
+  propertySuccess = '';
+
   ngOnInit(): void {
     this.fetchMetrics();
     this.fetchBookings();
     this.fetchPromotions();
+    this.fetchProperties();
+  }
+
+  fetchProperties() {
+    this.api.get<ApiResponse<Property[]>>('/host/properties').subscribe({
+      next: (res) => {
+        const list = res.data || (res as any) || [];
+        this.properties.set(Array.isArray(list) ? list : []);
+      }
+    });
+  }
+
+  submitProperty() {
+    this.propertyError = '';
+    this.propertySuccess = '';
+
+    if (!this.newProperty.name || !this.newProperty.city || !this.newProperty.address) {
+      this.propertyError = 'Por favor completa nombre, ciudad y dirección';
+      return;
+    }
+
+    this.submittingProperty = true;
+    this.api.post<ApiResponse<Property>>('/host/properties', this.newProperty).subscribe({
+      next: (res) => {
+        this.submittingProperty = false;
+        this.propertySuccess = '¡Alojamiento registrado exitosamente! En revisión por administración.';
+        this.newProperty = {
+          name: '',
+          type: 'HOTEL',
+          city: 'Cartagena',
+          address: '',
+          description: '',
+          phone: '',
+          mainImage: ''
+        };
+        this.fetchProperties();
+      },
+      error: (err) => {
+        this.submittingProperty = false;
+        this.propertyError = err?.error?.message || 'Error al registrar el alojamiento';
+      }
+    });
   }
 
   fetchMetrics() {

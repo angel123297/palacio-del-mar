@@ -22,6 +22,7 @@ public class DataInitializer implements CommandLineRunner {
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
     private final SuiteNightRepository suiteNightRepository;
+    private final PropertyRepository propertyRepository;
     private final PasswordEncoder passwordEncoder;
 
     @org.springframework.beans.factory.annotation.Value("${admin.default.password:Admin123456!}")
@@ -622,6 +623,41 @@ public class DataInitializer implements CommandLineRunner {
                     .updatedAt(Instant.now())
                     .build();
             userRepository.save(guest);
+        }
+
+        // Migración/Seed de Sedes a Propiedades en el Marketplace
+        User hostUser = userRepository.findByEmail("anfitrion@palaciodelmar.co").orElse(null);
+        if (hostUser != null) {
+            for (Branch b : branchRepository.findAll()) {
+                Property prop = propertyRepository.findBySlug(b.getSlug()).orElse(null);
+                if (prop == null) {
+                    prop = propertyRepository.save(Property.builder()
+                            .ownerId(hostUser.getId())
+                            .name(b.getName())
+                            .slug(b.getSlug())
+                            .type("HOTEL")
+                            .city("Cartagena")
+                            .address(b.getAddress())
+                            .description(b.getDescription())
+                            .shortDescription(b.getTagline())
+                            .mainImage(b.getMainImage())
+                            .phone(b.getPhone())
+                            .status("APPROVED")
+                            .active(true)
+                            .commissionRate(new BigDecimal("0.08"))
+                            .createdAt(Instant.now())
+                            .updatedAt(Instant.now())
+                            .build());
+                }
+                // Actualizar suites con propertyId
+                List<Suite> suites = suiteRepository.findByBranchAndActiveTrue(b.getId());
+                for (Suite s : suites) {
+                    if (s.getPropertyId() == null) {
+                        s.setPropertyId(prop.getId());
+                        suiteRepository.save(s);
+                    }
+                }
+            }
         }
     }
 }
