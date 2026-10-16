@@ -90,4 +90,40 @@ class AutoStayLifecycleSchedulerTest {
         assertTrue(booking.getGuaranteeRefunded());
         assertEquals(new BigDecimal("100000"), booking.getRefundedAmount());
     }
+
+    @Test
+    @DisplayName("Late Check-out: Si el PIN sigue activo pasadas las 13:00 antes de cerrar, se aplica recargo del 50%")
+    void testLateCheckOutPenaltyAppliedWhenPinActiveAfter13() {
+        LocalDate today = LocalDate.now();
+
+        Booking booking = Booking.builder()
+                .id("bk-late-1")
+                .status("checked_in")
+                .checkIn(today.minusDays(2))
+                .checkOut(today)
+                .smartLockPin("654321")
+                .pricePerNight(new BigDecimal("300000"))
+                .totalPrice(new BigDecimal("600000"))
+                .balanceDue(BigDecimal.ZERO)
+                .paidAmount(new BigDecimal("600000"))
+                .guaranteeDeposit(new BigDecimal("100000"))
+                .guaranteeRefunded(false)
+                .refundedAmount(BigDecimal.ZERO)
+                .build();
+
+        when(bookingRepository.findByStatusIn(List.of("checked_in"))).thenReturn(List.of(booking));
+
+        // Ejecutar a las 13:30 (pasadas las 13:00 límite)
+        scheduler.processAutoCheckOuts(today, LocalTime.of(13, 30));
+
+        verify(bookingService, atLeastOnce()).changeBookingStatus(
+                eq(booking), eq(BookingStatus.CHECKED_OUT), any(), any()
+        );
+
+        // Recargo de 50% de 300000 = 150000
+        assertEquals(new BigDecimal("750000.00"), booking.getTotalPrice());
+        assertEquals(new BigDecimal("150000.00"), booking.getBalanceDue());
+        assertNull(booking.getSmartLockPin()); // PIN desactivado al cerrar
+        assertTrue(booking.getGuaranteeRefunded());
+    }
 }
