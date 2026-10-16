@@ -92,6 +92,31 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendReviewInvitation(Booking booking) {
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom("experiencias@palaciodelmar.co");
+            String email = userRepository.findById(booking.getUser()).map(User::getEmail).orElse("cliente@ejemplo.com");
+            helper.setTo(email);
+            helper.setSubject("¿Cómo estuvo tu estadía? - Califica tu experiencia");
+
+            String link = "http://localhost:4200/reservas/" + booking.getId();
+            String html = "<h2>¡Gracias por hospedarte con nosotros!</h2>"
+                    + "<p>Esperamos que hayas disfrutado de tu tiempo en Palacio del Mar.</p>"
+                    + "<p>Nos encantaría conocer tu opinión para seguir mejorando. Déjanos una reseña verificada de tu estancia en el siguiente enlace:</p>"
+                    + "<p><a href=\"" + link + "\" style=\"background:#c9a96e; color:#0d0d0d; padding:10px 20px; text-decoration:none; border-radius:4px; font-weight:bold;\">Calificar mi Estadía</a></p>"
+                    + "<br/><p>Tu opinión ayuda a futuros viajeros y a nuestros anfitriones.</p>";
+
+            helper.setText(html, true);
+            javaMailSender.send(message);
+        } catch (Exception e) {
+            // No lanzar excepción para evitar interrumpir tareas programadas
+        }
+    }
+
     private byte[] generateReceiptPdf(Booking booking) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document document = new Document();
