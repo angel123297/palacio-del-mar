@@ -11,6 +11,54 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-10-16 — Avance masivo: Fases 1–5 implementadas y auditoría de seguridad resuelta (Vibe)
+
+**Commits del día (últimas 24h, rama `plan/marketplace-webhooks`):**
+- [Merge PR #14: fix(security) resolución integral de auditoría Vibe (PDM-01 a PDM-03, Anti-IDOR y Payouts)](https://github.com/angel123297/palacio-del-mar/commit/35954819fca997ec922020632ba591afa7672481)
+- [test(scheduler): fijar zona horaria America/Bogota en pruebas para CI UTC](https://github.com/angel123297/palacio-del-mar/commit/b0b9040193bef6214f4a6c08befc508744eb2e9d)
+- [fix(security): resolver hallazgos de auditoría Vibe (PDM-01 a PDM-03, anti-IDOR y payouts)](https://github.com/angel123297/palacio-del-mar/commit/1dbd8ee9434ed6ec78af4918d1e97e7f43dc0773)
+- [feat(automation): motor de precios dinámicos, liquidaciones 92%, self check-in y alertas de mantenimiento](https://github.com/angel123297/palacio-del-mar/commit/0aea9f7ea88018caf6200b4c4af12632ae25c879)
+- [fix(host): retornar SuiteResponseDTO en endpoints de habitaciones (AGENTS.md regla 5)](https://github.com/angel123297/palacio-del-mar/commit/5df894f25566684cea9bcf98016ad5c591f77422)
+- [chore(fase5): CI/CD (.github/workflows/ci.yml), OpenAPI Swagger, Actuator, RoleAndIdorSecurityTest — cobertura a 136 pruebas](https://github.com/angel123297/palacio-del-mar/commit/ccfc31d6756747630ce044c0cb822b3816e9ff84)
+- [feat(catalog): unificar alojamientos aprobados del marketplace en el catálogo y filtros públicos](https://github.com/angel123297/palacio-del-mar/commit/f826e1e86c0ef7dc3e55e7d77f2313ffe4980d6f)
+- [fix(auth): persistencia robusta de sesión con token Bearer y SameSite Lax (relacionado PDM-06)](https://github.com/angel123297/palacio-del-mar/commit/159bbb0ab6da1be703ca2b9ba325471b2e4dee88)
+- [feat(admin): moderación de alojamientos en panel admin y roles en navbar](https://github.com/angel123297/palacio-del-mar/commit/d733e95f956437aec8abe15e186edbcf7b2e32b6)
+- [feat(ui,api): lenguaje hotelero y corrección de UserPrincipal en claves/notificaciones](https://github.com/angel123297/palacio-del-mar/commit/b2ea3e5385c9e0ff26179b4781cfb7e4273aadfd)
+- [fix(backend): @Autowired en constructor de WebhookDispatcher](https://github.com/angel123297/palacio-del-mar/commit/01b175155682fbf4242f6c9aa133f86743b1dde3)
+- [fix(backend): registrar bean ObjectMapper e inyección opcional](https://github.com/angel123297/palacio-del-mar/commit/300513113824dc2b5df8797fb91be8c5454b0829)
+- [fix(backend): resolver ciclo de dependencias BookingService/SimulatedPaymentGateway/PaymentWebhookService](https://github.com/angel123297/palacio-del-mar/commit/f3a8e8e644798f8c5214d6d7bfbd0b76a791a6f5)
+- [fix: mapeo GET en receptor demo y ruta demo/external-hotel en frontend](https://github.com/angel123297/palacio-del-mar/commit/2369fbe7624de539f71c07e3eac5776e014ce414)
+- [merge: feat(fase4) API key para hoteles aliados, anti-overbooking y portal demo](https://github.com/angel123297/palacio-del-mar/commit/a791d1de27b71c923fb33bcfa888378d2794bf76)
+- [feat(fase4): integración API key hoteles aliados, anti-overbooking y portal demo](https://github.com/angel123297/palacio-del-mar/commit/628a8c0d3d83f4a9cee5aaef7f2fb953249ab19e)
+- [fix(fase3): protección contra nulos en cabeceras de webhook y generics en tests](https://github.com/angel123297/palacio-del-mar/commit/9bd77195ca2d952174194511705584aa2ad0f004)
+- [merge: feat(fase3) webhooks salientes para anfitriones y receptor demo](https://github.com/angel123297/palacio-del-mar/commit/f1848427f244d2addfeb26732ade6e9c6d33b419)
+- [feat(fase3): webhooks salientes, reintentos con backoff y receptor demo](https://github.com/angel123297/palacio-del-mar/commit/2a9a65855bae4d9a74a763bbdd55a5354031b562)
+- [merge: feat/fase2-payment-webhooks](https://github.com/angel123297/palacio-del-mar/commit/49a3e4ae4027f35ab508b272dc821e2fdc9dc6e6)
+- [fix(fase2): ObjectMapper y String timestamp para JSR-310](https://github.com/angel123297/palacio-del-mar/commit/7c38570d133881efef89e645893c3eadc7efe500)
+- [fix(fase2): firmas válidas de ApiResponse.error en PaymentWebhookController](https://github.com/angel123297/palacio-del-mar/commit/9f1f31b035a5272465d355bba496d91839885857)
+- [feat(fase2): intents persistidos en Mongo, confirmación asíncrona y webhooks con HMAC e idempotencia](https://github.com/angel123297/palacio-del-mar/commit/7cfc4950f0e8983949b788f04d5314ca58bd1c26)
+- [merge: feat/fase1-property-model](https://github.com/angel123297/palacio-del-mar/commit/451739f431604dfb5e82f88e8e3dad2768a82ba8)
+- [feat(fase1): modelo multi-anfitrión, aislamiento Anti-IDOR y comisión 8% / payout 92%](https://github.com/angel123297/palacio-del-mar/commit/67b52501e4c15272a5d64fc397527e04ea09663f)
+- [fix(frontend): restaurar importación de Booking en checkout.ts](https://github.com/angel123297/palacio-del-mar/commit/4538f26551e32719cb74847000787c09821bed68)
+- [chore(fase0): limpieza de componentes innecesarios, unificación de EmailService y flujo canónico de pagos](https://github.com/angel123297/palacio-del-mar/commit/17eee97c5b8d4b30d6b7bd9eb4594d9de95ea396)
+
+(Además, el 15 oct por la tarde: [7381b993 docs: consolidar QA](https://github.com/angel123297/palacio-del-mar/commit/7381b993ceb56ea0273a8450a1e95e62454096ac), merges de fase 2 y limpieza de docs.)
+
+**Pull requests abiertos:** #14 (auditoría de seguridad) fue **fusionado** el 16 oct. Los 3 PRs abiertos restantes son **drafts antiguos con base `proyecto-angular-java`** (#12, #4, #3) — sin actividad en el día y NO deben tocarse (base protegida).
+
+**Evaluación vs plan (PLAN_MARKETPLACE.md):**
+- ✅ Fase 0 (limpieza) completada; ✅ Fase 1 (modelo multi-anfitrión + comisión 8%/92%); ✅ Fase 2 (webhooks de pago HMAC + idempotencia); ✅ Fase 3 (webhooks salientes con backoff + receptor demo); ✅ Fase 4 (API key hoteles aliados + anti-overbooking + portal demo); ✅ Fase 5 en curso: CI/CD (.github/workflows/ci.yml), Swagger, Actuator, y automaciones (precios dinámicos, self check-in, alertas de mantenimiento).
+- ✅ **Bugs PDM-01, PDM-02 y PDM-03 corregidos** (commit 1dbd8ee) y **tests @Disabled activados**: `PriceIntegritySecurityTest` ya no tiene `@Disabled` (los tests BUG-PDM-01/02 ahora son pruebas activas de regresión) y se agregó `RoleAndIdorSecurityTest` (seguridad) que cubre roles/IDOR.
+- ✅ PDM-06 atendido: sesión con Bearer + cookie SameSite Lax (commit 159bbb0).
+
+**Tests esperados en verde:** ~136 tests de backend (según commit ccfc31d: "136 pruebas, 100% pasando al incluir RoleAndIdorSecurityTest") + 20 tests intensivos de Vibe ahora todos activos. Frontend 8/8.
+
+**Riesgos / pendientes de verificar:**
+- ⚠️ El conteo de 136 tests es **reportado por los agentes**, no verificado por Vibe en CI. Revisar la corrida del pipeline en `.github/workflows/ci.yml`.
+- ⚠️ `docs/CORRECCIONES.md` fue movido a `docs/` pero `QA_REPORTE.md` y el README aún referencian `CORRECCIONES.md` en la raíz (link roto potencial).
+- ⚠️ PRs #12, #4, #3 (drafts, base `proyecto-angular-java`) siguen abiertos y desactualizados; decisión pendiente: cerrar o re-basificar.
+- ⚠️ Hallazgos restantes de AUDITORIA_SEGURIDAD.md sin confirmar: PDM-04 (paginación de reservas de host), PDM-05 (chat eliminado en Fase 0 — verificar si quedó obsoleto), PDM-07 (Random no cripto-seguro en regeneratePin), PDM-08 (mass assignment Promotion).
+
 ### 📅 2026-10-15 — Consolidación inicial (Vibe)
 - Creada `AUDITORIA_SEGURIDAD.md`: 10 hallazgos (PDM-01 a PDM-10) con severidad y fix sugerido.
 - Agregadas 3 suites de tests intensivos: `BookingOwnershipSecurityTest` (12 tests anti-IDOR), `CancellationPolicyBoundaryTest` (5 tests de frontera), `PriceIntegritySecurityTest` (3 tests de manipulación de precios).
