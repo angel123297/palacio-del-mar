@@ -62,6 +62,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/demo/webhook-receiver/**").permitAll()
                         .requestMatchers("/api/integration/**").permitAll()
                         .requestMatchers("/demo/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/checkout").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/payments/confirm").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/bookings").authenticated()

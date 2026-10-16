@@ -16,6 +16,7 @@ export const routes: Routes = [
   { path: 'calendario', loadComponent: () => import('./pages/calendar/calendar').then(m => m.CalendarComponent) },
   { path: 'verificar-email/:token', loadComponent: () => import('./pages/verify-email/verify-email').then(m => m.VerifyEmail) },
   { path: 'demo/external-hotel', loadComponent: () => import('./pages/external-hotel/external-hotel.component').then(m => m.ExternalHotelComponent) },
+  { path: 'simulador-hotel-externo', redirectTo: 'demo/external-hotel', pathMatch: 'full' },
   { path: '**', loadComponent: () => import('./pages/not-found/not-found.component').then(m => m.NotFoundComponent) }
 ];
 

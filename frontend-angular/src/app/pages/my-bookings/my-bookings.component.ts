@@ -60,7 +60,7 @@ import { finalize } from 'rxjs';
               <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase;"
                     [style.background]="booking.status === 'confirmed' ? 'rgba(46, 204, 113, 0.2)' : 'rgba(241, 196, 15, 0.2)'"
                     [style.color]="booking.status === 'confirmed' ? '#2ecc71' : '#f1c40f'">
-                {{ booking.status }}
+                {{ getStatusLabel(booking.status) }}
               </span>
               <a [routerLink]="['/reservas', booking.id || booking._id]" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Ver Detalles</a>
               <a *ngIf="booking.status === 'pending'" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Pagar</a>
@@ -117,6 +117,19 @@ export class MyBookingsComponent implements OnInit {
     private router: Router,
     public loyalty: LoyaltyService
   ) {}
+
+  getStatusLabel(status?: string): string {
+    switch (status?.toLowerCase()) {
+      case 'confirmed': return 'Confirmada';
+      case 'pending': return 'Pendiente de pago';
+      case 'cancelled': return 'Cancelada';
+      case 'completed': return 'Completada';
+      case 'checked_in': return 'En estadía';
+      case 'checked_out': return 'Finalizada';
+      case 'expired': return 'Expirada';
+      default: return status || 'Pendiente';
+    }
+  }
 
   openCancelModal(b: Booking): void {
     this.selectedCancelBooking = b;
