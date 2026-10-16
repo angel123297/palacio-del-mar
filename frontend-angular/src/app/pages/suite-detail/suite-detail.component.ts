@@ -122,6 +122,7 @@ export class SuiteDetailComponent implements OnInit {
         next: (res) => {
           this.suite = res.data || res;
           this.loading = false;
+          this.fetchLiveQuote();
           this.cdr.detectChanges();
         },
         error: () => {
@@ -138,12 +139,36 @@ export class SuiteDetailComponent implements OnInit {
     }
   }
 
+  dynamicPricingNotes: string[] = [];
+  dynamicQuoteTotal: number | null = null;
+
+  fetchLiveQuote() {
+    const sId = this.suite?.id || this.suite?._id;
+    if (!sId || !this.checkIn || !this.checkOut) return;
+    this.api.post<any>('/suites/calculate-price', {
+      suiteId: sId,
+      checkIn: this.checkIn,
+      checkOut: this.checkOut
+    }).subscribe({
+      next: (res) => {
+        const d = res?.data || res;
+        this.dynamicPricingNotes = d?.dynamicPricingNotes || [];
+        if (d?.total) {
+          this.dynamicQuoteTotal = d.total;
+        }
+        this.cdr.detectChanges();
+      },
+      error: () => {}
+    });
+  }
+
   validateDates() {
     if (this.checkOut <= this.checkIn) {
       const d = new Date(this.checkIn + 'T12:00:00');
       d.setDate(d.getDate() + 1);
       this.checkOut = format(d, 'yyyy-MM-dd');
     }
+    this.fetchLiveQuote();
   }
 
   get nights(): number {
@@ -152,6 +177,9 @@ export class SuiteDetailComponent implements OnInit {
   }
 
   get totalRoomPrice(): number {
+    if (this.dynamicQuoteTotal != null) {
+      return this.dynamicQuoteTotal;
+    }
     const base = (this.suite?.basePrice || 0) * this.nights;
     const taxes = Math.round(base * 0.19);
     return base + taxes;

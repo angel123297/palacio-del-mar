@@ -140,6 +140,17 @@ public class Booking {
 
     private String companionGuests;
 
+    /** Ajustes de tarifa dinámica aplicados al cotizar (ej. "2026-10-17: Alta demanda (ocupación 80%) (+15%)"). */
+    @Builder.Default
+    private List<String> dynamicPricingNotes = new ArrayList<>();
+
+    /** Liquidación (HostPayout) que ya incluyó esta reserva; null = pendiente de liquidar. */
+    @Indexed(sparse = true)
+    private String payoutId;
+
+    /** Momento en que se envió automáticamente la invitación a calificar la estadía. */
+    private Instant reviewRequestSentAt;
+
     @Data
     @Builder
     @NoArgsConstructor

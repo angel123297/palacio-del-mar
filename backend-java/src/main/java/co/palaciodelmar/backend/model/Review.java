@@ -45,6 +45,10 @@ public class Review {
     private List<String> keyHighlights; // e.g. ["Piscina", "Ubicación", "Desayuno"]
     private String maintenanceAlert; // e.g. "Ruido en aire acondicionado"
 
+    // Seguimiento de la alerta de mantenimiento por parte del anfitrión
+    private Instant maintenanceResolvedAt;
+    private String maintenanceResolvedBy;
+
     @Builder.Default
     private Boolean approved = true;
 

@@ -4,11 +4,17 @@ import co.palaciodelmar.backend.dto.ApiResponse;
 import co.palaciodelmar.backend.dto.HostSuiteRequest;
 import co.palaciodelmar.backend.dto.PropertyDTO;
 import co.palaciodelmar.backend.dto.PropertyRequest;
+import co.palaciodelmar.backend.dto.SuiteResponseDTO;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.PropertyService;
 import jakarta.validation.Valid;
+import co.palaciodelmar.backend.dto.HostPayoutDTO;
+import co.palaciodelmar.backend.dto.ReviewDTO;
+import co.palaciodelmar.backend.service.HostPayoutService;
+import co.palaciodelmar.backend.service.ReviewService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +27,12 @@ import java.util.List;
 public class HostPropertyController {
 
     private final PropertyService propertyService;
+
+    @Autowired(required = false)
+    private HostPayoutService hostPayoutService;
+
+    @Autowired(required = false)
+    private ReviewService reviewService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<PropertyDTO>>> getMyProperties(
@@ -65,28 +77,31 @@ public class HostPropertyController {
     // --- Sub-recursos: Habitaciones de la Propiedad (Anti-IDOR) ---
 
     @GetMapping("/{propertyId}/suites")
-    public ResponseEntity<ApiResponse<List<Suite>>> getPropertySuites(
+    public ResponseEntity<ApiResponse<List<SuiteResponseDTO>>> getPropertySuites(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String propertyId) {
         String userId = principal.getUser().getId();
         boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         List<Suite> suites = propertyService.getPropertySuitesForHost(propertyId, userId, isAdmin);
-        return ResponseEntity.ok(ApiResponse.ok(suites));
+        List<SuiteResponseDTO> dtos = suites.stream()
+                .map(s -> SuiteResponseDTO.from(s, null))
+                .toList();
+        return ResponseEntity.ok(ApiResponse.ok(dtos));
     }
 
     @PostMapping("/{propertyId}/suites")
-    public ResponseEntity<ApiResponse<Suite>> createSuite(
+    public ResponseEntity<ApiResponse<SuiteResponseDTO>> createSuite(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String propertyId,
             @Valid @RequestBody HostSuiteRequest req) {
         String userId = principal.getUser().getId();
         boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         Suite created = propertyService.createSuiteForProperty(propertyId, userId, req, isAdmin);
-        return ResponseEntity.ok(ApiResponse.ok("Habitación creada exitosamente", created));
+        return ResponseEntity.ok(ApiResponse.ok("Habitación creada exitosamente", SuiteResponseDTO.from(created, null)));
     }
 
     @PutMapping("/{propertyId}/suites/{suiteId}")
-    public ResponseEntity<ApiResponse<Suite>> updateSuite(
+    public ResponseEntity<ApiResponse<SuiteResponseDTO>> updateSuite(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String propertyId,
             @PathVariable String suiteId,
@@ -94,7 +109,7 @@ public class HostPropertyController {
         String userId = principal.getUser().getId();
         boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         Suite updated = propertyService.updateSuiteForProperty(propertyId, suiteId, userId, req, isAdmin);
-        return ResponseEntity.ok(ApiResponse.ok("Habitación actualizada exitosamente", updated));
+        return ResponseEntity.ok(ApiResponse.ok("Habitación actualizada exitosamente", SuiteResponseDTO.from(updated, null)));
     }
 
     @DeleteMapping("/{propertyId}/suites/{suiteId}")
@@ -106,5 +121,38 @@ public class HostPropertyController {
         boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         propertyService.deleteSuiteForProperty(propertyId, suiteId, userId, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok("Habitación desactivada exitosamente", null));
+    }
+
+    // --- Liquidaciones Automáticas (Host Payouts) ---
+
+    @GetMapping("/payouts")
+    public ResponseEntity<ApiResponse<List<HostPayoutDTO>>> getMyPayouts(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        String userId = principal.getUser().getId();
+        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        List<HostPayoutDTO> payouts = isAdmin && hostPayoutService != null
+                ? hostPayoutService.getPayoutsForAdmin()
+                : (hostPayoutService != null ? hostPayoutService.getPayoutsForHost(userId) : List.of());
+        return ResponseEntity.ok(ApiResponse.ok(payouts));
+    }
+
+    @PostMapping("/payouts/process-now")
+    public ResponseEntity<ApiResponse<List<HostPayoutDTO>>> triggerPayoutProcess(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin) {
+            return ResponseEntity.status(403).body(ApiResponse.error("Solo administradores pueden forzar la liquidación inmediata"));
+        }
+        List<HostPayoutDTO> payouts = hostPayoutService != null ? hostPayoutService.processAutomatedPayouts() : List.of();
+        return ResponseEntity.ok(ApiResponse.ok("Proceso de liquidación ejecutado exitosamente", payouts));
+    }
+
+    @PutMapping("/reviews/{reviewId}/resolve-maintenance")
+    public ResponseEntity<ApiResponse<ReviewDTO>> resolveMaintenance(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String reviewId) {
+        String userId = principal.getUser().getId();
+        ReviewDTO dto = reviewService != null ? reviewService.resolveMaintenanceAlert(reviewId, userId) : null;
+        return ResponseEntity.ok(ApiResponse.ok("Alerta de mantenimiento marcada como resuelta", dto));
     }
 }

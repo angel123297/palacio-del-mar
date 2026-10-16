@@ -49,6 +49,9 @@ public class BookingService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DynamicPricingService dynamicPricingService;
+
     public BookingDTO createBooking(String userId, BookingRequest request) {
 
         if (userId == null || userId.isBlank()) {
@@ -129,7 +132,12 @@ public class BookingService {
         BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null
                 ? BigDecimal.valueOf(activePromo.getDiscountPercent())
                 : BigDecimal.ZERO;
-        PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
+        Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
+                ? dynamicPricingService.adjustmentsFor(suite, request.getCheckIn(), request.getCheckOut(), null)
+                : Map.of();
+        PricingService.PricingResult pricingResult = (dynamicAdjustments != null && !dynamicAdjustments.isEmpty())
+                ? pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent, DynamicPricingService.asFactorFunction(dynamicAdjustments))
+                : pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
         BigDecimal totalRoomPrice = pricingResult.total();
 
         List<Booking.SelectedExperience> selectedExpList = parseExperiences(request.getExperiences());
@@ -195,6 +203,7 @@ public class BookingService {
                 .discount(pricingResult.discount())
                 .taxes(pricingResult.taxes())
                 .nightlyPrices(pricingResult.nightlyPrices().stream().map(np -> new Booking.NightlyPrice(np.date(), np.price())).toList())
+                .dynamicPricingNotes(new ArrayList<>(DynamicPricingService.describe(dynamicAdjustments)))
                 .appliedPromotionId(promoId)
                 .appliedPromotionName(promoName)
                 .appliedPromotionDiscountPercent(promoDiscountPercent)
@@ -312,7 +321,12 @@ public class BookingService {
         BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null
                 ? BigDecimal.valueOf(activePromo.getDiscountPercent())
                 : BigDecimal.ZERO;
-        PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
+        Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
+                ? dynamicPricingService.adjustmentsFor(suite, request.getCheckIn(), request.getCheckOut(), booking.getId())
+                : Map.of();
+        PricingService.PricingResult pricingResult = (dynamicAdjustments != null && !dynamicAdjustments.isEmpty())
+                ? pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent, DynamicPricingService.asFactorFunction(dynamicAdjustments))
+                : pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
         BigDecimal totalRoomPrice = pricingResult.total();
         List<Booking.SelectedExperience> selectedExpList = request.getExperiences() != null ? parseExperiences(request.getExperiences()) : booking.getExperiences();
         BigDecimal experiencesTotal = BigDecimal.ZERO;
@@ -339,6 +353,7 @@ public class BookingService {
         booking.setDiscount(pricingResult.discount());
         booking.setTaxes(pricingResult.taxes());
         booking.setNightlyPrices(pricingResult.nightlyPrices().stream().map(np -> new Booking.NightlyPrice(np.date(), np.price())).toList());
+        booking.setDynamicPricingNotes(new ArrayList<>(DynamicPricingService.describe(dynamicAdjustments)));
         AppliedDiscount appliedDiscount = resolveAppliedDiscount(activePromo, nights);
         booking.setAppliedPromotionId(appliedDiscount.id());
         booking.setAppliedPromotionName(appliedDiscount.name());
@@ -754,6 +769,9 @@ public class BookingService {
                 .foodOrders(booking.getFoodOrders())
                 .smartLockPin(("confirmed".equalsIgnoreCase(status) || "checked_in".equalsIgnoreCase(status) || "completed".equalsIgnoreCase(status)) ? booking.getSmartLockPin() : null)
                 .preCheckInCompleted(booking.getPreCheckInCompleted())
+                .dynamicPricingNotes(booking.getDynamicPricingNotes() != null ? booking.getDynamicPricingNotes() : java.util.List.of())
+                .payoutId(booking.getPayoutId())
+                .reviewRequestSentAt(booking.getReviewRequestSentAt())
                 .notes(booking.getNotes())
                 .cancellationReason(booking.getCancellationReason())
                 .appliedPromotionId(booking.getAppliedPromotionId())
@@ -866,6 +884,36 @@ public class BookingService {
             if (eventPublisher != null) {
                 eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
                         "booking.cancelled",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
+        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CHECKED_IN) {
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.checked_in",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
+        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT) {
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.checked_out",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
+        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.NO_SHOW) {
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.no_show",
                         booking.getId(),
                         booking.getPropertyId(),
                         toDTO(booking),
