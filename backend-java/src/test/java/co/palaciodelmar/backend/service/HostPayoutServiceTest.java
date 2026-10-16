@@ -45,7 +45,7 @@ class HostPayoutServiceTest {
     @Test
     @DisplayName("Liquidación automática: Agrupa reservas elegibles, deduce comisión de 8% y emite webhook payout.processed")
     void testProcessAutomatedPayouts() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
 
         Booking b1 = Booking.builder()
                 .id("b1")

@@ -154,7 +154,7 @@ class ReviewAndMaintenanceAutomationTest {
     @Test
     @DisplayName("Invitación automática a reseña: El scheduler envía correo al huésped para reservas finalizadas")
     void testReviewInvitationScheduler() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
 
         Booking booking = Booking.builder()
                 .id("bk-finished-1")

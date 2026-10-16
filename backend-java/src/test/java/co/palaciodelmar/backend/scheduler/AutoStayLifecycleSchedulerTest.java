@@ -12,6 +12,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,6 +21,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class AutoStayLifecycleSchedulerTest {
+
+    private static final ZoneId BOGOTA = ZoneId.of("America/Bogota");
 
     private BookingRepository bookingRepository;
     private BookingService bookingService;
@@ -37,7 +40,7 @@ class AutoStayLifecycleSchedulerTest {
     @Test
     @DisplayName("Self Check-in automático: Activa PIN y pasa a CHECKED_IN a la hora de llegada oficial (15:00)")
     void testAutoCheckInExecution() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(BOGOTA);
 
         Booking booking = Booking.builder()
                 .id("bk-checkin-1")
@@ -49,10 +52,6 @@ class AutoStayLifecycleSchedulerTest {
 
         when(bookingRepository.findByStatusIn(List.of("confirmed"))).thenReturn(List.of(booking));
 
-        scheduler.processStayLifecycleTransitions();
-
-        // Si la hora del sistema es >= 15:00, se debe ejecutar. O forzamos con ReflectionTestUtils
-        // Probamos llamando con hora baja y hora alta
         ReflectionTestUtils.setField(scheduler, "autoCheckInHour", 0); // para garantizar ejecución en cualquier hora
         scheduler.processStayLifecycleTransitions();
 
@@ -66,7 +65,7 @@ class AutoStayLifecycleSchedulerTest {
     @Test
     @DisplayName("Auto Check-out programado: A la hora de salida (12:00) devuelve depósito y pasa a CHECKED_OUT")
     void testAutoCheckOutExecution() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(BOGOTA);
 
         Booking booking = Booking.builder()
                 .id("bk-checkout-1")
@@ -94,7 +93,7 @@ class AutoStayLifecycleSchedulerTest {
     @Test
     @DisplayName("Late Check-out: Si el PIN sigue activo pasadas las 13:00 antes de cerrar, se aplica recargo del 50%")
     void testLateCheckOutPenaltyAppliedWhenPinActiveAfter13() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(BOGOTA);
 
         Booking booking = Booking.builder()
                 .id("bk-late-1")
