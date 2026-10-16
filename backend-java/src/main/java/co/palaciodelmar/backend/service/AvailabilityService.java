@@ -7,6 +7,7 @@ import co.palaciodelmar.backend.model.SuiteNight;
 import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.PromotionRepository;
+import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.Builder;
@@ -28,6 +29,7 @@ public class AvailabilityService {
     private final BookingRepository bookingRepository;
     private final PromotionRepository promotionRepository;
     private final BranchRepository branchRepository;
+    private final PropertyRepository propertyRepository;
     private final PricingService pricingService;
 
     @Data
@@ -88,8 +90,10 @@ public class AvailabilityService {
         }
 
         String resolvedBranchId = null;
+        String resolvedPropertyId = null;
         if (branchId != null && !branchId.isEmpty()) {
             resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
+            resolvedPropertyId = propertyRepository.findBySlug(branchId).map(p -> p.getId()).orElse(branchId);
         }
 
         List<Suite> allSuites = suiteRepository.findByActiveTrue();
@@ -97,8 +101,12 @@ public class AvailabilityService {
         List<SuiteAvailabilityResult> unavailableSuites = new ArrayList<>();
 
         for (Suite suite : allSuites) {
-            if (resolvedBranchId != null && !resolvedBranchId.equals(suite.getBranch())) {
-                continue;
+            if (branchId != null && !branchId.isEmpty()) {
+                boolean matchesBranch = suite.getBranch() != null && (suite.getBranch().equals(resolvedBranchId) || suite.getBranch().equals(branchId));
+                boolean matchesProperty = suite.getPropertyId() != null && (suite.getPropertyId().equals(resolvedPropertyId) || suite.getPropertyId().equals(branchId));
+                if (!matchesBranch && !matchesProperty) {
+                    continue;
+                }
             }
             if (suiteType != null && !suiteType.isEmpty() && !"Todas las suites".equalsIgnoreCase(suiteType) && !suiteType.equalsIgnoreCase(suite.getType())) {
                 continue;
@@ -162,8 +170,10 @@ public class AvailabilityService {
         int daysInMonth = startDate.lengthOfMonth();
 
         String resolvedBranchId = null;
+        String resolvedPropertyId = null;
         if (branchId != null && !branchId.isEmpty()) {
             resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
+            resolvedPropertyId = propertyRepository.findBySlug(branchId).map(p -> p.getId()).orElse(branchId);
         }
 
         List<Suite> allSuites = suiteRepository.findByActiveTrue();
@@ -179,8 +189,12 @@ public class AvailabilityService {
 
         if (filteredSuites.isEmpty() && (suiteId == null || suiteId.isBlank())) {
             for (Suite suite : allSuites) {
-                if (resolvedBranchId != null && !resolvedBranchId.equals(suite.getBranch())) {
-                    continue;
+                if (branchId != null && !branchId.isEmpty()) {
+                    boolean matchesBranch = suite.getBranch() != null && (suite.getBranch().equals(resolvedBranchId) || suite.getBranch().equals(branchId));
+                    boolean matchesProperty = suite.getPropertyId() != null && (suite.getPropertyId().equals(resolvedPropertyId) || suite.getPropertyId().equals(branchId));
+                    if (!matchesBranch && !matchesProperty) {
+                        continue;
+                    }
                 }
                 if (suiteType != null && !suiteType.isEmpty() && !"Todas las suites".equalsIgnoreCase(suiteType) && !suiteType.equalsIgnoreCase(suite.getType())) {
                     continue;

@@ -90,9 +90,15 @@ export class SuiteDetailComponent implements OnInit {
   ) {}
 
   get mapUrl(): SafeResourceUrl {
-    const address = this.suite?.branch?.address || 'Cartagena, Colombia';
+    const address = (typeof this.suite?.branch === 'object' ? this.suite.branch?.address : null) || 'Cartagena, Colombia';
     const url = `https://maps.google.com/maps?q=${encodeURIComponent(address)}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
     return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  get branchIdentifier(): string {
+    if (!this.suite) return '';
+    const b: any = this.suite.branch;
+    return b?.id || b?._id || b?.slug || this.suite.propertyId || (typeof b === 'string' ? b : '') || '';
   }
 
   ngOnInit(): void {

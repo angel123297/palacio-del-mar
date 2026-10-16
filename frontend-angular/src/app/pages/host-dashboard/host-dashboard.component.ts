@@ -361,13 +361,117 @@ export interface HostPromotionItem {
 
                     <div class="pt-3 border-t border-[rgba(255,255,255,0.08)] flex justify-between items-center text-xs">
                       <span class="text-[#f5f0e8] opacity-60">Comisión: <strong class="text-[#c9a96e]">8%</strong></span>
-                      <span class="text-[#f5f0e8] opacity-60">{{ prop.suitesCount || 0 }} habitacion(es)</span>
+                      <button type="button" (click)="openSuitesModal(prop)" class="px-3 py-1 bg-[rgba(201,169,110,0.15)] hover:bg-[#c9a96e] text-[#c9a96e] hover:text-[#0d0d0d] font-semibold rounded border border-[rgba(201,169,110,0.4)] transition flex items-center gap-1.5 cursor-pointer">
+                        <span>🛌</span> Habitaciones ({{ prop.suitesCount || 0 }})
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
+          </div>
+
+          <!-- Modal: Gestión de Habitaciones de la Propiedad -->
+          <div *ngIf="suiteModalOpen() && selectedPropertyForSuites" class="fixed inset-0 bg-black/85 z-[1000] flex items-center justify-center p-4">
+            <div class="bg-[#111] border border-[#c9a96e] rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+              <!-- Modal Header -->
+              <div class="p-6 border-b border-[rgba(201,169,110,0.3)] flex justify-between items-center bg-[rgba(201,169,110,0.05)]">
+                <div>
+                  <h3 class="font-serif text-2xl text-[#c9a96e] mb-1">Habitaciones: {{ selectedPropertyForSuites.name }}</h3>
+                  <p class="text-xs text-[#f5f0e8] opacity-70">📍 {{ selectedPropertyForSuites.city }} &bull; {{ selectedPropertyForSuites.address }}</p>
+                </div>
+                <button (click)="closeSuitesModal()" class="text-2xl text-[#f5f0e8] opacity-70 hover:opacity-100 px-3 py-1 cursor-pointer">&times;</button>
+              </div>
+
+              <!-- Modal Body -->
+              <div class="p-6 overflow-y-auto space-y-6">
+                <!-- Toast inside modal -->
+                <div *ngIf="suiteSuccess" class="p-3 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded text-xs">
+                  {{ suiteSuccess }}
+                </div>
+                <div *ngIf="suiteError" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
+                  {{ suiteError }}
+                </div>
+
+                <!-- Create Room Form -->
+                <div class="p-4 bg-[rgba(255,255,255,0.02)] border border-[rgba(201,169,110,0.2)] rounded-lg">
+                  <h4 class="text-sm font-semibold text-[#c9a96e] uppercase tracking-wider mb-3">➕ Añadir Nueva Habitación</h4>
+                  <form (ngSubmit)="submitSuite()" class="space-y-3">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Nombre de la Habitación *</label>
+                        <input type="text" [(ngModel)]="newSuite.name" name="suiteName" required placeholder="Ej: Suite Vista al Mar" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                      </div>
+                      <div>
+                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Tipo *</label>
+                        <select [(ngModel)]="newSuite.type" name="suiteType" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                          <option value="Habitación">Habitación Estándar</option>
+                          <option value="Suite Deluxe">Suite Deluxe</option>
+                          <option value="Suite Imperial">Suite Imperial</option>
+                          <option value="Villa">Villa Privada</option>
+                          <option value="Bungalow">Bungalow</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Precio por Noche (COP) *</label>
+                        <input type="number" [(ngModel)]="newSuite.basePrice" name="suitePrice" required min="50000" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                      </div>
+                      <div>
+                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Máx Huéspedes *</label>
+                        <input type="number" [(ngModel)]="newSuite.maxGuests" name="suiteGuests" required min="1" max="10" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                      </div>
+                      <div>
+                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Tamaño (m²)</label>
+                        <input type="number" [(ngModel)]="newSuite.size" name="suiteSize" min="10" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">URL Imagen de la Habitación</label>
+                      <input type="url" [(ngModel)]="newSuite.mainImage" name="suiteImg" placeholder="https://images.unsplash.com/..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    </div>
+
+                    <div class="flex justify-end pt-2">
+                      <button type="submit" [disabled]="submittingSuite" class="px-5 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded uppercase tracking-wider text-xs transition duration-200 cursor-pointer">
+                        {{ submittingSuite ? 'Guardando...' : '➕ Guardar Habitación' }}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <!-- Existing Rooms List -->
+                <div>
+                  <h4 class="text-sm font-semibold text-[#c9a96e] uppercase tracking-wider mb-3">Habitaciones Registradas ({{ propertySuites().length }})</h4>
+                  <div *ngIf="loadingSuites()" class="py-6 text-center text-xs text-[#f5f0e8] opacity-60">Cargando habitaciones...</div>
+                  <div *ngIf="!loadingSuites() && propertySuites().length === 0" class="py-6 text-center text-xs text-[#f5f0e8] opacity-60 bg-[rgba(255,255,255,0.02)] rounded border border-[rgba(255,255,255,0.05)]">
+                    No hay habitaciones registradas aún para este alojamiento. Agrega la primera en el formulario superior.
+                  </div>
+                  <div *ngIf="!loadingSuites() && propertySuites().length > 0" class="space-y-2">
+                    <div *ngFor="let s of propertySuites()" class="p-3 bg-[#161616] border border-[rgba(255,255,255,0.08)] rounded-lg flex justify-between items-center">
+                      <div>
+                        <p class="text-xs font-semibold text-[#f5f0e8]">{{ s.name }}</p>
+                        <p class="text-[10px] text-[#f5f0e8] opacity-60">{{ s.type }} &bull; Máx {{ s.maxGuests }} huéspedes &bull; {{ s.size || 30 }} m²</p>
+                      </div>
+                      <div class="text-right">
+                        <p class="text-xs font-bold text-[#c9a96e]">$ {{ s.basePrice | number:'1.0-0' }} <span class="text-[10px] font-normal text-white/50">/ noche</span></p>
+                        <span class="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#2ecc71]/20 text-[#2ecc71]">● Activa</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Modal Footer -->
+              <div class="p-4 border-t border-[rgba(201,169,110,0.2)] bg-[#0d0d0d] flex justify-end">
+                <button type="button" (click)="closeSuitesModal()" class="px-5 py-2 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)] text-white rounded text-xs uppercase tracking-wider cursor-pointer">
+                  Cerrar
+                </button>
+              </div>
+            </div>
           </div>
         </ng-container>
 
@@ -781,6 +885,25 @@ export class HostDashboardComponent implements OnInit {
   apiKeyError = '';
   apiKeySuccess = '';
 
+  // Suite Management for Property State
+  selectedPropertyForSuites: Property | null = null;
+  propertySuites = signal<any[]>([]);
+  loadingSuites = signal<boolean>(false);
+  suiteModalOpen = signal<boolean>(false);
+  submittingSuite = false;
+  suiteError = '';
+  suiteSuccess = '';
+
+  newSuite = {
+    name: '',
+    type: 'Habitación',
+    basePrice: 250000,
+    maxGuests: 2,
+    size: 28,
+    description: '',
+    mainImage: ''
+  };
+
   ngOnInit(): void {
     this.fetchMetrics();
     this.fetchBookings();
@@ -1039,6 +1162,77 @@ export class HostDashboardComponent implements OnInit {
       error: (err) => {
         this.submittingProperty = false;
         this.propertyError = err?.error?.message || 'Error al registrar el alojamiento';
+      }
+    });
+  }
+
+  openSuitesModal(prop: Property) {
+    this.selectedPropertyForSuites = prop;
+    this.suiteError = '';
+    this.suiteSuccess = '';
+    this.suiteModalOpen.set(true);
+    const propId = prop.id || prop._id;
+    if (propId) {
+      this.fetchPropertySuites(propId);
+    }
+  }
+
+  closeSuitesModal() {
+    this.suiteModalOpen.set(false);
+    this.selectedPropertyForSuites = null;
+    this.propertySuites.set([]);
+    this.suiteError = '';
+    this.suiteSuccess = '';
+  }
+
+  fetchPropertySuites(propId: string) {
+    this.loadingSuites.set(true);
+    this.api.get<ApiResponse<any[]>>(`/host/properties/${propId}/suites`).subscribe({
+      next: (res) => {
+        this.loadingSuites.set(false);
+        const list = res?.data || (res as any) || [];
+        this.propertySuites.set(Array.isArray(list) ? list : []);
+      },
+      error: () => {
+        this.loadingSuites.set(false);
+        this.propertySuites.set([]);
+      }
+    });
+  }
+
+  submitSuite() {
+    if (!this.selectedPropertyForSuites) return;
+    this.suiteError = '';
+    this.suiteSuccess = '';
+
+    if (!this.newSuite.name || !this.newSuite.basePrice) {
+      this.suiteError = 'Por favor ingresa nombre y precio de la habitación';
+      return;
+    }
+
+    const propId = this.selectedPropertyForSuites.id || this.selectedPropertyForSuites._id;
+    if (!propId) return;
+
+    this.submittingSuite = true;
+    this.api.post<ApiResponse<any>>(`/host/properties/${propId}/suites`, this.newSuite).subscribe({
+      next: () => {
+        this.submittingSuite = false;
+        this.suiteSuccess = '¡Habitación agregada con éxito!';
+        this.newSuite = {
+          name: '',
+          type: 'Habitación',
+          basePrice: 250000,
+          maxGuests: 2,
+          size: 28,
+          description: '',
+          mainImage: ''
+        };
+        this.fetchPropertySuites(propId);
+        this.fetchProperties();
+      },
+      error: (err) => {
+        this.submittingSuite = false;
+        this.suiteError = err?.error?.message || 'Error al guardar la habitación';
       }
     });
   }
