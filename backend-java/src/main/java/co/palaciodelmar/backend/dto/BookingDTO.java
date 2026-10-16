@@ -23,6 +23,9 @@ public class BookingDTO {
     private String user;
     private Suite suite;
     private Branch branch;
+    private String propertyId;
+    private BigDecimal platformFee;
+    private BigDecimal hostPayout;
     private Integer unitSlot;
     private LocalDate checkIn;
     private LocalDate checkOut;

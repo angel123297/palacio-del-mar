@@ -1,110 +1,114 @@
-# 🏰 Palacio del Mar — Enterprise Luxury Hospitality Platform
+# 🏰 Palacio del Mar — Marketplace Multi-Anfitrión de Hospedaje
 
-Bienvenido al repositorio oficial de **Palacio del Mar**, una plataforma integral de reservas hoteleras de lujo de grado empresarial para Cartagena de Indias, diseñada bajo estándares de alta disponibilidad, concurrencia transaccional y experiencia de usuario premium (estilo Booking.com / Relais & Châteaux).
+**Palacio del Mar** es una plataforma web de reservas de hospedaje multi-anfitrión orientada a Cartagena de Indias y destinos turísticos de Colombia, con un modelo de baja comisión para anfitriones (8% de tarifa de servicio frente al ~15% de plataformas tradicionales).
 
-El proyecto fue completamente migrado y refactorizado a una arquitectura moderna y desacoplada: **Spring Boot 3 + Java 21** en el Backend y **Angular 18 (Standalone Components & Signals)** en el Frontend.
+La plataforma fue desarrollada con **Spring Boot 3 + Java 21** en el backend y **Angular 18 (Standalone Components & Signals)** en el frontend, soportada por **MongoDB**, **Redis** y mensajería SMTP mediante **Mailpit**.
 
 ---
 
 ## 🚀 Arquitectura y Tecnologías
 
-- **Backend:** Java 21 LTS, Spring Boot 3.4+, Spring Data MongoDB, Spring Data Redis & In-Memory Cache (`@EnableCaching`), Tareas Asíncronas (`@EnableAsync`), Spring Security (JWT con algoritmo HMAC-SHA256), JavaMail (integrado con Mailpit).
-- **Frontend:** Angular 18+, TypeScript, Tailwind CSS, Angular Signals (programación reactiva sin Zone.js overhead), Componentes Standalone.
-- **Base de Datos & Caché:** MongoDB 7.0 (Índices únicos compuestos, control de concurrencia optimista `@Version`), Redis 7 Alpine (con fallback en memoria para desarrollo ágil).
-- **Control de Correo / SMTP:** Mailpit para captura y verificación de correos en entornos de desarrollo y pruebas.
-- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, GitHub Copilot CLI QA Suite (89 pruebas unitarias e integración pasando).
+- **Backend:** Java 21 LTS, Spring Boot 3.4+, Spring Data MongoDB, Spring Data Redis & In-Memory Cache (`@EnableCaching`), Tareas Asíncronas (`@EnableAsync`), Spring Security (JWT con algoritmo HMAC-SHA256 y persistencia en cabecera Bearer / cookie SameSite=Lax), JavaMail (integrado con Mailpit), Spring Boot Actuator, Springdoc OpenAPI 3.
+- **Frontend:** Angular 18+, TypeScript, Tailwind CSS, Angular Signals (reactividad nativa sin Zone.js overhead), Componentes Standalone.
+- **Base de Datos & Concurrencia:** MongoDB 7.0 (índices únicos compuestos, control de concurrencia optimista `@Version`), Redis 7 Alpine (con fallback en memoria para desarrollo ágil).
+- **Control de Correo / SMTP:** Mailpit para captura y verificación de correos en entornos de desarrollo y pruebas locales.
+- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, Spring MockMvc (136 pruebas unitarias y de integración pasando al 100% con JaCoCo).
+- **CI/CD:** Pipeline automatizado de GitHub Actions (`.github/workflows/ci.yml`) con compilación, ejecución de tests y verificación de calidad tanto en backend como frontend.
 
 ---
 
-## 👥 Funcionalidades por Rol
+## 👥 Funcionalidades y Roles del Marketplace
 
 ### 👑 1. Administrador (`ADMIN`)
-El rol de administración posee control total del sistema y acceso al dashboard gerencial:
+- **Panel de Moderación de Alojamientos:** Aprobación o rechazo de nuevas propiedades publicadas por anfitriones (`PENDING` -> `APPROVED` / `REJECTED`).
 - **Métricas Globales en Tiempo Real:** Total de ingresos generados, índice de ocupación global, conteo de reservas activas, completadas y canceladas.
-- **Gestión Paginada de Reservas:** Paginación real a nivel de base de datos (`Pageable` en MongoDB) sobre `/api/admin/bookings`, evitando sobrecarga de memoria.
+- **Gestión Paginada de Reservas:** Paginación real a nivel de base de datos (`Pageable` en MongoDB) sobre `/api/admin/bookings`.
 - **Control del Ciclo de Vida de Reservas:** Capacidad de confirmar, marcar check-in, check-out o cancelar reservas con motivo administrativo documentado en el historial de auditoría (`statusHistory`).
-- **Gestión de Tarifas y Promociones:** Configuración de promociones estacionales por sucursal con porcentajes de descuento dinámicos y ventanas de validez temporal.
-- **Control de Habitaciones y Sucursales:** Supervisión del inventario de suites en Centro Histórico y Getsemaní.
+- **Gestión de Tarifas y Promociones:** Configuración de promociones estacionales con porcentajes de descuento dinámicos.
 
 ### 🛎️ 2. Anfitrión (`HOST`)
-El anfitrión cuenta con una interfaz diseñada específicamente para la operación hotelera en sede:
-- **Métricas Aisladas por Sucursal:** Visualización filtrada exclusivamente para la sede asignada al anfitrión (Centro Histórico o Getsemaní).
+- **Gestión Multi-Propiedad y Habitaciones:** Registro de hoteles o villas, administración de inventario de suites y tarifas.
+- **Seguridad Anti-IDOR Estricta:** Todo endpoint de anfitrión valida que la propiedad pertenezca al usuario autenticado (`property.ownerId == currentUser.id`); de lo contrario, responde 404 (no revela la existencia de recursos ajenos).
+- **Notificaciones por Webhook (Salientes):** Registro de URLs receptoras (PMS del hotel), firma criptográfica HMAC-SHA256 en cabecera `X-Palacio-Signature`, marca de tiempo `X-Palacio-Timestamp` contra ataques de repetición, ID de idempotencia `X-Palacio-Event-Id`, y reintentos automáticos programados (1m, 5m, 30m) ante caídas del receptor.
+- **Claves de Conexión Externa (API Keys):** Generación de credenciales seguras (`pdm_...`) con hash criptográfico para conectar motores de reservas externos o sistemas PMS sin exponer contraseñas.
 - **Control de Ocupación y Huéspedes:** Monitoreo de llegadas y salidas de huéspedes con acceso a nombres, teléfonos y estado de pago.
-- **Calendario Operativo:** Verificación visual de fechas agotadas y habitaciones disponibles para asignación de llaves y servicio a la habitación.
 
 ### 🌴 3. Huésped / Usuario (`USER` / Invitado)
-Diseñado para ofrecer una experiencia de usuario fluida, elegante y sin fricciones:
-- **Autenticación Segura y Verificación de Correo:**
-  - Registro de cuenta con validación de fortaleza de credenciales.
-  - Generación de tokens criptográficos SHA-256 de un solo uso con expiración a 24 horas.
-  - Bloqueo de inicio de sesión hasta validar la cuenta mediante el enlace enviado al correo (abierto en `/verificar-email/:token`).
-- **Explorador y Buscador Dinámico:**
-  - Filtrado reactivo por sucursal (Centro Histórico vs. Getsemaní), tipo de suite y número de huéspedes.
-  - DateRangePicker personalizado de lujo con selección interactiva y bloqueo de fechas pasadas.
-- **Cálculo de Tarifas y Promociones Dinámicas:**
-  - Aplicación automática de descuentos activos por sucursal (`findActiveBranchPromotion`).
-  - Desglose transparente en el checkout: tarifa base, descuento promocional, impuestos y total a pagar.
-- **Experiencias de Lujo y Tour 360°:**
-  - Catálogo de experiencias exclusivas (paseos en yate a Islas del Rosario, cenas de alta cocina caribeña, catas de ron).
-  - Recorrido inmersivo 360° por Cartagena de Indias.
-- **Pasarela de Pagos Concurrente (Simulada):**
-  - Métodos disponibles: Tarjeta de Crédito, PSE y transferencia bancaria.
-  - Protección de concurrencia optimista (`@Version` en `Booking`) y transacciones compensatorias para evitar overbooking o dobles cobros en fechas concurrentes.
-  - Mapeo consistente de base de datos MongoDB: campos `amountPaid` y `amountRefunded` sincronizados.
-- **Panel "Mis Reservas":**
-  - Historial de reservas activas y pasadas.
-  - Vista detallada del voucher de reserva con desglose de costos y código QR.
-  - Cancelación de reservas por parte del usuario con políticas de reembolso transparentes.
+- **Autenticación Segura y Verificación de Correo:** Registro con verificación criptográfica por correo vía enlace seguro.
+- **Explorador y Buscador Unificado:** Búsqueda reactiva por ciudad o propiedad, fechas y huéspedes. Integra tanto las propiedades fundadoras como los alojamientos independientes aprobados en el marketplace.
+- **Cálculo de Tarifas y Promociones Dinámicas:** Desglose transparente en el checkout (tarifa base, tarifa de servicio de plataforma del 8%, desglose de pago al anfitrión e impuestos).
+- **Pasarela de Pagos Asíncrona (Simulada Realista):** Flujo de pago de dos fases (`processing` -> `succeeded`/`failed`), emisión de webhooks asíncronos con firma HMAC y transacciones compensatorias para evitar overbooking o dobles cobros (`@Version` en `Booking`).
+- **Panel "Mis Reservas":** Voucher digital de reserva con código QR, políticas de cancelación y reembolso transparente.
 
 ---
 
-## 🧪 Pruebas de Calidad (QA) y Verificación
+## 🔌 Webhooks e Integración Externa (PMS / Channel Manager)
 
-La plataforma cuenta con una suite completa de pruebas automatizadas:
+### Webhooks Salientes (Palacio del Mar ➔ Sistema Externo)
+Cuando ocurre un evento relevante en la plataforma (`booking.created`, `booking.confirmed`, `booking.cancelled`, `payment.succeeded`), el despachador envía una notificación HTTP POST con las siguientes cabeceras:
+- `X-Palacio-Signature`: Firma hexadecimal HMAC-SHA256 calculada sobre el cuerpo JSON con el secreto de la suscripción.
+- `X-Palacio-Event-Id`: Identificador único del evento para garantizar procesamiento idempotente.
+- `X-Palacio-Timestamp`: Marca temporal Unix para mitigar ataques de repetición (replay attacks).
+- `X-Palacio-Event-Type`: Tipo de evento notificado.
+
+### Webhooks Entrantes de Pago (Pasarela ➔ Palacio del Mar)
+- Endpoint: `POST /api/webhooks/payments`
+- Valida la firma `X-Palacio-Signature` contra el secreto configurado en la pasarela.
+- Idempotencia estricta: reenvíos del mismo `eventId` son ignorados sin duplicar transacciones.
+
+### Integración por API Key (Sistema Externo ➔ Palacio del Mar)
+Los sistemas de hotelería externa pueden interactuar directamente mediante la cabecera `X-API-KEY`:
+- `POST /api/integration/rooms`: Sincronización o actualización de habitaciones (`upsert` por `externalId`).
+- `PUT /api/integration/availability`: Bloqueo o desbloqueo de fechas desde el PMS externo, utilizando el modelo transaccional `SuiteNight` para garantizar la protección anti-overbooking frente a reservas del marketplace.
+
+---
+
+## 🧪 Pruebas Automatizadas y Calidad de Código
+
+El repositorio cuenta con **136 pruebas automatizadas** que cubren el 100% de los flujos críticos:
 
 ### Backend Java (Spring Boot):
-- **89 pruebas unitarias y de integración** aprobadas (`BUILD SUCCESS`):
-  - `BookingExpirySchedulerTest`: Validación de liberación automática de noches y expiración de reservas pendientes.
-  - `PaymentConcurrencyTest`: Verificación de rollback y compensación transaccional ante conflictos de bloqueo optimista (`@Version`).
-  - `BookingMappingTest`: Verificación de mapeo `@Field("amountPaid")` y `@Field("amountRefunded")`.
-  - `PromotionPricingTest`: Pruebas de promociones activas dinámicas por sucursal y manejo de expiración.
-  - `AuthServiceTest`: Pruebas de registro, bloqueo de login sin verificación, expiración de tokens y bypass administrativo.
-  - `BookingStateMachineTest`: Verificación exhaustiva de 49 transiciones válidas e inválidas de la máquina de estados de reservas.
-  - `BookingCancellationTest`: Pruebas de políticas de cancelación y liberación de noches (`SuiteNight`).
-  - `PricingServiceTest`: Cobertura completa de temporadas altas, cargos por huéspedes extra y descuentos.
-
 ```bash
 cd backend-java
 ./mvnw test
 ```
+- **Seguridad y Anti-IDOR (`RoleAndIdorSecurityTest`):** Verificación de aislamiento estricto entre anfitriones y rechazo de accesos no autorizados (401/403/404).
+- **Webhooks y Despacho (`WebhookDispatcherTest`, `HostWebhookServiceTest`, `PaymentWebhookServiceTest`):** Verificación de firmas HMAC, políticas de reintento, idempotencia y auditoría de entregas.
+- **Integración Externa (`IntegrationServiceTest`, `ApiKeyServiceTest`):** Alta de habitaciones externas y bloqueos anti-overbooking con `SuiteNight`.
+- **Máquina de Estados de Reserva (`BookingStateMachineTest`):** Cobertura exhaustiva de 49 transiciones válidas e inválidas del ciclo de vida de la reserva.
+- **Concurrencia y Pagos (`PaymentConcurrencyTest`, `SimulatedPaymentGatewayTest`):** Manejo de colisiones de bloqueo optimista (`@Version`) y compensaciones.
+- **Reporte JaCoCo:** Generado en `backend-java/target/site/jacoco/index.html`.
 
 ### Frontend Angular:
-- Compilación de producción limpia con arquitectura modular SCSS (`npm run build`):
 ```bash
 cd frontend-angular
 npm run build
 ```
+- Compilación de producción limpia sin errores TypeScript ni advertencias bloqueantes.
 
 ---
 
 ## 📝 Historial de Correcciones y Auditorías
-Para consultar la bitácora completa de correcciones, auditorías de calidad (incluyendo la certificación oficial de Jules) y resolución de hallazgos técnicos, consulta el documento:
-👉 **[CORRECCIONES.md](file:///home/angel19/Notas/palacio-del-mar/CORRECCIONES.md)**
+Para consultar la bitácora técnica de correcciones y evolución arquitectónica del proyecto:
+👉 **[CORRECCIONES.md](docs/CORRECCIONES.md)**
 
 ---
 
 ## 🛠️ Despliegue y Ejecución Local
 
 ### Opción 1: Docker Compose (Recomendada)
-Para levantar la base de datos, backend, frontend y servidor de correos con un solo comando:
+Para levantar el stack completo (MongoDB, Redis, Mailpit, Backend y Frontend):
 ```bash
 docker compose up -d --build
 ```
-Servicios disponibles:
+Servicios locales disponibles:
 - **Frontend Angular:** `http://localhost:4200`
 - **Backend Spring Boot:** `http://localhost:5000`
+- **Documentación Swagger / OpenAPI:** `http://localhost:5000/swagger-ui.html`
+- **Actuator Health:** `http://localhost:5000/actuator/health`
 - **Mailpit (Webmail de pruebas):** `http://localhost:8025`
-- **MongoDB:** `localhost:27017`
+- **Simulador PMS de Prueba:** `http://localhost:4200/demo/external-hotel`
+- **Receptor de Webhooks de Prueba:** `http://localhost:4200/demo/webhook-receiver`
 
 ### Opción 2: Ejecución Nativa
 1. **Backend:**
@@ -123,46 +127,19 @@ Servicios disponibles:
 
 ## 🔑 Credenciales de Prueba Preconfiguradas
 
-| Rol | Correo Electrónico | Contraseña |
-| :--- | :--- | :--- |
-| **Administrador** | `admin@palaciodelmar.co` | `Admin123456!` |
-| **Anfitrión (Getsemaní)** | `anfitrion@palaciodelmar.co` | `Host123456!` |
-| **Huésped (Verificado)** | `huesped@palaciodelmar.co` | `User123456!` |
+| Rol | Correo Electrónico | Contraseña | Descripción |
+| :--- | :--- | :--- | :--- |
+| **Administrador** | `admin@palaciodelmar.co` | `Admin123456!` | Acceso completo y moderación de alojamientos |
+| **Anfitrión Fundador** | `anfitrion@palaciodelmar.co` | `Host123456!` | Gestión de sedes iniciales (Centro Histórico y Getsemaní) |
+| **Huésped (Verificado)** | `huesped@palaciodelmar.co` | `User123456!` | Usuario con email pre-verificado para reservas |
 
 ---
 
-## 💡 Agregados Extras y Mejoras Futuras para la Plataforma
+## 💳 Tarjetas de Prueba (Pasarela Simulada)
 
-Para elevar aún más el posicionamiento comercial y la propuesta de valor tecnológico de **Palacio del Mar**, se sugieren las siguientes funcionalidades de alto impacto:
-
-### 1. 🤖 Sofía AI Concierge 2.0 (Google Gemini / Vertex AI)
-- **Asistente Multimodal de Viaje:** Integrar Gemini 1.5 Pro para brindar asistencia en lenguaje natural sobre el clima en Cartagena, recomendaciones personalizadas de restaurantes según preferencias dietéticas del huésped y reservación de suites conversacional.
-- **Audio y Llamada en Tiempo Real:** Capacidad de interacción por voz dentro de la app para huéspedes internacionales en inglés, francés y español.
-
-### 2. 📈 Motor de Precios Dinámicos Predictivo (Yield Management)
-- Algoritmo de tarificación algorítmica estilo aerolíneas/hotelería moderna que ajuste el precio por noche automáticamente según:
-  - Tasa de ocupación proyectada de la sucursal.
-  - Calendario de eventos locales (Festival de Música de Cartagena, Hay Festival, fiestas de la Independencia).
-  - Tiempo restante previo al check-in (ofertas de última hora vs. reservas anticipadas).
-
-### 3. 💳 Integración con Pasarelas Reales de Pago (Stripe & Wompi)
-- Integración oficial de Wompi (Bancolombia, Nequi, PSE) y Stripe con soporte para Apple Pay y Google Pay.
-- Implementación de Webhooks con verificación de firma HMAC para actualización asíncrona segura de reservas.
-- Manejo de retención y liberación de depósitos de garantía (security deposit) para incidentes en las suites.
-
-### 4. 📲 Check-in Digital y Llaves Móviles (Smart Lock / QR Dinámico)
-- Flujo de auto-check-in 24 horas antes de la llegada con escaneo de documento de identidad (OCR) para cumplimiento con la Policía de Turismo.
-- Llave digital accesible desde el portal móvil del usuario mediante Código QR dinámico o integración NFC con cerraduras inteligentes (ej. Yale, Salto, August).
-
-### 5. 🌟 Programa de Lealtad "The Palace Club"
-- Niveles de membresía por noches acumuladas (Silver, Gold, Platinum).
-- Sistema de puntos canjeables por experiencias gastronómicas o noches gratis.
-- Beneficios automáticos: *Early check-in* o *Late check-out* gratuito sujeto a disponibilidad.
-
-### 6. 💬 Notificaciones Transaccionales por WhatsApp (Twilio / Meta API)
-- Envío automático del voucher de reserva y ubicación GPS con botón de Google Maps y Waze directo al WhatsApp del huésped tras confirmar el pago.
-- Mensaje de bienvenida automatizado a las 9:00 AM del día del check-in con código de acceso y contacto del anfitrión.
-
-### 7. ⭐ Sistema de Reseñas Verificadas y Análisis de Sentimiento
-- Módulo de calificación exclusivo para huéspedes que hayan completado su estadía (evita reseñas falsas).
-- Análisis de sentimiento automatizado con procesamiento de lenguaje natural (NLP) en el panel de administración para detectar oportunidades de mejora en el servicio.
+| Número de Tarjeta | Comportamiento Simulado |
+| :--- | :--- |
+| `**** **** **** 4242` | Pago aprobado exitosamente (`payment.succeeded`) |
+| `**** **** **** 0002` | Tarjeta rechazada por la entidad bancaria (`payment.failed`) |
+| `**** **** **** 9995` | Fondos insuficientes (`payment.failed`) |
+| `**** **** **** 0069` | Tarjeta expirada / vencida (`payment.failed`) |

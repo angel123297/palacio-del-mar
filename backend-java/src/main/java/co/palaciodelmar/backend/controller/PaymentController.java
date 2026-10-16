@@ -1,8 +1,7 @@
 package co.palaciodelmar.backend.controller;
 
 import co.palaciodelmar.backend.dto.ApiResponse;
-import co.palaciodelmar.backend.dto.PaymentDTO;
-import co.palaciodelmar.backend.dto.PaymentRequest;
+
 
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.PaymentService;
@@ -40,30 +39,6 @@ public class PaymentController {
         return ResponseEntity.ok(ApiResponse.ok("Payment intent created", result));
     }
 
-    @PostMapping("/process")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> processPayment(
-            @AuthenticationPrincipal UserPrincipal principal,
-            @RequestBody Map<String, Object> body,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
-    ) {
-        String bookingId = (String) body.get("bookingId");
-        String method = (String) body.getOrDefault("method", "card");
-        String userId = principal != null ? principal.getUser().getId() : null;
-
-        // Create intent
-        co.palaciodelmar.backend.service.PaymentGateway.PaymentIntentResponse intentResult = paymentService.createPaymentIntent(userId, bookingId, method, idempotencyKey);
-
-        // Auto-confirm for simulated process
-        String rawCard = (String) body.get("cardNumber");
-        if (rawCard == null && body.get("cardDetails") instanceof Map<?, ?> cd) {
-            rawCard = (String) ((Map<?, ?>) cd).get("cardNumber");
-            if (rawCard == null) rawCard = (String) ((Map<?, ?>) cd).get("last4");
-        }
-        String paymentToken = rawCard != null ? ("tok_" + rawCard.trim()) : "tok_test";
-        Map<String, Object> result = paymentService.confirmPayment(userId, intentResult.intentId(), paymentToken);
-
-        return ResponseEntity.ok(ApiResponse.ok("Pago procesado exitosamente", result));
-    }
 
     @PostMapping("/confirm")
     public ResponseEntity<ApiResponse<Map<String, Object>>> confirmPayment(
@@ -76,5 +51,15 @@ public class PaymentController {
 
         Map<String, Object> result = paymentService.confirmPayment(userId, intentId, paymentToken);
         return ResponseEntity.ok(ApiResponse.ok("Pago confirmado exitosamente", result));
+    }
+
+    @GetMapping("/status/{intentId}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getPaymentStatus(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String intentId
+    ) {
+        String userId = principal != null ? principal.getUser().getId() : null;
+        Map<String, Object> status = paymentService.getPaymentStatus(intentId, userId);
+        return ResponseEntity.ok(ApiResponse.ok(status));
     }
 }

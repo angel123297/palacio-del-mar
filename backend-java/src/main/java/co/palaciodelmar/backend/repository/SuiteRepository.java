@@ -11,6 +11,10 @@ import java.util.Optional;
 public interface SuiteRepository extends MongoRepository<Suite, String> {
     Optional<Suite> findBySlug(String slug);
     List<Suite> findByBranchAndActiveTrue(String branchId);
+    List<Suite> findByPropertyId(String propertyId);
+    List<Suite> findByPropertyIdAndActiveTrue(String propertyId);
+    Optional<Suite> findByPropertyIdAndExternalId(String propertyId, String externalId);
     List<Suite> findByActiveTrue();
     long countByBranchIn(List<String> branches);
+    long countByPropertyIdIn(List<String> propertyIds);
 }

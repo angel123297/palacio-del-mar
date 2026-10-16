@@ -33,24 +33,31 @@ export class AuthService {
   }
 
   private fetchMe() {
+    const token = localStorage.getItem('token');
+    const cachedUser = localStorage.getItem('user');
+    if (!token && !cachedUser) {
+      return;
+    }
+
     this.http.get<AuthResponse>(`${this.apiUrl}/me`).subscribe({
       next: (res) => {
         const user = res.user || res.data?.user;
         if (user) {
           localStorage.setItem('user', JSON.stringify(user));
           this.currentUserSignal.set(user);
-        } else {
-          this.clearLocalData();
         }
       },
-      error: () => {
-        this.clearLocalData();
+      error: (err) => {
+        if (err?.status === 401) {
+          this.clearLocalData();
+        }
       }
     });
   }
 
   clearLocalData() {
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     this.currentUserSignal.set(null);
   }
 
@@ -58,6 +65,10 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(
       timeout(this.TIMEOUT_MS),
       tap(res => {
+        const token = (res as any).token || (res as any).data?.token;
+        if (token) {
+          localStorage.setItem('token', token);
+        }
         const user = res.user || res.data?.user;
         if (user) {
           localStorage.setItem('user', JSON.stringify(user));
@@ -69,7 +80,18 @@ export class AuthService {
 
   register(data: RegisterDTO) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/register`, data).pipe(
-      timeout(this.TIMEOUT_MS)
+      timeout(this.TIMEOUT_MS),
+      tap(res => {
+        const token = (res as any).token || (res as any).data?.token;
+        if (token) {
+          localStorage.setItem('token', token);
+        }
+        const user = res.user || res.data?.user;
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+          this.currentUserSignal.set(user);
+        }
+      })
     );
   }
 

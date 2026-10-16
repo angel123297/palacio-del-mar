@@ -6,6 +6,7 @@ dist/
 .idea/
 .DS_Store
 logs/
+*.log
 *.patch
 
 frontend/playwright-report/

@@ -23,6 +23,9 @@ public class SuiteResponseDTO implements Serializable {
 
     private String id;
     private String _id;
+    private String propertyId;
+    private String source;
+    private String externalId;
     private Branch branch;
     private String name;
     private String slug;
@@ -56,6 +59,9 @@ public class SuiteResponseDTO implements Serializable {
         return SuiteResponseDTO.builder()
                 .id(suite.getId())
                 ._id(suite.getId())
+                .propertyId(suite.getPropertyId())
+                .source(suite.getSource())
+                .externalId(suite.getExternalId())
                 .branch(branch)
                 .name(suite.getName())
                 .slug(suite.getSlug())

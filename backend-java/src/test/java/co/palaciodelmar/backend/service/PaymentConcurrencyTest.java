@@ -4,7 +4,6 @@ import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Payment;
 import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.repository.PaymentRepository;
-import co.palaciodelmar.backend.repository.SuiteRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,9 +25,7 @@ class PaymentConcurrencyTest {
     private BookingRepository bookingRepository;
     private BookingService bookingService;
     private PaymentGateway paymentGateway;
-    private EmailNotificationService emailNotificationService;
-    private WhatsAppService whatsAppService;
-    private SuiteRepository suiteRepository;
+    private EmailService emailService;
     private UserRepository userRepository;
 
     private PaymentService paymentService;
@@ -39,9 +36,7 @@ class PaymentConcurrencyTest {
         bookingRepository = mock(BookingRepository.class);
         bookingService = mock(BookingService.class);
         paymentGateway = mock(PaymentGateway.class);
-        emailNotificationService = mock(EmailNotificationService.class);
-        whatsAppService = mock(WhatsAppService.class);
-        suiteRepository = mock(SuiteRepository.class);
+        emailService = mock(EmailService.class);
         userRepository = mock(UserRepository.class);
 
         paymentService = new PaymentService(
@@ -49,9 +44,7 @@ class PaymentConcurrencyTest {
                 bookingRepository,
                 bookingService,
                 paymentGateway,
-                emailNotificationService,
-                whatsAppService,
-                suiteRepository,
+                emailService,
                 userRepository
         );
     }
