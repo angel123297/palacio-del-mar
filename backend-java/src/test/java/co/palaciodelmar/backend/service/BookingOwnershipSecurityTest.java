@@ -11,7 +11,6 @@ import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -202,8 +201,6 @@ class BookingOwnershipSecurityTest {
     }
 
     @Test
-    @Disabled("BUG-PDM-03: un HOST sin branches asignadas puede leer CUALQUIER reserva (PII + PIN). " +
-              "Al corregir getBookingByIdSecure/getBookingByCodeSecure, quitar @Disabled y este test debe pasar.")
     @DisplayName("BUG-PDM-03: un HOST sin branches NO debería poder leer reservas ajenas")
     void testHostWithoutBranchesMustNotReadOthersBookings() {
         when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(victimBooking()));

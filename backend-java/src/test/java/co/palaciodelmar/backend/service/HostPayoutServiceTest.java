@@ -50,7 +50,7 @@ class HostPayoutServiceTest {
         Booking b1 = Booking.builder()
                 .id("b1")
                 .propertyId("prop-alpha")
-                .status("checked_in")
+                .status("completed")
                 .paymentStatus("paid")
                 .paidAmount(new BigDecimal("1000000"))
                 .subtotal(new BigDecimal("1000000"))
@@ -74,6 +74,8 @@ class HostPayoutServiceTest {
                 .build();
 
         when(bookingRepository.findByStatusIn(anyList())).thenReturn(List.of(b1, b2));
+        when(bookingRepository.findById("b1")).thenReturn(Optional.of(b1));
+        when(bookingRepository.findById("b2")).thenReturn(Optional.of(b2));
 
         Property prop = Property.builder()
                 .id("prop-alpha")
@@ -120,5 +122,15 @@ class HostPayoutServiceTest {
         assertTrue(payouts.isEmpty());
         verify(hostPayoutRepository, never()).save(any());
         verify(webhookDispatcher, never()).dispatchToProperty(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Anti-doble liquidación: Si una reserva ya tiene payoutId o no está finalizada no se vuelve a liquidar")
+    void testAvoidDoublePayoutForAlreadyLiquidatedOrActiveBookings() {
+        when(bookingRepository.findByStatusIn(anyList())).thenReturn(List.of());
+
+        List<HostPayoutDTO> payouts = hostPayoutService.processAutomatedPayouts();
+        assertTrue(payouts.isEmpty());
+        verify(hostPayoutRepository, never()).save(any());
     }
 }
