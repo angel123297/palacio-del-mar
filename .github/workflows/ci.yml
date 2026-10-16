@@ -1,0 +1,80 @@
+name: Continuous Integration - Palacio del Mar
+
+on:
+  push:
+    branches:
+      - main
+      - plan/marketplace-webhooks
+      - 'feat/**'
+      - 'chore/**'
+  pull_request:
+    branches:
+      - main
+      - plan/marketplace-webhooks
+
+jobs:
+  backend:
+    name: Backend Tests & Coverage (Spring Boot 3 / Java 21)
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Make Maven Wrapper Executable
+        run: chmod +x backend-java/mvnw
+
+      - name: Run Backend Tests & Generate Coverage (JaCoCo)
+        working-directory: backend-java
+        env:
+          JWT_SECRET: c2VjdXJlX2p3dF9zZWNyZXRfa2V5X3BhbGFjaW9fZGVsX21hcl9zdWl0ZXNfdG9rZW5fMjAyNg==
+          MONGO_HOST: localhost
+          REDIS_HOST: localhost
+        run: ./mvnw -B verify
+
+      - name: Upload JaCoCo Code Coverage Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-coverage-report
+          path: backend-java/target/site/jacoco/
+          retention-days: 14
+
+  frontend:
+    name: Frontend Build & Lint (Angular 18)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend-angular/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend-angular
+        run: npm ci --legacy-peer-deps
+
+      - name: Build Angular Application
+        working-directory: frontend-angular
+        run: npm run build

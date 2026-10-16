@@ -46,6 +46,9 @@ public class BookingService {
     private final PricingService pricingService;
     private final PaymentGateway paymentGateway;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     public BookingDTO createBooking(String userId, BookingRequest request) {
 
         if (userId == null || userId.isBlank()) {
@@ -171,10 +174,16 @@ public class BookingService {
         String promoName = appliedDiscount.name();
         BigDecimal promoDiscountPercent = appliedDiscount.percent();
 
+        BigDecimal platformFee = totalRoomPrice.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal hostPayout = totalRoomPrice.subtract(platformFee);
+
         Booking booking = Booking.builder()
                 .user(userId)
                 .suite(suite.getId())
                 .branch(suite.getBranch())
+                .propertyId(suite.getPropertyId())
+                .platformFee(platformFee)
+                .hostPayout(hostPayout)
                 .checkIn(request.getCheckIn())
                 .checkOut(request.getCheckOut())
                 .nights((int) nights)
@@ -235,7 +244,17 @@ public class BookingService {
             throw new IllegalStateException("Hubo una colisión concurrente. Las fechas ya no están disponibles.");
         }
 
-        return toDTO(savedBooking);
+        BookingDTO dto = toDTO(savedBooking);
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                    "booking.created",
+                    savedBooking.getId(),
+                    savedBooking.getPropertyId(),
+                    dto,
+                    Instant.now()
+            ));
+        }
+        return dto;
     }
 
     public BookingDTO modifyBooking(String bookingId, String userId, BookingRequest request) {
@@ -325,6 +344,9 @@ public class BookingService {
         booking.setAppliedPromotionName(appliedDiscount.name());
         booking.setAppliedPromotionDiscountPercent(appliedDiscount.percent());
         booking.setTotalPrice(newTotalPrice);
+        BigDecimal modPlatformFee = pricingResult.total().multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+        booking.setPlatformFee(modPlatformFee);
+        booking.setHostPayout(pricingResult.total().subtract(modPlatformFee));
 
         if (booking.getPaidAmount().compareTo(newTotalPrice) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
@@ -694,6 +716,9 @@ public class BookingService {
                 .user(booking.getUser())
                 .suite(suite)
                 .branch(branch)
+                .propertyId(booking.getPropertyId() != null ? booking.getPropertyId() : (suite != null ? suite.getPropertyId() : null))
+                .platformFee(booking.getPlatformFee())
+                .hostPayout(booking.getHostPayout())
                 .unitSlot(booking.getUnitSlot())
                 .checkIn(booking.getCheckIn())
                 .checkOut(booking.getCheckOut())
@@ -827,6 +852,25 @@ public class BookingService {
                 sn.setExpiresAt(null);
                 sn.setStatus("confirmed");
                 suiteNightRepository.save(sn);
+            }
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.confirmed",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
+        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.cancelled",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
             }
         }
     }
