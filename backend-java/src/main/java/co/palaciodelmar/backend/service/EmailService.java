@@ -9,6 +9,8 @@ import com.lowagie.text.pdf.PdfWriter;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -26,12 +28,16 @@ import java.util.UUID;
  * Servicio único de correo transaccional (verificación de cuenta y confirmación de reserva).
  * Unifica los antiguos EmailService y EmailNotificationService.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailService {
 
     private final JavaMailSender javaMailSender;
     private final UserRepository userRepository;
+
+    @Value("${app.base-url:http://localhost:4200}")
+    private String baseUrl = "http://localhost:4200";
 
     @Async
     public void sendVerificationEmail(String toEmail, String token) {
@@ -42,16 +48,18 @@ public class EmailService {
             helper.setTo(toEmail);
             helper.setSubject("Verifica tu cuenta - Palacio del Mar");
 
+            String verifyLink = (baseUrl != null ? baseUrl : "http://localhost:4200") + "/verificar-email/" + token;
             String htmlMsg = "<p>Hola,</p>"
                     + "<p>Gracias por registrarte en Palacio del Mar.</p>"
                     + "<p>Por favor, verifica tu cuenta haciendo clic en el siguiente enlace:</p>"
-                    + "<p><a href=\"http://localhost:4200/verificar-email/" + token + "\">Verificar cuenta</a></p>"
+                    + "<p><a href=\"" + verifyLink + "\">Verificar cuenta</a></p>"
                     + "<p>Si no solicitaste esto, puedes ignorar este correo.</p>";
 
             helper.setText(htmlMsg, true);
 
             javaMailSender.send(message);
         } catch (MessagingException e) {
+            log.error("Error al enviar el correo de verificación a {}: {}", toEmail, e.getMessage(), e);
             throw new RuntimeException("Error al enviar el correo de verificación", e);
         }
     }
@@ -94,16 +102,29 @@ public class EmailService {
 
     @Async
     public void sendReviewInvitation(Booking booking) {
+        if (booking == null) return;
         try {
+            String email = null;
+            if (booking.getUser() != null) {
+                email = userRepository.findById(booking.getUser()).map(User::getEmail).orElse(null);
+            }
+            if ((email == null || email.isBlank()) && booking.getGuestDetails() != null) {
+                email = booking.getGuestDetails().getEmail();
+            }
+
+            if (email == null || email.isBlank()) {
+                log.warn("sendReviewInvitation omitido: no se encontró email para la reserva {}", booking.getId());
+                return;
+            }
+
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom("experiencias@palaciodelmar.co");
-            String email = userRepository.findById(booking.getUser()).map(User::getEmail).orElse("cliente@ejemplo.com");
             helper.setTo(email);
             helper.setSubject("¿Cómo estuvo tu estadía? - Califica tu experiencia");
 
-            String link = "http://localhost:4200/reservas/" + booking.getId();
+            String link = (baseUrl != null ? baseUrl : "http://localhost:4200") + "/reservas/" + booking.getId();
             String html = "<h2>¡Gracias por hospedarte con nosotros!</h2>"
                     + "<p>Esperamos que hayas disfrutado de tu tiempo en Palacio del Mar.</p>"
                     + "<p>Nos encantaría conocer tu opinión para seguir mejorando. Déjanos una reseña verificada de tu estancia en el siguiente enlace:</p>"
@@ -113,7 +134,7 @@ public class EmailService {
             helper.setText(html, true);
             javaMailSender.send(message);
         } catch (Exception e) {
-            // No lanzar excepción para evitar interrumpir tareas programadas
+            log.error("Error al enviar invitación de reseña para la reserva {}: {}", booking.getId(), e.getMessage(), e);
         }
     }
 

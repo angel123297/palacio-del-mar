@@ -12,6 +12,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,6 +21,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class AutoStayLifecycleSchedulerTest {
+
+    private static final ZoneId BOGOTA = ZoneId.of("America/Bogota");
 
     private BookingRepository bookingRepository;
     private BookingService bookingService;
@@ -37,7 +40,7 @@ class AutoStayLifecycleSchedulerTest {
     @Test
     @DisplayName("Self Check-in automático: Activa PIN y pasa a CHECKED_IN a la hora de llegada oficial (15:00)")
     void testAutoCheckInExecution() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(BOGOTA);
 
         Booking booking = Booking.builder()
                 .id("bk-checkin-1")
@@ -49,10 +52,6 @@ class AutoStayLifecycleSchedulerTest {
 
         when(bookingRepository.findByStatusIn(List.of("confirmed"))).thenReturn(List.of(booking));
 
-        scheduler.processStayLifecycleTransitions();
-
-        // Si la hora del sistema es >= 15:00, se debe ejecutar. O forzamos con ReflectionTestUtils
-        // Probamos llamando con hora baja y hora alta
         ReflectionTestUtils.setField(scheduler, "autoCheckInHour", 0); // para garantizar ejecución en cualquier hora
         scheduler.processStayLifecycleTransitions();
 
@@ -66,7 +65,7 @@ class AutoStayLifecycleSchedulerTest {
     @Test
     @DisplayName("Auto Check-out programado: A la hora de salida (12:00) devuelve depósito y pasa a CHECKED_OUT")
     void testAutoCheckOutExecution() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(BOGOTA);
 
         Booking booking = Booking.builder()
                 .id("bk-checkout-1")
@@ -89,5 +88,41 @@ class AutoStayLifecycleSchedulerTest {
         );
         assertTrue(booking.getGuaranteeRefunded());
         assertEquals(new BigDecimal("100000"), booking.getRefundedAmount());
+    }
+
+    @Test
+    @DisplayName("Late Check-out: Si el PIN sigue activo pasadas las 13:00 antes de cerrar, se aplica recargo del 50%")
+    void testLateCheckOutPenaltyAppliedWhenPinActiveAfter13() {
+        LocalDate today = LocalDate.now(BOGOTA);
+
+        Booking booking = Booking.builder()
+                .id("bk-late-1")
+                .status("checked_in")
+                .checkIn(today.minusDays(2))
+                .checkOut(today)
+                .smartLockPin("654321")
+                .pricePerNight(new BigDecimal("300000"))
+                .totalPrice(new BigDecimal("600000"))
+                .balanceDue(BigDecimal.ZERO)
+                .paidAmount(new BigDecimal("600000"))
+                .guaranteeDeposit(new BigDecimal("100000"))
+                .guaranteeRefunded(false)
+                .refundedAmount(BigDecimal.ZERO)
+                .build();
+
+        when(bookingRepository.findByStatusIn(List.of("checked_in"))).thenReturn(List.of(booking));
+
+        // Ejecutar a las 13:30 (pasadas las 13:00 límite)
+        scheduler.processAutoCheckOuts(today, LocalTime.of(13, 30));
+
+        verify(bookingService, atLeastOnce()).changeBookingStatus(
+                eq(booking), eq(BookingStatus.CHECKED_OUT), any(), any()
+        );
+
+        // Recargo de 50% de 300000 = 150000
+        assertEquals(new BigDecimal("750000.00"), booking.getTotalPrice());
+        assertEquals(new BigDecimal("150000.00"), booking.getBalanceDue());
+        assertNull(booking.getSmartLockPin()); // PIN desactivado al cerrar
+        assertTrue(booking.getGuaranteeRefunded());
     }
 }

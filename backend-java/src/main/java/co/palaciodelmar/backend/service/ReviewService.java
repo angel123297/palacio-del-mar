@@ -27,6 +27,12 @@ public class ReviewService {
     private final UserRepository userRepository;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.repository.SuiteRepository suiteRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.repository.PropertyRepository propertyRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private co.palaciodelmar.backend.webhook.WebhookDispatcher webhookDispatcher;
 
     public List<ReviewDTO> getSuiteReviews(String suiteId) {
@@ -140,6 +146,30 @@ public class ReviewService {
     public ReviewDTO resolveMaintenanceAlert(String reviewId, String userId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new IllegalArgumentException("Reseña no encontrada: " + reviewId));
+
+        if (review.getMaintenanceAlert() == null || review.getMaintenanceAlert().isBlank()) {
+            throw new IllegalStateException("La reseña no tiene ninguna alerta de mantenimiento activa");
+        }
+
+        // Validación Anti-IDOR: Host debe ser dueño de la propiedad (o ser Administrador)
+        User user = (userId != null && userRepository != null) ? userRepository.findById(userId).orElse(null) : null;
+        boolean isAdmin = user != null && ("ADMIN".equalsIgnoreCase(user.getRole()) || "ROLE_ADMIN".equalsIgnoreCase(user.getRole()));
+
+        if (!isAdmin) {
+            co.palaciodelmar.backend.model.Suite suite = (review.getSuite() != null && suiteRepository != null)
+                    ? suiteRepository.findById(review.getSuite()).orElse(null)
+                    : null;
+            if (suite == null || suite.getPropertyId() == null) {
+                throw new org.springframework.security.access.AccessDeniedException("No tienes permiso para gestionar alertas de esta habitación");
+            }
+            co.palaciodelmar.backend.model.Property property = (propertyRepository != null)
+                    ? propertyRepository.findById(suite.getPropertyId()).orElse(null)
+                    : null;
+            if (property == null || property.getOwnerId() == null || !property.getOwnerId().equals(userId)) {
+                throw new org.springframework.security.access.AccessDeniedException("No tienes permiso para gestionar alertas de una propiedad ajena");
+            }
+        }
+
         review.setMaintenanceResolvedAt(Instant.now());
         review.setMaintenanceResolvedBy(userId);
         return toDTO(reviewRepository.save(review));
