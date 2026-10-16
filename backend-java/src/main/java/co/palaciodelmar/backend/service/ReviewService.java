@@ -26,6 +26,9 @@ public class ReviewService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.webhook.WebhookDispatcher webhookDispatcher;
+
     public List<ReviewDTO> getSuiteReviews(String suiteId) {
         return reviewRepository.findBySuiteAndApprovedTrueOrderByCreatedAtDesc(suiteId)
                 .stream()
@@ -112,6 +115,33 @@ public class ReviewService {
                 .build();
 
         log.info("Reseña verificada registrada con sentimiento {}: {}", analysis.sentiment(), analysis.highlights());
+        Review saved = reviewRepository.save(review);
+        ReviewDTO dto = toDTO(saved);
+
+        // Si se detectó alerta de mantenimiento, despachar webhook automático al anfitrión
+        if (analysis.maintenanceAlert() != null && webhookDispatcher != null) {
+            String propId = booking.getPropertyId() != null ? booking.getPropertyId() : booking.getBranch();
+            if (propId != null) {
+                webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", Map.of(
+                        "reviewId", saved.getId(),
+                        "bookingId", booking.getId(),
+                        "suiteId", saved.getSuite(),
+                        "alert", analysis.maintenanceAlert(),
+                        "comment", saved.getComment(),
+                        "rating", saved.getRating(),
+                        "createdAt", saved.getCreatedAt().toString()
+                ));
+            }
+        }
+
+        return dto;
+    }
+
+    public ReviewDTO resolveMaintenanceAlert(String reviewId, String userId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("Reseña no encontrada: " + reviewId));
+        review.setMaintenanceResolvedAt(Instant.now());
+        review.setMaintenanceResolvedBy(userId);
         return toDTO(reviewRepository.save(review));
     }
 
@@ -200,6 +230,8 @@ public class ReviewService {
                 .sentimentScore(review.getSentimentScore())
                 .keyHighlights(review.getKeyHighlights())
                 .maintenanceAlert(review.getMaintenanceAlert())
+                .maintenanceResolvedAt(review.getMaintenanceResolvedAt())
+                .maintenanceResolvedBy(review.getMaintenanceResolvedBy())
                 .approved(review.getApproved())
                 .createdAt(review.getCreatedAt())
                 .build();

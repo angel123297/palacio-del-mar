@@ -37,6 +37,9 @@ public class SuiteService {
     private final PromotionRepository promotionRepository;
     private final PricingService pricingService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DynamicPricingService dynamicPricingService;
+
     private Map<String, Branch> getBranchMap() {
         return branchRepository.findAll().stream()
                 .collect(Collectors.toMap(Branch::getId, Function.identity(), (a, b) -> a));
@@ -167,7 +170,12 @@ public class SuiteService {
         }
 
         BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
-        PricingService.PricingResult result = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
+        Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
+                ? dynamicPricingService.adjustmentsFor(suite, request.getCheckIn(), request.getCheckOut(), null)
+                : Map.of();
+        PricingService.PricingResult result = (dynamicAdjustments != null && !dynamicAdjustments.isEmpty())
+                ? pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent, DynamicPricingService.asFactorFunction(dynamicAdjustments))
+                : pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
 
         BigDecimal subtotal = result.subtotal();
 
@@ -206,6 +214,7 @@ public class SuiteService {
                 .experiencesTotal(experiencesTotal)
                 .discount(result.discount())
                 .discountReason(result.discount().compareTo(BigDecimal.ZERO) > 0 ? "Promoción / Larga estadía" : null)
+                .dynamicPricingNotes(new ArrayList<>(DynamicPricingService.describe(dynamicAdjustments)))
                 .total(total)
                 .lines(List.of(lineItem))
                 .build();

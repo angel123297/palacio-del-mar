@@ -49,6 +49,13 @@
               </select>
             </div>
           </div>
+          <!-- Alerta de Tarifa Dinámica Inteligente -->
+          <div *ngIf="dynamicPricingNotes.length > 0" style="margin-bottom: 1rem; background: rgba(201,169,110,0.12); border: 1px solid rgba(201,169,110,0.4); padding: 0.6rem 0.8rem; border-radius: 6px; font-size: 0.78rem;">
+            <div style="font-weight: bold; color: var(--gold); margin-bottom: 0.25rem;">⚡ Tarifa Inteligente Aplicada</div>
+            <div *ngFor="let note of dynamicPricingNotes" style="color: #f5f0e8; opacity: 0.9;">
+              • {{ note }}
+            </div>
+          </div>
           <p class="flex-between"><span>Precio ({{nights}} noches):</span> <strong>$ {{totalRoomPrice | number:'1.0-0'}}</strong></p>
           <button class="btn-primary" style="width: 100%; margin-top: 1rem; margin-bottom: 2rem;" (click)="nextStep()">Continuar →</button>
           

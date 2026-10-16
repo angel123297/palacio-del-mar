@@ -25,6 +25,8 @@ public class ReviewDTO {
     private Double sentimentScore;
     private List<String> keyHighlights;
     private String maintenanceAlert;
+    private Instant maintenanceResolvedAt;
+    private String maintenanceResolvedBy;
     private Boolean approved;
     private Instant createdAt;
 }
