@@ -11,6 +11,18 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-10-16 (2ª verificación, ~14:56 UTC) — Sin cambios nuevos en el día (Vibe)
+
+**Commits nuevos desde el reporte matutino (060c8244):** ninguno. El único commit reciente en `plan/marketplace-webhooks` es el propio [docs(qa): reporte diario 2026-10-16](https://github.com/angel123297/palacio-del-mar/commit/060c82449088108b649bbd1ad06092072a5231d1).
+
+**Pull requests abiertos:** sin cambios — #14 ya fusionado; quedan solo los drafts antiguos con base `proyecto-angular-java` ([#12](https://github.com/angel123297/palacio-del-mar/pull/12), [#4](https://github.com/angel123297/palacio-del-mar/pull/4), [#3](https://github.com/angel123297/palacio-del-mar/pull/3)), sin actividad y sin tocar (base protegida).
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones) — sigue en curso según el reporte matutino.
+
+**Tests esperados en verde:** ~136 de backend (según agentes) + 8 de frontend. Sin fallos nuevos detectados en esta verificación.
+
+**Nota:** los riesgos documentados esta mañana permanecen vigentes (conteo de 136 tests sin verificar en CI por Vibe, link de `CORRECCIONES.md`, hallazgos PDM-04/05/07/08 sin confirmar).
+
 ### 📅 2026-10-16 — Avance masivo: Fases 1–5 implementadas y auditoría de seguridad resuelta (Vibe)
 
 **Commits del día (últimas 24h, rama `plan/marketplace-webhooks`):**
