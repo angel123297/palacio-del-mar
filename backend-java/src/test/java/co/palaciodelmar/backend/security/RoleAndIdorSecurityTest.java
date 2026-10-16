@@ -6,12 +6,15 @@ import co.palaciodelmar.backend.dto.PropertyDTO;
 import co.palaciodelmar.backend.dto.PropertyRequest;
 import co.palaciodelmar.backend.exception.GlobalExceptionHandler;
 import co.palaciodelmar.backend.exception.ResourceNotFoundException;
+import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Property;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.BookingRepository;
+import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
+import co.palaciodelmar.backend.repository.UserRepository;
 import co.palaciodelmar.backend.service.AdminService;
 import co.palaciodelmar.backend.service.BookingService;
 import co.palaciodelmar.backend.service.PropertyService;
@@ -249,5 +252,59 @@ class RoleAndIdorSecurityTest {
         Property adminAccess = realService.getPropertyEntityWithOwnership("prop-victim-100", "admin-123", true);
         assertNotNull(adminAccess);
         assertEquals("prop-victim-100", adminAccess.getId());
+    }
+
+    @Test
+    @DisplayName("Anti-IDOR PDM-03: Host con branches vacío no puede acceder a reserva si no es dueño de la propiedad")
+    void hostWithoutBranchesCannotAccessBookingUnlessOwnerOfProperty() {
+        BookingRepository bRepo = mock(BookingRepository.class);
+        PropertyRepository pRepo = mock(PropertyRepository.class);
+        UserRepository uRepo = mock(UserRepository.class);
+        SuiteRepository sRepo = mock(SuiteRepository.class);
+        BranchRepository brRepo = mock(BranchRepository.class);
+
+        BookingService realBookingService = new BookingService(
+                bRepo, sRepo, brRepo, mock(co.palaciodelmar.backend.repository.ExperienceRepository.class),
+                mock(co.palaciodelmar.backend.repository.SuiteNightRepository.class), uRepo,
+                mock(co.palaciodelmar.backend.repository.PromotionRepository.class),
+                mock(co.palaciodelmar.backend.service.PricingService.class),
+                mock(co.palaciodelmar.backend.service.PaymentGateway.class)
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(realBookingService, "propertyRepository", pRepo);
+
+        Booking booking = Booking.builder()
+                .id("bk-target-1")
+                .propertyId("prop-target-1")
+                .user("user-guest")
+                .build();
+        when(bRepo.findById("bk-target-1")).thenReturn(Optional.of(booking));
+
+        Property property = Property.builder()
+                .id("prop-target-1")
+                .ownerId("real-host-owner")
+                .build();
+        when(pRepo.findById("prop-target-1")).thenReturn(Optional.of(property));
+
+        // Host atacante sin sedes legacy
+        User attackerHost = User.builder()
+                .id("attacker-host")
+                .role("HOST")
+                .branches(List.of())
+                .build();
+
+        assertThrows(IllegalArgumentException.class, () ->
+                realBookingService.getBookingByIdSecure("bk-target-1", attackerHost)
+        );
+
+        // Host dueño legítimo de la propiedad
+        User legitimateHost = User.builder()
+                .id("real-host-owner")
+                .role("HOST")
+                .branches(List.of())
+                .build();
+
+        assertDoesNotThrow(() ->
+                realBookingService.getBookingByIdSecure("bk-target-1", legitimateHost)
+        );
     }
 }

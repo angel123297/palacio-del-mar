@@ -12,16 +12,17 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Tarea programada que automatiza el ciclo de vida hotelero (Self Check-in y Auto Check-out):
  * - A las 15:00 COP del día de llegada activa la llave inteligente y pasa reservas confirmadas a CHECKED_IN.
- * - A las 12:00 COP del día de salida procesa el CHECKED_OUT, devuelve el depósito de garantía y libera la habitación.
+ * - A las 13:00 COP del día de salida (tras período de gracia post 12:00) procesa el CHECKED_OUT,
+ *   aplica recargo del 50% si el PIN continúa activo, devuelve el depósito de garantía y libera la habitación.
  */
 @Slf4j
 @Component
@@ -29,6 +30,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class AutoStayLifecycleScheduler {
 
     private static final ZoneId BOGOTA = ZoneId.of("America/Bogota");
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
@@ -36,8 +38,8 @@ public class AutoStayLifecycleScheduler {
     @Value("${palacio.lifecycle.autocheckin.hour:15}")
     private int autoCheckInHour = 15;
 
-    @Value("${palacio.lifecycle.autocheckout.hour:12}")
-    private int autoCheckOutHour = 12;
+    @Value("${palacio.lifecycle.autocheckout.hour:13}")
+    private int autoCheckOutHour = 13;
 
     @Scheduled(fixedRateString = "${palacio.lifecycle.check.interval.ms:60000}")
     public void processStayLifecycleTransitions() {
@@ -48,7 +50,7 @@ public class AutoStayLifecycleScheduler {
         processAutoCheckOuts(today, nowTime);
     }
 
-    private void processAutoCheckIns(LocalDate today, LocalTime nowTime) {
+    void processAutoCheckIns(LocalDate today, LocalTime nowTime) {
         // Reservas confirmadas con fecha de check-in hoy o anterior
         List<Booking> confirmedBookings = bookingRepository.findByStatusIn(List.of("confirmed"));
 
@@ -61,7 +63,7 @@ public class AutoStayLifecycleScheduler {
             if (isPastCheckInDate || isCheckInDayReady) {
                 try {
                     if (booking.getSmartLockPin() == null || booking.getSmartLockPin().isBlank()) {
-                        booking.setSmartLockPin(String.format("%06d", ThreadLocalRandom.current().nextInt(100000, 999999)));
+                        booking.setSmartLockPin(String.format("%06d", SECURE_RANDOM.nextInt(100000, 1000000)));
                     }
 
                     bookingService.changeBookingStatus(
@@ -81,7 +83,7 @@ public class AutoStayLifecycleScheduler {
         }
     }
 
-    private void processAutoCheckOuts(LocalDate today, LocalTime nowTime) {
+    void processAutoCheckOuts(LocalDate today, LocalTime nowTime) {
         // Reservas en estancia activa (checked_in)
         List<Booking> activeBookings = bookingRepository.findByStatusIn(List.of("checked_in"));
 
@@ -93,9 +95,11 @@ public class AutoStayLifecycleScheduler {
 
             if (isPastCheckOutDate || isCheckOutDayReady) {
                 try {
-                    // Late check-out automático si ya es pasado el día o después de la 1:00 PM del día de salida
-                    boolean late = isPastCheckOutDate || (today.isEqual(booking.getCheckOut()) && nowTime.isAfter(LocalTime.of(13, 0)));
-                    if (late && booking.getPricePerNight() != null) {
+                    // Late check-out automático: aplica si el PIN sigue activo pasadas las 13:00 ANTES de cerrar
+                    boolean isPast13 = isPastCheckOutDate || (today.isEqual(booking.getCheckOut()) && (nowTime.getHour() >= 13 || nowTime.isAfter(LocalTime.of(13, 0))));
+                    boolean pinStillActive = booking.getSmartLockPin() != null && !booking.getSmartLockPin().isBlank();
+
+                    if (isPast13 && pinStillActive && booking.getPricePerNight() != null) {
                         BigDecimal currentTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
                         BigDecimal currentBalance = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
                         BigDecimal recargo = booking.getPricePerNight().multiply(new BigDecimal("0.50")).setScale(2, RoundingMode.HALF_UP);
@@ -104,6 +108,9 @@ public class AutoStayLifecycleScheduler {
                         booking.setPaymentStatus("partial");
                         booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Recargo automático Late Check-out aplicado: $" + recargo);
                     }
+
+                    // Desactivar el PIN de la cerradura inteligente al cerrar
+                    booking.setSmartLockPin(null);
 
                     // Devolución automática del depósito de garantía
                     BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
