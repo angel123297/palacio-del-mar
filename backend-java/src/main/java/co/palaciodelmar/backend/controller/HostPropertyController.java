@@ -4,6 +4,7 @@ import co.palaciodelmar.backend.dto.ApiResponse;
 import co.palaciodelmar.backend.dto.HostSuiteRequest;
 import co.palaciodelmar.backend.dto.PropertyDTO;
 import co.palaciodelmar.backend.dto.PropertyRequest;
+import co.palaciodelmar.backend.dto.SuiteResponseDTO;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.PropertyService;
@@ -65,28 +66,31 @@ public class HostPropertyController {
     // --- Sub-recursos: Habitaciones de la Propiedad (Anti-IDOR) ---
 
     @GetMapping("/{propertyId}/suites")
-    public ResponseEntity<ApiResponse<List<Suite>>> getPropertySuites(
+    public ResponseEntity<ApiResponse<List<SuiteResponseDTO>>> getPropertySuites(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String propertyId) {
         String userId = principal.getUser().getId();
         boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         List<Suite> suites = propertyService.getPropertySuitesForHost(propertyId, userId, isAdmin);
-        return ResponseEntity.ok(ApiResponse.ok(suites));
+        List<SuiteResponseDTO> dtos = suites.stream()
+                .map(s -> SuiteResponseDTO.from(s, null))
+                .toList();
+        return ResponseEntity.ok(ApiResponse.ok(dtos));
     }
 
     @PostMapping("/{propertyId}/suites")
-    public ResponseEntity<ApiResponse<Suite>> createSuite(
+    public ResponseEntity<ApiResponse<SuiteResponseDTO>> createSuite(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String propertyId,
             @Valid @RequestBody HostSuiteRequest req) {
         String userId = principal.getUser().getId();
         boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         Suite created = propertyService.createSuiteForProperty(propertyId, userId, req, isAdmin);
-        return ResponseEntity.ok(ApiResponse.ok("Habitación creada exitosamente", created));
+        return ResponseEntity.ok(ApiResponse.ok("Habitación creada exitosamente", SuiteResponseDTO.from(created, null)));
     }
 
     @PutMapping("/{propertyId}/suites/{suiteId}")
-    public ResponseEntity<ApiResponse<Suite>> updateSuite(
+    public ResponseEntity<ApiResponse<SuiteResponseDTO>> updateSuite(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String propertyId,
             @PathVariable String suiteId,
@@ -94,7 +98,7 @@ public class HostPropertyController {
         String userId = principal.getUser().getId();
         boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         Suite updated = propertyService.updateSuiteForProperty(propertyId, suiteId, userId, req, isAdmin);
-        return ResponseEntity.ok(ApiResponse.ok("Habitación actualizada exitosamente", updated));
+        return ResponseEntity.ok(ApiResponse.ok("Habitación actualizada exitosamente", SuiteResponseDTO.from(updated, null)));
     }
 
     @DeleteMapping("/{propertyId}/suites/{suiteId}")
