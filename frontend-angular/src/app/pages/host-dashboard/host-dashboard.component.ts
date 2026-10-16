@@ -59,6 +59,11 @@ export interface HostPromotionItem {
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Promociones
             </button>
+            <button (click)="activeTab.set('payouts'); fetchPayouts();" 
+                    [ngClass]="activeTab() === 'payouts' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
+              Liquidaciones (92%)
+            </button>
           </div>
         </div>
 
@@ -805,6 +810,75 @@ export interface HostPromotionItem {
           </div>
         </ng-container>
 
+        <!-- ==================== TAB 6: LIQUIDACIONES Y DESEMBOLSOS (92%) ==================== -->
+        <ng-container *ngIf="activeTab() === 'payouts'">
+          <div class="space-y-6">
+            <!-- Header explicativo y botón de acción -->
+            <div class="bg-[#141414] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 class="text-xl font-bold text-[#c9a96e] mb-1">Cortes y Liquidaciones Automáticas a Anfitriones</h3>
+                <p class="text-xs text-[#f5f0e8] opacity-75 max-w-2xl">
+                  Proceso desatendido por lotes: El sistema agrupa reservas finalizadas, descuenta automáticamente la comisión del 
+                  <strong class="text-[#c9a96e]">8%</strong> de la plataforma y genera el saldo neto a transferir (<strong class="text-[#2ecc71]">92%</strong>). 
+                  Cada liquidación emite el evento y webhook <code class="text-[#2ecc71] bg-black/40 px-1 py-0.5 rounded">payout.processed</code>.
+                </p>
+              </div>
+              <button (click)="triggerImmediatePayout()" class="px-5 py-2.5 bg-[#c9a96e] hover:bg-[#b5955a] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider rounded-lg transition shadow-lg flex items-center gap-2 whitespace-nowrap cursor-pointer">
+                <span>⚡</span> Ejecutar Corte de Liquidación Ahora
+              </button>
+            </div>
+
+            <!-- Listado de Liquidaciones -->
+            <div class="bg-[#141414] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden">
+              <div class="p-5 border-b border-[rgba(255,255,255,0.08)] flex justify-between items-center">
+                <h4 class="text-sm font-semibold uppercase tracking-wider text-[#f5f0e8]">Historial de Liquidaciones Generadas ({{ payouts().length }})</h4>
+                <button (click)="fetchPayouts()" class="text-xs text-[#c9a96e] hover:underline flex items-center gap-1">
+                  <span>🔄</span> Actualizar
+                </button>
+              </div>
+
+              <div *ngIf="payouts().length === 0" class="p-12 text-center text-[#f5f0e8] opacity-60 text-sm">
+                No hay liquidaciones generadas todavía. Las reservas con check-in o check-out completado se liquidan automáticamente al procesar el corte.
+              </div>
+
+              <div *ngIf="payouts().length > 0" class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-[#f5f0e8]">
+                  <thead class="bg-[#0d0d0d] text-[10px] uppercase tracking-wider text-[#c9a96e] border-b border-[rgba(255,255,255,0.08)]">
+                    <tr>
+                      <th class="p-4">Código</th>
+                      <th class="p-4">Alojamiento</th>
+                      <th class="p-4">Período</th>
+                      <th class="p-4 text-center">Reservas</th>
+                      <th class="p-4 text-right">Total Bruto</th>
+                      <th class="p-4 text-right">Comisión Plataforma (8%)</th>
+                      <th class="p-4 text-right font-bold text-[#2ecc71]">Neto a Desembolsar (92%)</th>
+                      <th class="p-4 text-center">Estado</th>
+                      <th class="p-4">Fecha Proceso</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-[rgba(255,255,255,0.05)]">
+                    <tr *ngFor="let p of payouts()" class="hover:bg-[rgba(201,169,110,0.04)] transition">
+                      <td class="p-4 font-mono font-bold text-[#c9a96e]">{{ p.payoutCode }}</td>
+                      <td class="p-4 font-semibold">{{ p.propertyName || p.propertyId }}</td>
+                      <td class="p-4 text-xs opacity-75">{{ p.periodStart }} — {{ p.periodEnd }}</td>
+                      <td class="p-4 text-center font-bold">{{ p.totalBookings }}</td>
+                      <td class="p-4 text-right">$ {{ (p.grossTotal || 0) | number:'1.0-0' }}</td>
+                      <td class="p-4 text-right text-[#e74c3c]">-$ {{ (p.platformFee || 0) | number:'1.0-0' }}</td>
+                      <td class="p-4 text-right font-bold text-[#2ecc71] text-sm">$ {{ (p.netAmount || 0) | number:'1.0-0' }}</td>
+                      <td class="p-4 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border border-[rgba(46,204,113,0.3)]">
+                          {{ p.status }}
+                        </span>
+                      </td>
+                      <td class="p-4 text-xs opacity-60">{{ p.processedAt | date:'short' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
       </div>
     </div>
   `
@@ -812,7 +886,7 @@ export interface HostPromotionItem {
 export class HostDashboardComponent implements OnInit {
   api = inject(ApiService);
   
-  activeTab = signal<'bookings' | 'promotions' | 'properties' | 'webhooks' | 'apikeys'>('bookings');
+  activeTab = signal<'bookings' | 'promotions' | 'properties' | 'webhooks' | 'apikeys' | 'payouts'>('bookings');
 
   metrics = signal<DashboardMetricsDTO | null>(null);
   bookings = signal<Booking[]>([]);
@@ -822,9 +896,32 @@ export class HostDashboardComponent implements OnInit {
   deliveries = signal<WebhookDelivery[]>([]);
   demoEvents = signal<any[]>([]);
   demoSimulateFailure = signal<boolean>(false);
+  payouts = signal<any[]>([]);
   loading = signal(true);
   actionMessage = signal<string>('');
   actionError = signal<string>('');
+
+  fetchPayouts() {
+    this.api.get<ApiResponse<any[]>>('/host/properties/payouts').subscribe({
+      next: (res) => {
+        const data = res?.data || (res as any) || [];
+        this.payouts.set(Array.isArray(data) ? data : []);
+      },
+      error: () => this.payouts.set([])
+    });
+  }
+
+  triggerImmediatePayout() {
+    this.api.post<ApiResponse<any[]>>('/host/properties/payouts/process-now', {}).subscribe({
+      next: (res) => {
+        this.actionMessage.set('¡Liquidación ejecutada exitosamente! Se procesaron los lotes pendientes.');
+        this.fetchPayouts();
+      },
+      error: (err) => {
+        this.actionError.set(err.error?.message || 'Error al ejecutar liquidación');
+      }
+    });
+  }
 
   // Pagination & Filters state
   currentPage = signal<number>(1);
