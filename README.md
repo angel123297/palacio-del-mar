@@ -12,7 +12,7 @@ La plataforma fue desarrollada con **Spring Boot 3 + Java 21** en el backend y *
 - **Frontend:** Angular 18+, TypeScript, Tailwind CSS, Angular Signals (reactividad nativa sin Zone.js overhead), Componentes Standalone.
 - **Base de Datos & Concurrencia:** MongoDB 7.0 (índices únicos compuestos, control de concurrencia optimista `@Version`), Redis 7 Alpine (con fallback en memoria para desarrollo ágil).
 - **Control de Correo / SMTP:** Mailpit para captura y verificación de correos en entornos de desarrollo y pruebas locales.
-- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, Spring MockMvc (175 pruebas unitarias y de integración pasando al 100% con JaCoCo).
+- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, Spring MockMvc (251 pruebas unitarias y de integración pasando al 100% con JaCoCo).
 - **CI/CD:** Pipeline automatizado de GitHub Actions (`.github/workflows/ci.yml`) con compilación, ejecución de tests y verificación de calidad tanto en backend como frontend.
 
 ---
@@ -65,18 +65,20 @@ Los sistemas de hotelería externa pueden interactuar directamente mediante la c
 
 ## 🧪 Pruebas Automatizadas y Calidad de Código
 
-El repositorio cuenta con **175 pruebas automatizadas en backend + 8 en frontend** que cubren el 100% de los flujos críticos:
+El repositorio cuenta con **251 pruebas automatizadas en backend + 13 en frontend** que cubren el 100% de los flujos críticos:
 
 ### Backend Java (Spring Boot):
 ```bash
 cd backend-java
 ./mvnw test
 ```
-- **Seguridad y Anti-IDOR (`RoleAndIdorSecurityTest`, `BookingOwnershipSecurityTest`):** Verificación de aislamiento estricto entre anfitriones (`propertyId` + `branches`), prevención de mass assignment y rechazo de accesos no autorizados (401/403/404).
+- **Seguridad y Anti-IDOR (`RoleAndIdorSecurityTest`, `BookingOwnershipSecurityTest`, `TokenBlacklistServiceTest`):** Verificación de aislamiento estricto entre anfitriones (`propertyId` + `branches`), revocación duradera de JWT en MongoDB/Redis al cerrar sesión o cambiar credenciales, protección estricta de Actuator y rechazo de accesos no autorizados (401/403/404).
 - **Webhooks y Despacho (`WebhookDispatcherTest`, `HostWebhookServiceTest`, `PaymentWebhookServiceTest`):** Verificación de firmas HMAC, protección Anti-SSRF, políticas de reintento, idempotencia y auditoría de entregas.
+- **Sincronización iCal RFC 5545 (`ICalServiceTest`, `ICalServiceAdversarialTest`):** Feeds de calendario exportables compatibles con Airbnb y Google Calendar, con validación de estado aprobado y bloqueo de borradores.
 - **Integración Externa (`IntegrationServiceTest`, `ApiKeyServiceTest`):** Alta de habitaciones externas y bloqueos anti-overbooking con `SuiteNight`.
 - **Máquina de Estados de Reserva (`BookingStateMachineTest`):** Cobertura exhaustiva de 49 transiciones válidas e inválidas del ciclo de vida de la reserva.
 - **Concurrencia y Pagos (`PaymentConcurrencyTest`, `SimulatedPaymentGatewayTest`, `BookingExpirySchedulerTest`):** Manejo de colisiones de bloqueo optimista multi-slot (`@Version`), expiración de reservas pendientes y compensaciones.
+- **Notificaciones Transaccionales (`EmailServiceTest`):** Generación y despacho de vouchers adjuntos en PDF y eventos `.ics` vía Mailpit.
 - **Reporte JaCoCo:** Generado en `backend-java/target/site/jacoco/index.html`.
 
 ### Frontend Angular:
@@ -85,7 +87,7 @@ cd frontend-angular
 npm run build
 npm test -- --watch=false
 ```
-- Compilación de producción limpia sin errores TypeScript ni advertencias bloqueantes, y 8 pruebas unitarias pasando con Vitest.
+- Compilación de producción limpia sin errores TypeScript ni advertencias bloqueantes, y 13 pruebas unitarias pasando con Vitest (incluyendo componentes de Voucher QR, PIN inteligente y estado reactivo).
 
 ---
 
@@ -112,7 +114,7 @@ Servicios locales disponibles:
 - **Actuator Health:** `http://localhost:5000/actuator/health`
 - **Mailpit (Webmail de pruebas):** `http://localhost:8025`
 - **Simulador PMS de Prueba:** `http://localhost:4200/demo/external-hotel`
-- **Receptor de Webhooks de Prueba:** `http://localhost:4200/demo/webhook-receiver`
+- **Receptor de Webhooks de Prueba:** `http://localhost:5000/api/demo/webhook-receiver`
 
 ### Opción 2: Ejecución Nativa
 1. **Backend:**
