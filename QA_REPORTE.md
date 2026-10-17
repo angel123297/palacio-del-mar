@@ -11,6 +11,18 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-10-17 — Sin cambios en el día (Vibe)
+
+**Commits de las últimas 24h en `plan/marketplace-webhooks`:** ninguno. El HEAD sigue siendo [2d729c6 docs(qa): reporte diario 2026-10-16 (2ª verificación)](https://github.com/angel123297/palacio-del-mar/commit/2d729c6d4913674ce911635c5af2e353b458cf66) (16 oct 14:56 UTC).
+
+**Pull requests abiertos:** sin cambios ni actividad. Los 3 PRs abiertos son drafts antiguos con base `proyecto-angular-java` ([#12](https://github.com/angel123297/palacio-del-mar/pull/12), [#4](https://github.com/angel123297/palacio-del-mar/pull/4), [#3](https://github.com/angel123297/palacio-del-mar/pull/3)) — siguen sin tocarse (base protegida). #14 (auditoría de seguridad) permanece fusionado.
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator, automaciones y calidad) — sin avance nuevo en el día.
+
+**Tests esperados en verde:** sin cambios — ~136 tests de backend (reportado por agentes, aún sin verificación de Vibe en CI) + 8 de frontend. Sin fallos nuevos detectados.
+
+**Riesgos vigentes (sin cambios):** conteo de 136 tests sin verificar en CI; referencias a `CORRECCIONES.md` (raíz vs `docs/`); hallazgos PDM-04/05/07/08 sin confirmar; drafts #12/#4/#3 pendientes de decisión.
+
 ### 📅 2026-10-16 (2ª verificación, ~14:56 UTC) — Sin cambios nuevos en el día (Vibe)
 
 **Commits nuevos desde el reporte matutino (060c8244):** ninguno. El único commit reciente en `plan/marketplace-webhooks` es el propio [docs(qa): reporte diario 2026-10-16](https://github.com/angel123297/palacio-del-mar/commit/060c82449088108b649bbd1ad06092072a5231d1).
@@ -86,3 +98,4 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 - `CORRECCIONES.md` — bitácora de correcciones
 - `PLAN_MARKETPLACE.md` — plan aprobado (5 fases)
 - `AGENTS.md` — reglas para agentes de IA
+"}}]
