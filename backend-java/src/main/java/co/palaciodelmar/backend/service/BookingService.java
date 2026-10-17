@@ -306,6 +306,10 @@ public class BookingService {
             throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
         }
 
+        if (request.getCheckIn().isBefore(LocalDate.now(BOGOTA_ZONE))) {
+            throw new IllegalArgumentException("La fecha de check-in no puede ser anterior a la fecha actual");
+        }
+
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
         if (nights <= 0) {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
@@ -316,7 +320,7 @@ public class BookingService {
         occupiedNights.removeIf(sn -> bookingId.equals(sn.getBooking()));
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
-        int assignedSlot = -1;
+        List<Integer> availableSlots = new ArrayList<>();
         for (int slot = 1; slot <= totalCapacity; slot++) {
             int finalSlot = slot;
             boolean isAvailable = true;
@@ -330,11 +334,10 @@ public class BookingService {
                 }
             }
             if (isAvailable) {
-                assignedSlot = slot;
-                break;
+                availableSlots.add(slot);
             }
         }
-        if (assignedSlot == -1) {
+        if (availableSlots.isEmpty()) {
             throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
         }
 
@@ -351,9 +354,11 @@ public class BookingService {
         BigDecimal totalRoomPrice = pricingResult.total();
         List<Booking.SelectedExperience> selectedExpList = request.getExperiences() != null ? parseExperiences(request.getExperiences()) : booking.getExperiences();
         BigDecimal experiencesTotal = BigDecimal.ZERO;
-        for (Booking.SelectedExperience exp : selectedExpList) {
-            if (exp.getPrice() != null && exp.getQuantity() != null) {
-                experiencesTotal = experiencesTotal.add(exp.getPrice().multiply(BigDecimal.valueOf(exp.getQuantity())));
+        if (selectedExpList != null) {
+            for (Booking.SelectedExperience exp : selectedExpList) {
+                if (exp.getPrice() != null && exp.getQuantity() != null) {
+                    experiencesTotal = experiencesTotal.add(exp.getPrice().multiply(BigDecimal.valueOf(exp.getQuantity())));
+                }
             }
         }
 
@@ -369,7 +374,6 @@ public class BookingService {
         if (request.getChildren() != null) booking.setChildren(request.getChildren());
         booking.setGuestDetails(parseGuestDetails(request));
         booking.setExperiences(selectedExpList);
-        booking.setUnitSlot(assignedSlot);
         booking.setSubtotal(pricingResult.subtotal());
         booking.setDiscount(pricingResult.discount());
         booking.setTaxes(pricingResult.taxes());
@@ -384,38 +388,47 @@ public class BookingService {
         booking.setPlatformFee(modPlatformFee);
         booking.setHostPayout(pricingResult.total().subtract(modPlatformFee));
 
-        if (booking.getPaidAmount().compareTo(newTotalPrice) >= 0) {
+        BigDecimal paidAmt = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+        if (paidAmt.compareTo(newTotalPrice) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
-            booking.setRefundedAmount(booking.getPaidAmount().subtract(newTotalPrice));
+            booking.setRefundedAmount(paidAmt.subtract(newTotalPrice));
             booking.setPaymentStatus("paid");
         } else {
-            booking.setBalanceDue(newTotalPrice.subtract(booking.getPaidAmount()));
-            booking.setPaymentStatus(booking.getPaidAmount().compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
+            booking.setBalanceDue(newTotalPrice.subtract(paidAmt));
+            booking.setPaymentStatus(paidAmt.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
         }
 
         booking.setUpdatedAt(Instant.now());
 
-        // Re-block nights
+        // Re-block nights con reintento automático en slots alternativos ante colisión concurrente
         List<SuiteNight> originalNights = suiteNightRepository.findByBooking(bookingId);
         suiteNightRepository.deleteByBooking(bookingId);
-        List<SuiteNight> insertedNights = new java.util.ArrayList<>();
-        try {
-            for (int i = 0; i < nights; i++) {
-                LocalDate date = request.getCheckIn().plusDays(i);
-                SuiteNight suiteNight = SuiteNight.builder()
-                        .suite(suite.getId())
-                        .branch(suite.getBranch())
-                        .unitSlot(assignedSlot)
-                        .dates(java.util.Collections.singletonList(date))
-                        .booking(booking.getId())
-                        .status("pending".equalsIgnoreCase(booking.getStatus()) ? "held" : "blocked")
-                        .expiresAt("pending".equalsIgnoreCase(booking.getStatus()) ? Instant.now().plusSeconds(900) : null)
-                        .createdAt(Instant.now())
-                        .build();
-                insertedNights.add(suiteNightRepository.save(suiteNight));
+        boolean nightsLocked = false;
+        for (int candidateSlot : availableSlots) {
+            List<SuiteNight> insertedNights = new java.util.ArrayList<>();
+            try {
+                for (int i = 0; i < nights; i++) {
+                    LocalDate date = request.getCheckIn().plusDays(i);
+                    SuiteNight suiteNight = SuiteNight.builder()
+                            .suite(suite.getId())
+                            .branch(suite.getBranch())
+                            .unitSlot(candidateSlot)
+                            .dates(java.util.Collections.singletonList(date))
+                            .booking(booking.getId())
+                            .status("pending".equalsIgnoreCase(booking.getStatus()) ? "held" : "confirmed")
+                            .expiresAt("pending".equalsIgnoreCase(booking.getStatus()) ? Instant.now().plusSeconds(900) : null)
+                            .createdAt(Instant.now())
+                            .build();
+                    insertedNights.add(suiteNightRepository.save(suiteNight));
+                }
+                booking.setUnitSlot(candidateSlot);
+                nightsLocked = true;
+                break;
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                suiteNightRepository.deleteAll(insertedNights);
             }
-        } catch (org.springframework.dao.DuplicateKeyException e) {
-            suiteNightRepository.deleteAll(insertedNights);
+        }
+        if (!nightsLocked) {
             suiteNightRepository.saveAll(originalNights);
             throw new IllegalStateException("Hubo una colisión concurrente al modificar. Las fechas ya no están disponibles.");
         }
@@ -606,12 +619,13 @@ public class BookingService {
         BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
         BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal).add(fixedCharges(booking));
         booking.setTotalPrice(newTotal);
-        if (booking.getPaidAmount().compareTo(newTotal) >= 0) {
+        BigDecimal paidAmt = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+        if (paidAmt.compareTo(newTotal) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
             booking.setPaymentStatus("paid");
         } else {
-            booking.setBalanceDue(newTotal.subtract(booking.getPaidAmount()));
-            booking.setPaymentStatus(booking.getPaidAmount().compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
+            booking.setBalanceDue(newTotal.subtract(paidAmt));
+            booking.setPaymentStatus(paidAmt.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
         }
         booking.setUpdatedAt(Instant.now());
         return toDTO(bookingRepository.save(booking));
@@ -640,12 +654,13 @@ public class BookingService {
         BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
         BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal).add(fixedCharges(booking));
         booking.setTotalPrice(newTotal);
-        if (booking.getPaidAmount().compareTo(newTotal) >= 0) {
+        BigDecimal paidAmt = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+        if (paidAmt.compareTo(newTotal) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
             booking.setPaymentStatus("paid");
         } else {
-            booking.setBalanceDue(newTotal.subtract(booking.getPaidAmount()));
-            booking.setPaymentStatus(booking.getPaidAmount().compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
+            booking.setBalanceDue(newTotal.subtract(paidAmt));
+            booking.setPaymentStatus(paidAmt.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
         }
         booking.setUpdatedAt(Instant.now());
         return toDTO(bookingRepository.save(booking));

@@ -115,11 +115,18 @@ export class BookingModalComponent implements OnChanges {
     private router: Router,
     private cdr: ChangeDetectorRef
   ) {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 2);
-    this.checkIn = format(today, 'yyyy-MM-dd');
-    this.checkOut = format(tomorrow, 'yyyy-MM-dd');
+    const todayIso = this.bogotaTodayIso();
+    this.checkIn = todayIso;
+    const [y, m, d] = todayIso.split('-').map(Number);
+    this.checkOut = new Date(Date.UTC(y, m - 1, d + 2)).toISOString().slice(0, 10);
+  }
+
+  private bogotaTodayIso(): string {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    } catch {
+      return format(new Date(), 'yyyy-MM-dd');
+    }
   }
 
   get isLoggedIn(): boolean {
@@ -183,7 +190,7 @@ export class BookingModalComponent implements OnChanges {
     if (!this.isLoggedIn && !email) missing.push('correo electrónico');
     if (missing.length) return `Por favor completa: ${missing.join(', ')}.`;
 
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = this.bogotaTodayIso();
     if (this.checkIn < today) return 'La fecha de llegada no puede ser en el pasado.';
     if (this.checkOut <= this.checkIn) return 'La fecha de salida debe ser posterior a la de llegada.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Ingresa un correo electrónico válido.';
