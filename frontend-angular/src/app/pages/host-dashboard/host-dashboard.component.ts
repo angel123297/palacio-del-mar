@@ -1318,7 +1318,10 @@ export class HostDashboardComponent implements OnInit {
     this.api.post<ApiResponse<any>>(`/host/properties/${propId}/suites`, this.newSuite).subscribe({
       next: () => {
         this.submittingSuite = false;
-        this.suiteSuccess = '¡Habitación agregada con éxito!';
+        const isApproved = this.selectedPropertyForSuites?.status === 'APPROVED';
+        this.suiteSuccess = isApproved
+          ? '¡Habitación agregada con éxito y publicada en el catálogo!'
+          : '¡Habitación agregada con éxito! Quedará visible al público una vez que la propiedad sea aprobada por el administrador.';
         this.newSuite = {
           name: '',
           type: 'Habitación',

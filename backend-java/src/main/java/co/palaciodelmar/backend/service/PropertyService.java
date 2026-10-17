@@ -93,6 +93,11 @@ public class PropertyService {
     /**
      * Actualiza una propiedad del anfitrión autenticado (Anti-IDOR).
      */
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public PropertyDTO updateProperty(String propertyId, String ownerId, PropertyRequest req, boolean isAdmin) {
         Property property = getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
 
@@ -198,10 +203,21 @@ public class PropertyService {
         return suiteRepository.findByPropertyIdAndActiveTrue(propertyId);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public Suite createSuiteForProperty(String propertyId, String ownerId, HostSuiteRequest req, boolean isAdmin) {
         Property property = getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
 
         String suiteSlug = ensureUniqueSuiteSlug(toSlug(property.getName() + " " + req.getName()));
+
+        String mainImage = (req.getMainImage() != null && !req.getMainImage().isBlank())
+                ? req.getMainImage().trim()
+                : (property.getMainImage() != null && !property.getMainImage().isBlank()
+                    ? property.getMainImage()
+                    : "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800");
 
         Suite suite = Suite.builder()
                 .propertyId(property.getId())
@@ -214,7 +230,7 @@ public class PropertyService {
                 .shortDescription(req.getShortDescription())
                 .basePrice(req.getBasePrice())
                 .originalPrice(req.getOriginalPrice() != null ? req.getOriginalPrice() : req.getBasePrice())
-                .mainImage(req.getMainImage() != null ? req.getMainImage() : property.getMainImage())
+                .mainImage(mainImage)
                 .images(req.getImages() != null ? req.getImages() : List.of())
                 .maxGuests(req.getMaxGuests() != null ? req.getMaxGuests() : 2)
                 .maxOccupancy(req.getMaxGuests() != null ? req.getMaxGuests() : 2)
@@ -231,6 +247,11 @@ public class PropertyService {
         return suiteRepository.save(suite);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public Suite updateSuiteForProperty(String propertyId, String suiteId, String ownerId, HostSuiteRequest req, boolean isAdmin) {
         getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
 
@@ -247,7 +268,7 @@ public class PropertyService {
         if (req.getShortDescription() != null) suite.setShortDescription(req.getShortDescription());
         if (req.getBasePrice() != null) suite.setBasePrice(req.getBasePrice());
         if (req.getOriginalPrice() != null) suite.setOriginalPrice(req.getOriginalPrice());
-        if (req.getMainImage() != null) suite.setMainImage(req.getMainImage());
+        if (req.getMainImage() != null && !req.getMainImage().isBlank()) suite.setMainImage(req.getMainImage().trim());
         if (req.getImages() != null) suite.setImages(req.getImages());
         if (req.getMaxGuests() != null) {
             suite.setMaxGuests(req.getMaxGuests());
@@ -265,6 +286,11 @@ public class PropertyService {
         return suiteRepository.save(suite);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public void deleteSuiteForProperty(String propertyId, String suiteId, String ownerId, boolean isAdmin) {
         getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
 
