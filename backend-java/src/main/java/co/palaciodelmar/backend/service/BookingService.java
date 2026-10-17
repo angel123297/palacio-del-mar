@@ -92,6 +92,13 @@ public class BookingService {
             throw new IllegalArgumentException("Esta habitación no está disponible para reservas actualmente");
         }
 
+        if (suite.getPropertyId() != null && propertyRepository != null) {
+            co.palaciodelmar.backend.model.Property property = propertyRepository.findById(suite.getPropertyId()).orElse(null);
+            if (property == null || Boolean.FALSE.equals(property.getActive()) || !"APPROVED".equalsIgnoreCase(property.getStatus())) {
+                throw new IllegalArgumentException("El alojamiento no está disponible para reservas porque la propiedad no está aprobada o está inactiva");
+            }
+        }
+
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
         if (request.getGuests() != null && (request.getGuests() < 1 || request.getGuests() > maxGuests)) {
             throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
@@ -110,7 +117,7 @@ public class BookingService {
         assertCribAvailable(request, null);
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
-        int assignedSlot = -1;
+        List<Integer> availableSlots = new ArrayList<>();
         for (int slot = 1; slot <= totalCapacity; slot++) {
             int finalSlot = slot;
             boolean isAvailable = true;
@@ -124,11 +131,10 @@ public class BookingService {
                 }
             }
             if (isAvailable) {
-                assignedSlot = slot;
-                break;
+                availableSlots.add(slot);
             }
         }
-        if (assignedSlot == -1) {
+        if (availableSlots.isEmpty()) {
             throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
         }
 
@@ -236,27 +242,34 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
 
-        // Block nights
-        savedBooking.setUnitSlot(assignedSlot);
-        bookingRepository.save(savedBooking);
-        List<SuiteNight> insertedNights = new java.util.ArrayList<>();
-        try {
-            for (int i = 0; i < nights; i++) {
-                LocalDate date = request.getCheckIn().plusDays(i);
-                SuiteNight suiteNight = SuiteNight.builder()
-                        .suite(suite.getId())
-                        .branch(suite.getBranch())
-                        .unitSlot(assignedSlot)
-                        .dates(java.util.Collections.singletonList(date))
-                        .booking(savedBooking.getId())
-                        .status("held")
-                        .expiresAt(savedBooking.getExpiresAt())
-                        .createdAt(Instant.now())
-                        .build();
-                insertedNights.add(suiteNightRepository.save(suiteNight));
+        // Block nights con reintento automático en el siguiente slot disponible si hay colisión concurrente
+        boolean nightsLocked = false;
+        for (int candidateSlot : availableSlots) {
+            List<SuiteNight> insertedNights = new java.util.ArrayList<>();
+            try {
+                for (int i = 0; i < nights; i++) {
+                    LocalDate date = request.getCheckIn().plusDays(i);
+                    SuiteNight suiteNight = SuiteNight.builder()
+                            .suite(suite.getId())
+                            .branch(suite.getBranch())
+                            .unitSlot(candidateSlot)
+                            .dates(java.util.Collections.singletonList(date))
+                            .booking(savedBooking.getId())
+                            .status("held")
+                            .expiresAt(savedBooking.getExpiresAt())
+                            .createdAt(Instant.now())
+                            .build();
+                    insertedNights.add(suiteNightRepository.save(suiteNight));
+                }
+                savedBooking.setUnitSlot(candidateSlot);
+                bookingRepository.save(savedBooking);
+                nightsLocked = true;
+                break;
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                suiteNightRepository.deleteAll(insertedNights);
             }
-        } catch (org.springframework.dao.DuplicateKeyException e) {
-            suiteNightRepository.deleteAll(insertedNights);
+        }
+        if (!nightsLocked) {
             bookingRepository.delete(savedBooking);
             throw new IllegalStateException("Hubo una colisión concurrente. Las fechas ya no están disponibles.");
         }
@@ -453,7 +466,11 @@ public class BookingService {
                 throw new IllegalArgumentException("Esta reserva pertenece a una cuenta registrada. Inicia sesión para ver los detalles.");
             }
         }
-        return toDTO(booking);
+        BookingDTO dto = toDTO(booking);
+        if (user == null) {
+            dto.setSmartLockPin(null);
+        }
+        return dto;
     }
 
     public BookingDTO getBookingByCodeSecure(String bookingCode, User user) {
@@ -475,7 +492,11 @@ public class BookingService {
                 throw new IllegalArgumentException("Esta reserva pertenece a una cuenta registrada. Inicia sesión para ver los detalles.");
             }
         }
-        return toDTO(booking);
+        BookingDTO dto = toDTO(booking);
+        if (user == null) {
+            dto.setSmartLockPin(null);
+        }
+        return dto;
     }
 
     private void validateHostAccessToBooking(User user, Booking booking) {

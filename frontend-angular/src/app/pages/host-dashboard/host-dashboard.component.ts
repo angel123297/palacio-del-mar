@@ -193,12 +193,12 @@ export interface HostPromotionItem {
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Sucursal Asignada</label>
-                  <select [(ngModel)]="newPromo.branchId" name="promoBranch" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
-                    <option value="branch-1">Palacio del Mar · Centro Histórico</option>
-                    <option value="branch-2">Palacio del Mar · Getsemaní</option>
-                    <option value="branch-3">Palacio del Mar · Bocagrande</option>
-                    <option value="branch-4">Palacio del Mar · La Boquilla</option>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Alojamiento Asignado *</label>
+                  <select [(ngModel)]="newPromo.branchId" name="promoBranch" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <option *ngIf="properties().length === 0" value="" disabled>No tienes alojamientos disponibles</option>
+                    <option *ngFor="let prop of properties()" [value]="prop.id || prop._id">
+                      {{ prop.name }} ({{ prop.city }})
+                    </option>
                   </select>
                 </div>
 
@@ -934,7 +934,7 @@ export class HostDashboardComponent implements OnInit {
   // Host Promotion Form
   newPromo = {
     title: '',
-    branchId: 'branch-1',
+    branchId: '',
     startDate: '',
     endDate: '',
     discountPercent: 15,
@@ -1226,7 +1226,11 @@ export class HostDashboardComponent implements OnInit {
     this.api.get<ApiResponse<Property[]>>('/host/properties').subscribe({
       next: (res) => {
         const list = res.data || (res as any) || [];
-        this.properties.set(Array.isArray(list) ? list : []);
+        const propList = Array.isArray(list) ? list : [];
+        this.properties.set(propList);
+        if (propList.length > 0 && !this.newPromo.branchId) {
+          this.newPromo.branchId = propList[0].id || (propList[0] as any)._id || '';
+        }
       }
     });
   }
@@ -1397,6 +1401,11 @@ export class HostDashboardComponent implements OnInit {
       return;
     }
 
+    if (!this.newPromo.branchId) {
+      this.promoError = 'Debes seleccionar un alojamiento o sede para la oferta';
+      return;
+    }
+
     if (this.newPromo.endDate < this.newPromo.startDate) {
       this.promoError = 'La fecha de fin debe ser posterior a la fecha de inicio';
       return;
@@ -1412,9 +1421,10 @@ export class HostDashboardComponent implements OnInit {
       next: () => {
         this.submittingPromo = false;
         this.promoSuccess = '¡Oferta publicada exitosamente para tu sede!';
+        const defaultScope = this.properties()[0]?.id || (this.properties()[0] as any)?._id || '';
         this.newPromo = {
           title: '',
-          branchId: 'branch-1',
+          branchId: defaultScope,
           startDate: '',
           endDate: '',
           discountPercent: 15,

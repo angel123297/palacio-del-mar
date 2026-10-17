@@ -53,6 +53,13 @@ public class SuiteService {
 
         List<Suite> suites = suiteRepository.findAll().stream()
                 .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
                 .toList();
 
         if (branchFilter != null && !branchFilter.isBlank()) {
@@ -101,8 +108,18 @@ public class SuiteService {
                 .orElse(null);
         String targetId = branch != null ? branch.getId() : branchId;
 
+        Map<String, Property> propMap = propertyRepository.findAll().stream()
+                .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
+
         return suiteRepository.findAll().stream()
                 .filter(s -> targetId.equals(s.getBranch()) && !Boolean.FALSE.equals(s.getActive()))
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
                 .map(s -> SuiteResponseDTO.from(s, branch))
                 .collect(Collectors.toList());
     }
@@ -112,6 +129,12 @@ public class SuiteService {
         Suite suite = suiteRepository.findById(idOrSlug)
                 .or(() -> suiteRepository.findBySlug(idOrSlug.toLowerCase()))
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada con identificador: " + idOrSlug));
+        if (suite.getPropertyId() != null) {
+            Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
+            if (p == null || Boolean.FALSE.equals(p.getActive()) || !"APPROVED".equalsIgnoreCase(p.getStatus())) {
+                throw new IllegalArgumentException("Suite no disponible o la propiedad no está aprobada: " + idOrSlug);
+            }
+        }
         Branch branch = suite.getBranch() != null ? branchRepository.findById(suite.getBranch()).orElse(null) : null;
         if (branch == null && suite.getPropertyId() != null) {
             branch = propertyRepository.findById(suite.getPropertyId())
@@ -131,7 +154,18 @@ public class SuiteService {
 
     @Cacheable(value = "suite_types")
     public List<SuiteTypeDTO> getSuiteTypes() {
-        List<Suite> activeSuites = suiteRepository.findByActiveTrue();
+        Map<String, Property> propMap = propertyRepository.findAll().stream()
+                .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
+
+        List<Suite> activeSuites = suiteRepository.findByActiveTrue().stream()
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
+                .toList();
         Map<String, List<Suite>> grouped = activeSuites.stream()
                 .filter(s -> s.getType() != null)
                 .collect(Collectors.groupingBy(Suite::getType));
@@ -163,6 +197,13 @@ public class SuiteService {
         Suite suite = suiteRepository.findById(request.getSuiteId())
                 .or(() -> suiteRepository.findBySlug(request.getSuiteId().toLowerCase()))
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: " + request.getSuiteId()));
+
+        if (suite.getPropertyId() != null) {
+            Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
+            if (p == null || Boolean.FALSE.equals(p.getActive()) || !"APPROVED".equalsIgnoreCase(p.getStatus())) {
+                throw new IllegalArgumentException("Suite no disponible o la propiedad no está aprobada: " + request.getSuiteId());
+            }
+        }
 
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
         if (nights <= 0) {

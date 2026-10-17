@@ -28,6 +28,7 @@ docker compose up -d --build
 7. **Webhooks (contrato)**: firma HMAC-SHA256 del body en `X-Palacio-Signature`; `X-Palacio-Event-Id` para idempotencia; `X-Palacio-Timestamp` contra replay; reintentos 1m/5m/30m; registrar toda entrega en `WebhookDelivery`.
 8. **No hacer en esta entrega**: widget embebible, feed iCal, pasarela de pago real, chat de IA. Está en `PLAN_MARKETPLACE.md` § Fase 4.
 9. **Idioma**: nombres de código en inglés; comentarios y mensajes de usuario en español.
+10. **Protocolo Seguro de No-Regresión (`non-breaking-delivery`)**: Para toda adición o corrección, cumplir estrictamente el flujo de 4 fases: **1) CREAR** (diseño aislado), **2) TESTEAR PROFUNDAMENTE** (reproducir caso y asegurar cero roturas previas), **3) CONFIGURAR** (DTOs, contratos y seguridad), **4) IMPLEMENTAR** (cambio quirúrgico y validación total de suites).
 
 ## Guía por fase (archivos clave)
 - **Fase 1**: `model/Suite.java` (agregar `propertyId, source, externalId`), `model/User.java` (`branches` → reemplazo gradual por `Property.ownerId`), `config/DataInitializer.java` (migrar sedes a `Property`), `controller/HostController.java` (base del nuevo `HostPropertyController`).

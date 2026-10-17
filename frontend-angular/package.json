@@ -6,7 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "NODE_PATH=./node_modules/@angular/build/node_modules ng test"
   },
   "private": true,
   "dependencies": {
@@ -36,6 +36,7 @@
     "prettier": "^3.8.1",
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.2",
+    "vite": "^8.3.0",
     "vitest": "^5.0.3"
   }
 }
