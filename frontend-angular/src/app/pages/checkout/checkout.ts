@@ -314,9 +314,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   ) {
     this.paymentForm = this.fb.group({
       cardName: ['', Validators.required],
-      cardNumber: ['', [Validators.required, Validators.minLength(19)]],
+      cardNumber: ['', [Validators.required, Validators.minLength(19), Validators.pattern(/^\d{4}\s\d{4}\s\d{4}\s\d{4}$/)]],
       expiry: ['', [Validators.required, Validators.pattern(/^(0[1-9]|1[0-2])\/\d{2}$/)]],
-      cvv: ['', [Validators.required, Validators.minLength(3)]]
+      cvv: ['', [Validators.required, Validators.minLength(3), Validators.pattern(/^\d{3,4}$/)]]
     });
   }
 
@@ -414,26 +414,54 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   processPSE() {
     if (!this.pseBank) return;
     this.processing = true;
-    this.processingMessage = 'Conectando con el banco...';
+    this.processingMessage = `Redirigiendo a pasarela ACH Colombia (${this.pseBank})...`;
     this.errorMsg = '';
     this.cdr.detectChanges();
     
-    // Simulate redirect delay to bank
     setTimeout(() => {
-      this.executePaymentPayload({ method: 'PSE', bank: this.pseBank });
-    }, 1500);
+      this.processingMessage = `Esperando autorización de débito en ${this.pseBank}...`;
+      this.cdr.detectChanges();
+      setTimeout(() => {
+        this.executePaymentPayload({ method: 'PSE', bank: this.pseBank });
+      }, 900);
+    }, 900);
   }
 
   processPayPal() {
     this.processing = true;
-    this.processingMessage = 'Abriendo PayPal...';
+    this.processingMessage = 'Conectando con ventana segura de PayPal...';
     this.errorMsg = '';
     this.cdr.detectChanges();
     
-    // Simulate opening paypal popup
     setTimeout(() => {
-      this.executePaymentPayload({ method: 'PAYPAL' });
-    }, 1500);
+      this.processingMessage = 'Verificando autorización de cuenta PayPal...';
+      this.cdr.detectChanges();
+      setTimeout(() => {
+        this.executePaymentPayload({ method: 'PAYPAL' });
+      }, 900);
+    }, 900);
+  }
+
+  private isValidCardNumber(digits: string): boolean {
+    if (!/^\d{16}$/.test(digits)) return false;
+    if (/^(\d)\1{15}$/.test(digits)) return false;
+    // Permitir tarjetas de prueba simuladas del proyecto (4242, 0002, 9995, 0069)
+    if (digits.endsWith('4242') || digits.endsWith('0002') || digits.endsWith('9995') || digits.endsWith('0069')) {
+      return true;
+    }
+    // Algoritmo de Luhn estándar
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let digit = parseInt(digits.charAt(i), 10);
+      if (shouldDouble) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      shouldDouble = !shouldDouble;
+    }
+    return sum % 10 === 0;
   }
 
   processPayment() {
@@ -442,12 +470,31 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const rawNumber = (this.paymentForm.value.cardNumber || '').replace(/\s+/g, '');
+    if (!this.isValidCardNumber(rawNumber)) {
+      this.errorMsg = 'El número de tarjeta ingresado no es válido (verifica los 16 dígitos o usa la tarjeta de prueba 4242).';
+      this.cdr.detectChanges();
+      return;
+    }
+
+    const expiry = (this.paymentForm.value.expiry || '').trim();
+    const [expMonth, expYear] = expiry.split('/').map(Number);
+    if (expMonth && expYear && !rawNumber.endsWith('0069')) {
+      const now = new Date();
+      const currentYear = now.getFullYear() % 100;
+      const currentMonth = now.getMonth() + 1;
+      if (expYear < currentYear || (expYear === currentYear && expMonth < currentMonth)) {
+        this.errorMsg = 'La fecha de expiración de la tarjeta ya ha vencido.';
+        this.cdr.detectChanges();
+        return;
+      }
+    }
+
     this.processing = true;
     this.processingMessage = 'Autorizando transacción...';
     this.errorMsg = '';
     this.cdr.detectChanges();
 
-    const rawNumber = (this.paymentForm.value.cardNumber || '').replace(/\s+/g, '');
     const payload = {
       method: 'CREDIT_CARD',
       cardNumber: rawNumber,

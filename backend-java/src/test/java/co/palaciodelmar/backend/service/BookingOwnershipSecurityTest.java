@@ -177,14 +177,16 @@ class BookingOwnershipSecurityTest {
     }
 
     @Test
-    @DisplayName("Lectura sin sesión: reserva de invitado (sin contraseña) es consultable por código")
+    @DisplayName("Lectura sin sesión: reserva de invitado (sin contraseña) es consultable por código pero oculta el smartLockPin")
     void testAnonymousCanReadGuestBookingByCode() {
         Booking booking = victimBooking();
+        booking.setSmartLockPin("123456");
         when(bookingRepository.findByBookingCode("PDM-XYZ")).thenReturn(Optional.of(booking));
         User guest = User.builder().id("user-victim").email("g@g.com").build(); // sin password
         when(userRepository.findById("user-victim")).thenReturn(Optional.of(guest));
 
-        assertDoesNotThrow(() -> bookingService.getBookingByCodeSecure("PDM-XYZ", null));
+        co.palaciodelmar.backend.dto.BookingDTO dto = assertDoesNotThrow(() -> bookingService.getBookingByCodeSecure("PDM-XYZ", null));
+        org.junit.jupiter.api.Assertions.assertNull(dto.getSmartLockPin(), "El PIN de la cerradura no debe exponerse en consultas sin sesión");
     }
 
     @Test
@@ -209,5 +211,59 @@ class BookingOwnershipSecurityTest {
 
         assertThrows(IllegalArgumentException.class, () ->
                 bookingService.getBookingByIdSecure("b-victim", hostSinSedes));
+    }
+
+    @Test
+    @DisplayName("Concurrencia Multi-Slot: si el slot 1 falla por DuplicateKeyException, asigna el slot 2")
+    void testCreateBookingRetriesNextAvailableSlotOnCollision() {
+        co.palaciodelmar.backend.model.Suite multiUnitSuite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-multi")
+                .branch("branch-1")
+                .propertyId("prop-1")
+                .basePrice(java.math.BigDecimal.valueOf(500000))
+                .maxGuests(4)
+                .totalUnits(2)
+                .active(true)
+                .available(true)
+                .build();
+
+        when(suiteRepository.findById("suite-multi")).thenReturn(Optional.of(multiUnitSuite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of());
+        when(promotionRepository.findByBranchAndActiveTrue("branch-1")).thenReturn(List.of());
+        when(pricingService.calculatePrice(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new PricingService.PricingResult(
+                        java.math.BigDecimal.valueOf(500000),
+                        java.math.BigDecimal.ZERO,
+                        java.math.BigDecimal.valueOf(95000),
+                        java.math.BigDecimal.valueOf(595000),
+                        List.of()
+                ));
+        when(bookingRepository.save(org.mockito.ArgumentMatchers.any(Booking.class))).thenAnswer(inv -> {
+            Booking b = inv.getArgument(0);
+            if (b.getId() == null) b.setId("booking-retry-1");
+            return b;
+        });
+
+        // Simular que otro hilo ocupó el slot 1 justo antes del insert, pero el slot 2 está libre
+        when(suiteNightRepository.save(org.mockito.ArgumentMatchers.any(co.palaciodelmar.backend.model.SuiteNight.class)))
+                .thenAnswer(inv -> {
+                    co.palaciodelmar.backend.model.SuiteNight sn = inv.getArgument(0);
+                    if (Integer.valueOf(1).equals(sn.getUnitSlot())) {
+                        throw new org.springframework.dao.DuplicateKeyException("Slot 1 ocupado concurrentemente");
+                    }
+                    return sn;
+                });
+
+        BookingRequest req = BookingRequest.builder()
+                .suiteId("suite-multi")
+                .checkIn(LocalDate.now().plusDays(5))
+                .checkOut(LocalDate.now().plusDays(6))
+                .guests(2)
+                .build();
+
+        co.palaciodelmar.backend.dto.BookingDTO result = assertDoesNotThrow(() -> bookingService.createBooking("user-1", req));
+        assertNotNull(result);
+        assertEquals(2, result.getUnitSlot(), "Debe asignar automáticamente el slot 2 tras la colisión en el slot 1");
     }
 }
