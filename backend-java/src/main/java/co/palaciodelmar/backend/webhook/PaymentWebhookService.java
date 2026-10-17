@@ -31,28 +31,17 @@ public class PaymentWebhookService {
     private final EmailService emailService;
     private final ObjectMapper objectMapper;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private PaymentGateway paymentGateway;
+    private final PaymentGateway paymentGateway;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public PaymentWebhookService(
             PaymentRepository paymentRepository,
             BookingRepository bookingRepository,
             @org.springframework.context.annotation.Lazy BookingService bookingService,
             ProcessedWebhookEventRepository processedWebhookEventRepository,
             EmailService emailService,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper
-    ) {
-        this(paymentRepository, bookingRepository, bookingService, processedWebhookEventRepository, emailService, objectMapper, null);
-    }
-
-    public PaymentWebhookService(
-            PaymentRepository paymentRepository,
-            BookingRepository bookingRepository,
-            @org.springframework.context.annotation.Lazy BookingService bookingService,
-            ProcessedWebhookEventRepository processedWebhookEventRepository,
-            EmailService emailService,
-            ObjectMapper objectMapper,
-            PaymentGateway paymentGateway
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) PaymentGateway paymentGateway
     ) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;

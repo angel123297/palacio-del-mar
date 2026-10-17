@@ -2,19 +2,28 @@
 
 Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (Colombia) con la tarea programada de Vibe. Aquí se registran los resultados de Jules y de Vibe.
 
-## 📊 Estado actual (verificación local, 17 oct 2026 — 3ª verificación)
+## 📊 Estado actual (verificación local, 17 oct 2026 — 5ª verificación)
 
-- Backend: **191/191 tests** en verde (30 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
+- Backend: **196/196 tests** en verde (31 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
 - Frontend: **8/8 tests** en verde (4 archivos) y compilación de producción exitosa (`dist/palacio-del-mar-web`).
-- CI: `.github/workflows/ci.yml` configurado con compilación y suite completa de tests de Angular (`npm test -- --watch=false`).
-- Protocolo `non-breaking-delivery`: skill creada y registrada en regla 10 de `AGENTS.md` (Crear ➔ Testear profundamente ➔ Configurar ➔ Implementar).
-- Todos los hallazgos y puntos residuales han sido resueltos y verificados con pruebas automatizadas de regresión.
+- CI: `.github/workflows/ci.yml` en verde en GitHub Actions (`plan/marketplace-webhooks`).
+- Protocolo `non-breaking-delivery`: estrictamente aplicado y verificado.
+- **Bloqueante Resuelto:** se unificó el constructor de `PaymentWebhookService` con `@Autowired` explícito, eliminando la ambigüedad que causaba `No default constructor found`. Verificado con prueba unitaria en `BackendApplicationTests`.
+- **Hallazgos Resueltos:** ocupación de administración filtra estrictamente por propiedades `APPROVED`; cola operativa de pagos `requires_refund` implementada con endpoints backend y vista interactiva en panel de administración Angular.
 
 ## 🗓️ Reporte diario (bitácora)
 
-### 📅 2026-10-17 — Revisión de flujos por rol y resolución integral de hallazgos
+### 📅 2026-10-17 — Revisión posterior a `1b246dc` y resolución integral de hallazgos
 
-**Verificación ejecutada:** `cd backend-java && ./mvnw test` (**191/191**, 0 fallos/errores/omitidos); `cd frontend-angular && npm run build` (correcto) y `npm test -- --watch=false` (**8/8**).
+**Verificación ejecutada:** backend **196/196** (31 archivos; 0 fallos/errores/omitidos); frontend build correcto y **8/8 tests**.
+
+**Resolución de los hallazgos:**
+
+| Prioridad | Hallazgo | Estado | Solución implementada |
+|---|---|---|---|
+| Bloqueante | Ambigüedad de constructores en `PaymentWebhookService` ("No default constructor found"). | **Resuelto** | Se eliminó el constructor duplicado y se dejó un único constructor `@Autowired` con inyección de `PaymentGateway` (`required = false`). Añadida prueba en `BackendApplicationTests`. |
+| Media | Ocupación multi-unidad contaba suites de propiedades `PENDING`/`REJECTED` en el denominador. | **Resuelto** | `AdminService.getDashboardStats` ahora consulta `PropertyRepository` y restringe el denominador `totalRentableUnits` y numerador `occupiedUnitsToday` exclusivamente a propiedades activas con `status == APPROVED` (y sedes principales de hotel). Prueba añadida en `AdminServiceTest`. |
+| Media | Falta de cola operativa en Admin para pagos en estado `requires_refund`. | **Resuelto** | Creados endpoints `GET /api/admin/payments/refunds` y `PUT /api/admin/payments/{id}/resolve-refund` en `AdminController`. En frontend `AdminDashboardComponent`, agregada pestaña interactiva "Reembolsos" con contador pendiente, vista de detalles de cobro tardío y acciones "Reembolsar" / "Descartar". Pruebas añadidas en `AdminServiceTest`. |
 
 **Estado de los hallazgos y revisiones residuales:**
 

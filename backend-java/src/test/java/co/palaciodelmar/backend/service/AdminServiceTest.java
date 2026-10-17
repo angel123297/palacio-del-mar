@@ -22,6 +22,9 @@ class AdminServiceTest {
     private PromotionRepository promotionRepository;
     private SuiteNightRepository suiteNightRepository;
     private BookingService bookingService;
+    private PropertyRepository propertyRepository;
+    private PaymentRepository paymentRepository;
+    private PaymentGateway paymentGateway;
 
     private AdminService adminService;
 
@@ -33,6 +36,9 @@ class AdminServiceTest {
         promotionRepository = mock(PromotionRepository.class);
         suiteNightRepository = mock(SuiteNightRepository.class);
         bookingService = mock(BookingService.class);
+        propertyRepository = mock(PropertyRepository.class);
+        paymentRepository = mock(PaymentRepository.class);
+        paymentGateway = mock(PaymentGateway.class);
 
         adminService = new AdminService(
                 bookingRepository,
@@ -40,7 +46,10 @@ class AdminServiceTest {
                 userRepository,
                 promotionRepository,
                 suiteNightRepository,
-                bookingService
+                bookingService,
+                propertyRepository,
+                paymentRepository,
+                paymentGateway
         );
     }
 
@@ -164,5 +173,85 @@ class AdminServiceTest {
 
         // 1 unidad ocupada de 4 unidades vendibles = 25.0% (no 100%)
         assertEquals(25.0, stats.getAverageOccupancy());
+    }
+
+    @Test
+    @DisplayName("getDashboardStats excluye suites de propiedades pendientes o rechazadas del cálculo de ocupación")
+    void testDashboardOccupancyExcludesSuitesOfUnapprovedProperties() {
+        LocalDate today = LocalDate.now(ZoneId.of("America/Bogota"));
+
+        co.palaciodelmar.backend.model.Property approvedProp = co.palaciodelmar.backend.model.Property.builder()
+                .id("prop-approved").status("APPROVED").active(true).build();
+        co.palaciodelmar.backend.model.Property pendingProp = co.palaciodelmar.backend.model.Property.builder()
+                .id("prop-pending").status("PENDING").active(true).build();
+
+        when(propertyRepository.findAll()).thenReturn(List.of(approvedProp, pendingProp));
+
+        // Suite 1: propiedad aprobada (1 unidad)
+        co.palaciodelmar.backend.model.Suite sApproved = co.palaciodelmar.backend.model.Suite.builder()
+                .id("s-approved").propertyId("prop-approved").totalUnits(1).active(true).build();
+        // Suite 2: propiedad pendiente (1 unidad) - NO DEBE CONTAR
+        co.palaciodelmar.backend.model.Suite sPending = co.palaciodelmar.backend.model.Suite.builder()
+                .id("s-pending").propertyId("prop-pending").totalUnits(1).active(true).build();
+
+        when(suiteRepository.findAll()).thenReturn(List.of(sApproved, sPending));
+
+        // Reserva ocupando la suite aprobada hoy
+        Booking b = Booking.builder()
+                .id("bk-appr")
+                .suite("s-approved")
+                .status("confirmed")
+                .checkIn(today)
+                .checkOut(today.plusDays(2))
+                .paidAmount(new BigDecimal("150000"))
+                .build();
+        when(bookingRepository.findAll()).thenReturn(List.of(b));
+
+        AdminService.AdminDashboardStats stats = adminService.getDashboardStats();
+
+        // Solo 1 unidad vendible (la suite aprobada), ocupada hoy = 100.0%
+        // Si se incluyera la suite pendiente, daría 50.0%
+        assertEquals(100.0, stats.getAverageOccupancy());
+    }
+
+    @Test
+    @DisplayName("resolveRefund con mark_refunded invoca pasarela y actualiza estado a refunded")
+    void testResolveRefundMarkRefundedCallsGateway() {
+        co.palaciodelmar.backend.model.Payment payment = co.palaciodelmar.backend.model.Payment.builder()
+                .id("pay-ref-1")
+                .status("requires_refund")
+                .amount(new BigDecimal("250000"))
+                .transactionId("tx_gate_123")
+                .notes("Pago tardío")
+                .build();
+
+        when(paymentRepository.findById("pay-ref-1")).thenReturn(java.util.Optional.of(payment));
+        when(paymentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        co.palaciodelmar.backend.model.Payment result = adminService.resolveRefund("pay-ref-1", "mark_refunded", "Aprobado tras revisión de soporte");
+
+        assertEquals("refunded", result.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(result.getNotes().contains("Reembolso procesado por ADMIN"));
+        verify(paymentGateway).refund("tx_gate_123", new BigDecimal("250000"));
+    }
+
+    @Test
+    @DisplayName("resolveRefund con dismiss actualiza estado a failed sin invocar pasarela")
+    void testResolveRefundDismissSetsFailedStatus() {
+        co.palaciodelmar.backend.model.Payment payment = co.palaciodelmar.backend.model.Payment.builder()
+                .id("pay-ref-2")
+                .status("requires_refund")
+                .amount(new BigDecimal("100000"))
+                .notes("Pago dudoso")
+                .build();
+
+        when(paymentRepository.findById("pay-ref-2")).thenReturn(java.util.Optional.of(payment));
+        when(paymentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        co.palaciodelmar.backend.model.Payment result = adminService.resolveRefund("pay-ref-2", "dismiss", "Fraude confirmado");
+
+        assertEquals("failed", result.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(result.getNotes().contains("Reembolso descartado por ADMIN"));
+        verify(paymentGateway, never()).refund(any(), any());
     }
 }
