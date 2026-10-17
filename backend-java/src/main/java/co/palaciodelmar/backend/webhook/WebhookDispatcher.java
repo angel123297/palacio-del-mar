@@ -5,8 +5,10 @@ import co.palaciodelmar.backend.model.WebhookDelivery;
 import co.palaciodelmar.backend.model.WebhookSubscription;
 import co.palaciodelmar.backend.repository.WebhookDeliveryRepository;
 import co.palaciodelmar.backend.repository.WebhookSubscriptionRepository;
+import co.palaciodelmar.backend.service.EmailService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
@@ -28,6 +30,13 @@ public class WebhookDispatcher {
     private final WebhookDeliveryRepository deliveryRepository;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+
+    @Autowired(required = false)
+    private EmailService emailService;
+
+    public void setEmailService(EmailService emailService) {
+        this.emailService = emailService;
+    }
 
     @Value("${palacio.webhooks.retry.backoff-attempt-1:60}")
     private long backoffAttempt1Seconds = 60; // 1 minuto por defecto
@@ -162,6 +171,13 @@ public class WebhookDispatcher {
             delivery.setStatus("FAILED");
             delivery.setNextRetryAt(null);
             log.warn("Webhook {} ha agotado sus {} intentos. Marcado como FAILED", delivery.getEventId(), delivery.getMaxAttempts());
+            if (emailService != null) {
+                try {
+                    emailService.sendWebhookFailureAlert(delivery);
+                } catch (Exception e) {
+                    log.warn("Error enviando alerta por email para webhook fallido {}: {}", delivery.getId(), e.getMessage());
+                }
+            }
         }
     }
 

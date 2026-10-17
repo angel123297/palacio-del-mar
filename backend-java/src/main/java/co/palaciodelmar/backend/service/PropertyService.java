@@ -21,12 +21,23 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PropertyService {
 
     private final PropertyRepository propertyRepository;
     private final SuiteRepository suiteRepository;
+
+    @Autowired(required = false)
+    private EmailService emailService;
+
+    public void setEmailService(EmailService emailService) {
+        this.emailService = emailService;
+    }
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -149,7 +160,15 @@ public class PropertyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Propiedad no encontrada"));
         property.setStatus(status.toUpperCase());
         property.setUpdatedAt(Instant.now());
-        return toDTO(propertyRepository.save(property));
+        Property saved = propertyRepository.save(property);
+        if (emailService != null) {
+            try {
+                emailService.sendPropertyStatusNotification(saved, status);
+            } catch (Exception e) {
+                log.warn("Error al enviar notificación de estado para propiedad {}: {}", propertyId, e.getMessage());
+            }
+        }
+        return toDTO(saved);
     }
 
     public List<PropertyDTO> getAllPropertiesForAdmin(String status) {

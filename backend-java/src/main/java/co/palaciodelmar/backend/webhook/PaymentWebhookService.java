@@ -225,6 +225,11 @@ public class PaymentWebhookService {
                 } catch (Exception e) {
                     log.warn("Error enviando email de confirmación: {}", e.getMessage());
                 }
+                try {
+                    emailService.sendHostBookingNotification(booking);
+                } catch (Exception e) {
+                    log.warn("Error enviando email al anfitrión: {}", e.getMessage());
+                }
             }
         } else {
             booking.setPaymentStatus("partial");
