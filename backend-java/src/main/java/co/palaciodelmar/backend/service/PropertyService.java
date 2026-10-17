@@ -350,6 +350,7 @@ public class PropertyService {
                 .phone(p.getPhone())
                 .active(p.getActive())
                 .suitesCount(count)
+                .icalUrl(p.getId() != null ? "/api/properties/" + p.getId() + "/calendar.ics" : null)
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
                 .build();

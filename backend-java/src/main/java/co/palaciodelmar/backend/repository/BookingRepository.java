@@ -20,6 +20,9 @@ public interface BookingRepository extends MongoRepository<Booking, String> {
     org.springframework.data.domain.Page<Booking> findByBranchInAndStatusIgnoreCase(List<String> branches, String status, org.springframework.data.domain.Pageable pageable);
     List<Booking> findByBranchIn(List<String> branches);
     List<Booking> findByPropertyIdIn(List<String> propertyIds);
+    List<Booking> findByPropertyId(String propertyId);
+    List<Booking> findByPropertyIdAndStatusIn(String propertyId, List<String> statuses);
+    List<Booking> findBySuite(String suiteId);
     org.springframework.data.domain.Page<Booking> findByPropertyIdIn(List<String> propertyIds, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Booking> findByPropertyIdInAndStatusIgnoreCase(List<String> propertyIds, String status, org.springframework.data.domain.Pageable pageable);
 }
