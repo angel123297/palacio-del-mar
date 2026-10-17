@@ -230,6 +230,19 @@ public class SimulatedPaymentGateway implements PaymentGateway {
 
         PaymentIntent intent = paymentIntentRepository.findByTransactionId(transactionId)
                 .or(() -> paymentIntentRepository.findById(transactionId))
+                .or(() -> {
+                    String candidateBookingId = transactionId.startsWith("tx_")
+                            ? transactionId.substring(3)
+                            : transactionId;
+                    java.util.List<PaymentIntent> byBooking = paymentIntentRepository.findAllByBookingId(candidateBookingId);
+                    if (byBooking != null && !byBooking.isEmpty()) {
+                        return byBooking.stream()
+                                .filter(pi -> "succeeded".equalsIgnoreCase(pi.getStatus()))
+                                .findFirst()
+                                .or(() -> Optional.of(byBooking.get(0)));
+                    }
+                    return paymentIntentRepository.findByBookingId(candidateBookingId);
+                })
                 .orElse(null);
 
         if (intent == null) {

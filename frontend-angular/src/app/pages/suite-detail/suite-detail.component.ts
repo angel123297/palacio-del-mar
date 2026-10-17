@@ -11,6 +11,19 @@ import { Suite, Experience } from '../../models/types';
 import { format } from 'date-fns';
 import { AuthModalComponent } from '../../components/auth-modal/auth-modal.component';
 
+const bogotaTodayIso = (): string => {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch {
+    return format(new Date(), 'yyyy-MM-dd');
+  }
+};
+
+const addDaysIso = (iso: string, days: number): string => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+};
+
 @Component({
   selector: 'app-suite-detail',
   standalone: true,
@@ -24,10 +37,10 @@ export class SuiteDetailComponent implements OnInit {
   step = 1;
   
   // Step 1: Basic Booking Info
-  checkIn = format(new Date(), 'yyyy-MM-dd');
-  checkOut = format(new Date(Date.now() + 86400000 * 2), 'yyyy-MM-dd');
+  today = bogotaTodayIso();
+  checkIn = this.today;
+  checkOut = addDaysIso(this.today, 2);
   guests = 2;
-  today = format(new Date(), 'yyyy-MM-dd');
 
   // Step 2: Experiences
   experiences: Experience[] = [];

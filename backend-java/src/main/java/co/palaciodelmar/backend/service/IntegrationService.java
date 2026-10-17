@@ -163,6 +163,7 @@ public class IntegrationService {
             List<SuiteNight> toRemove = occupied.stream()
                     .filter(sn -> sn.getUnitSlot() != null && sn.getUnitSlot() == slot)
                     .filter(sn -> "blocked".equalsIgnoreCase(sn.getStatus()))
+                    .filter(sn -> sn.getBooking() == null || sn.getBooking().startsWith("EXT_BLOCK_"))
                     .toList();
 
             suiteNightRepository.deleteAll(toRemove);

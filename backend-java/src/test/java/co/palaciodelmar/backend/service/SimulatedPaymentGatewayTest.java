@@ -197,4 +197,32 @@ class SimulatedPaymentGatewayTest {
         assertNotNull(res4.refundId());
         assertEquals("refunded", succeededIntent.getStatus());
     }
+
+    @Test
+    void testRefundResolvesByTxBookingIdPrefix() {
+        PaymentIntent failedAttempt = PaymentIntent.builder()
+                .id("pi_fail_1")
+                .bookingId("book_cancel_123")
+                .amount(new BigDecimal("400000"))
+                .status("failed")
+                .build();
+
+        PaymentIntent succeededAttempt = PaymentIntent.builder()
+                .id("pi_succ_2")
+                .bookingId("book_cancel_123")
+                .transactionId("ch_real_999")
+                .amount(new BigDecimal("400000"))
+                .status("succeeded")
+                .build();
+
+        when(paymentIntentRepository.findByTransactionId("tx_book_cancel_123")).thenReturn(Optional.empty());
+        when(paymentIntentRepository.findById("tx_book_cancel_123")).thenReturn(Optional.empty());
+        when(paymentIntentRepository.findAllByBookingId("book_cancel_123"))
+                .thenReturn(java.util.List.of(failedAttempt, succeededAttempt));
+
+        PaymentGateway.PaymentRefundResponse res = gateway.refund("tx_book_cancel_123", new BigDecimal("360000"));
+        assertTrue(res.success());
+        assertEquals("refunded", res.status());
+        assertEquals("refunded", succeededAttempt.getStatus());
+    }
 }
