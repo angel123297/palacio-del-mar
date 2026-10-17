@@ -112,39 +112,8 @@ export class SearchComponent implements OnInit {
           return s;
         });
         
-        const vibe = this.searchState.filters().vibe;
-        if (vibe && mappedSuites.length > 0) {
-          // Send to Gemini AI via backend
-          const payload = {
-            vibe: vibe,
-            suites: mappedSuites.map((s: any) => ({
-              id: s.id || s._id,
-              name: s.name,
-              description: s.description
-            }))
-          };
-          this.api.post<ApiResponse<Record<string, number>>>('/chat/vibe-score', payload).subscribe({
-            next: (vibeRes) => {
-              const scores = vibeRes.data || {};
-              mappedSuites.sort((a: any, b: any) => {
-                const idA = a.id || a._id;
-                const idB = b.id || b._id;
-                const scoreA = scores[idA] || 50;
-                const scoreB = scores[idB] || 50;
-                return scoreB - scoreA;
-              });
-              this.suites.set(mappedSuites);
-              this.loading.set(false);
-            },
-            error: () => {
-              this.suites.set(mappedSuites);
-              this.loading.set(false);
-            }
-          });
-        } else {
-          this.suites.set(mappedSuites);
-          this.loading.set(false);
-        }
+        this.suites.set(mappedSuites);
+        this.loading.set(false);
       },
       error: () => {
         this.suites.set([]);

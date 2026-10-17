@@ -13,6 +13,29 @@ export interface Branch {
   highlights?: any[];
 }
 
+export interface Property {
+  id?: string;
+  _id?: string;
+  ownerId?: string;
+  name: string;
+  slug?: string;
+  type?: string;
+  city: string;
+  address: string;
+  description?: string;
+  shortDescription?: string;
+  mainImage?: string;
+  images?: string[];
+  commissionRate?: number;
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  externalSiteUrl?: string;
+  phone?: string;
+  active?: boolean;
+  suitesCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Suite {
   id?: string;
   _id?: string;
@@ -29,8 +52,11 @@ export interface Suite {
   size?: number;
   amenities?: string[];
   features?: string[];
+  propertyId?: string;
   branchId?: string;
   branch?: Branch;
+  source?: 'NATIVE' | 'EXTERNAL';
+  externalId?: string;
   mainImage?: string;
   images?: string[];
   available?: boolean;
@@ -115,6 +141,9 @@ export interface Booking {
   paidAmount?: number;
   refundedAmount?: number;
   balanceDue?: number;
+  propertyId?: string;
+  platformFee?: number;
+  hostPayout?: number;
   status: string;
   paymentStatus?: string;
   bookingCode?: string;
@@ -162,4 +191,51 @@ export interface DashboardMetricsDTO {
   totalUsers?: number;
   totalSuites?: number;
 }
+
+export interface WebhookSubscription {
+  id: string;
+  propertyId: string;
+  ownerId?: string;
+  url: string;
+  secret: string;
+  events: string[];
+  active: boolean;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  subscriptionId: string;
+  propertyId: string;
+  eventId: string;
+  eventType: string;
+  targetUrl: string;
+  payload: string;
+  attempts: number;
+  maxAttempts: number;
+  status: string; // PENDING, SUCCESS, FAILED
+  responseCode?: number;
+  responseBody?: string;
+  errorMessage?: string;
+  nextRetryAt?: string;
+  createdAt?: string;
+  deliveredAt?: string;
+}
+
+export interface ApiKeyItem {
+  id: string;
+  propertyId: string;
+  ownerId?: string;
+  name: string;
+  keyPrefix: string;
+  rawKey?: string;
+  active: boolean;
+  createdAt?: string;
+  lastUsedAt?: string;
+  revokedAt?: string;
+}
+
+
 

@@ -90,9 +90,15 @@ export class SuiteDetailComponent implements OnInit {
   ) {}
 
   get mapUrl(): SafeResourceUrl {
-    const address = this.suite?.branch?.address || 'Cartagena, Colombia';
+    const address = (typeof this.suite?.branch === 'object' ? this.suite.branch?.address : null) || 'Cartagena, Colombia';
     const url = `https://maps.google.com/maps?q=${encodeURIComponent(address)}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
     return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  get branchIdentifier(): string {
+    if (!this.suite) return '';
+    const b: any = this.suite.branch;
+    return b?.id || b?._id || b?.slug || this.suite.propertyId || (typeof b === 'string' ? b : '') || '';
   }
 
   ngOnInit(): void {
@@ -116,6 +122,7 @@ export class SuiteDetailComponent implements OnInit {
         next: (res) => {
           this.suite = res.data || res;
           this.loading = false;
+          this.fetchLiveQuote();
           this.cdr.detectChanges();
         },
         error: () => {
@@ -132,12 +139,36 @@ export class SuiteDetailComponent implements OnInit {
     }
   }
 
+  dynamicPricingNotes: string[] = [];
+  dynamicQuoteTotal: number | null = null;
+
+  fetchLiveQuote() {
+    const sId = this.suite?.id || this.suite?._id;
+    if (!sId || !this.checkIn || !this.checkOut) return;
+    this.api.post<any>('/suites/calculate-price', {
+      suiteId: sId,
+      checkIn: this.checkIn,
+      checkOut: this.checkOut
+    }).subscribe({
+      next: (res) => {
+        const d = res?.data || res;
+        this.dynamicPricingNotes = d?.dynamicPricingNotes || [];
+        if (d?.total) {
+          this.dynamicQuoteTotal = d.total;
+        }
+        this.cdr.detectChanges();
+      },
+      error: () => {}
+    });
+  }
+
   validateDates() {
     if (this.checkOut <= this.checkIn) {
       const d = new Date(this.checkIn + 'T12:00:00');
       d.setDate(d.getDate() + 1);
       this.checkOut = format(d, 'yyyy-MM-dd');
     }
+    this.fetchLiveQuote();
   }
 
   get nights(): number {
@@ -146,6 +177,9 @@ export class SuiteDetailComponent implements OnInit {
   }
 
   get totalRoomPrice(): number {
+    if (this.dynamicQuoteTotal != null) {
+      return this.dynamicQuoteTotal;
+    }
     const base = (this.suite?.basePrice || 0) * this.nights;
     const taxes = Math.round(base * 0.19);
     return base + taxes;

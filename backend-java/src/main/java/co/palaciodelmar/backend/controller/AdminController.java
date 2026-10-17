@@ -24,6 +24,23 @@ public class AdminController {
     private final AdminService adminService;
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
+    private final co.palaciodelmar.backend.service.PropertyService propertyService;
+
+    @GetMapping("/properties")
+    public ResponseEntity<ApiResponse<List<co.palaciodelmar.backend.dto.PropertyDTO>>> getAdminProperties(
+            @RequestParam(required = false) String status) {
+        List<co.palaciodelmar.backend.dto.PropertyDTO> list = propertyService.getAllPropertiesForAdmin(status);
+        return ResponseEntity.ok(ApiResponse.ok(list));
+    }
+
+    @PutMapping("/properties/{id}/status")
+    public ResponseEntity<ApiResponse<co.palaciodelmar.backend.dto.PropertyDTO>> updatePropertyStatus(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        String status = body.getOrDefault("status", "APPROVED");
+        co.palaciodelmar.backend.dto.PropertyDTO updated = propertyService.updatePropertyStatus(id, status);
+        return ResponseEntity.ok(ApiResponse.ok("Estado de propiedad actualizado", updated));
+    }
 
     @GetMapping("/bookings")
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<BookingDTO>>> getAllBookings(
@@ -57,7 +74,17 @@ public class AdminController {
     }
 
     @PostMapping("/promotions")
-    public ResponseEntity<ApiResponse<PromotionDTO>> createPromotion(@RequestBody Promotion promotion) {
+    public ResponseEntity<ApiResponse<PromotionDTO>> createPromotion(
+            @jakarta.validation.Valid @RequestBody co.palaciodelmar.backend.dto.PromotionRequest request) {
+        Promotion promotion = Promotion.builder()
+                .title(request.getTitle())
+                .branch(request.resolveBranch())
+                .discountPercent(request.getDiscountPercent())
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .active(true)
+                .isSample(false)
+                .build();
         Promotion created = adminService.createPromotion(promotion);
         return ResponseEntity.ok(ApiResponse.ok("Promoción creada exitosamente", toPromotionDTO(created)));
     }

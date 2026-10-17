@@ -7,6 +7,7 @@ import co.palaciodelmar.backend.model.SuiteNight;
 import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.PromotionRepository;
+import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.Builder;
@@ -28,6 +29,7 @@ public class AvailabilityService {
     private final BookingRepository bookingRepository;
     private final PromotionRepository promotionRepository;
     private final BranchRepository branchRepository;
+    private final PropertyRepository propertyRepository;
     private final PricingService pricingService;
 
     @Data
@@ -81,6 +83,24 @@ public class AvailabilityService {
         private MonthlySummary summary;
     }
 
+    private List<Suite> getApprovedActiveSuites() {
+        Map<String, co.palaciodelmar.backend.model.Property> propMap = propertyRepository.findAll().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        co.palaciodelmar.backend.model.Property::getId,
+                        java.util.function.Function.identity(),
+                        (a, b) -> a
+                ));
+        return suiteRepository.findByActiveTrue().stream()
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    co.palaciodelmar.backend.model.Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
+                .toList();
+    }
+
     public AvailabilityResponseData checkAvailability(LocalDate checkIn, LocalDate checkOut, Integer guests, String branchId, String suiteType) {
         long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
         if (nights <= 0) {
@@ -88,17 +108,23 @@ public class AvailabilityService {
         }
 
         String resolvedBranchId = null;
+        String resolvedPropertyId = null;
         if (branchId != null && !branchId.isEmpty()) {
             resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
+            resolvedPropertyId = propertyRepository.findBySlug(branchId).map(p -> p.getId()).orElse(branchId);
         }
 
-        List<Suite> allSuites = suiteRepository.findByActiveTrue();
+        List<Suite> allSuites = getApprovedActiveSuites();
         List<SuiteAvailabilityResult> availableSuites = new ArrayList<>();
         List<SuiteAvailabilityResult> unavailableSuites = new ArrayList<>();
 
         for (Suite suite : allSuites) {
-            if (resolvedBranchId != null && !resolvedBranchId.equals(suite.getBranch())) {
-                continue;
+            if (branchId != null && !branchId.isEmpty()) {
+                boolean matchesBranch = suite.getBranch() != null && (suite.getBranch().equals(resolvedBranchId) || suite.getBranch().equals(branchId));
+                boolean matchesProperty = suite.getPropertyId() != null && (suite.getPropertyId().equals(resolvedPropertyId) || suite.getPropertyId().equals(branchId));
+                if (!matchesBranch && !matchesProperty) {
+                    continue;
+                }
             }
             if (suiteType != null && !suiteType.isEmpty() && !"Todas las suites".equalsIgnoreCase(suiteType) && !suiteType.equalsIgnoreCase(suite.getType())) {
                 continue;
@@ -162,25 +188,39 @@ public class AvailabilityService {
         int daysInMonth = startDate.lengthOfMonth();
 
         String resolvedBranchId = null;
+        String resolvedPropertyId = null;
         if (branchId != null && !branchId.isEmpty()) {
             resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
+            resolvedPropertyId = propertyRepository.findBySlug(branchId).map(p -> p.getId()).orElse(branchId);
         }
 
-        List<Suite> allSuites = suiteRepository.findByActiveTrue();
+        List<Suite> allSuites = getApprovedActiveSuites();
         List<Suite> filteredSuites = new ArrayList<>();
 
         if (suiteId != null && !suiteId.isBlank()) {
             Optional<Suite> specificSuite = suiteRepository.findById(suiteId)
                     .or(() -> suiteRepository.findBySlug(suiteId.toLowerCase()));
-            if (specificSuite.isPresent()) {
-                filteredSuites.add(specificSuite.get());
+            if (specificSuite.isPresent() && !Boolean.FALSE.equals(specificSuite.get().getActive())) {
+                Suite s = specificSuite.get();
+                boolean approved = true;
+                if (s.getPropertyId() != null) {
+                    co.palaciodelmar.backend.model.Property p = propertyRepository.findById(s.getPropertyId()).orElse(null);
+                    approved = p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                }
+                if (approved) {
+                    filteredSuites.add(s);
+                }
             }
         }
 
         if (filteredSuites.isEmpty() && (suiteId == null || suiteId.isBlank())) {
             for (Suite suite : allSuites) {
-                if (resolvedBranchId != null && !resolvedBranchId.equals(suite.getBranch())) {
-                    continue;
+                if (branchId != null && !branchId.isEmpty()) {
+                    boolean matchesBranch = suite.getBranch() != null && (suite.getBranch().equals(resolvedBranchId) || suite.getBranch().equals(branchId));
+                    boolean matchesProperty = suite.getPropertyId() != null && (suite.getPropertyId().equals(resolvedPropertyId) || suite.getPropertyId().equals(branchId));
+                    if (!matchesBranch && !matchesProperty) {
+                        continue;
+                    }
                 }
                 if (suiteType != null && !suiteType.isEmpty() && !"Todas las suites".equalsIgnoreCase(suiteType) && !suiteType.equalsIgnoreCase(suite.getType())) {
                     continue;

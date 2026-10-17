@@ -9,6 +9,7 @@ import java.time.Month;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 @Service
 public class PricingService {
@@ -16,6 +17,16 @@ public class PricingService {
     private static final BigDecimal TAX_RATE = new BigDecimal("0.19"); // IVA 19%
 
     public PricingResult calculatePrice(BigDecimal basePrice, LocalDate checkIn, LocalDate checkOut, BigDecimal branchPromotionPercent) {
+        return calculatePrice(basePrice, checkIn, checkOut, branchPromotionPercent, null);
+    }
+
+    /**
+     * Igual que {@link #calculatePrice(BigDecimal, LocalDate, LocalDate, BigDecimal)} pero aplicando,
+     * noche a noche, un factor de tarifa dinámica (ocupación / última hora). Si {@code dynamicFactor}
+     * es nulo o devuelve nulo para una fecha, esa noche se cobra sin ajuste.
+     */
+    public PricingResult calculatePrice(BigDecimal basePrice, LocalDate checkIn, LocalDate checkOut,
+                                        BigDecimal branchPromotionPercent, Function<LocalDate, BigDecimal> dynamicFactor) {
         long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
         if (nights <= 0) {
             throw new IllegalArgumentException("La estadía debe ser de al menos 1 noche.");
@@ -28,6 +39,10 @@ public class PricingService {
             LocalDate date = checkIn.plusDays(i);
             BigDecimal multiplier = getSeasonMultiplier(date);
             BigDecimal nightlyRaw = basePrice.multiply(multiplier);
+            BigDecimal factor = dynamicFactor != null ? dynamicFactor.apply(date) : null;
+            if (factor != null && factor.compareTo(BigDecimal.ONE) != 0) {
+                nightlyRaw = nightlyRaw.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+            }
             subtotal = subtotal.add(nightlyRaw);
             nightlyPrices.add(new NightlyPrice(date, nightlyRaw));
         }
