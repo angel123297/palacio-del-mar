@@ -23,6 +23,9 @@ public class BookingDTO {
     private String user;
     private Suite suite;
     private Branch branch;
+    private String propertyId;
+    private BigDecimal platformFee;
+    private BigDecimal hostPayout;
     private Integer unitSlot;
     private LocalDate checkIn;
     private LocalDate checkOut;
@@ -68,6 +71,9 @@ public class BookingDTO {
     private BigDecimal appliedPromotionDiscountPercent;
     private String smartLockPin;
     private Boolean preCheckInCompleted;
+    private List<String> dynamicPricingNotes;
+    private String payoutId;
+    private Instant reviewRequestSentAt;
     private Instant expiresAt;
     private Instant createdAt;
     private Instant updatedAt;

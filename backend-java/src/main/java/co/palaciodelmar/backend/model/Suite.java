@@ -34,7 +34,16 @@ public class Suite implements Serializable {
     }
 
     @Indexed
-    private String branch; // Branch ObjectId reference
+    private String branch; // Branch ObjectId reference (mantenido por compatibilidad)
+
+    @Indexed
+    private String propertyId; // Property ObjectId reference (marketplace)
+
+    @Indexed
+    @Builder.Default
+    private String source = "NATIVE"; // "NATIVE", "EXTERNAL"
+
+    private String externalId; // ID en sistema externo del anfitrión
 
     private String name;
 

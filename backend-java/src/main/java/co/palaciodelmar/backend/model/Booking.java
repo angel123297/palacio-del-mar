@@ -32,7 +32,10 @@ public class Booking {
     private String suite; // Suite ObjectId reference
 
     @Indexed
-    private String branch; // Branch ObjectId reference
+    private String branch; // Branch ObjectId reference (mantenido por compatibilidad)
+
+    @Indexed
+    private String propertyId; // Property ObjectId reference (marketplace)
 
     @Builder.Default
     private Integer unitSlot = 1;
@@ -56,6 +59,12 @@ public class Booking {
     private BigDecimal taxes;
     private BigDecimal totalPrice;
     private BigDecimal pricePerNight; // Retained for backward compatibility
+
+    @Builder.Default
+    private BigDecimal platformFee = BigDecimal.ZERO; // Comisión del marketplace (ej. 8%)
+
+    @Builder.Default
+    private BigDecimal hostPayout = BigDecimal.ZERO; // Monto a liquidar al anfitrión (ej. 92%)
 
     @Builder.Default
     private List<NightlyPrice> nightlyPrices = new ArrayList<>();
@@ -130,6 +139,17 @@ public class Booking {
     private String documentNumber;
 
     private String companionGuests;
+
+    /** Ajustes de tarifa dinámica aplicados al cotizar (ej. "2026-10-17: Alta demanda (ocupación 80%) (+15%)"). */
+    @Builder.Default
+    private List<String> dynamicPricingNotes = new ArrayList<>();
+
+    /** Liquidación (HostPayout) que ya incluyó esta reserva; null = pendiente de liquidar. */
+    @Indexed(sparse = true)
+    private String payoutId;
+
+    /** Momento en que se envió automáticamente la invitación a calificar la estadía. */
+    private Instant reviewRequestSentAt;
 
     @Data
     @Builder

@@ -24,6 +24,7 @@ public class CalculatePriceResponseDTO {
     private String discountReason;
     private BigDecimal total;
     private List<LineItem> lines;
+    private List<String> dynamicPricingNotes;
 
     @Data
     @Builder

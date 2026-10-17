@@ -1,18 +1,43 @@
 package co.palaciodelmar.backend.service;
 
+import co.palaciodelmar.backend.model.Booking;
+import co.palaciodelmar.backend.model.User;
+import co.palaciodelmar.backend.repository.UserRepository;
+import com.lowagie.text.Document;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.pdf.PdfWriter;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
+
+/**
+ * Servicio único de correo transaccional (verificación de cuenta y confirmación de reserva).
+ * Unifica los antiguos EmailService y EmailNotificationService.
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailService {
 
     private final JavaMailSender javaMailSender;
+    private final UserRepository userRepository;
+
+    @Value("${app.base-url:http://localhost:4200}")
+    private String baseUrl = "http://localhost:4200";
 
     @Async
     public void sendVerificationEmail(String toEmail, String token) {
@@ -23,17 +48,138 @@ public class EmailService {
             helper.setTo(toEmail);
             helper.setSubject("Verifica tu cuenta - Palacio del Mar");
 
+            String verifyLink = (baseUrl != null ? baseUrl : "http://localhost:4200") + "/verificar-email/" + token;
             String htmlMsg = "<p>Hola,</p>"
                     + "<p>Gracias por registrarte en Palacio del Mar.</p>"
                     + "<p>Por favor, verifica tu cuenta haciendo clic en el siguiente enlace:</p>"
-                    + "<p><a href=\"http://localhost:4200/verificar-email/" + token + "\">Verificar cuenta</a></p>"
+                    + "<p><a href=\"" + verifyLink + "\">Verificar cuenta</a></p>"
                     + "<p>Si no solicitaste esto, puedes ignorar este correo.</p>";
 
             helper.setText(htmlMsg, true);
 
             javaMailSender.send(message);
-        } catch (MessagingException e) {
-            throw new RuntimeException("Error al enviar el correo de verificación", e);
+        } catch (Exception e) {
+            log.warn("No se pudo enviar correo de verificación a {} (servidor SMTP no disponible): {}", toEmail, e.getMessage());
         }
+    }
+
+    @Async
+    public void sendBookingConfirmation(Booking booking) {
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom("reservas@palaciodelmar.co");
+            String email = userRepository.findById(booking.getUser()).map(User::getEmail).orElse("cliente@ejemplo.com");
+            helper.setTo(email);
+            helper.setSubject("Confirmación de tu reserva - Palacio del Mar");
+
+            String text = "<h1>¡Gracias por tu reserva en Palacio del Mar!</h1>"
+                    + "<p>Tu reserva ha sido confirmada.</p>"
+                    + "<p><strong>ID de Reserva:</strong> " + booking.getId() + "</p>"
+                    + "<p><strong>Check-in:</strong> " + booking.getCheckIn() + "</p>"
+                    + "<p><strong>Check-out:</strong> " + booking.getCheckOut() + "</p>"
+                    + "<p><strong>Total:</strong> COP $" + booking.getTotalPrice() + "</p>"
+                    + "<br/><p>Adjuntamos el comprobante de pago y tu invitación al calendario.</p>";
+
+            helper.setText(text, true);
+
+            // Generar PDF
+            byte[] pdfBytes = generateReceiptPdf(booking);
+            helper.addAttachment("Comprobante_Reserva_" + booking.getId() + ".pdf", new ByteArrayResource(pdfBytes));
+
+            // Generar ICS
+            byte[] icsBytes = generateIcsFile(booking);
+            helper.addAttachment("Reserva_" + booking.getId() + ".ics", new ByteArrayResource(icsBytes));
+
+            javaMailSender.send(message);
+
+        } catch (Exception e) {
+            log.warn("No se pudo enviar correo de confirmación para reserva {} (servidor SMTP no disponible): {}",
+                    booking != null ? booking.getId() : "N/A", e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendReviewInvitation(Booking booking) {
+        if (booking == null) return;
+        try {
+            String email = null;
+            if (booking.getUser() != null) {
+                email = userRepository.findById(booking.getUser()).map(User::getEmail).orElse(null);
+            }
+            if ((email == null || email.isBlank()) && booking.getGuestDetails() != null) {
+                email = booking.getGuestDetails().getEmail();
+            }
+
+            if (email == null || email.isBlank()) {
+                log.warn("sendReviewInvitation omitido: no se encontró email para la reserva {}", booking.getId());
+                return;
+            }
+
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom("experiencias@palaciodelmar.co");
+            helper.setTo(email);
+            helper.setSubject("¿Cómo estuvo tu estadía? - Califica tu experiencia");
+
+            String link = (baseUrl != null ? baseUrl : "http://localhost:4200") + "/reservas/" + booking.getId();
+            String html = "<h2>¡Gracias por hospedarte con nosotros!</h2>"
+                    + "<p>Esperamos que hayas disfrutado de tu tiempo en Palacio del Mar.</p>"
+                    + "<p>Nos encantaría conocer tu opinión para seguir mejorando. Déjanos una reseña verificada de tu estancia en el siguiente enlace:</p>"
+                    + "<p><a href=\"" + link + "\" style=\"background:#c9a96e; color:#0d0d0d; padding:10px 20px; text-decoration:none; border-radius:4px; font-weight:bold;\">Calificar mi Estadía</a></p>"
+                    + "<br/><p>Tu opinión ayuda a futuros viajeros y a nuestros anfitriones.</p>";
+
+            helper.setText(html, true);
+            javaMailSender.send(message);
+        } catch (Exception e) {
+            log.warn("No se pudo enviar invitación de reseña para la reserva {} (servidor SMTP no disponible): {}", booking.getId(), e.getMessage());
+        }
+    }
+
+    private byte[] generateReceiptPdf(Booking booking) {
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Document document = new Document();
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            document.add(new Paragraph("PALACIO DEL MAR - COMPROBANTE DE RESERVA"));
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("ID Reserva: " + booking.getId()));
+            document.add(new Paragraph("Estado: " + booking.getStatus()));
+            document.add(new Paragraph("Check-in: " + booking.getCheckIn()));
+            document.add(new Paragraph("Check-out: " + booking.getCheckOut()));
+            document.add(new Paragraph("Huéspedes: " + booking.getGuests()));
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("Subtotal: $" + (booking.getNightlyPrices() != null ? booking.getNightlyPrices().stream().map(p -> p.getPrice()).reduce(BigDecimal.ZERO, BigDecimal::add) : booking.getTotalPrice())));
+            document.add(new Paragraph("Total Pagado: $" + booking.getPaidAmount()));
+            document.add(new Paragraph("Balance Pendiente: $" + booking.getBalanceDue()));
+
+            document.close();
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Error al generar PDF", e);
+        }
+    }
+
+    private byte[] generateIcsFile(Booking booking) {
+        String dtStart = booking.getCheckIn().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String dtEnd = booking.getCheckOut().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+        String icsContent = "BEGIN:VCALENDAR\r\n" +
+                "VERSION:2.0\r\n" +
+                "PRODID:-//Palacio del Mar//Reservas//ES\r\n" +
+                "BEGIN:VEVENT\r\n" +
+                "UID:" + UUID.randomUUID() + "@palaciodelmar.co\r\n" +
+                "DTSTAMP:" + Instant.now().toString().replaceAll("[-:]", "").split("\\.")[0] + "Z\r\n" +
+                "DTSTART;VALUE=DATE:" + dtStart + "\r\n" +
+                "DTEND;VALUE=DATE:" + dtEnd + "\r\n" +
+                "SUMMARY:Reserva en Palacio del Mar\r\n" +
+                "DESCRIPTION:Reserva confirmada. ID: " + booking.getId() + "\r\n" +
+                "END:VEVENT\r\n" +
+                "END:VCALENDAR\r\n";
+
+        return icsContent.getBytes(StandardCharsets.UTF_8);
     }
 }

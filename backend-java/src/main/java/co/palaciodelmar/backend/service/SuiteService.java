@@ -6,10 +6,12 @@ import co.palaciodelmar.backend.dto.SuiteResponseDTO;
 import co.palaciodelmar.backend.dto.SuiteTypeDTO;
 import co.palaciodelmar.backend.model.Branch;
 import co.palaciodelmar.backend.model.Experience;
+import co.palaciodelmar.backend.model.Property;
 import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.ExperienceRepository;
+import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.PromotionRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,9 +32,13 @@ public class SuiteService {
 
     private final SuiteRepository suiteRepository;
     private final BranchRepository branchRepository;
+    private final PropertyRepository propertyRepository;
     private final ExperienceRepository experienceRepository;
     private final PromotionRepository promotionRepository;
     private final PricingService pricingService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DynamicPricingService dynamicPricingService;
 
     private Map<String, Branch> getBranchMap() {
         return branchRepository.findAll().stream()
@@ -42,25 +48,57 @@ public class SuiteService {
     @Cacheable(value = "suites", key = "#branchFilter != null ? #branchFilter : 'all'")
     public List<SuiteResponseDTO> getAllActiveSuites(String branchFilter) {
         Map<String, Branch> branchMap = getBranchMap();
+        Map<String, Property> propMap = propertyRepository.findAll().stream()
+                .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
+
         List<Suite> suites = suiteRepository.findAll().stream()
                 .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
                 .toList();
 
         if (branchFilter != null && !branchFilter.isBlank()) {
             String lower = branchFilter.trim().toLowerCase();
             Optional<Branch> targetBranch = branchRepository.findById(branchFilter)
                     .or(() -> branchRepository.findBySlug(lower));
+            Optional<Property> targetProp = propertyRepository.findById(branchFilter)
+                    .or(() -> propertyRepository.findBySlug(lower));
 
-            if (targetBranch.isPresent()) {
-                String targetId = targetBranch.get().getId();
-                suites = suites.stream()
-                        .filter(s -> targetId.equals(s.getBranch()))
-                        .toList();
-            }
+            suites = suites.stream()
+                    .filter(s -> {
+                        if (targetBranch.isPresent() && targetBranch.get().getId().equals(s.getBranch())) {
+                            return true;
+                        }
+                        if (targetProp.isPresent() && targetProp.get().getId().equals(s.getPropertyId())) {
+                            return true;
+                        }
+                        return false;
+                    })
+                    .toList();
         }
 
         return suites.stream()
-                .map(s -> SuiteResponseDTO.from(s, branchMap.get(s.getBranch())))
+                .map(s -> {
+                    Branch b = branchMap.get(s.getBranch());
+                    if (b == null && s.getPropertyId() != null && propMap.containsKey(s.getPropertyId())) {
+                        Property p = propMap.get(s.getPropertyId());
+                        b = Branch.builder()
+                                .id(p.getId())
+                                .name(p.getName())
+                                .slug(p.getSlug())
+                                .zone(p.getCity())
+                                .address(p.getAddress())
+                                .mainImage(p.getMainImage())
+                                .active(true)
+                                .build();
+                    }
+                    return SuiteResponseDTO.from(s, b);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -70,8 +108,18 @@ public class SuiteService {
                 .orElse(null);
         String targetId = branch != null ? branch.getId() : branchId;
 
+        Map<String, Property> propMap = propertyRepository.findAll().stream()
+                .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
+
         return suiteRepository.findAll().stream()
                 .filter(s -> targetId.equals(s.getBranch()) && !Boolean.FALSE.equals(s.getActive()))
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
                 .map(s -> SuiteResponseDTO.from(s, branch))
                 .collect(Collectors.toList());
     }
@@ -81,13 +129,43 @@ public class SuiteService {
         Suite suite = suiteRepository.findById(idOrSlug)
                 .or(() -> suiteRepository.findBySlug(idOrSlug.toLowerCase()))
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada con identificador: " + idOrSlug));
+        if (suite.getPropertyId() != null) {
+            Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
+            if (p == null || Boolean.FALSE.equals(p.getActive()) || !"APPROVED".equalsIgnoreCase(p.getStatus())) {
+                throw new IllegalArgumentException("Suite no disponible o la propiedad no está aprobada: " + idOrSlug);
+            }
+        }
         Branch branch = suite.getBranch() != null ? branchRepository.findById(suite.getBranch()).orElse(null) : null;
+        if (branch == null && suite.getPropertyId() != null) {
+            branch = propertyRepository.findById(suite.getPropertyId())
+                    .map(p -> Branch.builder()
+                            .id(p.getId())
+                            .name(p.getName())
+                            .slug(p.getSlug())
+                            .zone(p.getCity())
+                            .address(p.getAddress())
+                            .mainImage(p.getMainImage())
+                            .active(true)
+                            .build()
+                    ).orElse(null);
+        }
         return SuiteResponseDTO.from(suite, branch);
     }
 
     @Cacheable(value = "suite_types")
     public List<SuiteTypeDTO> getSuiteTypes() {
-        List<Suite> activeSuites = suiteRepository.findByActiveTrue();
+        Map<String, Property> propMap = propertyRepository.findAll().stream()
+                .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
+
+        List<Suite> activeSuites = suiteRepository.findByActiveTrue().stream()
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
+                .toList();
         Map<String, List<Suite>> grouped = activeSuites.stream()
                 .filter(s -> s.getType() != null)
                 .collect(Collectors.groupingBy(Suite::getType));
@@ -120,13 +198,25 @@ public class SuiteService {
                 .or(() -> suiteRepository.findBySlug(request.getSuiteId().toLowerCase()))
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: " + request.getSuiteId()));
 
+        if (suite.getPropertyId() != null) {
+            Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
+            if (p == null || Boolean.FALSE.equals(p.getActive()) || !"APPROVED".equalsIgnoreCase(p.getStatus())) {
+                throw new IllegalArgumentException("Suite no disponible o la propiedad no está aprobada: " + request.getSuiteId());
+            }
+        }
+
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
         if (nights <= 0) {
             nights = 1;
         }
 
         BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
-        PricingService.PricingResult result = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
+        Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
+                ? dynamicPricingService.adjustmentsFor(suite, request.getCheckIn(), request.getCheckOut(), null)
+                : Map.of();
+        PricingService.PricingResult result = (dynamicAdjustments != null && !dynamicAdjustments.isEmpty())
+                ? pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent, DynamicPricingService.asFactorFunction(dynamicAdjustments))
+                : pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
 
         BigDecimal subtotal = result.subtotal();
 
@@ -165,6 +255,7 @@ public class SuiteService {
                 .experiencesTotal(experiencesTotal)
                 .discount(result.discount())
                 .discountReason(result.discount().compareTo(BigDecimal.ZERO) > 0 ? "Promoción / Larga estadía" : null)
+                .dynamicPricingNotes(new ArrayList<>(DynamicPricingService.describe(dynamicAdjustments)))
                 .total(total)
                 .lines(List.of(lineItem))
                 .build();

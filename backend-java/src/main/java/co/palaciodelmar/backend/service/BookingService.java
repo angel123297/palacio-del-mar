@@ -35,6 +35,7 @@ import java.util.UUID;
 public class BookingService {
 
     private static final ZoneId BOGOTA_ZONE = ZoneId.of("America/Bogota");
+    private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
 
     private final BookingRepository bookingRepository;
     private final SuiteRepository suiteRepository;
@@ -45,6 +46,15 @@ public class BookingService {
     private final PromotionRepository promotionRepository;
     private final PricingService pricingService;
     private final PaymentGateway paymentGateway;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DynamicPricingService dynamicPricingService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.repository.PropertyRepository propertyRepository;
 
     public BookingDTO createBooking(String userId, BookingRequest request) {
 
@@ -82,6 +92,13 @@ public class BookingService {
             throw new IllegalArgumentException("Esta habitación no está disponible para reservas actualmente");
         }
 
+        if (suite.getPropertyId() != null && propertyRepository != null) {
+            co.palaciodelmar.backend.model.Property property = propertyRepository.findById(suite.getPropertyId()).orElse(null);
+            if (property == null || Boolean.FALSE.equals(property.getActive()) || !"APPROVED".equalsIgnoreCase(property.getStatus())) {
+                throw new IllegalArgumentException("El alojamiento no está disponible para reservas porque la propiedad no está aprobada o está inactiva");
+            }
+        }
+
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
         if (request.getGuests() != null && (request.getGuests() < 1 || request.getGuests() > maxGuests)) {
             throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
@@ -100,7 +117,7 @@ public class BookingService {
         assertCribAvailable(request, null);
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
-        int assignedSlot = -1;
+        List<Integer> availableSlots = new ArrayList<>();
         for (int slot = 1; slot <= totalCapacity; slot++) {
             int finalSlot = slot;
             boolean isAvailable = true;
@@ -114,11 +131,10 @@ public class BookingService {
                 }
             }
             if (isAvailable) {
-                assignedSlot = slot;
-                break;
+                availableSlots.add(slot);
             }
         }
-        if (assignedSlot == -1) {
+        if (availableSlots.isEmpty()) {
             throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
         }
 
@@ -126,7 +142,12 @@ public class BookingService {
         BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null
                 ? BigDecimal.valueOf(activePromo.getDiscountPercent())
                 : BigDecimal.ZERO;
-        PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
+        Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
+                ? dynamicPricingService.adjustmentsFor(suite, request.getCheckIn(), request.getCheckOut(), null)
+                : Map.of();
+        PricingService.PricingResult pricingResult = (dynamicAdjustments != null && !dynamicAdjustments.isEmpty())
+                ? pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent, DynamicPricingService.asFactorFunction(dynamicAdjustments))
+                : pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
         BigDecimal totalRoomPrice = pricingResult.total();
 
         List<Booking.SelectedExperience> selectedExpList = parseExperiences(request.getExperiences());
@@ -144,16 +165,20 @@ public class BookingService {
         if (Boolean.TRUE.equals(request.getAirportPickup())) {
             vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("150000"));
         }
+        List<Booking.FoodOrder> sanitizedFoodOrders = new ArrayList<>();
         if (request.getFoodOrders() != null) {
             for (Booking.FoodOrder fo : request.getFoodOrders()) {
-                if (fo.getPrice() != null && fo.getPrice().compareTo(BigDecimal.ZERO) >= 0) {
-                    vipExtrasTotal = vipExtrasTotal.add(fo.getPrice());
-                } else {
-                    vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
-                }
+                BigDecimal foodPrice = new BigDecimal("80000");
+                vipExtrasTotal = vipExtrasTotal.add(foodPrice);
                 if (Boolean.TRUE.equals(fo.getIncludesBreakfastCombo())) {
                     vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("35000"));
                 }
+                sanitizedFoodOrders.add(Booking.FoodOrder.builder()
+                        .dishName(fo.getDishName())
+                        .type(fo.getType())
+                        .includesBreakfastCombo(fo.getIncludesBreakfastCombo())
+                        .price(foodPrice)
+                        .build());
             }
         }
 
@@ -171,10 +196,16 @@ public class BookingService {
         String promoName = appliedDiscount.name();
         BigDecimal promoDiscountPercent = appliedDiscount.percent();
 
+        BigDecimal platformFee = totalRoomPrice.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal hostPayout = totalRoomPrice.subtract(platformFee);
+
         Booking booking = Booking.builder()
                 .user(userId)
                 .suite(suite.getId())
                 .branch(suite.getBranch())
+                .propertyId(suite.getPropertyId())
+                .platformFee(platformFee)
+                .hostPayout(hostPayout)
                 .checkIn(request.getCheckIn())
                 .checkOut(request.getCheckOut())
                 .nights((int) nights)
@@ -186,6 +217,7 @@ public class BookingService {
                 .discount(pricingResult.discount())
                 .taxes(pricingResult.taxes())
                 .nightlyPrices(pricingResult.nightlyPrices().stream().map(np -> new Booking.NightlyPrice(np.date(), np.price())).toList())
+                .dynamicPricingNotes(new ArrayList<>(DynamicPricingService.describe(dynamicAdjustments)))
                 .appliedPromotionId(promoId)
                 .appliedPromotionName(promoName)
                 .appliedPromotionDiscountPercent(promoDiscountPercent)
@@ -201,8 +233,8 @@ public class BookingService {
                 .experiences(selectedExpList)
                 .petFriendly(request.getPetFriendly())
                 .airportPickup(request.getAirportPickup())
-                .foodOrders(request.getFoodOrders() != null ? request.getFoodOrders() : new ArrayList<>())
-                .smartLockPin(String.format("%06d", java.util.concurrent.ThreadLocalRandom.current().nextInt(100000, 999999)))
+                .foodOrders(sanitizedFoodOrders)
+                .smartLockPin(String.format("%06d", SECURE_RANDOM.nextInt(100000, 1000000)))
                 .expiresAt(Instant.now().plusSeconds(900)) // 15 mins hold
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -210,32 +242,49 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
 
-        // Block nights
-        savedBooking.setUnitSlot(assignedSlot);
-        bookingRepository.save(savedBooking);
-        List<SuiteNight> insertedNights = new java.util.ArrayList<>();
-        try {
-            for (int i = 0; i < nights; i++) {
-                LocalDate date = request.getCheckIn().plusDays(i);
-                SuiteNight suiteNight = SuiteNight.builder()
-                        .suite(suite.getId())
-                        .branch(suite.getBranch())
-                        .unitSlot(assignedSlot)
-                        .dates(java.util.Collections.singletonList(date))
-                        .booking(savedBooking.getId())
-                        .status("held")
-                        .expiresAt(savedBooking.getExpiresAt())
-                        .createdAt(Instant.now())
-                        .build();
-                insertedNights.add(suiteNightRepository.save(suiteNight));
+        // Block nights con reintento automático en el siguiente slot disponible si hay colisión concurrente
+        boolean nightsLocked = false;
+        for (int candidateSlot : availableSlots) {
+            List<SuiteNight> insertedNights = new java.util.ArrayList<>();
+            try {
+                for (int i = 0; i < nights; i++) {
+                    LocalDate date = request.getCheckIn().plusDays(i);
+                    SuiteNight suiteNight = SuiteNight.builder()
+                            .suite(suite.getId())
+                            .branch(suite.getBranch())
+                            .unitSlot(candidateSlot)
+                            .dates(java.util.Collections.singletonList(date))
+                            .booking(savedBooking.getId())
+                            .status("held")
+                            .expiresAt(savedBooking.getExpiresAt())
+                            .createdAt(Instant.now())
+                            .build();
+                    insertedNights.add(suiteNightRepository.save(suiteNight));
+                }
+                savedBooking.setUnitSlot(candidateSlot);
+                bookingRepository.save(savedBooking);
+                nightsLocked = true;
+                break;
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                suiteNightRepository.deleteAll(insertedNights);
             }
-        } catch (org.springframework.dao.DuplicateKeyException e) {
-            suiteNightRepository.deleteAll(insertedNights);
+        }
+        if (!nightsLocked) {
             bookingRepository.delete(savedBooking);
             throw new IllegalStateException("Hubo una colisión concurrente. Las fechas ya no están disponibles.");
         }
 
-        return toDTO(savedBooking);
+        BookingDTO dto = toDTO(savedBooking);
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                    "booking.created",
+                    savedBooking.getId(),
+                    savedBooking.getPropertyId(),
+                    dto,
+                    Instant.now()
+            ));
+        }
+        return dto;
     }
 
     public BookingDTO modifyBooking(String bookingId, String userId, BookingRequest request) {
@@ -293,7 +342,12 @@ public class BookingService {
         BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null
                 ? BigDecimal.valueOf(activePromo.getDiscountPercent())
                 : BigDecimal.ZERO;
-        PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
+        Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
+                ? dynamicPricingService.adjustmentsFor(suite, request.getCheckIn(), request.getCheckOut(), booking.getId())
+                : Map.of();
+        PricingService.PricingResult pricingResult = (dynamicAdjustments != null && !dynamicAdjustments.isEmpty())
+                ? pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent, DynamicPricingService.asFactorFunction(dynamicAdjustments))
+                : pricingService.calculatePrice(suite.getBasePrice(), request.getCheckIn(), request.getCheckOut(), branchPromoPercent);
         BigDecimal totalRoomPrice = pricingResult.total();
         List<Booking.SelectedExperience> selectedExpList = request.getExperiences() != null ? parseExperiences(request.getExperiences()) : booking.getExperiences();
         BigDecimal experiencesTotal = BigDecimal.ZERO;
@@ -320,11 +374,15 @@ public class BookingService {
         booking.setDiscount(pricingResult.discount());
         booking.setTaxes(pricingResult.taxes());
         booking.setNightlyPrices(pricingResult.nightlyPrices().stream().map(np -> new Booking.NightlyPrice(np.date(), np.price())).toList());
+        booking.setDynamicPricingNotes(new ArrayList<>(DynamicPricingService.describe(dynamicAdjustments)));
         AppliedDiscount appliedDiscount = resolveAppliedDiscount(activePromo, nights);
         booking.setAppliedPromotionId(appliedDiscount.id());
         booking.setAppliedPromotionName(appliedDiscount.name());
         booking.setAppliedPromotionDiscountPercent(appliedDiscount.percent());
         booking.setTotalPrice(newTotalPrice);
+        BigDecimal modPlatformFee = pricingResult.total().multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+        booking.setPlatformFee(modPlatformFee);
+        booking.setHostPayout(pricingResult.total().subtract(modPlatformFee));
 
         if (booking.getPaidAmount().compareTo(newTotalPrice) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
@@ -396,9 +454,7 @@ public class BookingService {
             boolean isAdmin = "ADMIN".equalsIgnoreCase(user.getRole());
             boolean isHost = "HOST".equalsIgnoreCase(user.getRole());
             if (isHost) {
-                if (user.getBranches() != null && !user.getBranches().isEmpty() && booking.getBranch() != null && !user.getBranches().contains(booking.getBranch())) {
-                    throw new IllegalArgumentException("No tienes permiso para acceder a una reserva de otra sucursal");
-                }
+                validateHostAccessToBooking(user, booking);
             } else if (!isAdmin && !booking.getUser().equals(user.getId())) {
                 throw new IllegalArgumentException("No tienes permiso para acceder a esta reserva");
             }
@@ -410,7 +466,11 @@ public class BookingService {
                 throw new IllegalArgumentException("Esta reserva pertenece a una cuenta registrada. Inicia sesión para ver los detalles.");
             }
         }
-        return toDTO(booking);
+        BookingDTO dto = toDTO(booking);
+        if (user == null) {
+            dto.setSmartLockPin(null);
+        }
+        return dto;
     }
 
     public BookingDTO getBookingByCodeSecure(String bookingCode, User user) {
@@ -420,9 +480,7 @@ public class BookingService {
             boolean isAdmin = "ADMIN".equalsIgnoreCase(user.getRole());
             boolean isHost = "HOST".equalsIgnoreCase(user.getRole());
             if (isHost) {
-                if (user.getBranches() != null && !user.getBranches().isEmpty() && booking.getBranch() != null && !user.getBranches().contains(booking.getBranch())) {
-                    throw new IllegalArgumentException("No tienes permiso para acceder a una reserva de otra sucursal");
-                }
+                validateHostAccessToBooking(user, booking);
             } else if (!isAdmin && !booking.getUser().equals(user.getId())) {
                 throw new IllegalArgumentException("No tienes permiso para acceder a esta reserva");
             }
@@ -434,7 +492,24 @@ public class BookingService {
                 throw new IllegalArgumentException("Esta reserva pertenece a una cuenta registrada. Inicia sesión para ver los detalles.");
             }
         }
-        return toDTO(booking);
+        BookingDTO dto = toDTO(booking);
+        if (user == null) {
+            dto.setSmartLockPin(null);
+        }
+        return dto;
+    }
+
+    private void validateHostAccessToBooking(User user, Booking booking) {
+        if (booking.getPropertyId() != null && propertyRepository != null) {
+            co.palaciodelmar.backend.model.Property property = propertyRepository.findById(booking.getPropertyId()).orElse(null);
+            if (property != null && property.getOwnerId() != null && property.getOwnerId().equals(user.getId())) {
+                return;
+            }
+        }
+        if (user.getBranches() != null && !user.getBranches().isEmpty() && booking.getBranch() != null && user.getBranches().contains(booking.getBranch())) {
+            return;
+        }
+        throw new IllegalArgumentException("No tienes permiso para acceder a una reserva de otra propiedad");
     }
 
     public Booking getBookingEntityById(String id) {
@@ -639,11 +714,7 @@ public class BookingService {
         }
         if (booking.getFoodOrders() != null) {
             for (Booking.FoodOrder fo : booking.getFoodOrders()) {
-                if (fo.getPrice() != null && fo.getPrice().compareTo(BigDecimal.ZERO) >= 0) {
-                    vipExtrasTotal = vipExtrasTotal.add(fo.getPrice());
-                } else {
-                    vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
-                }
+                vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
                 if (Boolean.TRUE.equals(fo.getIncludesBreakfastCombo())) {
                     vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("35000"));
                 }
@@ -694,6 +765,9 @@ public class BookingService {
                 .user(booking.getUser())
                 .suite(suite)
                 .branch(branch)
+                .propertyId(booking.getPropertyId() != null ? booking.getPropertyId() : (suite != null ? suite.getPropertyId() : null))
+                .platformFee(booking.getPlatformFee())
+                .hostPayout(booking.getHostPayout())
                 .unitSlot(booking.getUnitSlot())
                 .checkIn(booking.getCheckIn())
                 .checkOut(booking.getCheckOut())
@@ -729,6 +803,9 @@ public class BookingService {
                 .foodOrders(booking.getFoodOrders())
                 .smartLockPin(("confirmed".equalsIgnoreCase(status) || "checked_in".equalsIgnoreCase(status) || "completed".equalsIgnoreCase(status)) ? booking.getSmartLockPin() : null)
                 .preCheckInCompleted(booking.getPreCheckInCompleted())
+                .dynamicPricingNotes(booking.getDynamicPricingNotes() != null ? booking.getDynamicPricingNotes() : java.util.List.of())
+                .payoutId(booking.getPayoutId())
+                .reviewRequestSentAt(booking.getReviewRequestSentAt())
                 .notes(booking.getNotes())
                 .cancellationReason(booking.getCancellationReason())
                 .appliedPromotionId(booking.getAppliedPromotionId())
@@ -746,8 +823,18 @@ public class BookingService {
             return result;
         }
         for (Object item : rawExperiences) {
+            String expId = null;
             if (item instanceof String id) {
-                experienceRepository.findById(id).ifPresent(exp -> {
+                expId = id;
+            } else if (item instanceof Booking.SelectedExperience selExp) {
+                expId = selExp.getExperienceId();
+            } else if (item instanceof Map<?, ?> map) {
+                expId = (String) map.get("experienceId");
+                if (expId == null) expId = (String) map.get("id");
+                if (expId == null) expId = (String) map.get("_id");
+            }
+            if (expId != null) {
+                experienceRepository.findById(expId).ifPresent(exp -> {
                     result.add(Booking.SelectedExperience.builder()
                             .experienceId(exp.getId())
                             .name(exp.getName())
@@ -755,22 +842,6 @@ public class BookingService {
                             .quantity(1)
                             .build());
                 });
-            } else if (item instanceof Booking.SelectedExperience selExp) {
-                result.add(selExp);
-            } else if (item instanceof Map<?, ?> map) {
-                String expId = (String) map.get("experienceId");
-                if (expId == null) expId = (String) map.get("id");
-                if (expId == null) expId = (String) map.get("_id");
-                if (expId != null) {
-                    experienceRepository.findById(expId).ifPresent(exp -> {
-                        result.add(Booking.SelectedExperience.builder()
-                                .experienceId(exp.getId())
-                                .name(exp.getName())
-                                .price(exp.getPrice())
-                                .quantity(1)
-                                .build());
-                    });
-                }
             }
         }
         return result;
@@ -828,6 +899,55 @@ public class BookingService {
                 sn.setStatus("confirmed");
                 suiteNightRepository.save(sn);
             }
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.confirmed",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
+        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.cancelled",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
+        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CHECKED_IN) {
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.checked_in",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
+        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT) {
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.checked_out",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
+        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.NO_SHOW) {
+            if (eventPublisher != null) {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        "booking.no_show",
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            }
         }
     }
 
@@ -860,7 +980,7 @@ public class BookingService {
         booking.setCompanionGuests(companionGuests != null ? companionGuests.trim() : "");
         booking.setPreCheckInCompleted(true);
         if (booking.getSmartLockPin() == null) {
-            booking.setSmartLockPin(String.format("%06d", java.util.concurrent.ThreadLocalRandom.current().nextInt(100000, 999999)));
+            booking.setSmartLockPin(String.format("%06d", SECURE_RANDOM.nextInt(100000, 1000000)));
         }
         booking.setUpdatedAt(Instant.now());
         return toDTO(bookingRepository.save(booking));

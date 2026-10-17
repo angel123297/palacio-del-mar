@@ -26,6 +26,15 @@ public class ReviewService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.repository.SuiteRepository suiteRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.repository.PropertyRepository propertyRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.webhook.WebhookDispatcher webhookDispatcher;
+
     public List<ReviewDTO> getSuiteReviews(String suiteId) {
         return reviewRepository.findBySuiteAndApprovedTrueOrderByCreatedAtDesc(suiteId)
                 .stream()
@@ -112,6 +121,57 @@ public class ReviewService {
                 .build();
 
         log.info("Reseña verificada registrada con sentimiento {}: {}", analysis.sentiment(), analysis.highlights());
+        Review saved = reviewRepository.save(review);
+        ReviewDTO dto = toDTO(saved);
+
+        // Si se detectó alerta de mantenimiento, despachar webhook automático al anfitrión
+        if (analysis.maintenanceAlert() != null && webhookDispatcher != null) {
+            String propId = booking.getPropertyId() != null ? booking.getPropertyId() : booking.getBranch();
+            if (propId != null) {
+                webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", Map.of(
+                        "reviewId", saved.getId(),
+                        "bookingId", booking.getId(),
+                        "suiteId", saved.getSuite(),
+                        "alert", analysis.maintenanceAlert(),
+                        "comment", saved.getComment(),
+                        "rating", saved.getRating(),
+                        "createdAt", saved.getCreatedAt().toString()
+                ));
+            }
+        }
+
+        return dto;
+    }
+
+    public ReviewDTO resolveMaintenanceAlert(String reviewId, String userId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("Reseña no encontrada: " + reviewId));
+
+        if (review.getMaintenanceAlert() == null || review.getMaintenanceAlert().isBlank()) {
+            throw new IllegalStateException("La reseña no tiene ninguna alerta de mantenimiento activa");
+        }
+
+        // Validación Anti-IDOR: Host debe ser dueño de la propiedad (o ser Administrador)
+        User user = (userId != null && userRepository != null) ? userRepository.findById(userId).orElse(null) : null;
+        boolean isAdmin = user != null && ("ADMIN".equalsIgnoreCase(user.getRole()) || "ROLE_ADMIN".equalsIgnoreCase(user.getRole()));
+
+        if (!isAdmin) {
+            co.palaciodelmar.backend.model.Suite suite = (review.getSuite() != null && suiteRepository != null)
+                    ? suiteRepository.findById(review.getSuite()).orElse(null)
+                    : null;
+            if (suite == null || suite.getPropertyId() == null) {
+                throw new org.springframework.security.access.AccessDeniedException("No tienes permiso para gestionar alertas de esta habitación");
+            }
+            co.palaciodelmar.backend.model.Property property = (propertyRepository != null)
+                    ? propertyRepository.findById(suite.getPropertyId()).orElse(null)
+                    : null;
+            if (property == null || property.getOwnerId() == null || !property.getOwnerId().equals(userId)) {
+                throw new org.springframework.security.access.AccessDeniedException("No tienes permiso para gestionar alertas de una propiedad ajena");
+            }
+        }
+
+        review.setMaintenanceResolvedAt(Instant.now());
+        review.setMaintenanceResolvedBy(userId);
         return toDTO(reviewRepository.save(review));
     }
 
@@ -200,6 +260,8 @@ public class ReviewService {
                 .sentimentScore(review.getSentimentScore())
                 .keyHighlights(review.getKeyHighlights())
                 .maintenanceAlert(review.getMaintenanceAlert())
+                .maintenanceResolvedAt(review.getMaintenanceResolvedAt())
+                .maintenanceResolvedBy(review.getMaintenanceResolvedBy())
                 .approved(review.getApproved())
                 .createdAt(review.getCreatedAt())
                 .build();

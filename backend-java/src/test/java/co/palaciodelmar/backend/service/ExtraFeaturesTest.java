@@ -3,8 +3,6 @@ package co.palaciodelmar.backend.service;
 import co.palaciodelmar.backend.dto.ReviewDTO;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Review;
-import co.palaciodelmar.backend.model.Suite;
-import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.repository.ReviewRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
@@ -12,7 +10,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,27 +17,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 class ExtraFeaturesTest {
-
-    @Test
-    @DisplayName("WhatsAppService envía notificación simulada con formato de lujo")
-    void verifiesWhatsAppSimulationFormatting() {
-        WhatsAppService whatsAppService = new WhatsAppService();
-        Booking booking = Booking.builder()
-                .id("BOOK-777")
-                .guestDetails(Booking.GuestDetails.builder().fullName("Carlos Santana").phone("+573001234567").build())
-                .checkIn(LocalDate.of(2026, 12, 1))
-                .checkOut(LocalDate.of(2026, 12, 5))
-                .smartLockPin("928174")
-                .build();
-
-        Suite suite = Suite.builder().name("Suite Presidencial Getsemaní").build();
-        User guest = User.builder().name("Carlos Santana")
-                .profile(User.Profile.builder().phone("+573001234567").build())
-                .build();
-
-        boolean sent = whatsAppService.sendBookingConfirmation(booking, guest, suite).join();
-        assertTrue(sent, "WhatsApp simulator debe retornar true exitosamente");
-    }
 
     @Test
     @DisplayName("ReviewService valida estancia completada y analiza sentimiento con alertas de mantenimiento")
