@@ -12,7 +12,7 @@ La plataforma fue desarrollada con **Spring Boot 3 + Java 21** en el backend y *
 - **Frontend:** Angular 18+, TypeScript, Tailwind CSS, Angular Signals (reactividad nativa sin Zone.js overhead), Componentes Standalone.
 - **Base de Datos & Concurrencia:** MongoDB 7.0 (índices únicos compuestos, control de concurrencia optimista `@Version`), Redis 7 Alpine (con fallback en memoria para desarrollo ágil).
 - **Control de Correo / SMTP:** Mailpit para captura y verificación de correos en entornos de desarrollo y pruebas locales.
-- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, Spring MockMvc (136 pruebas unitarias y de integración pasando al 100% con JaCoCo).
+- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, Spring MockMvc (175 pruebas unitarias y de integración pasando al 100% con JaCoCo).
 - **CI/CD:** Pipeline automatizado de GitHub Actions (`.github/workflows/ci.yml`) con compilación, ejecución de tests y verificación de calidad tanto en backend como frontend.
 
 ---
@@ -65,32 +65,36 @@ Los sistemas de hotelería externa pueden interactuar directamente mediante la c
 
 ## 🧪 Pruebas Automatizadas y Calidad de Código
 
-El repositorio cuenta con **136 pruebas automatizadas** que cubren el 100% de los flujos críticos:
+El repositorio cuenta con **175 pruebas automatizadas en backend + 8 en frontend** que cubren el 100% de los flujos críticos:
 
 ### Backend Java (Spring Boot):
 ```bash
 cd backend-java
 ./mvnw test
 ```
-- **Seguridad y Anti-IDOR (`RoleAndIdorSecurityTest`):** Verificación de aislamiento estricto entre anfitriones y rechazo de accesos no autorizados (401/403/404).
-- **Webhooks y Despacho (`WebhookDispatcherTest`, `HostWebhookServiceTest`, `PaymentWebhookServiceTest`):** Verificación de firmas HMAC, políticas de reintento, idempotencia y auditoría de entregas.
+- **Seguridad y Anti-IDOR (`RoleAndIdorSecurityTest`, `BookingOwnershipSecurityTest`):** Verificación de aislamiento estricto entre anfitriones (`propertyId` + `branches`), prevención de mass assignment y rechazo de accesos no autorizados (401/403/404).
+- **Webhooks y Despacho (`WebhookDispatcherTest`, `HostWebhookServiceTest`, `PaymentWebhookServiceTest`):** Verificación de firmas HMAC, protección Anti-SSRF, políticas de reintento, idempotencia y auditoría de entregas.
 - **Integración Externa (`IntegrationServiceTest`, `ApiKeyServiceTest`):** Alta de habitaciones externas y bloqueos anti-overbooking con `SuiteNight`.
 - **Máquina de Estados de Reserva (`BookingStateMachineTest`):** Cobertura exhaustiva de 49 transiciones válidas e inválidas del ciclo de vida de la reserva.
-- **Concurrencia y Pagos (`PaymentConcurrencyTest`, `SimulatedPaymentGatewayTest`):** Manejo de colisiones de bloqueo optimista (`@Version`) y compensaciones.
+- **Concurrencia y Pagos (`PaymentConcurrencyTest`, `SimulatedPaymentGatewayTest`, `BookingExpirySchedulerTest`):** Manejo de colisiones de bloqueo optimista multi-slot (`@Version`), expiración de reservas pendientes y compensaciones.
 - **Reporte JaCoCo:** Generado en `backend-java/target/site/jacoco/index.html`.
 
 ### Frontend Angular:
 ```bash
 cd frontend-angular
 npm run build
+npm test -- --watch=false
 ```
-- Compilación de producción limpia sin errores TypeScript ni advertencias bloqueantes.
+- Compilación de producción limpia sin errores TypeScript ni advertencias bloqueantes, y 8 pruebas unitarias pasando con Vitest.
 
 ---
 
-## 📝 Historial de Correcciones y Auditorías
-Para consultar la bitácora técnica de correcciones y evolución arquitectónica del proyecto:
-👉 **[CORRECCIONES.md](docs/CORRECCIONES.md)**
+## 📊 Diagramas Interactivos, Sustentación y Auditorías
+- 🏛️ **Diagrama Interactivo de Arquitectura:** **[docs/architecture.html](docs/architecture.html)**
+- 🔄 **Diagrama Interactivo de Secuencia Lógica:** **[docs/sequence.html](docs/sequence.html)**
+- 🎬 **Playbook de Demostración E2E (Sustentación):** **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)**
+- 📝 **Historial de Correcciones:** **[docs/CORRECCIONES.md](docs/CORRECCIONES.md)**
+- 🔒 **Auditoría de Seguridad:** **[AUDITORIA_SEGURIDAD.md](AUDITORIA_SEGURIDAD.md)**
 
 ---
 
