@@ -108,8 +108,18 @@ public class SuiteService {
                 .orElse(null);
         String targetId = branch != null ? branch.getId() : branchId;
 
+        Map<String, Property> propMap = propertyRepository.findAll().stream()
+                .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
+
         return suiteRepository.findAll().stream()
                 .filter(s -> targetId.equals(s.getBranch()) && !Boolean.FALSE.equals(s.getActive()))
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
                 .map(s -> SuiteResponseDTO.from(s, branch))
                 .collect(Collectors.toList());
     }
@@ -144,7 +154,18 @@ public class SuiteService {
 
     @Cacheable(value = "suite_types")
     public List<SuiteTypeDTO> getSuiteTypes() {
-        List<Suite> activeSuites = suiteRepository.findByActiveTrue();
+        Map<String, Property> propMap = propertyRepository.findAll().stream()
+                .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
+
+        List<Suite> activeSuites = suiteRepository.findByActiveTrue().stream()
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
+                .toList();
         Map<String, List<Suite>> grouped = activeSuites.stream()
                 .filter(s -> s.getType() != null)
                 .collect(Collectors.groupingBy(Suite::getType));

@@ -129,23 +129,27 @@ public class AdminService {
 
         LocalDate today = LocalDate.now(ZoneId.of("America/Bogota"));
         List<Booking> allBookings = bookingRepository.findAll();
+        List<co.palaciodelmar.backend.model.Suite> allSuites = suiteRepository.findAll();
 
         long activeBookings = allBookings.stream()
                 .filter(b -> isActiveStatus(b.getStatus()))
                 .count();
 
-        // Ocupación real del día de hoy: habitaciones con reserva activa alojada hoy (checkIn <= hoy < checkOut)
-        long occupiedSuitesToday = allBookings.stream()
+        // Inventario total de unidades vendibles (considerando totalUnits de cada suite activa)
+        long totalRentableUnits = allSuites.stream()
+                .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+                .mapToLong(s -> (s.getTotalUnits() != null && s.getTotalUnits() > 0) ? s.getTotalUnits() : 1)
+                .sum();
+
+        // Unidades ocupadas hoy: conteo de reservas activas alojadas hoy (checkIn <= hoy < checkOut)
+        long occupiedUnitsToday = allBookings.stream()
                 .filter(b -> isActiveStatus(b.getStatus()))
                 .filter(b -> b.getCheckIn() != null && b.getCheckOut() != null)
                 .filter(b -> !today.isBefore(b.getCheckIn()) && today.isBefore(b.getCheckOut()))
-                .map(Booking::getSuite)
-                .filter(Objects::nonNull)
-                .distinct()
                 .count();
 
-        double averageOccupancy = totalSuites > 0
-                ? Math.min(100.0, Math.round(((double) occupiedSuitesToday / totalSuites) * 100.0 * 10.0) / 10.0)
+        double averageOccupancy = totalRentableUnits > 0
+                ? Math.min(100.0, Math.round(((double) occupiedUnitsToday / totalRentableUnits) * 100.0 * 10.0) / 10.0)
                 : 0.0;
 
         BigDecimal totalRevenue = allBookings.stream()

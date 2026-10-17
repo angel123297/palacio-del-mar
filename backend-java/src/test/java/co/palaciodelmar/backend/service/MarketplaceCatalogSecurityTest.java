@@ -37,6 +37,8 @@ class MarketplaceCatalogSecurityTest {
     private UserRepository userRepository;
     private PaymentGateway paymentGateway;
     private BookingService bookingService;
+    private AvailabilityService availabilityService;
+    private PropertyService propertyService;
 
     @BeforeEach
     void setUp() {
@@ -73,6 +75,18 @@ class MarketplaceCatalogSecurityTest {
                 paymentGateway
         );
         ReflectionTestUtils.setField(bookingService, "propertyRepository", propertyRepository);
+
+        availabilityService = new AvailabilityService(
+                suiteRepository,
+                suiteNightRepository,
+                bookingRepository,
+                promotionRepository,
+                branchRepository,
+                propertyRepository,
+                pricingService
+        );
+
+        propertyService = new PropertyService(propertyRepository, suiteRepository);
     }
 
     @Test
@@ -201,5 +215,101 @@ class MarketplaceCatalogSecurityTest {
                 bookingService.createBooking("user-guest-1", req)
         );
         assertTrue(ex.getMessage().contains("no está aprobada"));
+    }
+
+    @Test
+    @DisplayName("AvailabilityService.checkAvailability excluye habitaciones de propiedades pendientes o rechazadas")
+    void checkAvailabilityExcludesSuitesOfUnapprovedProperties() {
+        LocalDate checkIn = LocalDate.now(ZoneId.of("America/Bogota")).plusDays(1);
+        LocalDate checkOut = LocalDate.now(ZoneId.of("America/Bogota")).plusDays(3);
+
+        Property approvedProp = Property.builder().id("p-appr").status("APPROVED").active(true).build();
+        Property pendingProp = Property.builder().id("p-pend").status("PENDING").active(true).build();
+
+        Suite approvedSuite = Suite.builder().id("s-appr").name("Suite Aprobada").propertyId("p-appr").active(true).basePrice(new BigDecimal("200000")).build();
+        Suite pendingSuite = Suite.builder().id("s-pend").name("Suite Pendiente").propertyId("p-pend").active(true).basePrice(new BigDecimal("150000")).build();
+
+        when(propertyRepository.findAll()).thenReturn(List.of(approvedProp, pendingProp));
+        when(suiteRepository.findByActiveTrue()).thenReturn(List.of(approvedSuite, pendingSuite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(any(), any(), any())).thenReturn(List.of());
+        when(pricingService.calculatePrice(any(), any(), any(), any()))
+                .thenReturn(new PricingService.PricingResult(new BigDecimal("400000"), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("400000"), List.of()));
+
+        AvailabilityService.AvailabilityResponseData data = availabilityService.checkAvailability(checkIn, checkOut, 1, null, null);
+
+        assertEquals(1, data.getAvailableSuites().size(), "Solo la suite de la propiedad aprobada debe estar disponible");
+        assertEquals("s-appr", data.getAvailableSuites().get(0).getSuite().getId());
+    }
+
+    @Test
+    @DisplayName("AvailabilityService.getMonthlyAvailability excluye habitaciones de propiedades pendientes o rechazadas")
+    void getMonthlyAvailabilityExcludesSuitesOfUnapprovedProperties() {
+        Property approvedProp = Property.builder().id("p-appr").status("APPROVED").active(true).build();
+        Property pendingProp = Property.builder().id("p-pend").status("PENDING").active(true).build();
+
+        Suite approvedSuite = Suite.builder().id("s-appr").name("Suite Aprobada").propertyId("p-appr").active(true).basePrice(new BigDecimal("150000")).build();
+        Suite pendingSuite = Suite.builder().id("s-pend").name("Suite Pendiente").propertyId("p-pend").active(true).basePrice(new BigDecimal("150000")).build();
+
+        when(propertyRepository.findAll()).thenReturn(List.of(approvedProp, pendingProp));
+        when(suiteRepository.findByActiveTrue()).thenReturn(List.of(approvedSuite, pendingSuite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(any(), any(), any())).thenReturn(List.of());
+        when(pricingService.calculatePrice(any(), any(), any(), any()))
+                .thenReturn(new PricingService.PricingResult(new BigDecimal("150000"), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("150000"),
+                        List.of(new PricingService.NightlyPrice(LocalDate.of(2026, 11, 1), new BigDecimal("150000")))));
+
+        AvailabilityService.MonthlyAvailabilityResponseData monthly = availabilityService.getMonthlyAvailability(2026, 11, 1, null, null);
+
+        assertEquals(1, monthly.getTotalSuites(), "Solo debe contar las unidades de la suite aprobada");
+    }
+
+    @Test
+    @DisplayName("SuiteService.getSuitesByBranch excluye suites de propiedades pendientes")
+    void getSuitesByBranchExcludesUnapprovedPropertySuites() {
+        Branch branch = Branch.builder().id("branch-1").name("Centro").build();
+        when(branchRepository.findById("branch-1")).thenReturn(Optional.of(branch));
+
+        Property pendingProp = Property.builder().id("prop-pend").status("PENDING").active(true).build();
+        Suite s1 = Suite.builder().id("s1").branch("branch-1").active(true).build(); // legacy
+        Suite s2 = Suite.builder().id("s2").branch("branch-1").propertyId("prop-pend").active(true).build(); // unapproved prop
+
+        when(propertyRepository.findAll()).thenReturn(List.of(pendingProp));
+        when(suiteRepository.findAll()).thenReturn(List.of(s1, s2));
+
+        List<SuiteResponseDTO> list = suiteService.getSuitesByBranch("branch-1");
+
+        assertEquals(1, list.size());
+        assertEquals("s1", list.get(0).getId());
+    }
+
+    @Test
+    @DisplayName("SuiteService.getSuiteTypes excluye suites de propiedades pendientes o rechazadas")
+    void getSuiteTypesExcludesUnapprovedPropertySuites() {
+        Property approvedProp = Property.builder().id("p-appr").status("APPROVED").active(true).build();
+        Property pendingProp = Property.builder().id("p-pend").status("PENDING").active(true).build();
+
+        Suite approvedSuite = Suite.builder().id("s-appr").type("Deluxe").basePrice(new BigDecimal("250000")).propertyId("p-appr").active(true).build();
+        Suite pendingSuite = Suite.builder().id("s-pend").type("Deluxe").basePrice(new BigDecimal("100000")).propertyId("p-pend").active(true).build();
+
+        when(propertyRepository.findAll()).thenReturn(List.of(approvedProp, pendingProp));
+        when(suiteRepository.findByActiveTrue()).thenReturn(List.of(approvedSuite, pendingSuite));
+
+        var types = suiteService.getSuiteTypes();
+
+        assertEquals(1, types.size());
+        assertEquals(1, types.get(0).getCount(), "Solo debe contar 1 suite aprobada");
+        assertEquals(new BigDecimal("250000"), types.get(0).getMinPrice());
+    }
+
+    @Test
+    @DisplayName("PropertyService.updatePropertyStatus cambia estado de aprobación correctamente")
+    void testUpdatePropertyStatusUpdatesStatusCorrectly() {
+        Property prop = Property.builder().id("p-1").status("PENDING").build();
+        when(propertyRepository.findById("p-1")).thenReturn(Optional.of(prop));
+        when(propertyRepository.save(any(Property.class))).thenAnswer(i -> i.getArgument(0));
+
+        var dto = propertyService.updatePropertyStatus("p-1", "APPROVED");
+
+        assertEquals("APPROVED", dto.getStatus());
+        verify(propertyRepository).save(any(Property.class));
     }
 }

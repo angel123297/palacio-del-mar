@@ -104,6 +104,12 @@ class AdminServiceTest {
                 .refundedAmount(new BigDecimal("100000"))
                 .build();
 
+        co.palaciodelmar.backend.model.Suite s1 = co.palaciodelmar.backend.model.Suite.builder().id("suite-1").totalUnits(1).active(true).build();
+        co.palaciodelmar.backend.model.Suite s2 = co.palaciodelmar.backend.model.Suite.builder().id("suite-2").totalUnits(1).active(true).build();
+        co.palaciodelmar.backend.model.Suite s3 = co.palaciodelmar.backend.model.Suite.builder().id("suite-3").totalUnits(1).active(true).build();
+        co.palaciodelmar.backend.model.Suite s4 = co.palaciodelmar.backend.model.Suite.builder().id("suite-4").totalUnits(1).active(true).build();
+        when(suiteRepository.findAll()).thenReturn(List.of(s1, s2, s3, s4));
+
         when(bookingRepository.findAll()).thenReturn(List.of(b1, b2, b3, b4, b5));
 
         AdminService.AdminDashboardStats stats = adminService.getDashboardStats();
@@ -115,10 +121,48 @@ class AdminServiceTest {
         // Activas: b1, b2, b3 (confirmed, checked_in, confirmed). b4 es checked_out, b5 es cancelled.
         assertEquals(3L, stats.getActiveBookings());
 
-        // 2 suites ocupadas hoy (suite-1 y suite-2) de 4 suites totales = 50.0%
+        // 2 unidades ocupadas hoy (suite-1 y suite-2) de 4 unidades totales = 50.0%
         assertEquals(50.0, stats.getAverageOccupancy());
 
         // Revenue: 300000 + 400000 + 500000 + 200000 + 0 = 1400000
         assertEquals(new BigDecimal("1400000"), stats.getTotalRevenue());
+    }
+
+    @Test
+    @DisplayName("getDashboardStats con suite multi-unidad no infla la ocupación")
+    void testDashboardOccupancyMultiUnitSuiteDoesNotInflate() {
+        LocalDate today = LocalDate.now(ZoneId.of("America/Bogota"));
+
+        when(suiteRepository.count()).thenReturn(1L);
+        when(bookingRepository.count()).thenReturn(1L);
+        when(userRepository.count()).thenReturn(1L);
+
+        // 1 sola suite pero con 4 unidades físicas vendibles
+        co.palaciodelmar.backend.model.Suite multiSuite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-multi-4")
+                .totalUnits(4)
+                .active(true)
+                .build();
+        when(suiteRepository.findAll()).thenReturn(List.of(multiSuite));
+
+        // 1 sola reserva ocupando slot 1 hoy
+        Booking b = Booking.builder()
+                .id("bk-slot-1")
+                .suite("suite-multi-4")
+                .unitSlot(1)
+                .status("confirmed")
+                .checkIn(today)
+                .checkOut(today.plusDays(2))
+                .paidAmount(new BigDecimal("200000"))
+                .build();
+        when(bookingRepository.findAll()).thenReturn(List.of(b));
+
+        AdminService.AdminDashboardStats stats = adminService.getDashboardStats();
+
+        assertEquals(1L, stats.getTotalSuites());
+        assertEquals(1L, stats.getActiveBookings());
+
+        // 1 unidad ocupada de 4 unidades vendibles = 25.0% (no 100%)
+        assertEquals(25.0, stats.getAverageOccupancy());
     }
 }
