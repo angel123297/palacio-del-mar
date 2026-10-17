@@ -2,14 +2,26 @@
 
 Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (Colombia) con la tarea programada de Vibe. Aquí se registran los resultados de Jules y de Vibe.
 
-## 📊 Estado actual (verificación local, 17 oct 2026 — 5ª verificación)
+## 📊 Estado actual (verificación local, 17 oct 2026 — 7ª verificación)
 
-- Backend: **196/196 tests** en verde (31 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
+- Backend: **197/197 tests** en verde (31 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
 - Frontend: **8/8 tests** en verde (4 archivos) y compilación de producción exitosa (`dist/palacio-del-mar-web`).
 - CI: `.github/workflows/ci.yml` en verde en GitHub Actions (`plan/marketplace-webhooks`).
 - Protocolo `non-breaking-delivery`: estrictamente aplicado y verificado.
-- **Bloqueante Resuelto:** se unificó el constructor de `PaymentWebhookService` con `@Autowired` explícito, eliminando la ambigüedad que causaba `No default constructor found`. Verificado con prueba unitaria en `BackendApplicationTests`.
-- **Hallazgos Resueltos:** ocupación de administración filtra estrictamente por propiedades `APPROVED`; cola operativa de pagos `requires_refund` implementada con endpoints backend y vista interactiva en panel de administración Angular.
+- **Hallazgo de Reembolso Resuelto:** `AdminService.resolveRefund` valida estrictamente la respuesta de `paymentGateway.refund(...)`. Si la pasarela devuelve `success == false` o arroja error, no se cambia el estado del pago, se lanza excepción y el pago permanece en `requires_refund` con mensaje descriptivo de error visible para el administrador. Verificado con `testResolveRefundWhenGatewayFailsThrowsExceptionAndDoesNotMarkRefunded` en `AdminServiceTest`.
+- Todos los bloqueantes y hallazgos reportados han sido completamente solucionados.
+
+## 🗓️ Reporte diario (bitácora)
+
+### 📅 2026-10-17 — Revisión del commit `85b3e70` y validación de pasarela en reembolsos
+
+**Verificación ejecutada:** backend **197/197** tests (0 fallos, errores u omitidos); frontend build de producción correcto y **8/8** tests.
+
+**Resolución del hallazgo:**
+
+| Prioridad | Hallazgo | Estado | Solución implementada |
+|---|---|---|---|
+| Alta | `AdminService.resolveRefund` marcaba el pago como `refunded` incluso si la pasarela fallaba o devolvía `success=false`. | **Resuelto** | Se eliminó el `catch (Exception ignored)` y se añadió validación obligatoria de `res != null && res.success()`. Ante cualquier fallo o rechazo de pasarela se lanza `IllegalStateException` abortando la transacción y manteniendo el pago en `requires_refund` con el motivo del rechazo visible. Pruebas añadidas en `AdminServiceTest`. |
 
 ## 🗓️ Reporte diario (bitácora)
 

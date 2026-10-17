@@ -224,15 +224,19 @@ public class AdminService {
         }
 
         if ("mark_refunded".equalsIgnoreCase(action) || "refund".equalsIgnoreCase(action)) {
+            String refundDetails = "";
             if (paymentGateway != null && payment.getTransactionId() != null) {
-                try {
-                    paymentGateway.refund(payment.getTransactionId(), payment.getAmount());
-                } catch (Exception ignored) {
+                co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse res =
+                        paymentGateway.refund(payment.getTransactionId(), payment.getAmount());
+                if (res == null || !res.success()) {
+                    String errorMsg = (res != null && res.errorMessage() != null) ? res.errorMessage() : "Transacción rechazada por la pasarela";
+                    throw new IllegalStateException("Fallo en pasarela al procesar reembolso: " + errorMsg);
                 }
+                refundDetails = " (id=" + res.refundId() + ")";
             }
             payment.setStatus("refunded");
             payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
-                    "Reembolso procesado por ADMIN: " + (notes != null && !notes.isBlank() ? notes : "Aprobado manualmente"));
+                    "Reembolso procesado por ADMIN" + refundDetails + ": " + (notes != null && !notes.isBlank() ? notes : "Aprobado manualmente"));
         } else if ("dismiss".equalsIgnoreCase(action) || "reject".equalsIgnoreCase(action)) {
             payment.setStatus("failed");
             payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
