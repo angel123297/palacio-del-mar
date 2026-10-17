@@ -92,6 +92,13 @@ public class BookingService {
             throw new IllegalArgumentException("Esta habitación no está disponible para reservas actualmente");
         }
 
+        if (suite.getPropertyId() != null && propertyRepository != null) {
+            co.palaciodelmar.backend.model.Property property = propertyRepository.findById(suite.getPropertyId()).orElse(null);
+            if (property == null || Boolean.FALSE.equals(property.getActive()) || !"APPROVED".equalsIgnoreCase(property.getStatus())) {
+                throw new IllegalArgumentException("El alojamiento no está disponible para reservas porque la propiedad no está aprobada o está inactiva");
+            }
+        }
+
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
         if (request.getGuests() != null && (request.getGuests() < 1 || request.getGuests() > maxGuests)) {
             throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");

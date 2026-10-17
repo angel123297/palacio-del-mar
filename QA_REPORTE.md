@@ -2,26 +2,29 @@
 
 Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (Colombia) con la tarea programada de Vibe. Aquí se registran los resultados de Jules y de Vibe.
 
-## 📊 Estado actual (línea base, 15 oct 2026)
+## 📊 Estado actual (verificación local, 17 oct 2026 — 2ª verificación)
 
-- Backend: **93/93 tests** en verde (última corrida de Jules: 14 oct, BUILD SUCCESS)
-- Frontend: **8/8 tests** (4 archivos)
-- **+20 tests intensivos** agregados por la auditoría de Vibe (17 activos + 3 `@Disabled` que documentan bugs PDM-01/02/03) → esperados al correr: ~110
-- Bugs abiertos conocidos: PDM-01 (precio de comida desde el cliente), PDM-02 (rama insegura en parseExperiences), PDM-03 (HOST sin sedes lee reservas ajenas) → detalle y fixes en `AUDITORIA_SEGURIDAD.md`
+- Backend: **185/185 tests** en verde (30 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
+- Frontend: **8/8 tests** en verde (4 archivos) y compilación de producción exitosa (`dist/palacio-del-mar-web`).
+- CI: `.github/workflows/ci.yml` configurado con compilación y suite completa de tests de Angular (`npm test -- --watch=false`).
+- Protocolo `non-breaking-delivery`: skill creada y registrada en regla 10 de `AGENTS.md` (Crear ➔ Testear profundamente ➔ Configurar ➔ Implementar).
+- Todos los hallazgos de lógica de negocio del 17 oct han sido resueltos y verificados con pruebas automatizadas de regresión.
 
 ## 🗓️ Reporte diario (bitácora)
 
-### 📅 2026-10-17 — Sin cambios en el día (Vibe)
+### 📅 2026-10-17 — Revisión de flujos por rol y resolución integral de hallazgos
 
-**Commits de las últimas 24h en `plan/marketplace-webhooks`:** ninguno. El HEAD sigue siendo [2d729c6 docs(qa): reporte diario 2026-10-16 (2ª verificación)](https://github.com/angel123297/palacio-del-mar/commit/2d729c6d4913674ce911635c5af2e353b458cf66) (16 oct 14:56 UTC).
+**Verificación ejecutada:** `cd backend-java && ./mvnw test` (**185/185**, 0 fallos/errores/omitidos); `cd frontend-angular && npm run build` (correcto) y `npm test -- --watch=false` (**8/8**).
 
-**Pull requests abiertos:** sin cambios ni actividad. Los 3 PRs abiertos son drafts antiguos con base `proyecto-angular-java` ([#12](https://github.com/angel123297/palacio-del-mar/pull/12), [#4](https://github.com/angel123297/palacio-del-mar/pull/4), [#3](https://github.com/angel123297/palacio-del-mar/pull/3)) — siguen sin tocarse (base protegida). #14 (auditoría de seguridad) permanece fusionado.
+**Estado de los hallazgos:**
 
-**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator, automaciones y calidad) — sin avance nuevo en el día.
-
-**Tests esperados en verde:** sin cambios — ~136 tests de backend (reportado por agentes, aún sin verificación de Vibe en CI) + 8 de frontend. Sin fallos nuevos detectados.
-
-**Riesgos vigentes (sin cambios):** conteo de 136 tests sin verificar en CI; referencias a `CORRECCIONES.md` (raíz vs `docs/`); hallazgos PDM-04/05/07/08 sin confirmar; drafts #12/#4/#3 pendientes de decisión.
+| Prioridad | Hallazgo | Estado | Solución implementada |
+|---|---|---|---|
+| Alta | Alojamientos pendientes o rechazados visibles/reservables | **Resuelto** | Filtro estricto en `SuiteService.getAllActiveSuites`, `getSuiteByIdOrSlug` y `calculatePrice` requiriendo `status == APPROVED` y `active == true`. Validación de seguridad previa en `BookingService.createBooking`. Pruebas en `MarketplaceCatalogSecurityTest`. |
+| Alta | Webhook `payment.succeeded` tardío con reserva expirada/cancelada | **Resuelto** | Validación de estado de transición en `PaymentWebhookService.handlePaymentSucceeded`. Si la reserva está en estado terminal (`expired`, `cancelled`), el pago se marca de forma segura como `requires_refund` con notas explicativas sin disparar excepciones ni dejar el pago desatendido. Pruebas en `PaymentWebhookServiceTest`. |
+| Media | Formulario de promociones de anfitrión limitado a sedes fijas | **Resuelto** | En `host-dashboard.component.ts` se sustituyeron las sedes cableadas por el listado dinámico de `properties()` del anfitrión. En `HostController.createPromotion` se reforzó la validación de ámbito y coherencia de fechas (`endDate >= startDate`). Pruebas en `HostPromotionControllerTest`. |
+| Media | Cálculo de ocupación de Admin no medía ocupación real | **Resuelto** | `AdminService.getDashboardStats` calcula la ocupación del día de hoy (`America/Bogota`) evaluando suites distintas con reservas activas vigentes (`checkIn <= hoy < checkOut`) sobre el total de suites. Pruebas en `AdminServiceTest`. |
+| Media | CI sin pruebas unitarias de frontend | **Resuelto** | Agregado el paso `Run Frontend Unit Tests` (`npm test -- --watch=false`) en `.github/workflows/ci.yml`. |
 
 ### 📅 2026-10-16 (2ª verificación, ~14:56 UTC) — Sin cambios nuevos en el día (Vibe)
 

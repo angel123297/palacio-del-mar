@@ -295,6 +295,12 @@ public class HostController {
 
         User user = userPrincipal != null ? userPrincipal.getUser() : null;
         String targetBranch = request.resolveBranch();
+        if (targetBranch == null || targetBranch.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Debes especificar una sede o propiedad para la promoción"));
+        }
+        if (request.getStartDate() != null && request.getEndDate() != null && request.getEndDate().isBefore(request.getStartDate())) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("La fecha fin no puede ser anterior a la fecha inicio"));
+        }
         if (!hasAccessToTargetScope(user, targetBranch)) {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta sede o propiedad"));
         }
