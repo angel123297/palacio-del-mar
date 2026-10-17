@@ -20,6 +20,19 @@ export interface PromotionItem {
   createdAt?: string;
 }
 
+export interface RefundItem {
+  id: string;
+  bookingId?: string;
+  amount: number;
+  currency: string;
+  status: string;
+  provider?: string;
+  transactionId?: string;
+  paymentMethod?: string;
+  notes?: string;
+  createdAt?: string;
+}
+
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
@@ -50,6 +63,14 @@ export interface PromotionItem {
               Alojamientos / Marketplace
               <span *ngIf="pendingPropertiesCount() > 0" class="bg-[#f1c40f] text-[#0d0d0d] text-[10px] px-2 py-0.5 rounded-full font-bold">
                 {{ pendingPropertiesCount() }}
+              </span>
+            </button>
+            <button (click)="activeTab.set('refunds')" 
+                    [ngClass]="activeTab() === 'refunds' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-2">
+              Reembolsos
+              <span *ngIf="pendingRefundsCount() > 0" class="bg-[#e74c3c] text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                {{ pendingRefundsCount() }}
               </span>
             </button>
           </div>
@@ -412,6 +433,72 @@ export interface PromotionItem {
             </div>
           </div>
         </ng-container>
+ 
+        <!-- ==================== TAB 4: REEMBOLSOS ==================== -->
+        <ng-container *ngIf="activeTab() === 'refunds'">
+          <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
+            <div class="flex justify-between items-center mb-6">
+              <div>
+                <h2 class="font-serif text-2xl text-[#c9a96e]">Pagos Pendientes de Reembolso</h2>
+                <p class="text-xs text-[#f5f0e8] opacity-60">Cobros marcados como requires_refund por cancelaciones, expiración o pagos tardíos</p>
+              </div>
+              <button (click)="fetchRefunds()" class="px-4 py-2 border border-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded-md text-xs uppercase tracking-widest hover:bg-[rgba(201,169,110,0.1)] transition">
+                ↻ Actualizar
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-[rgba(255,255,255,0.08)] text-[10px] uppercase tracking-widest text-[#c9a96e]">
+                    <th class="py-3 px-4">ID Pago</th>
+                    <th class="py-3 px-4">Reserva</th>
+                    <th class="py-3 px-4">Monto</th>
+                    <th class="py-3 px-4">Estado</th>
+                    <th class="py-3 px-4">Notas / Motivo</th>
+                    <th class="py-3 px-4">Fecha</th>
+                    <th class="py-3 px-4 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[rgba(255,255,255,0.04)] text-sm">
+                  <tr *ngFor="let r of refunds()" class="hover:bg-[rgba(255,255,255,0.02)] transition">
+                    <td class="py-4 px-4 font-mono text-xs text-[#f5f0e8]">{{ r.id }}</td>
+                    <td class="py-4 px-4 font-mono text-xs text-[#c9a96e]">{{ r.bookingId || 'N/A' }}</td>
+                    <td class="py-4 px-4 font-serif text-[#f5f0e8] font-bold">$ {{ r.amount | number:'1.0-0' }} {{ r.currency }}</td>
+                    <td class="py-4 px-4">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[rgba(231,76,60,0.2)] text-[#e74c3c] border border-[rgba(231,76,60,0.4)]">
+                        Requiere Reembolso
+                      </span>
+                    </td>
+                    <td class="py-4 px-4 text-xs text-[#f5f0e8] opacity-80 max-w-xs truncate" [title]="r.notes || ''">
+                      {{ r.notes || 'Pago tardío o reserva cancelada' }}
+                    </td>
+                    <td class="py-4 px-4 text-xs text-[#f5f0e8] opacity-60">
+                      {{ r.createdAt | date:'short' }}
+                    </td>
+                    <td class="py-4 px-4 text-right">
+                      <div class="flex gap-2 justify-end">
+                        <button (click)="resolveRefund(r.id, 'mark_refunded')" 
+                                class="px-3 py-1.5 bg-[#2ecc71] hover:bg-[#27ae60] text-[#0d0d0d] font-bold rounded text-xs transition">
+                          ✔ Reembolsar
+                        </button>
+                        <button (click)="resolveRefund(r.id, 'dismiss')" 
+                                class="px-3 py-1.5 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)] text-[#f5f0e8] rounded text-xs transition">
+                          ✕ Descartar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr *ngIf="refunds().length === 0">
+                    <td colspan="7" class="py-12 text-center text-[#f5f0e8] opacity-50 text-sm">
+                      ✔ No hay pagos pendientes de reembolso. Todos los cobros y devoluciones están al día.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </ng-container>
 
       </div>
     </div>
@@ -420,7 +507,7 @@ export interface PromotionItem {
 export class AdminDashboardComponent implements OnInit {
   api = inject(ApiService);
   
-  activeTab = signal<'bookings' | 'promotions' | 'properties'>('bookings');
+  activeTab = signal<'bookings' | 'promotions' | 'properties' | 'refunds'>('bookings');
 
   metrics = signal<DashboardMetricsDTO | null>(null);
   bookings = signal<Booking[]>([]);
@@ -459,6 +546,10 @@ export class AdminDashboardComponent implements OnInit {
   pendingPropertiesCount = computed(() => this.properties().filter(p => p.status === 'PENDING').length);
   approvedPropertiesCount = computed(() => this.properties().filter(p => p.status === 'APPROVED').length);
 
+  // Refunds state
+  refunds = signal<RefundItem[]>([]);
+  pendingRefundsCount = computed(() => this.refunds().filter(r => r.status === 'requires_refund').length);
+
   filteredProperties = computed(() => {
     let list = this.properties();
     const status = this.propertyStatusFilter();
@@ -481,6 +572,7 @@ export class AdminDashboardComponent implements OnInit {
     this.fetchBookings();
     this.fetchPromotions();
     this.fetchProperties();
+    this.fetchRefunds();
   }
 
   fetchMetrics() {
@@ -664,6 +756,35 @@ export class AdminDashboardComponent implements OnInit {
       },
       error: (err) => {
         this.actionError.set(err?.error?.message || 'Error al actualizar estado del alojamiento');
+        setTimeout(() => this.actionError.set(''), 5000);
+      }
+    });
+  }
+
+  fetchRefunds() {
+    this.api.get<ApiResponse<RefundItem[]>>('/admin/payments/refunds').subscribe({
+      next: (res) => {
+        const list = res.data || (res as any) || [];
+        this.refunds.set(Array.isArray(list) ? list : []);
+      },
+      error: () => {
+        this.refunds.set([]);
+      }
+    });
+  }
+
+  resolveRefund(paymentId: string, action: 'mark_refunded' | 'dismiss') {
+    if (!paymentId) return;
+    const notes = prompt('Ingrese una observación para esta acción (opcional):') || '';
+    this.api.put<ApiResponse<any>>(`/admin/payments/${paymentId}/resolve-refund`, { action, notes }).subscribe({
+      next: () => {
+        const actionText = action === 'mark_refunded' ? 'marcado como reembolsado' : 'descartado';
+        this.actionMessage.set(`Pago ${actionText} exitosamente.`);
+        setTimeout(() => this.actionMessage.set(''), 4000);
+        this.fetchRefunds();
+      },
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al procesar el reembolso');
         setTimeout(() => this.actionError.set(''), 5000);
       }
     });
