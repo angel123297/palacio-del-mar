@@ -25,7 +25,7 @@ public class RevokedToken {
     @Id
     private String tokenHash;
 
-    @Indexed(expireAfterSeconds = 0)
+    @Indexed(expireAfter = "0s")
     private Date expiresAt;
 
     private Date revokedAt;

@@ -2,13 +2,13 @@
 
 Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (Colombia) con la tarea programada de Vibe. Aquí se registran los resultados de Jules y de Vibe.
 
-## 📊 Estado actual (verificación local, 17 oct 2026 — 7ª verificación)
+## 📊 Estado actual (verificación local, 17 oct 2026 — 8ª verificación)
 
-- Backend: **197/197 tests** en verde (31 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
-- Frontend: **8/8 tests** en verde (4 archivos) y compilación de producción exitosa (`dist/palacio-del-mar-web`).
+- Backend: **251/251 tests** en verde (39 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
+- Frontend: **13/13 tests** en verde (5 archivos de pruebas en Vitest) y compilación de producción exitosa (`dist/palacio-del-mar-web`).
 - CI: `.github/workflows/ci.yml` en verde en GitHub Actions (`plan/marketplace-webhooks`).
 - Protocolo `non-breaking-delivery`: estrictamente aplicado y verificado.
-- **Hallazgo de Reembolso Resuelto:** `AdminService.resolveRefund` valida estrictamente la respuesta de `paymentGateway.refund(...)`. Si la pasarela devuelve `success == false` o arroja error, no se cambia el estado del pago, se lanza excepción y el pago permanece en `requires_refund` con mensaje descriptivo de error visible para el administrador. Verificado con `testResolveRefundWhenGatewayFailsThrowsExceptionAndDoesNotMarkRefunded` en `AdminServiceTest`.
+- **Funcionalidades Tareas 1-5 Verificadas:** Blacklist duradera JWT multi-tier, notificaciones de email Mailpit con vouchers PDF/ICS, sincronización iCal RFC 5545 para Airbnb/Google Calendar, comprobante imprimible con QR offline SVG y PIN inteligente, y playbook de sustentación interactivo.
 - Todos los bloqueantes y hallazgos reportados han sido completamente solucionados.
 
 ## 🗓️ Reporte diario (bitácora)
