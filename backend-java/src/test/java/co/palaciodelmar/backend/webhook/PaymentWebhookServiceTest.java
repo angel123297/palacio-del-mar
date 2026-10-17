@@ -230,4 +230,117 @@ class PaymentWebhookServiceTest {
         assertEquals("failed", booking.getPaymentStatus());
         assertEquals("pending", booking.getStatus()); // no se confirma
     }
+
+    @Test
+    void testLatePaymentSucceededOnExpiredBookingMarksRequiresRefund() {
+        String eventId = "evt_late_expired";
+        String intentId = "pi_late_expired";
+        String bookingId = "book_expired_999";
+
+        Payment payment = Payment.builder()
+                .id("pay_expired")
+                .intentId(intentId)
+                .booking(bookingId)
+                .amount(new BigDecimal("450000"))
+                .currency("COP")
+                .status("processing")
+                .build();
+
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .status("expired")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("450000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("450000"))
+                .build();
+
+        when(processedWebhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(paymentRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        String rawBody = """
+                {
+                  "eventId": "evt_late_expired",
+                  "eventType": "payment.succeeded",
+                  "timestamp": "%s",
+                  "data": {
+                    "intentId": "pi_late_expired",
+                    "bookingId": "book_expired_999",
+                    "amount": 450000,
+                    "currency": "COP",
+                    "status": "succeeded",
+                    "transactionId": "tx_late_999"
+                  }
+                }
+                """.formatted(Instant.now().toString());
+
+        String signature = WebhookSigner.sign(rawBody, secret);
+
+        Map<String, Object> result = webhookService.processWebhook(rawBody, signature, eventId, timestamp);
+
+        assertEquals("processed", result.get("status"));
+        assertEquals("requires_refund", payment.getStatus());
+        assertTrue(payment.getNotes().contains("Requiere reembolso"));
+        assertEquals("expired", booking.getStatus());
+        verify(bookingService, never()).changeBookingStatus(any(), any(), any(), any());
+        verify(emailService, never()).sendBookingConfirmation(any());
+        verify(processedWebhookEventRepository).save(any(ProcessedWebhookEvent.class));
+    }
+
+    @Test
+    void testLatePaymentSucceededOnCancelledBookingMarksRequiresRefund() {
+        String eventId = "evt_late_cancelled";
+        String intentId = "pi_late_cancelled";
+        String bookingId = "book_cancelled_888";
+
+        Payment payment = Payment.builder()
+                .id("pay_cancelled")
+                .intentId(intentId)
+                .booking(bookingId)
+                .amount(new BigDecimal("300000"))
+                .currency("COP")
+                .status("processing")
+                .build();
+
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .status("cancelled")
+                .paymentStatus("refunded")
+                .totalPrice(new BigDecimal("300000"))
+                .build();
+
+        when(processedWebhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(paymentRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        String rawBody = """
+                {
+                  "eventId": "evt_late_cancelled",
+                  "eventType": "payment.succeeded",
+                  "timestamp": "%s",
+                  "data": {
+                    "intentId": "pi_late_cancelled",
+                    "bookingId": "book_cancelled_888",
+                    "amount": 300000,
+                    "currency": "COP",
+                    "status": "succeeded",
+                    "transactionId": "tx_late_888"
+                  }
+                }
+                """.formatted(Instant.now().toString());
+
+        String signature = WebhookSigner.sign(rawBody, secret);
+
+        Map<String, Object> result = webhookService.processWebhook(rawBody, signature, eventId, timestamp);
+
+        assertEquals("processed", result.get("status"));
+        assertEquals("requires_refund", payment.getStatus());
+        assertEquals("cancelled", booking.getStatus());
+        verify(bookingService, never()).changeBookingStatus(any(), any(), any(), any());
+    }
 }

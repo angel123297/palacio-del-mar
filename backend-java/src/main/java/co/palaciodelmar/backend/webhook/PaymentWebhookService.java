@@ -141,17 +141,43 @@ public class PaymentWebhookService {
             return;
         }
 
+        Booking booking = bookingRepository.findById(payment.getBooking()).orElse(null);
+        if (booking == null) {
+            log.warn("No se encontró Booking para el pago: {}", payment.getId());
+            payment.setStatus("requires_refund");
+            payment.setTransactionId(data.getTransactionId());
+            payment.setUpdatedAt(Instant.now());
+            payment.setNotes("Pago huérfano sin reserva asociada (" + payment.getBooking() + "). Requiere verificación manual.");
+            paymentRepository.save(payment);
+            return;
+        }
+
+        BookingStatus currentStatus = null;
+        if (booking.getStatus() != null) {
+            try {
+                currentStatus = BookingStatus.valueOf(booking.getStatus().toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        boolean canConfirm = (currentStatus != null && currentStatus.canTransitionTo(BookingStatus.CONFIRMED));
+        boolean alreadyConfirmed = (currentStatus == BookingStatus.CONFIRMED);
+
+        if (!canConfirm && !alreadyConfirmed) {
+            payment.setStatus("requires_refund");
+            payment.setTransactionId(data.getTransactionId());
+            payment.setUpdatedAt(Instant.now());
+            payment.setNotes("Pago recibido para reserva en estado " + booking.getStatus() + " (" + booking.getId() + "). Requiere reembolso.");
+            paymentRepository.save(payment);
+            log.warn("Pago {} marcado como requires_refund porque la reserva {} está en {}", payment.getId(), booking.getId(), booking.getStatus());
+            return;
+        }
+
         payment.setStatus("completed");
         payment.setTransactionId(data.getTransactionId());
         payment.setUpdatedAt(Instant.now());
         payment.setNotes("Pago confirmado exitosamente via webhook (" + eventId + ")");
         paymentRepository.save(payment);
-
-        Booking booking = bookingRepository.findById(payment.getBooking()).orElse(null);
-        if (booking == null) {
-            log.warn("No se encontró Booking para el pago: {}", payment.getId());
-            return;
-        }
 
         BigDecimal currentPaid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
         BigDecimal newPaid = currentPaid.add(payment.getAmount());
@@ -162,11 +188,13 @@ public class PaymentWebhookService {
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
             booking.setPaymentStatus("paid");
-            bookingService.changeBookingStatus(booking, BookingStatus.CONFIRMED, "Webhook", "Pago completado via webhook");
-            try {
-                emailService.sendBookingConfirmation(booking);
-            } catch (Exception e) {
-                log.warn("Error enviando email de confirmación: {}", e.getMessage());
+            if (canConfirm) {
+                bookingService.changeBookingStatus(booking, BookingStatus.CONFIRMED, "Webhook", "Pago completado via webhook");
+                try {
+                    emailService.sendBookingConfirmation(booking);
+                } catch (Exception e) {
+                    log.warn("Error enviando email de confirmación: {}", e.getMessage());
+                }
             }
         } else {
             booking.setPaymentStatus("partial");

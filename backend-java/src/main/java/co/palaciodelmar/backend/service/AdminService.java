@@ -10,7 +10,10 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -124,13 +127,28 @@ public class AdminService {
         long totalBookings = bookingRepository.count();
         long totalUsers = userRepository.count();
 
-        long activeBookings = bookingRepository.findAll().stream()
+        LocalDate today = LocalDate.now(ZoneId.of("America/Bogota"));
+        List<Booking> allBookings = bookingRepository.findAll();
+
+        long activeBookings = allBookings.stream()
                 .filter(b -> isActiveStatus(b.getStatus()))
                 .count();
 
-        double averageOccupancy = totalSuites > 0 ? Math.min(100.0, Math.round((double) activeBookings / totalSuites * 100.0)) : 0.0;
+        // Ocupación real del día de hoy: habitaciones con reserva activa alojada hoy (checkIn <= hoy < checkOut)
+        long occupiedSuitesToday = allBookings.stream()
+                .filter(b -> isActiveStatus(b.getStatus()))
+                .filter(b -> b.getCheckIn() != null && b.getCheckOut() != null)
+                .filter(b -> !today.isBefore(b.getCheckIn()) && today.isBefore(b.getCheckOut()))
+                .map(Booking::getSuite)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
 
-        BigDecimal totalRevenue = bookingRepository.findAll().stream()
+        double averageOccupancy = totalSuites > 0
+                ? Math.min(100.0, Math.round(((double) occupiedSuitesToday / totalSuites) * 100.0 * 10.0) / 10.0)
+                : 0.0;
+
+        BigDecimal totalRevenue = allBookings.stream()
                 .map(AdminService::netCollected)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
