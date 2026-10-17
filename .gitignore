@@ -22,3 +22,6 @@ frontend-angular/.angular/
 frontend-angular/.vite/
 frontend-angular/dist/
 
+
+# Archify local diagram output
+.archify/
