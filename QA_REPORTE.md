@@ -2,28 +2,29 @@
 
 Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (Colombia) con la tarea programada de Vibe. Aquí se registran los resultados de Jules y de Vibe.
 
-## 📊 Estado actual (verificación local, 17 oct 2026 — 2ª verificación)
+## 📊 Estado actual (verificación local, 17 oct 2026 — 3ª verificación)
 
-- Backend: **185/185 tests** en verde (30 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
+- Backend: **191/191 tests** en verde (30 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
 - Frontend: **8/8 tests** en verde (4 archivos) y compilación de producción exitosa (`dist/palacio-del-mar-web`).
 - CI: `.github/workflows/ci.yml` configurado con compilación y suite completa de tests de Angular (`npm test -- --watch=false`).
 - Protocolo `non-breaking-delivery`: skill creada y registrada en regla 10 de `AGENTS.md` (Crear ➔ Testear profundamente ➔ Configurar ➔ Implementar).
-- Todos los hallazgos de lógica de negocio del 17 oct han sido resueltos y verificados con pruebas automatizadas de regresión.
+- Todos los hallazgos y puntos residuales han sido resueltos y verificados con pruebas automatizadas de regresión.
 
 ## 🗓️ Reporte diario (bitácora)
 
 ### 📅 2026-10-17 — Revisión de flujos por rol y resolución integral de hallazgos
 
-**Verificación ejecutada:** `cd backend-java && ./mvnw test` (**185/185**, 0 fallos/errores/omitidos); `cd frontend-angular && npm run build` (correcto) y `npm test -- --watch=false` (**8/8**).
+**Verificación ejecutada:** `cd backend-java && ./mvnw test` (**191/191**, 0 fallos/errores/omitidos); `cd frontend-angular && npm run build` (correcto) y `npm test -- --watch=false` (**8/8**).
 
-**Estado de los hallazgos:**
+**Estado de los hallazgos y revisiones residuales:**
 
-| Prioridad | Hallazgo | Estado | Solución implementada |
+| Prioridad | Hallazgo / Revisión | Estado | Solución implementada |
 |---|---|---|---|
-| Alta | Alojamientos pendientes o rechazados visibles/reservables | **Resuelto** | Filtro estricto en `SuiteService.getAllActiveSuites`, `getSuiteByIdOrSlug` y `calculatePrice` requiriendo `status == APPROVED` y `active == true`. Validación de seguridad previa en `BookingService.createBooking`. Pruebas en `MarketplaceCatalogSecurityTest`. |
-| Alta | Webhook `payment.succeeded` tardío con reserva expirada/cancelada | **Resuelto** | Validación de estado de transición en `PaymentWebhookService.handlePaymentSucceeded`. Si la reserva está en estado terminal (`expired`, `cancelled`), el pago se marca de forma segura como `requires_refund` con notas explicativas sin disparar excepciones ni dejar el pago desatendido. Pruebas en `PaymentWebhookServiceTest`. |
+| Alta | Alojamientos pendientes o rechazados visibles/reservables | **Resuelto** | Filtro estricto en catálogo, detalle, precio y reserva. Además se extendió a disponibilidad (`/api/availability`, `/api/availability/monthly`), sedes (`/api/suites/branch/{id}`) y tipos (`/api/suites/types`). Pruebas en `MarketplaceCatalogSecurityTest`. |
+| Alta | Webhook `payment.succeeded` tardío con reserva expirada/cancelada | **Resuelto** | Llamada automatizada a `paymentGateway.refund(...)`. Si el reembolso tiene éxito, el pago queda en `refunded`; si falla, pasa a `requires_refund` para intervención manual con registro auditado. Pruebas en `PaymentWebhookServiceTest`. |
+| Media | Inconsistencia de caché tras cambio de aprobación de propiedad | **Resuelto** | `@Caching(evict = { @CacheEvict(value = "suites", allEntries = true), @CacheEvict(value = "suite_detail", allEntries = true), @CacheEvict(value = "suite_types", allEntries = true) })` añadido a `PropertyService.updatePropertyStatus`. |
+| Media | Cálculo de ocupación de Admin con alojamientos multi-unidad | **Resuelto** | `AdminService.getDashboardStats` calcula el ratio diario de ocupación contrastando las reservas activas contra el inventario real acumulado (`totalUnits`) de suites aprobadas activas. Pruebas en `AdminServiceTest`. |
 | Media | Formulario de promociones de anfitrión limitado a sedes fijas | **Resuelto** | En `host-dashboard.component.ts` se sustituyeron las sedes cableadas por el listado dinámico de `properties()` del anfitrión. En `HostController.createPromotion` se reforzó la validación de ámbito y coherencia de fechas (`endDate >= startDate`). Pruebas en `HostPromotionControllerTest`. |
-| Media | Cálculo de ocupación de Admin no medía ocupación real | **Resuelto** | `AdminService.getDashboardStats` calcula la ocupación del día de hoy (`America/Bogota`) evaluando suites distintas con reservas activas vigentes (`checkIn <= hoy < checkOut`) sobre el total de suites. Pruebas en `AdminServiceTest`. |
 | Media | CI sin pruebas unitarias de frontend | **Resuelto** | Agregado el paso `Run Frontend Unit Tests` (`npm test -- --watch=false`) en `.github/workflows/ci.yml`. |
 
 ### 📅 2026-10-16 (2ª verificación, ~14:56 UTC) — Sin cambios nuevos en el día (Vibe)

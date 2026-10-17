@@ -9,6 +9,7 @@ import co.palaciodelmar.backend.repository.PaymentRepository;
 import co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository;
 import co.palaciodelmar.backend.service.BookingService;
 import co.palaciodelmar.backend.service.EmailService;
+import co.palaciodelmar.backend.service.PaymentGateway;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,9 @@ public class PaymentWebhookService {
     private final EmailService emailService;
     private final ObjectMapper objectMapper;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private PaymentGateway paymentGateway;
+
     public PaymentWebhookService(
             PaymentRepository paymentRepository,
             BookingRepository bookingRepository,
@@ -38,12 +42,25 @@ public class PaymentWebhookService {
             EmailService emailService,
             @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper
     ) {
+        this(paymentRepository, bookingRepository, bookingService, processedWebhookEventRepository, emailService, objectMapper, null);
+    }
+
+    public PaymentWebhookService(
+            PaymentRepository paymentRepository,
+            BookingRepository bookingRepository,
+            @org.springframework.context.annotation.Lazy BookingService bookingService,
+            ProcessedWebhookEventRepository processedWebhookEventRepository,
+            EmailService emailService,
+            ObjectMapper objectMapper,
+            PaymentGateway paymentGateway
+    ) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
         this.bookingService = bookingService;
         this.processedWebhookEventRepository = processedWebhookEventRepository;
         this.emailService = emailService;
         this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper().findAndRegisterModules();
+        this.paymentGateway = paymentGateway;
     }
 
     @Value("${palacio.webhooks.payments.secret:whsec_simulated_secret_key_palacio_2026}")
@@ -164,12 +181,36 @@ public class PaymentWebhookService {
         boolean alreadyConfirmed = (currentStatus == BookingStatus.CONFIRMED);
 
         if (!canConfirm && !alreadyConfirmed) {
-            payment.setStatus("requires_refund");
             payment.setTransactionId(data.getTransactionId());
             payment.setUpdatedAt(Instant.now());
-            payment.setNotes("Pago recibido para reserva en estado " + booking.getStatus() + " (" + booking.getId() + "). Requiere reembolso.");
+
+            boolean refundSuccess = false;
+            String refundDetails = "";
+            if (paymentGateway != null && data.getTransactionId() != null && payment.getAmount() != null) {
+                try {
+                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(data.getTransactionId(), payment.getAmount());
+                    if (refundResp != null && refundResp.success()) {
+                        refundSuccess = true;
+                        refundDetails = " Reembolso automático exitoso (ID: " + refundResp.refundId() + ").";
+                    } else {
+                        refundDetails = " Falló pasarela: " + (refundResp != null ? refundResp.errorMessage() : "respuesta nula");
+                    }
+                } catch (Exception e) {
+                    log.error("Excepción al ejecutar reembolso automático para pago {}: {}", payment.getId(), e.getMessage());
+                    refundDetails = " Excepción en reembolso: " + e.getMessage();
+                }
+            }
+
+            if (refundSuccess) {
+                payment.setStatus("refunded");
+                payment.setNotes("Pago recibido para reserva en estado " + booking.getStatus() + " (" + booking.getId() + ")." + refundDetails);
+            } else {
+                payment.setStatus("requires_refund");
+                payment.setNotes("Pago recibido para reserva en estado " + booking.getStatus() + " (" + booking.getId() + "). Requiere reembolso manual." + refundDetails);
+            }
+
             paymentRepository.save(payment);
-            log.warn("Pago {} marcado como requires_refund porque la reserva {} está en {}", payment.getId(), booking.getId(), booking.getStatus());
+            log.warn("Pago {} actualizado a status {} para reserva {} en {}", payment.getId(), payment.getStatus(), booking.getId(), booking.getStatus());
             return;
         }
 

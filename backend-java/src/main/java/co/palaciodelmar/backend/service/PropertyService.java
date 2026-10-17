@@ -9,6 +9,8 @@ import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -132,6 +134,11 @@ public class PropertyService {
     /**
      * Cambia el estado de aprobación de una propiedad (ADMIN).
      */
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public PropertyDTO updatePropertyStatus(String propertyId, String status) {
         Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Propiedad no encontrada"));

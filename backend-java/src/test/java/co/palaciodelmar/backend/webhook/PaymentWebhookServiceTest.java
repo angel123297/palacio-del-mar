@@ -32,6 +32,7 @@ class PaymentWebhookServiceTest {
     private ProcessedWebhookEventRepository processedWebhookEventRepository;
     private EmailService emailService;
     private ObjectMapper objectMapper;
+    private co.palaciodelmar.backend.service.PaymentGateway paymentGateway;
 
     private PaymentWebhookService webhookService;
     private final String secret = "test_webhook_secret_key_123456";
@@ -44,6 +45,7 @@ class PaymentWebhookServiceTest {
         processedWebhookEventRepository = mock(ProcessedWebhookEventRepository.class);
         emailService = mock(EmailService.class);
         objectMapper = new ObjectMapper().findAndRegisterModules();
+        paymentGateway = mock(co.palaciodelmar.backend.service.PaymentGateway.class);
 
         webhookService = new PaymentWebhookService(
                 paymentRepository,
@@ -51,7 +53,8 @@ class PaymentWebhookServiceTest {
                 bookingService,
                 processedWebhookEventRepository,
                 emailService,
-                objectMapper
+                objectMapper,
+                paymentGateway
         );
 
         ReflectionTestUtils.setField(webhookService, "webhookSecret", secret);
@@ -232,7 +235,7 @@ class PaymentWebhookServiceTest {
     }
 
     @Test
-    void testLatePaymentSucceededOnExpiredBookingMarksRequiresRefund() {
+    void testLatePaymentSucceededOnExpiredBookingExecutesAutomaticRefund() {
         String eventId = "evt_late_expired";
         String intentId = "pi_late_expired";
         String bookingId = "book_expired_999";
@@ -259,6 +262,8 @@ class PaymentWebhookServiceTest {
         when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
         when(paymentRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+        when(paymentGateway.refund("tx_late_999", new BigDecimal("450000")))
+                .thenReturn(new co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse(true, "ref_auto_123", "succeeded", null));
 
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String rawBody = """
@@ -282,16 +287,17 @@ class PaymentWebhookServiceTest {
         Map<String, Object> result = webhookService.processWebhook(rawBody, signature, eventId, timestamp);
 
         assertEquals("processed", result.get("status"));
-        assertEquals("requires_refund", payment.getStatus());
-        assertTrue(payment.getNotes().contains("Requiere reembolso"));
+        assertEquals("refunded", payment.getStatus());
+        assertTrue(payment.getNotes().contains("Reembolso automático exitoso"));
         assertEquals("expired", booking.getStatus());
+        verify(paymentGateway).refund("tx_late_999", new BigDecimal("450000"));
         verify(bookingService, never()).changeBookingStatus(any(), any(), any(), any());
         verify(emailService, never()).sendBookingConfirmation(any());
         verify(processedWebhookEventRepository).save(any(ProcessedWebhookEvent.class));
     }
 
     @Test
-    void testLatePaymentSucceededOnCancelledBookingMarksRequiresRefund() {
+    void testLatePaymentSucceededOnCancelledBookingWhenGatewayFailsFallsBackToRequiresRefund() {
         String eventId = "evt_late_cancelled";
         String intentId = "pi_late_cancelled";
         String bookingId = "book_cancelled_888";
@@ -316,6 +322,8 @@ class PaymentWebhookServiceTest {
         when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
         when(paymentRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+        when(paymentGateway.refund("tx_late_888", new BigDecimal("300000")))
+                .thenReturn(new co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse(false, null, "failed", "Saldo insuficiente en cuenta de liquidación"));
 
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String rawBody = """
@@ -340,7 +348,9 @@ class PaymentWebhookServiceTest {
 
         assertEquals("processed", result.get("status"));
         assertEquals("requires_refund", payment.getStatus());
+        assertTrue(payment.getNotes().contains("Requiere reembolso manual"));
         assertEquals("cancelled", booking.getStatus());
+        verify(paymentGateway).refund("tx_late_888", new BigDecimal("300000"));
         verify(bookingService, never()).changeBookingStatus(any(), any(), any(), any());
     }
 }
