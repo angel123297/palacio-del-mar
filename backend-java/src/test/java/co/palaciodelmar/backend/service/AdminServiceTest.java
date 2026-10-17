@@ -227,12 +227,37 @@ class AdminServiceTest {
 
         when(paymentRepository.findById("pay-ref-1")).thenReturn(java.util.Optional.of(payment));
         when(paymentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(paymentGateway.refund("tx_gate_123", new BigDecimal("250000")))
+                .thenReturn(new co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse(true, "ref_123", "succeeded", null));
 
         co.palaciodelmar.backend.model.Payment result = adminService.resolveRefund("pay-ref-1", "mark_refunded", "Aprobado tras revisión de soporte");
 
         assertEquals("refunded", result.getStatus());
-        org.junit.jupiter.api.Assertions.assertTrue(result.getNotes().contains("Reembolso procesado por ADMIN"));
+        org.junit.jupiter.api.Assertions.assertTrue(result.getNotes().contains("Reembolso procesado por ADMIN (id=ref_123)"));
         verify(paymentGateway).refund("tx_gate_123", new BigDecimal("250000"));
+    }
+
+    @Test
+    @DisplayName("resolveRefund con mark_refunded cuando la pasarela falla lanza IllegalStateException y no altera estado")
+    void testResolveRefundWhenGatewayFailsThrowsExceptionAndDoesNotMarkRefunded() {
+        co.palaciodelmar.backend.model.Payment payment = co.palaciodelmar.backend.model.Payment.builder()
+                .id("pay-fail-1")
+                .status("requires_refund")
+                .amount(new BigDecimal("250000"))
+                .transactionId("tx_fail_123")
+                .notes("Pago a reembolsar")
+                .build();
+
+        when(paymentRepository.findById("pay-fail-1")).thenReturn(java.util.Optional.of(payment));
+        when(paymentGateway.refund("tx_fail_123", new BigDecimal("250000")))
+                .thenReturn(new co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse(false, null, "failed", "Saldo insuficiente en cuenta de liquidación"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                adminService.resolveRefund("pay-fail-1", "mark_refunded", "Intento manual")
+        );
+
+        assertEquals("requires_refund", payment.getStatus(), "El estado debe permanecer en requires_refund");
+        verify(paymentRepository, never()).save(any());
     }
 
     @Test
