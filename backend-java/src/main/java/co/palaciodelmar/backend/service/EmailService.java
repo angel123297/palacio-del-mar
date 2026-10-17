@@ -58,9 +58,8 @@ public class EmailService {
             helper.setText(htmlMsg, true);
 
             javaMailSender.send(message);
-        } catch (MessagingException e) {
-            log.error("Error al enviar el correo de verificación a {}: {}", toEmail, e.getMessage(), e);
-            throw new RuntimeException("Error al enviar el correo de verificación", e);
+        } catch (Exception e) {
+            log.warn("No se pudo enviar correo de verificación a {} (servidor SMTP no disponible): {}", toEmail, e.getMessage());
         }
     }
 
@@ -96,7 +95,8 @@ public class EmailService {
             javaMailSender.send(message);
 
         } catch (Exception e) {
-            throw new RuntimeException("Error al enviar el correo de confirmación", e);
+            log.warn("No se pudo enviar correo de confirmación para reserva {} (servidor SMTP no disponible): {}",
+                    booking != null ? booking.getId() : "N/A", e.getMessage());
         }
     }
 
@@ -134,7 +134,7 @@ public class EmailService {
             helper.setText(html, true);
             javaMailSender.send(message);
         } catch (Exception e) {
-            log.error("Error al enviar invitación de reseña para la reserva {}: {}", booking.getId(), e.getMessage(), e);
+            log.warn("No se pudo enviar invitación de reseña para la reserva {} (servidor SMTP no disponible): {}", booking.getId(), e.getMessage());
         }
     }
 

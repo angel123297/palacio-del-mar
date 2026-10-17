@@ -10,7 +10,10 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -124,13 +127,32 @@ public class AdminService {
         long totalBookings = bookingRepository.count();
         long totalUsers = userRepository.count();
 
-        long activeBookings = bookingRepository.findAll().stream()
+        LocalDate today = LocalDate.now(ZoneId.of("America/Bogota"));
+        List<Booking> allBookings = bookingRepository.findAll();
+        List<co.palaciodelmar.backend.model.Suite> allSuites = suiteRepository.findAll();
+
+        long activeBookings = allBookings.stream()
                 .filter(b -> isActiveStatus(b.getStatus()))
                 .count();
 
-        double averageOccupancy = totalSuites > 0 ? Math.min(100.0, Math.round((double) activeBookings / totalSuites * 100.0)) : 0.0;
+        // Inventario total de unidades vendibles (considerando totalUnits de cada suite activa)
+        long totalRentableUnits = allSuites.stream()
+                .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+                .mapToLong(s -> (s.getTotalUnits() != null && s.getTotalUnits() > 0) ? s.getTotalUnits() : 1)
+                .sum();
 
-        BigDecimal totalRevenue = bookingRepository.findAll().stream()
+        // Unidades ocupadas hoy: conteo de reservas activas alojadas hoy (checkIn <= hoy < checkOut)
+        long occupiedUnitsToday = allBookings.stream()
+                .filter(b -> isActiveStatus(b.getStatus()))
+                .filter(b -> b.getCheckIn() != null && b.getCheckOut() != null)
+                .filter(b -> !today.isBefore(b.getCheckIn()) && today.isBefore(b.getCheckOut()))
+                .count();
+
+        double averageOccupancy = totalRentableUnits > 0
+                ? Math.min(100.0, Math.round(((double) occupiedUnitsToday / totalRentableUnits) * 100.0 * 10.0) / 10.0)
+                : 0.0;
+
+        BigDecimal totalRevenue = allBookings.stream()
                 .map(AdminService::netCollected)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 

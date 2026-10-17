@@ -2,14 +2,30 @@
 
 Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (Colombia) con la tarea programada de Vibe. Aquí se registran los resultados de Jules y de Vibe.
 
-## 📊 Estado actual (línea base, 15 oct 2026)
+## 📊 Estado actual (verificación local, 17 oct 2026 — 3ª verificación)
 
-- Backend: **93/93 tests** en verde (última corrida de Jules: 14 oct, BUILD SUCCESS)
-- Frontend: **8/8 tests** (4 archivos)
-- **+20 tests intensivos** agregados por la auditoría de Vibe (17 activos + 3 `@Disabled` que documentan bugs PDM-01/02/03) → esperados al correr: ~110
-- Bugs abiertos conocidos: PDM-01 (precio de comida desde el cliente), PDM-02 (rama insegura en parseExperiences), PDM-03 (HOST sin sedes lee reservas ajenas) → detalle y fixes en `AUDITORIA_SEGURIDAD.md`
+- Backend: **191/191 tests** en verde (30 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
+- Frontend: **8/8 tests** en verde (4 archivos) y compilación de producción exitosa (`dist/palacio-del-mar-web`).
+- CI: `.github/workflows/ci.yml` configurado con compilación y suite completa de tests de Angular (`npm test -- --watch=false`).
+- Protocolo `non-breaking-delivery`: skill creada y registrada en regla 10 de `AGENTS.md` (Crear ➔ Testear profundamente ➔ Configurar ➔ Implementar).
+- Todos los hallazgos y puntos residuales han sido resueltos y verificados con pruebas automatizadas de regresión.
 
 ## 🗓️ Reporte diario (bitácora)
+
+### 📅 2026-10-17 — Revisión de flujos por rol y resolución integral de hallazgos
+
+**Verificación ejecutada:** `cd backend-java && ./mvnw test` (**191/191**, 0 fallos/errores/omitidos); `cd frontend-angular && npm run build` (correcto) y `npm test -- --watch=false` (**8/8**).
+
+**Estado de los hallazgos y revisiones residuales:**
+
+| Prioridad | Hallazgo / Revisión | Estado | Solución implementada |
+|---|---|---|---|
+| Alta | Alojamientos pendientes o rechazados visibles/reservables | **Resuelto** | Filtro estricto en catálogo, detalle, precio y reserva. Además se extendió a disponibilidad (`/api/availability`, `/api/availability/monthly`), sedes (`/api/suites/branch/{id}`) y tipos (`/api/suites/types`). Pruebas en `MarketplaceCatalogSecurityTest`. |
+| Alta | Webhook `payment.succeeded` tardío con reserva expirada/cancelada | **Resuelto** | Llamada automatizada a `paymentGateway.refund(...)`. Si el reembolso tiene éxito, el pago queda en `refunded`; si falla, pasa a `requires_refund` para intervención manual con registro auditado. Pruebas en `PaymentWebhookServiceTest`. |
+| Media | Inconsistencia de caché tras cambio de aprobación de propiedad | **Resuelto** | `@Caching(evict = { @CacheEvict(value = "suites", allEntries = true), @CacheEvict(value = "suite_detail", allEntries = true), @CacheEvict(value = "suite_types", allEntries = true) })` añadido a `PropertyService.updatePropertyStatus`. |
+| Media | Cálculo de ocupación de Admin con alojamientos multi-unidad | **Resuelto** | `AdminService.getDashboardStats` calcula el ratio diario de ocupación contrastando las reservas activas contra el inventario real acumulado (`totalUnits`) de suites aprobadas activas. Pruebas en `AdminServiceTest`. |
+| Media | Formulario de promociones de anfitrión limitado a sedes fijas | **Resuelto** | En `host-dashboard.component.ts` se sustituyeron las sedes cableadas por el listado dinámico de `properties()` del anfitrión. En `HostController.createPromotion` se reforzó la validación de ámbito y coherencia de fechas (`endDate >= startDate`). Pruebas en `HostPromotionControllerTest`. |
+| Media | CI sin pruebas unitarias de frontend | **Resuelto** | Agregado el paso `Run Frontend Unit Tests` (`npm test -- --watch=false`) en `.github/workflows/ci.yml`. |
 
 ### 📅 2026-10-16 (2ª verificación, ~14:56 UTC) — Sin cambios nuevos en el día (Vibe)
 
@@ -86,3 +102,4 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 - `CORRECCIONES.md` — bitácora de correcciones
 - `PLAN_MARKETPLACE.md` — plan aprobado (5 fases)
 - `AGENTS.md` — reglas para agentes de IA
+"}}]

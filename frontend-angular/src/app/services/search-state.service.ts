@@ -12,7 +12,15 @@ export interface SearchFilters {
 
 @Injectable({ providedIn: 'root' })
 export class SearchStateService {
-  private today = new Date();
+  private today = (() => {
+    try {
+      const iso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(y, m - 1, d, 12, 0, 0);
+    } catch {
+      return new Date();
+    }
+  })();
   
   // Default: checkIn tomorrow, checkOut in 3 days
   private defaultCheckIn = new Date(this.today.getFullYear(), this.today.getMonth(), this.today.getDate() + 1, 12, 0, 0);

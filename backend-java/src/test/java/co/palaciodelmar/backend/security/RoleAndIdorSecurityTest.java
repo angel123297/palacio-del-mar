@@ -307,4 +307,89 @@ class RoleAndIdorSecurityTest {
                 realBookingService.getBookingByIdSecure("bk-target-1", legitimateHost)
         );
     }
+
+    @Test
+    @DisplayName("HostController + PDM-07: Anfitrión del marketplace (propertyId) puede hacer check-in y regenerar PIN criptográfico de 6 dígitos; otro host recibe 403")
+    void marketplaceHostCanCheckInAndRegenerateSecurePinOnOwnedPropertyOnly() throws Exception {
+        co.palaciodelmar.backend.repository.PromotionRepository promoRepo = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        co.palaciodelmar.backend.controller.HostController hostOpsController =
+                new co.palaciodelmar.backend.controller.HostController(
+                        bookingRepository, suiteRepository, bookingService, promoRepo, propertyRepository);
+
+        MockMvc opsMvc = MockMvcBuilders.standaloneSetup(hostOpsController)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        Booking marketplaceBooking = Booking.builder()
+                .id("bk-mkt-1")
+                .propertyId("prop-mkt-1")
+                .status("confirmed")
+                .build();
+        when(bookingRepository.findById("bk-mkt-1")).thenReturn(Optional.of(marketplaceBooking));
+
+        Property ownedProperty = Property.builder()
+                .id("prop-mkt-1")
+                .ownerId("host-owner-1")
+                .build();
+        when(propertyRepository.findById("prop-mkt-1")).thenReturn(Optional.of(ownedProperty));
+
+        // 1. Host atacante sin acceso a la propiedad -> 403 Forbidden
+        authenticateUser("host-attacker", "attacker@palacio.co", "HOST");
+        opsMvc.perform(post("/api/host/bookings/bk-mkt-1/checkin"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+
+        opsMvc.perform(post("/api/host/bookings/bk-mkt-1/regenerate-pin"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+
+        // 2. Host propietario legítimo (branches vacío, dueño por propertyId) -> 200 OK y PIN de 6 dígitos >= 100000
+        authenticateUser("host-owner-1", "owner@palacio.co", "HOST");
+        opsMvc.perform(post("/api/host/bookings/bk-mkt-1/checkin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        opsMvc.perform(post("/api/host/bookings/bk-mkt-1/regenerate-pin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.smartLockPin").isString());
+
+        assertNotNull(marketplaceBooking.getSmartLockPin());
+        assertEquals(6, marketplaceBooking.getSmartLockPin().length());
+        int pinValue = Integer.parseInt(marketplaceBooking.getSmartLockPin());
+        assertTrue(pinValue >= 100000 && pinValue <= 999999, "El PIN debe estar en el rango [100000, 999999]");
+    }
+
+    @Test
+    @DisplayName("PDM-08: AdminController.createPromotion usa PromotionRequest DTO validado e ignora mass assignment")
+    void adminCreatePromotionValidatesDtoAndPreventsMassAssignment() throws Exception {
+        authenticateUser("admin-1", "admin@palacio.co", "ADMIN");
+
+        // Payload inválido (descuento fuera de rango y título vacío) -> 400 Bad Request
+        adminMockMvc.perform(post("/api/admin/promotions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"\",\"discountPercent\":150}"))
+                .andExpect(status().isBadRequest());
+
+        // Payload válido con intento de inyectar id e isSample -> se ignoran campos internos
+        co.palaciodelmar.backend.model.Promotion savedPromo = co.palaciodelmar.backend.model.Promotion.builder()
+                .id("generated-id")
+                .title("Promo Caribe")
+                .branch("all")
+                .discountPercent(20)
+                .active(true)
+                .isSample(false)
+                .build();
+        when(adminService.createPromotion(any())).thenReturn(savedPromo);
+
+        adminMockMvc.perform(post("/api/admin/promotions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":\"hacked-id\",\"isSample\":true,\"title\":\"Promo Caribe\",\"branchId\":\"all\",\"discountPercent\":20}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.title").value("Promo Caribe"))
+                .andExpect(jsonPath("$.data.branch").value("all"))
+                .andExpect(jsonPath("$.data.isSample").value(false));
+    }
 }

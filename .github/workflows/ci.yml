@@ -78,3 +78,7 @@ jobs:
       - name: Build Angular Application
         working-directory: frontend-angular
         run: npm run build
+
+      - name: Run Frontend Unit Tests
+        working-directory: frontend-angular
+        run: npm test -- --watch=false

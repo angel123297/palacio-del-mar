@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "ab62fb64-5db6-4a24-827e-ff07a4b57bcb",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/home/angel19/Notas/palacio-del-mar/.archify/architecture-palacio-del-mar-20261016-105600/candidate.json",
+  "output": "/home/angel19/Notas/palacio-del-mar/docs/architecture.html",
+  "specification": {
+    "sha256": "70db1af116150c13d73d159015a16e4e154fcd80b3c557e5a32968e669a0fa65",
+    "bytes": 10040
+  },
+  "artifact": {
+    "sha256": "2862b3602cb0952d0418728632accb3c70218974ac7c0e73d6175c05a009b62f",
+    "bytes": 847302
+  }
+}

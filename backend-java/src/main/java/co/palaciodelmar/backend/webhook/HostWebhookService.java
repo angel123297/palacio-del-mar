@@ -49,6 +49,7 @@ public class HostWebhookService {
 
     public WebhookSubscriptionDTO createSubscription(User currentUser, WebhookSubscriptionRequest request) {
         Property property = assertPropertyOwnership(request.getPropertyId(), currentUser);
+        String validatedUrl = validateWebhookUrl(request.getUrl());
 
         String secret = "whsec_" + UUID.randomUUID().toString().replace("-", "");
         List<String> events = (request.getEvents() != null && !request.getEvents().isEmpty())
@@ -58,7 +59,7 @@ public class HostWebhookService {
         WebhookSubscription subscription = WebhookSubscription.builder()
                 .propertyId(property.getId())
                 .ownerId(property.getOwnerId())
-                .url(request.getUrl().trim())
+                .url(validatedUrl)
                 .secret(secret)
                 .events(events)
                 .description(request.getDescription())
@@ -80,7 +81,7 @@ public class HostWebhookService {
         assertSubscriptionOwnership(sub, currentUser);
 
         if (request.getUrl() != null && !request.getUrl().isBlank()) {
-            sub.setUrl(request.getUrl().trim());
+            sub.setUrl(validateWebhookUrl(request.getUrl()));
         }
         if (request.getEvents() != null) {
             sub.setEvents(request.getEvents());
@@ -95,6 +96,39 @@ public class HostWebhookService {
 
         WebhookSubscription saved = subscriptionRepository.save(sub);
         return toSubscriptionDTO(saved);
+    }
+
+    private String validateWebhookUrl(String rawUrl) {
+        if (rawUrl == null || rawUrl.isBlank()) {
+            throw new IllegalArgumentException("La URL del webhook es obligatoria");
+        }
+        String trimmed = rawUrl.trim();
+        java.net.URI uri;
+        try {
+            uri = java.net.URI.create(trimmed);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Formato de URL de webhook inválido");
+        }
+        String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase() : "";
+        if (!"http".equals(scheme) && !"https".equals(scheme)) {
+            throw new IllegalArgumentException("La URL del webhook debe usar protocolo http o https");
+        }
+        String host = uri.getHost() != null ? uri.getHost().toLowerCase() : "";
+        if (host.isBlank()) {
+            throw new IllegalArgumentException("La URL del webhook debe incluir un host válido");
+        }
+        Set<String> forbiddenHosts = Set.of(
+                "169.254.169.254", "metadata.google.internal", "0.0.0.0",
+                "mongo", "palacio-mongo", "redis", "palacio-redis", "mailpit", "palacio-mailpit"
+        );
+        if (forbiddenHosts.contains(host)) {
+            throw new IllegalArgumentException("URL de webhook no permitida: apunta a un servicio interno restringido");
+        }
+        int port = uri.getPort();
+        if (port == 27017 || port == 6379 || port == 1025) {
+            throw new IllegalArgumentException("Puerto de destino no permitido para webhooks");
+        }
+        return trimmed;
     }
 
     public void deleteSubscription(User currentUser, String subscriptionId) {

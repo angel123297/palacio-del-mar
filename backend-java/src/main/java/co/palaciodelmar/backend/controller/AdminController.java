@@ -74,7 +74,17 @@ public class AdminController {
     }
 
     @PostMapping("/promotions")
-    public ResponseEntity<ApiResponse<PromotionDTO>> createPromotion(@RequestBody Promotion promotion) {
+    public ResponseEntity<ApiResponse<PromotionDTO>> createPromotion(
+            @jakarta.validation.Valid @RequestBody co.palaciodelmar.backend.dto.PromotionRequest request) {
+        Promotion promotion = Promotion.builder()
+                .title(request.getTitle())
+                .branch(request.resolveBranch())
+                .discountPercent(request.getDiscountPercent())
+                .startDate(request.getStartDate())
+                .endDate(request.getEndDate())
+                .active(true)
+                .isSample(false)
+                .build();
         Promotion created = adminService.createPromotion(promotion);
         return ResponseEntity.ok(ApiResponse.ok("Promoción creada exitosamente", toPromotionDTO(created)));
     }
