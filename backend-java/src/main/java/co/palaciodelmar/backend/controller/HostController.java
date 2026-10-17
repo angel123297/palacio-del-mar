@@ -2,20 +2,25 @@ package co.palaciodelmar.backend.controller;
 
 import co.palaciodelmar.backend.dto.ApiResponse;
 import co.palaciodelmar.backend.dto.BookingDTO;
+import co.palaciodelmar.backend.dto.PromotionDTO;
+import co.palaciodelmar.backend.dto.PromotionRequest;
 import co.palaciodelmar.backend.model.Booking;
+import co.palaciodelmar.backend.model.Promotion;
+import co.palaciodelmar.backend.model.Property;
+import co.palaciodelmar.backend.model.Suite;
+import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.BookingRepository;
+import co.palaciodelmar.backend.repository.PromotionRepository;
+import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.BookingService;
-import co.palaciodelmar.backend.repository.PromotionRepository;
-import co.palaciodelmar.backend.model.Promotion;
-import co.palaciodelmar.backend.dto.PromotionRequest;
-import co.palaciodelmar.backend.dto.PromotionDTO;
-import java.util.Optional;
+import jakarta.validation.Valid;
 import lombok.Builder;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -23,18 +28,51 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/host")
-@RequiredArgsConstructor
 public class HostController {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final BookingRepository bookingRepository;
     private final SuiteRepository suiteRepository;
     private final BookingService bookingService;
     private final PromotionRepository promotionRepository;
+
+    @Autowired(required = false)
+    private PropertyRepository propertyRepository;
+
+    @Autowired
+    public HostController(
+            BookingRepository bookingRepository,
+            SuiteRepository suiteRepository,
+            BookingService bookingService,
+            PromotionRepository promotionRepository,
+            @Autowired(required = false) PropertyRepository propertyRepository
+    ) {
+        this.bookingRepository = bookingRepository;
+        this.suiteRepository = suiteRepository;
+        this.bookingService = bookingService;
+        this.promotionRepository = promotionRepository;
+        this.propertyRepository = propertyRepository;
+    }
+
+    public HostController(
+            BookingRepository bookingRepository,
+            SuiteRepository suiteRepository,
+            BookingService bookingService,
+            PromotionRepository promotionRepository
+    ) {
+        this(bookingRepository, suiteRepository, bookingService, promotionRepository, null);
+    }
 
     @Data
     @Builder
@@ -46,6 +84,77 @@ public class HostController {
         private long activeBookings;
     }
 
+    private List<String> getOwnedPropertyIds(User user) {
+        if (user == null || user.getId() == null || propertyRepository == null) {
+            return List.of();
+        }
+        List<Property> props = propertyRepository.findByOwnerId(user.getId());
+        if (props == null || props.isEmpty()) {
+            return List.of();
+        }
+        return props.stream().map(Property::getId).toList();
+    }
+
+    private List<String> getEffectiveBranches(User user) {
+        if (user == null || user.getBranches() == null) {
+            return List.of();
+        }
+        return user.getBranches();
+    }
+
+    private boolean hasAccessToBooking(User user, Booking booking) {
+        if (user == null || booking == null) {
+            return false;
+        }
+        if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+            return true;
+        }
+        if (booking.getPropertyId() != null && propertyRepository != null) {
+            Property prop = propertyRepository.findById(booking.getPropertyId()).orElse(null);
+            if (prop != null && user.getId() != null && user.getId().equals(prop.getOwnerId())) {
+                return true;
+            }
+        }
+        List<String> branches = getEffectiveBranches(user);
+        return booking.getBranch() != null && !branches.isEmpty() && branches.contains(booking.getBranch());
+    }
+
+    private boolean hasAccessToTargetScope(User user, String scopeId) {
+        if (user == null || scopeId == null || scopeId.isBlank()) {
+            return false;
+        }
+        if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+            return true;
+        }
+        List<String> branches = getEffectiveBranches(user);
+        if (branches.contains(scopeId)) {
+            return true;
+        }
+        List<String> propertyIds = getOwnedPropertyIds(user);
+        return propertyIds.contains(scopeId);
+    }
+
+    private List<Booking> loadAllHostBookings(List<String> branches, List<String> propertyIds) {
+        Map<String, Booking> merged = new LinkedHashMap<>();
+        if (!branches.isEmpty()) {
+            List<Booking> byBranches = bookingRepository.findByBranchIn(branches);
+            if (byBranches != null) {
+                for (Booking b : byBranches) {
+                    if (b != null && b.getId() != null) merged.put(b.getId(), b);
+                }
+            }
+        }
+        if (!propertyIds.isEmpty()) {
+            List<Booking> byProperties = bookingRepository.findByPropertyIdIn(propertyIds);
+            if (byProperties != null) {
+                for (Booking b : byProperties) {
+                    if (b != null && b.getId() != null) merged.put(b.getId(), b);
+                }
+            }
+        }
+        return new ArrayList<>(merged.values());
+    }
+
     @GetMapping("/bookings")
     public ResponseEntity<ApiResponse<Page<BookingDTO>>> getHostBookings(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -54,8 +163,11 @@ public class HostController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search) {
 
-        List<String> branches = userPrincipal.getUser().getBranches();
-        if (branches == null || branches.isEmpty()) {
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        List<String> branches = getEffectiveBranches(user);
+        List<String> propertyIds = getOwnedPropertyIds(user);
+
+        if (branches.isEmpty() && propertyIds.isEmpty()) {
             return ResponseEntity.ok(ApiResponse.ok(Page.empty()));
         }
 
@@ -63,50 +175,62 @@ public class HostController {
         int safeLimit = Math.min(Math.max(1, limit), 100);
         Pageable pageable = PageRequest.of(pageIndex, safeLimit);
 
-        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all") && (search == null || search.isBlank())) {
-            Page<BookingDTO> statusPage = bookingRepository.findByBranchInAndStatusIgnoreCase(branches, status, pageable)
-                    .map(bookingService::toDTO);
-            return ResponseEntity.ok(ApiResponse.ok(statusPage));
+        boolean hasStatusFilter = status != null && !status.isBlank() && !status.equalsIgnoreCase("all");
+        boolean hasSearchFilter = search != null && !search.isBlank();
+
+        // Ruta optimizada a nivel de MongoDB (PDM-04) cuando no hay búsqueda por texto libre y solo aplica un ámbito
+        if (!hasSearchFilter) {
+            if (!branches.isEmpty() && propertyIds.isEmpty()) {
+                Page<BookingDTO> pageResult = (hasStatusFilter
+                        ? bookingRepository.findByBranchInAndStatusIgnoreCase(branches, status, pageable)
+                        : bookingRepository.findByBranchIn(branches, pageable))
+                        .map(bookingService::toDTO);
+                return ResponseEntity.ok(ApiResponse.ok(pageResult));
+            }
+            if (branches.isEmpty() && !propertyIds.isEmpty()) {
+                Page<BookingDTO> pageResult = (hasStatusFilter
+                        ? bookingRepository.findByPropertyIdInAndStatusIgnoreCase(propertyIds, status, pageable)
+                        : bookingRepository.findByPropertyIdIn(propertyIds, pageable))
+                        .map(bookingService::toDTO);
+                return ResponseEntity.ok(ApiResponse.ok(pageResult));
+            }
         }
 
-        List<Booking> allHostBookings = bookingRepository.findByBranchIn(branches);
-        if ((status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) || (search != null && !search.isBlank())) {
-            List<BookingDTO> filtered = allHostBookings.stream()
-                    .filter(b -> {
-                        if (status != null && !status.isBlank() && !status.equalsIgnoreCase("all")) {
-                            if (b.getStatus() == null || !b.getStatus().equalsIgnoreCase(status)) return false;
-                        }
-                        if (search != null && !search.isBlank()) {
-                            String q = search.toLowerCase();
-                            boolean codeMatch = b.getBookingCode() != null && b.getBookingCode().toLowerCase().contains(q);
-                            boolean guestMatch = b.getGuestDetails() != null && (
-                                    (b.getGuestDetails().getFullName() != null && b.getGuestDetails().getFullName().toLowerCase().contains(q)) ||
-                                    (b.getGuestDetails().getEmail() != null && b.getGuestDetails().getEmail().toLowerCase().contains(q))
-                            );
-                            if (!codeMatch && !guestMatch) return false;
-                        }
-                        return true;
-                    })
-                    .map(bookingService::toDTO)
-                    .toList();
-            int start = (int) pageable.getOffset();
-            int end = Math.min(start + pageable.getPageSize(), filtered.size());
-            List<BookingDTO> subList = start <= end && start < filtered.size() ? filtered.subList(start, end) : java.util.Collections.emptyList();
-            return ResponseEntity.ok(ApiResponse.ok(new org.springframework.data.domain.PageImpl<>(subList, pageable, filtered.size())));
-        }
+        List<Booking> allHostBookings = loadAllHostBookings(branches, propertyIds);
+        List<BookingDTO> filtered = allHostBookings.stream()
+                .filter(b -> {
+                    if (hasStatusFilter) {
+                        if (b.getStatus() == null || !b.getStatus().equalsIgnoreCase(status)) return false;
+                    }
+                    if (hasSearchFilter) {
+                        String q = search.toLowerCase();
+                        boolean codeMatch = b.getBookingCode() != null && b.getBookingCode().toLowerCase().contains(q);
+                        boolean guestMatch = b.getGuestDetails() != null && (
+                                (b.getGuestDetails().getFullName() != null && b.getGuestDetails().getFullName().toLowerCase().contains(q)) ||
+                                (b.getGuestDetails().getEmail() != null && b.getGuestDetails().getEmail().toLowerCase().contains(q))
+                        );
+                        if (!codeMatch && !guestMatch) return false;
+                    }
+                    return true;
+                })
+                .map(bookingService::toDTO)
+                .toList();
 
-        Page<BookingDTO> bookings = bookingRepository.findByBranchIn(branches, pageable)
-                .map(bookingService::toDTO);
-
-        return ResponseEntity.ok(ApiResponse.ok(bookings));
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), filtered.size());
+        List<BookingDTO> subList = start <= end && start < filtered.size() ? filtered.subList(start, end) : Collections.emptyList();
+        return ResponseEntity.ok(ApiResponse.ok(new PageImpl<>(subList, pageable, filtered.size())));
     }
 
     @GetMapping({"/metrics", "/stats"})
     public ResponseEntity<ApiResponse<HostDashboardStats>> getHostMetrics(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        List<String> branches = userPrincipal.getUser().getBranches();
-        if (branches == null || branches.isEmpty()) {
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        List<String> branches = getEffectiveBranches(user);
+        List<String> propertyIds = getOwnedPropertyIds(user);
+
+        if (branches.isEmpty() && propertyIds.isEmpty()) {
             return ResponseEntity.ok(ApiResponse.ok(
                     HostDashboardStats.builder()
                             .totalSuites(0)
@@ -118,9 +242,27 @@ public class HostController {
             ));
         }
 
-        long totalSuites = suiteRepository.countByBranchIn(branches);
+        long totalSuites = 0;
+        if (!branches.isEmpty() && propertyIds.isEmpty()) {
+            totalSuites = suiteRepository.countByBranchIn(branches);
+        } else if (branches.isEmpty() && !propertyIds.isEmpty()) {
+            totalSuites = suiteRepository.countByPropertyIdIn(propertyIds);
+        } else {
+            Map<String, Suite> uniqueSuites = new LinkedHashMap<>();
+            for (String branchId : branches) {
+                List<Suite> sList = suiteRepository.findByBranchAndActiveTrue(branchId);
+                if (sList != null) sList.forEach(s -> uniqueSuites.put(s.getId(), s));
+            }
+            for (String propId : propertyIds) {
+                List<Suite> sList = suiteRepository.findByPropertyId(propId);
+                if (sList != null) sList.forEach(s -> uniqueSuites.put(s.getId(), s));
+            }
+            totalSuites = !uniqueSuites.isEmpty()
+                    ? uniqueSuites.size()
+                    : Math.max(suiteRepository.countByBranchIn(branches), suiteRepository.countByPropertyIdIn(propertyIds));
+        }
 
-        List<Booking> hostBookings = bookingRepository.findByBranchIn(branches);
+        List<Booking> hostBookings = loadAllHostBookings(branches, propertyIds);
         long totalBookings = hostBookings.size();
 
         BigDecimal totalRevenue = hostBookings.stream()
@@ -149,16 +291,17 @@ public class HostController {
     @PostMapping("/promotions")
     public ResponseEntity<ApiResponse<PromotionDTO>> createPromotion(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestBody PromotionRequest request) {
+            @Valid @RequestBody PromotionRequest request) {
 
-        List<String> branches = userPrincipal.getUser().getBranches();
-        if (branches == null || branches.isEmpty() || !branches.contains(request.getBranchId())) {
-            return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta sede"));
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        String targetBranch = request.resolveBranch();
+        if (!hasAccessToTargetScope(user, targetBranch)) {
+            return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta sede o propiedad"));
         }
 
         Promotion promo = Promotion.builder()
                 .title(request.getTitle())
-                .branch(request.getBranchId())
+                .branch(targetBranch)
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
                 .discountPercent(request.getDiscountPercent())
@@ -192,8 +335,8 @@ public class HostController {
         }
 
         Promotion promo = promoOpt.get();
-        List<String> branches = userPrincipal.getUser().getBranches();
-        if (branches == null || branches.isEmpty() || !branches.contains(promo.getBranch())) {
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        if (!hasAccessToTargetScope(user, promo.getBranch())) {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta promoción"));
         }
 
@@ -210,12 +353,12 @@ public class HostController {
             return ResponseEntity.notFound().build();
         }
         Booking booking = bookingOpt.get();
-        List<String> branches = userPrincipal.getUser().getBranches();
-        if (branches == null || branches.isEmpty() || !branches.contains(booking.getBranch())) {
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        if (!hasAccessToBooking(user, booking)) {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
-        bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_IN, userPrincipal.getUser().getId(), "Check-in by host");
+        bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_IN, user.getId(), "Check-in by host");
         bookingRepository.save(booking);
         return ResponseEntity.ok(ApiResponse.ok("Check-in registrado", null));
     }
@@ -229,8 +372,8 @@ public class HostController {
             return ResponseEntity.notFound().build();
         }
         Booking booking = bookingOpt.get();
-        List<String> branches = userPrincipal.getUser().getBranches();
-        if (branches == null || branches.isEmpty() || !branches.contains(booking.getBranch())) {
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        if (!hasAccessToBooking(user, booking)) {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
@@ -260,13 +403,13 @@ public class HostController {
             booking.setGuaranteeRefunded(true);
             booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto: $" + refundable);
         }
-        bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT, userPrincipal.getUser().getId(), "Check-out by host");
+        bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT, user.getId(), "Check-out by host");
         bookingRepository.save(booking);
         return ResponseEntity.ok(ApiResponse.ok("Check-out registrado", null));
     }
 
     @PostMapping("/bookings/{id}/regenerate-pin")
-    public ResponseEntity<ApiResponse<java.util.Map<String, String>>> regeneratePin(
+    public ResponseEntity<ApiResponse<Map<String, String>>> regeneratePin(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable String id) {
         Optional<Booking> bookingOpt = bookingRepository.findById(id);
@@ -274,15 +417,15 @@ public class HostController {
             return ResponseEntity.notFound().build();
         }
         Booking booking = bookingOpt.get();
-        List<String> branches = userPrincipal.getUser().getBranches();
-        if (branches == null || branches.isEmpty() || !branches.contains(booking.getBranch())) {
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        if (!hasAccessToBooking(user, booking)) {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
-        String newPin = String.format("%06d", new java.util.Random().nextInt(999999));
+        String newPin = String.format("%06d", SECURE_RANDOM.nextInt(100000, 1000000));
         booking.setSmartLockPin(newPin);
         bookingRepository.save(booking);
 
-        return ResponseEntity.ok(ApiResponse.ok(java.util.Map.of("smartLockPin", newPin)));
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("smartLockPin", newPin)));
     }
 }

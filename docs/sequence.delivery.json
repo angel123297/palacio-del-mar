@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "receiptId": "d3a26226-4d00-4e49-963d-7e9e105664ef",
+  "receiptId": "47cbecd1-1040-47d7-bfab-77dee9de1610",
   "status": "current",
   "command": "deliver",
   "type": "sequence",
   "input": "/home/angel19/Notas/palacio-del-mar/.archify/sequence-palacio-del-mar-20261016-125000/candidate.json",
   "output": "/home/angel19/Notas/palacio-del-mar/docs/sequence.html",
   "specification": {
-    "sha256": "b2783eb17900f06b16d60ae2f3a9dc1466c80a9d044c2a84ad1b7c1141d2d6ae",
-    "bytes": 9163
+    "sha256": "7904efd5eee17e12587d7579b8e3786dacce5f4037fe0818e727a593d1789085",
+    "bytes": 9404
   },
   "artifact": {
-    "sha256": "4b185fcff1885f8ced64cf5a64026289b9f6e2b989fd005b8ffddee80e3474cb",
-    "bytes": 833490
+    "sha256": "f2359b8eb0e05fd23f0dbf79380b4135eb76980b830c6f3826cc5d01e9f4e1e0",
+    "bytes": 833942
   }
 }
