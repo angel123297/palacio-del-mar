@@ -22,6 +22,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final co.palaciodelmar.backend.security.TokenBlacklistService tokenBlacklistService;
 
     @org.springframework.beans.factory.annotation.Value("${security.cookie.secure:false}")
     private boolean cookieSecure;
@@ -127,10 +128,19 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, Object>> logout(jakarta.servlet.http.HttpServletResponse httpResponse) {
+    public ResponseEntity<Map<String, Object>> logout(
+            jakarta.servlet.http.HttpServletRequest httpRequest,
+            jakarta.servlet.http.HttpServletResponse httpResponse
+    ) {
+        String token = extractToken(httpRequest);
+        if (token != null && !token.isBlank()) {
+            tokenBlacklistService.blacklistToken(token);
+        }
+
+        boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
         org.springframework.http.ResponseCookie springCookie = org.springframework.http.ResponseCookie.from("jwt", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(isSecure)
                 .path("/")
                 .maxAge(java.time.Duration.ZERO)
                 .sameSite("Lax")
@@ -139,8 +149,24 @@ public class AuthController {
 
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
-        body.put("message", "Sesión cerrada");
+        body.put("message", "Sesión cerrada exitosamente");
         return ResponseEntity.ok(body);
+    }
+
+    private String extractToken(jakarta.servlet.http.HttpServletRequest request) {
+        if (request == null) return null;
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("jwt".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
     }
 
     @PutMapping("/profile")
@@ -155,11 +181,30 @@ public class AuthController {
     @PutMapping("/change-password")
     public ResponseEntity<ApiResponse<String>> changePassword(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestBody Map<String, String> body
+            @RequestBody Map<String, String> body,
+            jakarta.servlet.http.HttpServletRequest httpRequest,
+            jakarta.servlet.http.HttpServletResponse httpResponse
     ) {
         String currentPassword = body != null ? body.get("currentPassword") : null;
         String newPassword = body != null ? body.get("newPassword") : null;
         authService.changePassword(principal.getUser().getId(), currentPassword, newPassword);
+
+        // Revocar token actual tras cambio exitoso de contraseña
+        String token = extractToken(httpRequest);
+        if (token != null && !token.isBlank()) {
+            tokenBlacklistService.blacklistToken(token);
+        }
+
+        boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
+        org.springframework.http.ResponseCookie springCookie = org.springframework.http.ResponseCookie.from("jwt", "")
+                .httpOnly(true)
+                .secure(isSecure)
+                .path("/")
+                .maxAge(java.time.Duration.ZERO)
+                .sameSite("Lax")
+                .build();
+        httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, springCookie.toString());
+
         return ResponseEntity.ok(ApiResponse.ok("Contraseña actualizada exitosamente", null));
     }
 }
