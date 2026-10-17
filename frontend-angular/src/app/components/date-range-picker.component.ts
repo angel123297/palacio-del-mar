@@ -14,8 +14,12 @@ const addDays = (iso: string, n: number) => {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 };
 const localToday = () => {
-  const t = new Date();
-  return toISO(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch {
+    const t = new Date();
+    return toISO(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  }
 };
 const nightsBetween = (a: string, b: string) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 const prettyDate = (iso: string) => {
