@@ -13,6 +13,45 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-10-18 — Revisión diaria de Vibe: gran jornada del 17 oct (Tareas 1-5) registrada; sin commits nuevos hoy
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`, todos del 17 oct por Gemini CLI; ninguno nuevo hoy 18 oct):**
+- [merge: integrar chore/security-audit-vibe en plan/marketplace-webhooks (resiliencia en pagos, anti-SSRF y diagramas)](https://github.com/angel123297/palacio-del-mar/commit/cd8e9921efa7fbca5532edf882e469f38d5b77f0)
+- [feat(security-docs): cierre integral PDM-04/07/08, unificación HostController con propertyId, playbook E2E y diagramas](https://github.com/angel123297/palacio-del-mar/commit/842442825713d99ba851a3d5b25ae90de105fa14)
+- [fix(qa): resolver 5 hallazgos de calidad y adoptar protocolo non-breaking-delivery](https://github.com/angel123297/palacio-del-mar/commit/5c1981dd46b2d931e784e40f43fab424354cf750)
+- [fix(marketplace): resolución de hallazgos residuales de Copilot (reembolso automático, filtros públicos, caché y ocupación multi-unidad)](https://github.com/angel123297/palacio-del-mar/commit/1b246dc4b58f6433125da43d9322d841152785e3)
+- [fix(core): resolver bean PaymentWebhookService, filtrar ocupación admin por APPROVED y cola de reembolsos](https://github.com/angel123297/palacio-del-mar/commit/85b3e705fb838775912ce3ae5c1674130b7cdfd8)
+- [fix(admin): validar respuesta de pasarela en resolveRefund](https://github.com/angel123297/palacio-del-mar/commit/716fa459e81eab38b86728770574b8c7affb4ff3)
+- [chore(docker): .dockerignore en frontend, backend y root](https://github.com/angel123297/palacio-del-mar/commit/e82b38bd704f0bb6590bf6bebcbc3c3c666ce3e2)
+- [fix(catalog): evict de caché Redis de suites en mutaciones de propiedades y habitaciones](https://github.com/angel123297/palacio-del-mar/commit/6283e8e7918cfbdbcba64cc0bafb1a8f2102285f)
+- [fix(core): 5 edge cases de deep-debug en bookings, PMS unblock, refunds, payouts y zona horaria Bogotá](https://github.com/angel123297/palacio-del-mar/commit/3c87d80ad1d7a12d204ad3fcc637e12e3349a98f)
+- [feat(security): blacklist JWT multi-tier durable, invalidación de sesión al cambiar contraseña y Actuator restringido](https://github.com/angel123297/palacio-del-mar/commit/e91f1eacb62c7e11e0d508a526ad0cbcf2808b44)
+- [feat(email): notificaciones transaccionales con Mailpit, vouchers PDF/ICS y alertas de anfitrión](https://github.com/angel123297/palacio-del-mar/commit/a1f64e209764cd8743715ae04d56e6f86029715e)
+- [feat(ical): feeds RFC 5545 para propiedades y suites con sync Airbnb/Booking y anti-IDOR](https://github.com/angel123297/palacio-del-mar/commit/10193ec2889944685305df6b5274530b71e68410)
+- [feat(voucher): comprobante imprimible con QR offline, PIN inteligente y calificación verificada](https://github.com/angel123297/palacio-del-mar/commit/33da3c55cb95c6ebfff785b7f7edebbdc888f7c0)
+- [docs: playbook de sustentación, métricas de QA y remoción de advertencias de deprecación](https://github.com/angel123297/palacio-del-mar/commit/c7be8e7867671e6cc931d3142ba48aadb817d3e1)
+
+**Pull requests abiertos:**
+- [#19 — Add GET /promotions endpoint for HostController](https://github.com/angel123297/palacio-del-mar/pull/19) (draft, base `plan/marketplace-webhooks`, actualizado hoy 18 oct). ⚠️ Posible redundancia: la bitácora del 17 oct ya registra la resolución de promociones de anfitrión (commits `1b246dc`/`8424428`, unificación de HostController con propertyId). Revisar si quedó obsoleto antes de fusionar.
+- [#18 — Remove mock Loyalty feature](https://github.com/angel123297/palacio-del-mar/pull/18) (draft, base `proyecto-angular-java` — rama protegida, NO tocar).
+- Drafts antiguos sin actividad con base `proyecto-angular-java`: [#12](https://github.com/angel123297/palacio-del-mar/pull/12), [#4](https://github.com/angel123297/palacio-del-mar/pull/4), [#3](https://github.com/angel123297/palacio-del-mar/pull/3) — sin cambios, base protegida.
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones) prácticamente completada. El trabajo del 17 oct corresponde a las "Tareas 1-5": blacklist JWT durable, emails Mailpit con vouchers PDF/ICS, iCal RFC 5545, voucher QR offline y playbook de sustentación. Fases 0-4 del PLAN_MARKETPLACE.md ya completadas.
+
+**Estado de seguridad (AUDITORIA_SEGURIDAD.md):**
+- ✅ PDM-01/02/03 corregidos desde el 16 oct; tests @Disabled activados (búsqueda de código sin resultados para `@Disabled` en backend).
+- ✅ PDM-04/07/08 cerrados en `8424428` (paginación de reservas de host, PIN cripto-seguro, mass assignment de Promotion, unificación HostController con propertyId).
+- PDM-06 atendido (Bearer + SameSite Lax). PDM-05 y PDM-09/10 sin confirmación explícita en commits o bitácora — pendiente verificación documental.
+
+**Tests esperados en verde:** backend **251/251** (39 archivos, 0 fallos/errores/omitidos según verificación local del 17 oct en `c7be8e7`) y frontend **13/13** + build de producción; CI verde en GitHub Actions. Vibe no ejecutó la suite localmente hoy; los conteos provienen de la cabecera actualizada por los agentes.
+
+**Riesgos / problemas:**
+- ⚠️ El conteo de 251 tests es reportado por los agentes (verificación local del 17 oct); Vibe no ha corrido la suite ni revisado la corrida de CI de hoy.
+- ⚠️ PR #19 (draft) posiblemente obsoleto frente a la unificación de HostController ya fusionada; riesgo de conflicto si se mergea sin rebase.
+- ⚠️ PRs #18, #12, #4, #3 apuntan a `proyecto-angular-java` (rama protegida): pendiente decisión de cerrarlos o re-basarlos.
+- ⚠️ PDM-05 y PDM-09/PDM-10 sin confirmación de cierre documentada.
+- ℹ️ Sin actividad nueva en la rama desde las 23:09 UTC del 17 oct hasta ahora.
+
 ### 📅 2026-10-17 — Revisión del commit `85b3e70` y validación de pasarela en reembolsos
 
 **Verificación ejecutada:** backend **197/197** tests (0 fallos, errores u omitidos); frontend build de producción correcto y **8/8** tests.
