@@ -24,16 +24,21 @@ Bienvenido al índice central de documentación y guías técnicas de **Palacio 
 ### 📝 3. Historial de Correcciones y Evolución Técnica
 - **[CORRECCIONES.md](CORRECCIONES.md):** Bitácora cronológica exhaustiva de auditorías de código, transiciones de seguridad, corrección de endpoints de anfitrión y refactorizaciones anti-regresión.
 
+### 📋 4. Planes, Calidad y Seguridad
+- **[PLAN_MARKETPLACE.md](PLAN_MARKETPLACE.md):** Especificación funcional del roadmap de 5 fases de transformación multi-anfitrión, modelo de datos y contratos de webhooks.
+- **[QA_REPORTE.md](QA_REPORTE.md):** Bitácora oficial de aseguramiento de calidad (QA), suite de pruebas automatizadas (256 pruebas backend + 13 frontend) y verificación de no-regresión.
+- **[AUDITORIA_SEGURIDAD.md](AUDITORIA_SEGURIDAD.md):** Matriz técnica de mitigaciones de seguridad: Anti-IDOR en endpoints de anfitrión, Anti-SSRF en webhooks, revocación duradera JWT y aleatoriedad criptográfica.
+
 ---
 
-## 📂 Enlaces a Reportes Raíz del Proyecto
+## 📂 Archivos Raíz del Repositorio
 
-Para mantener el estándar del repositorio, los reportes operativos principales se encuentran indexados desde aquí:
+Para mantener el estándar y máxima limpieza en la raíz del repositorio, únicamente residen los archivos fundamentales:
 
-| Documento | Ubicación | Propósito |
+| Archivo | Ubicación | Propósito |
 | :--- | :--- | :--- |
-| **README Principal** | `../README.md` | Guía de inicio rápido, despliegue Docker y credenciales. |
-| **Plan del Marketplace** | `../PLAN_MARKETPLACE.md` | Roadmap de 5 fases de transformación multi-anfitrión y contratos. |
-| **Reporte de QA y Tests** | `../QA_REPORTE.md` | Bitácora de calidad diaria y estado de suites (256 BE + 13 FE). |
-| **Auditoría de Seguridad** | `../AUDITORIA_SEGURIDAD.md` | Matriz de vulnerabilidades mitigadas (Anti-IDOR, Anti-SSRF, JWT Blacklist). |
-| **Reglas de Agentes IA** | `../AGENTS.md` | Directivas de desarrollo seguro (`non-breaking-delivery`) para IA. |
+| **README Principal** | `../README.md` | Guía de inicio rápido, arquitectura, despliegue Docker y credenciales. |
+| **Reglas de Agentes IA** | `../AGENTS.md` | Directivas operativas y protocolo `non-breaking-delivery` para IA. |
+| **Docker Compose** | `../docker-compose.yml` | Orquestación completa de servicios (MongoDB, Redis, Mailpit, Apps). |
+| **Variables de Entorno** | `../.env.example` | Plantilla de configuración segura sin secretos expuestos. |
+

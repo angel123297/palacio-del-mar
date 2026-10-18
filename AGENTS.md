@@ -1,7 +1,7 @@
 # AGENTS.md — Reglas para agentes de IA (Antigravity / Cursor / Claude Code)
 
 ## Contexto del proyecto
-Marketplace de hospedaje estilo Airbnb con comisión baja. Backend Spring Boot / Java 21 LTS, MongoDB, Redis opcional, JWT. Frontend Angular (standalone + signals). Actualmente monohotel ("Palacio del Mar"); se transforma en marketplace multi-anfitrión con webhooks siguiendo `PLAN_MARKETPLACE.md` (aprobado, rama `plan/marketplace-webhooks`).
+Marketplace de hospedaje estilo Airbnb con comisión baja. Backend Spring Boot / Java 21 LTS, MongoDB, Redis opcional, JWT. Frontend Angular (standalone + signals). Actualmente monohotel ("Palacio del Mar"); se transforma en marketplace multi-anfitrión con webhooks siguiendo `docs/PLAN_MARKETPLACE.md` (aprobado, rama `plan/marketplace-webhooks`).
 
 ## Comandos
 ```bash
@@ -26,7 +26,7 @@ docker compose up -d --build
 5. **Convenciones de código**: paquetes bajo `co.palaciodelmar.backend.{model,repository,service,controller,dto,security,config,scheduler}`; Lombok (`@Data @Builder`); respuestas envueltas en `ApiResponse`; DTOs para toda entrada/salida HTTP (nunca exponer entidades).
 6. **Secretos**: nunca al repo. Usar `.env` y `application.properties`/`application.yml` con `${VAR}`. Las firmas de webhook requieren secrets generados por suscripción.
 7. **Webhooks (contrato)**: firma HMAC-SHA256 del body en `X-Palacio-Signature`; `X-Palacio-Event-Id` para idempotencia; `X-Palacio-Timestamp` contra replay; reintentos 1m/5m/30m; registrar toda entrega en `WebhookDelivery`.
-8. **No hacer en esta entrega**: widget embebible, pasarela de pago real (Stripe/Wompi), chat de IA (feed iCal RFC 5545 ya integrado en `ICalService`). Está en `PLAN_MARKETPLACE.md` § Fase 4.
+8. **No hacer en esta entrega**: widget embebible, pasarela de pago real (Stripe/Wompi), chat de IA (feed iCal RFC 5545 ya integrado en `ICalService`). Está en `docs/PLAN_MARKETPLACE.md` § Fase 4.
 9. **Idioma**: nombres de código en inglés; comentarios y mensajes de usuario en español.
 10. **Protocolo Seguro de No-Regresión (`non-breaking-delivery`)**: Para toda adición o corrección, cumplir estrictamente el flujo de 4 fases: **1) CREAR** (diseño aislado), **2) TESTEAR PROFUNDAMENTE** (reproducir caso y asegurar cero roturas previas), **3) CONFIGURAR** (DTOs, contratos y seguridad), **4) IMPLEMENTAR** (cambio quirúrgico y validación total de suites).
 
@@ -39,5 +39,5 @@ docker compose up -d --build
 ## Definición de terminado (por fase)
 1. Tests de la fase en verde + los 89 existentes en verde.
 2. `npm run build` limpio.
-3. Criterios de aceptación de la fase (en `PLAN_MARKETPLACE.md`) cumplidos y demostrables.
+3. Criterios de aceptación de la fase (en `docs/PLAN_MARKETPLACE.md`) cumplidos y demostrables.
 4. PR a `plan/marketplace-webhooks` con descripción de qué cambió y cómo verificarlo.
