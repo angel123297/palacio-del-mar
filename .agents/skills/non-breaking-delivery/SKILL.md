@@ -49,4 +49,4 @@ flowchart LR
   # 3. Frontend: pruebas unitarias pasando
   cd frontend-angular && npm test -- --watch=false
   ```
-- **Documentación:** Actualizar la bitácora (`QA_REPORTE.md`), README o diagramas si el cambio impacta la arquitectura o el flujo lógico.
+- **Documentación:** Actualizar la bitácora (`docs/QA_REPORTE.md`), README o diagramas si el cambio impacta la arquitectura o el flujo lógico.

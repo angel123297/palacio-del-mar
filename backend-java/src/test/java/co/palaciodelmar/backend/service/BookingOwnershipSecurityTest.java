@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Tests intensivos de autorización (anti-IDOR) sobre BookingService.
- * Generados por la auditoría de seguridad del 2026-10-15 (ver /AUDITORIA_SEGURIDAD.md).
+ * Generados por la auditoría de seguridad del 2026-10-15 (ver docs/AUDITORIA_SEGURIDAD.md).
  * Todos deben pasar con el código actual; los que documentan bugs van @Disabled.
  */
 class BookingOwnershipSecurityTest {
