@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { DateRangePickerComponent } from '../../components/date-range-picker.component';
+import { DateRangePickerComponent } from '../../components/date-range-picker/date-range-picker.component';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { SearchStateService } from '../../services/search-state.service';

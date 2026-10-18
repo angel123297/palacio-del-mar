@@ -1,7 +1,7 @@
 import { Component, Input, Output, EventEmitter, OnChanges, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { DateRangePickerComponent } from '../date-range-picker.component';
+import { DateRangePickerComponent } from '../date-range-picker/date-range-picker.component';
 import { CustomGuestpickerComponent } from '../custom-guestpicker/custom-guestpicker.component';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
