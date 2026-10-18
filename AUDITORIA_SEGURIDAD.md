@@ -30,7 +30,7 @@
 
 **Adicional (Seguridad de Webhooks Salientes):** Protección **Anti-SSRF** implementada en `HostWebhookService` para bloquear direcciones loopback, redes privadas RFC1918 y metadatos cloud (`169.254.169.254`) (`HostWebhookServiceTest`).
 
-## 🧪 Suites de Tests de Seguridad y Regresión (175 Tests Activos, 0 `@Disabled`)
+## 🧪 Suites de Tests de Seguridad y Regresión (256 Tests Activos, 37 archivos, 0 `@Disabled`)
 
 | Archivo | Qué cubre | Estado |
 |---------|-----------|--------|
