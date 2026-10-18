@@ -11,5 +11,6 @@ import java.util.List;
 public interface PromotionRepository extends MongoRepository<Promotion, String> {
     List<Promotion> findByActiveTrue();
     List<Promotion> findByBranchAndActiveTrue(String branchId);
+    List<Promotion> findByBranchIn(List<String> branches);
     List<Promotion> findByActiveTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqual(LocalDate endDate, LocalDate startDate);
 }

@@ -35,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/host")
@@ -286,6 +287,37 @@ public class HostController {
                 .build();
 
         return ResponseEntity.ok(ApiResponse.ok(stats));
+    }
+
+    @GetMapping("/promotions")
+    public ResponseEntity<ApiResponse<List<PromotionDTO>>> getPromotions(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        List<String> branches = getEffectiveBranches(user);
+        List<String> propertyIds = getOwnedPropertyIds(user);
+
+        List<String> scopes = new ArrayList<>();
+        scopes.addAll(branches);
+        scopes.addAll(propertyIds);
+
+        if (scopes.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.ok(Collections.emptyList()));
+        }
+
+        List<PromotionDTO> promotions = promotionRepository.findByBranchIn(scopes).stream()
+                .map(p -> PromotionDTO.builder()
+                        .id(p.getId())
+                        .branch(p.getBranch())
+                        .title(p.getTitle())
+                        .discountPercent(p.getDiscountPercent())
+                        .startDate(p.getStartDate())
+                        .endDate(p.getEndDate())
+                        .active(p.getActive())
+                        .build())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ApiResponse.ok(promotions));
     }
 
     @PostMapping("/promotions")

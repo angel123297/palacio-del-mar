@@ -1387,7 +1387,7 @@ export class HostDashboardComponent implements OnInit {
   }
 
   fetchPromotions() {
-    this.api.get<any>('/promotions').subscribe({
+    this.api.get<any>('/host/promotions').subscribe({
       next: (res) => {
         const list = res.data || res || [];
         this.promotions.set(Array.isArray(list) ? list : []);

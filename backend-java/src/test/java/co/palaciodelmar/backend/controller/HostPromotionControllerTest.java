@@ -117,6 +117,48 @@ class HostPromotionControllerTest {
     }
 
     @Test
+    @DisplayName("Host puede listar las promociones de sus propiedades")
+    void hostCanListPromotionsOfOwnedProperties() {
+        User hostUser = User.builder()
+                .id("host-1")
+                .role("HOST")
+                .branches(List.of("branch-1"))
+                .build();
+        UserPrincipal principal = new UserPrincipal(hostUser);
+
+        Property ownedProp = Property.builder()
+                .id("prop-mine")
+                .ownerId("host-1")
+                .name("Mi Hotel")
+                .build();
+        when(propertyRepository.findByOwnerId("host-1")).thenReturn(List.of(ownedProp));
+
+        Promotion promo1 = Promotion.builder()
+                .id("promo-1")
+                .title("Promo 1")
+                .branch("branch-1")
+                .discountPercent(10)
+                .build();
+
+        Promotion promo2 = Promotion.builder()
+                .id("promo-2")
+                .title("Promo 2")
+                .branch("prop-mine")
+                .discountPercent(20)
+                .build();
+
+        when(promotionRepository.findByBranchIn(anyList())).thenReturn(List.of(promo1, promo2));
+
+        ResponseEntity<ApiResponse<List<PromotionDTO>>> response = hostController.getPromotions(principal);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        List<PromotionDTO> promotions = response.getBody().getData();
+        assertEquals(2, promotions.size());
+        assertEquals("Promo 1", promotions.get(0).getTitle());
+        assertEquals("Promo 2", promotions.get(1).getTitle());
+    }
+
+    @Test
     @DisplayName("Host no puede crear promoción con fecha fin anterior a fecha inicio (retorna 400)")
     void hostCannotCreatePromotionWithInvalidDates() {
         User hostUser = User.builder()
