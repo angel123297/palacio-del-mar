@@ -38,7 +38,6 @@ Para mantener el estándar y máxima limpieza en la raíz del repositorio, únic
 | Archivo | Ubicación | Propósito |
 | :--- | :--- | :--- |
 | **README Principal** | `../README.md` | Guía de inicio rápido, arquitectura, despliegue Docker y credenciales. |
-| **Reglas de Agentes IA** | `../AGENTS.md` | Directivas operativas y protocolo `non-breaking-delivery` para IA. |
 | **Docker Compose** | `../docker-compose.yml` | Orquestación completa de servicios (MongoDB, Redis, Mailpit, Apps). |
 | **Variables de Entorno** | `../.env.example` | Plantilla de configuración segura sin secretos expuestos. |
 

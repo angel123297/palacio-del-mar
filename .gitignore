@@ -28,3 +28,8 @@ frontend-angular/dist/
 graphify-out/
 *.delivery.json
 
+# AI tools and agent instructions
+.agents/
+AGENTS.md
+
+
