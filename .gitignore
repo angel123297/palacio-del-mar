@@ -25,3 +25,4 @@ frontend-angular/dist/
 
 # Archify local diagram output
 .archify/
+graphify-out/
