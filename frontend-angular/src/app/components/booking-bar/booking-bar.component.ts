@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { SearchStateService } from '../../services/search-state.service';
 import { Branch, ApiResponse } from '../../models/types';
-import { DateRangePickerComponent } from '../date-range-picker.component';
+import { DateRangePickerComponent } from '../date-range-picker/date-range-picker.component';
 
 @Component({
   selector: 'app-booking-bar',

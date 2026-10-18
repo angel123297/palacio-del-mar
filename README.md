@@ -92,11 +92,14 @@ npm test -- --watch=false
 ---
 
 ## 📊 Diagramas Interactivos, Sustentación y Auditorías
+- 📚 **Índice Completo de Documentación:** **[docs/README.md](docs/README.md)**
 - 🏛️ **Diagrama Interactivo de Arquitectura:** **[docs/architecture.html](docs/architecture.html)**
 - 🔄 **Diagrama Interactivo de Secuencia Lógica:** **[docs/sequence.html](docs/sequence.html)**
 - 🎬 **Playbook de Demostración E2E (Sustentación):** **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)**
-- 📝 **Historial de Correcciones:** **[docs/CORRECCIONES.md](docs/CORRECCIONES.md)**
+- 📋 **Plan de Marketplace & Webhooks:** **[PLAN_MARKETPLACE.md](PLAN_MARKETPLACE.md)**
+- 🧪 **Reporte de Calidad y QA:** **[QA_REPORTE.md](QA_REPORTE.md)**
 - 🔒 **Auditoría de Seguridad:** **[AUDITORIA_SEGURIDAD.md](AUDITORIA_SEGURIDAD.md)**
+- 📝 **Historial de Correcciones:** **[docs/CORRECCIONES.md](docs/CORRECCIONES.md)**
 
 ---
 
