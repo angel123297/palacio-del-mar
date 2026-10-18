@@ -2,7 +2,6 @@ import { Component, OnInit, ChangeDetectorRef, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
-import { LoyaltyService } from '../../services/loyalty.service';
 import { finalize } from 'rxjs';
 
 @Component({
@@ -20,21 +19,6 @@ import { finalize } from 'rxjs';
         </div>
 
         <div *ngIf="!loading">
-          <!-- The Palace Club Loyalty Card -->
-          <div style="background: linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(0,0,0,0.8) 100%); border: 1px solid rgba(212,175,55,0.3); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; text-align: center;">
-            <h2 style="font-family: var(--font-title); font-size: 1.5rem; color: var(--gold); margin-bottom: 0.5rem; letter-spacing: 2px; text-transform: uppercase;">The Palace Club</h2>
-            <p style="color: #ccc; font-size: 0.95rem; margin-bottom: 1.5rem;">Nivel Actual: <strong style="color: #fff; font-size: 1.1rem;">{{ loyalty.status().tier }}</strong></p>
-            
-            <div style="background: rgba(255,255,255,0.1); border-radius: 20px; height: 12px; width: 100%; margin-bottom: 1rem; overflow: hidden; position: relative;">
-              <div style="background: var(--gold); height: 100%; transition: width 1s ease-in-out;" [style.width.%]="loyalty.progressPercentage()"></div>
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #aaa;">
-              <span>{{ loyalty.status().points | number }} pts</span>
-              <span>Siguiente Nivel: {{ loyalty.status().nextTierPoints | number }} pts</span>
-            </div>
-          </div>
-
           <!-- Profile Edit Form -->
           <form [formGroup]="profileForm" (ngSubmit)="updateProfile()" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 2rem; margin-bottom: 2rem;">
             <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.2rem; border-bottom: 1px solid rgba(212,175,55,0.2); padding-bottom: 0.5rem;">Datos Personales</h3>
@@ -101,8 +85,7 @@ export class ProfileComponent implements OnInit {
   constructor(
     private api: ApiService,
     private fb: FormBuilder,
-    private cdr: ChangeDetectorRef,
-    public loyalty: LoyaltyService
+    private cdr: ChangeDetectorRef
   ) {
     this.profileForm = this.fb.group({
       name: ['', Validators.required],
