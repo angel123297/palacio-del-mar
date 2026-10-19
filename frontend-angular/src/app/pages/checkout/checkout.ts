@@ -347,7 +347,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
           if (!this.booking.nights) {
             const d1 = new Date(this.booking.checkIn);
             const d2 = new Date(this.booking.checkOut);
-            this.booking.nights = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24)));
+            const computedNights = Math.round((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24));
+            this.booking.nights = isNaN(computedNights) || computedNights < 1 ? 1 : computedNights;
           }
           this.initTimer();
         }
@@ -413,6 +414,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   processPSE() {
     if (!this.pseBank) return;
+    if (this.timerSeconds <= 0) {
+      this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+      this.cdr.detectChanges();
+      return;
+    }
     this.processing = true;
     this.processingMessage = `Redirigiendo a pasarela ACH Colombia (${this.pseBank})...`;
     this.errorMsg = '';
@@ -428,6 +434,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   processPayPal() {
+    if (this.timerSeconds <= 0) {
+      this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+      this.cdr.detectChanges();
+      return;
+    }
     this.processing = true;
     this.processingMessage = 'Conectando con ventana segura de PayPal...';
     this.errorMsg = '';
@@ -465,6 +476,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   processPayment() {
+    if (this.timerSeconds <= 0) {
+      this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+      this.cdr.detectChanges();
+      return;
+    }
     if (this.paymentForm.invalid || !this.booking) {
       this.paymentForm.markAllAsTouched();
       return;
@@ -521,8 +537,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const currentBooking = this.booking;
     const targetBookingId = currentBooking.id || currentBooking._id || this.bookingId;
 
-    const rawNumber = methodPayload.cardNumber || '';
-    const paymentToken = rawNumber ? `tok_${rawNumber.trim()}` : 'tok_test';
+    const rawNumber = (methodPayload.cardNumber || '').trim();
+    const paymentToken = rawNumber ? `tok_${rawNumber.slice(-4)}` : 'tok_test';
 
     const checkoutPayload = {
       bookingId: targetBookingId,

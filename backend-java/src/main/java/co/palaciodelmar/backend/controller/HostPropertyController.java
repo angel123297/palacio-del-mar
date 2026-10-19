@@ -170,11 +170,15 @@ public class HostPropertyController {
         syncInfo.put("propertyIcalUrl", "/api/properties/" + property.getId() + "/calendar.ics");
 
         List<Suite> suites = propertyService.getPropertySuitesForHost(id, userId, isAdmin);
-        List<java.util.Map<String, String>> suiteFeeds = suites.stream().map(s -> java.util.Map.of(
-                "suiteId", s.getId(),
-                "suiteName", s.getName(),
-                "icalUrl", "/api/suites/" + s.getId() + "/calendar.ics"
-        )).toList();
+        List<java.util.Map<String, String>> suiteFeeds = suites.stream().map(s -> {
+            String suiteId = s.getId() != null ? s.getId().trim() : "";
+            String icalUrl = suiteId.isEmpty() ? "" : "/api/suites/" + suiteId + "/calendar.ics";
+            return java.util.Map.of(
+                    "suiteId", suiteId,
+                    "suiteName", s.getName() != null ? s.getName() : "Suite",
+                    "icalUrl", icalUrl
+            );
+        }).toList();
         syncInfo.put("suiteFeeds", suiteFeeds);
         syncInfo.put("instructions", java.util.Map.of(
                 "airbnb", "En Airbnb: Anuncios > Precios y disponibilidad > Sincronización del calendario > Exportar calendario.",

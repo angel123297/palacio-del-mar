@@ -32,4 +32,8 @@ export class ApiService {
   delete<T>(path: string): Observable<T> {
     return this.http.delete<T>(`${environment.apiUrl}${path}`).pipe(timeout(this.TIMEOUT_MS));
   }
+
+  getBlob(path: string): Observable<Blob> {
+    return this.http.get(`${environment.apiUrl}${path}`, { responseType: 'blob' }).pipe(timeout(this.TIMEOUT_MS));
+  }
 }

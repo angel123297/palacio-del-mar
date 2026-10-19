@@ -1455,7 +1455,7 @@ export class HostDashboardComponent implements OnInit {
     const id = b.id || b._id;
     this.api.post<any>(`/host/bookings/${id}/checkin`, {}).subscribe({
       next: () => {
-        b.checkedIn = true;
+        this.bookings.update(list => list.map(item => (item.id || item._id) === id ? { ...item, checkedIn: true } : item));
         this.fetchMetrics();
         this.actionMessage.set(`Check-in registrado con éxito para ${b.guestName || 'el huésped'}.`);
         setTimeout(() => this.actionMessage.set(''), 4000);
@@ -1471,8 +1471,7 @@ export class HostDashboardComponent implements OnInit {
     const id = b.id || b._id;
     this.api.post<any>(`/host/bookings/${id}/checkout`, {}).subscribe({
       next: () => {
-        b.checkedOut = true;
-        b.status = 'completed';
+        this.bookings.update(list => list.map(item => (item.id || item._id) === id ? { ...item, checkedOut: true, status: 'completed' } : item));
         this.fetchMetrics();
         this.actionMessage.set('Check-out completado. Habitación liberada para aseo.');
         setTimeout(() => this.actionMessage.set(''), 4000);
@@ -1490,9 +1489,12 @@ export class HostDashboardComponent implements OnInit {
       next: (res) => {
         const newPin = res?.smartLockPin || res?.data?.smartLockPin;
         if (newPin) {
-          b.smartLockPin = newPin;
+          this.bookings.update(list => list.map(item => (item.id || item._id) === id ? { ...item, smartLockPin: newPin } : item));
           this.actionMessage.set(`PIN regenerado exitosamente: ${newPin}`);
           setTimeout(() => this.actionMessage.set(''), 4000);
+        } else {
+          this.actionError.set('No se recibió el nuevo PIN del servidor.');
+          setTimeout(() => this.actionError.set(''), 4000);
         }
       },
       error: (err) => {

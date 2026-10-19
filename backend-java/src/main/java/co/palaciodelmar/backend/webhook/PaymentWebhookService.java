@@ -125,7 +125,16 @@ public class PaymentWebhookService {
                 .processedAt(Instant.now())
                 .details("Procesado exitosamente para intentId: " + data.getIntentId())
                 .build();
-        processedWebhookEventRepository.save(record);
+        try {
+            processedWebhookEventRepository.save(record);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            log.info("Evento de webhook registrado concurrentemente (idempotencia): {}", eventId);
+            return Map.of(
+                    "status", "already_processed",
+                    "idempotent", true,
+                    "eventId", eventId
+            );
+        }
 
         return Map.of(
                 "status", "processed",
@@ -210,10 +219,12 @@ public class PaymentWebhookService {
         paymentRepository.save(payment);
 
         BigDecimal currentPaid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
-        BigDecimal newPaid = currentPaid.add(payment.getAmount());
+        BigDecimal paymentAmount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+        BigDecimal newPaid = currentPaid.add(paymentAmount);
         booking.setPaidAmount(newPaid);
 
-        BigDecimal balance = booking.getTotalPrice().subtract(newPaid);
+        BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : newPaid;
+        BigDecimal balance = totalPrice.subtract(newPaid);
         booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {

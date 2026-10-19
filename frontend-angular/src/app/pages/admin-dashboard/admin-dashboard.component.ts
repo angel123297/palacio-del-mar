@@ -603,7 +603,7 @@ export class AdminDashboardComponent implements OnInit {
           this.currentPage.set((payload.number || 0) + 1);
           this.totalPages.set(payload.totalPages || 1);
           this.totalItems.set(payload.totalElements || 0);
-        } else if (payload && payload.data && !Array.isArray(payload)) {
+        } else if (payload && Array.isArray(payload.data) && !Array.isArray(payload)) {
           this.bookings.set(payload.data);
           this.currentPage.set(payload.page || 1);
           this.totalPages.set(payload.totalPages || 1);
@@ -679,6 +679,10 @@ export class AdminDashboardComponent implements OnInit {
     this.api.delete<any>(`/admin/promotions/${id}`).subscribe({
       next: () => {
         this.fetchPromotions();
+      },
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al eliminar la promoción');
+        setTimeout(() => this.actionError.set(''), 5000);
       }
     });
   }
@@ -700,7 +704,20 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   exportCSV() {
-    window.location.href = '/api/admin/bookings/export-csv';
+    this.api.getBlob('/admin/bookings/export-csv').subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'reservas-palacio-del-mar.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => {
+        this.actionError.set('Error al exportar el archivo CSV de reservas.');
+        setTimeout(() => this.actionError.set(''), 5000);
+      }
+    });
   }
 
   getBranchName(id?: string): string {
