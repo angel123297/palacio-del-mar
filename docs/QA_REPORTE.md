@@ -13,6 +13,34 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-10-19 — Revisión diaria de Vibe (depuración intensiva cerrada, 263 tests backend esperados)
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`, todos de Gemini CLI del 18–19 oct):**
+- [fix: cerrar depuración intensiva de marketplace (concurrencia en confirmIntent, idempotencia de webhooks, sanitización QR/PAN, autenticación CSV, inmutabilidad de Signals, -Xshare:off en Surefire y 7 pruebas intensivas de regresión)](https://github.com/angel123297/palacio-del-mar/commit/b1a2849106faf35fcd6091903ca2f81af9057927)
+- [chore: remover archivos y directivas de IA del repositorio y agregar a .gitignore](https://github.com/angel123297/palacio-del-mar/commit/df2c2e01681b2e1ff4b217ff16e9cf1599bd108c)
+- [refactor(docs): unificar reportes tecnicos en docs/ y limpiar raiz del repositorio](https://github.com/angel123297/palacio-del-mar/commit/65d9b5ff6757dabbe977404f436065b7bea6932c)
+- [refactor(org): organizar DateRangePicker en subdirectorio dedicado y anadir docs/README.md central](https://github.com/angel123297/palacio-del-mar/commit/108d4e47aecc55563149460da18aeeb2afa1482c)
+- [fix(qa): resolver inconsistencias de contratos, endpoints de host, cabeceras de integracion y metricas (GET /api/host/promotions anti-IDOR, cabeceras duales X-API-KEY / X-Palacio-Api-Key, 256/256 tests backend en verde)](https://github.com/angel123297/palacio-del-mar/commit/876d3ced0425924944bde4b69294e81eb82a3d2e)
+
+**Pull requests abiertos:**
+- [#22 — feat(admin): implement missing bookings export and approve endpoints](https://github.com/angel123297/palacio-del-mar/pull/22) (draft, base `plan/marketplace-webhooks`, actualizado hoy 19 oct). Pendiente de revisión y fusión.
+- [#20 — Plan/marketplace webhooks](https://github.com/angel123297/palacio-del-mar/pull/20) (abierto, `plan/marketplace-webhooks` → `proyecto-angular-java`, sincronizado con b1a2849). **PR de entrega a la rama original; no fusionar sin decisión explícita del usuario.**
+- [#19 — Add GET /promotions endpoint for HostController](https://github.com/angel123297/palacio-del-mar/pull/19) (draft, base `plan/marketplace-webhooks`). Ya resuelto vía `GET /api/host/promotions` en 876d3ced; candidata a cerrar.
+- Drafts con base `proyecto-angular-java` (rama protegida, NO tocar): [#21](https://github.com/angel123297/palacio-del-mar/pull/21), [#18](https://github.com/angel123297/palacio-del-mar/pull/18), [#12](https://github.com/angel123297/palacio-del-mar/pull/12), [#4](https://github.com/angel123297/palacio-del-mar/pull/4), [#3](https://github.com/angel123297/palacio-del-mar/pull/3).
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones) — funcionalmente implementada; la actividad actual es depuración intensiva y orden del repositorio (post-Fase 5).
+
+**Bugs PDM-01/02/03 y tests @Disabled:** confirmados como corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`). Hoy b1a284 agrega 7 pruebas intensivas de regresión adicionales.
+
+**Tests esperados en verde:** 263 de backend (256 verificados el 18 oct + 7 nuevas pruebas intensivas de b1a284, conteo nuevo reportado por agente, **pendiente de verificación local/CI**) y 13 de frontend.
+
+**Riesgos / problemas detectados:**
+- ⚠️ El conteo de 263 tests proviene del mensaje de commit del agente; verificar la corrida de CI (`.github/workflows/ci.yml`) antes de dar por buena la cifra.
+- ⚠️ El commit df2c2e0 **removió `AGENTS.md` y directivas de IA del repositorio** (agregadas a `.gitignore`). Si las reglas para agentes siguen siendo requeridas, deben restaurarse fuera del repo o des-ignorar el archivo.
+- ⚠️ Reorganización de docs: `QA_REPORTE.md`, `AUDITORIA_SEGURIDAD.md`, `CORRECCIONES.md` y `PLAN_MARKETPLACE.md` ahora viven en `docs/`; verificar que los enlaces internos y el workflow de la tarea diaria apunten a la nueva ruta.
+- ⚠️ Acumulación de PRs draft sin triaje (#22, #19, #21, #18, #12, #4, #3): definir cerrar/re-basificar para no bloquear el flujo.
+- ⚠️ #20 apunta a `proyecto-angular-java` (rama original del usuario): cualquier fusión requiere aprobación explícita del usuario.
+
 ### 📅 2026-10-18 — Auditoría exhaustiva Vibe post-corrección de inconsistencias (256 tests backend + 13 tests frontend)
 
 **Verificación ejecutada:** backend **256/256** tests (37 archivos de pruebas, 0 fallos, 0 errores, 0 omitidos); frontend build de producción limpio (`dist/palacio-del-mar-web`) y **13/13** tests en Vitest.
