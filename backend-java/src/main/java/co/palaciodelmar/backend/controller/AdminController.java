@@ -65,6 +65,21 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok("Estado actualizado exitosamente", bookingService.toDTO(booking)));
     }
 
+    @PostMapping("/bookings/{id}/approve")
+    public ResponseEntity<ApiResponse<BookingDTO>> approveBooking(@PathVariable String id) {
+        Booking booking = adminService.updateBookingStatus(id, "CONFIRMED");
+        return ResponseEntity.ok(ApiResponse.ok("Reserva aprobada exitosamente", bookingService.toDTO(booking)));
+    }
+
+    @GetMapping("/bookings/export-csv")
+    public ResponseEntity<byte[]> exportBookingsToCsv() {
+        byte[] csvData = adminService.exportBookingsToCsv();
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"reservas-palacio-del-mar.csv\"")
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv"))
+                .body(csvData);
+    }
+
     @GetMapping("/promotions")
     public ResponseEntity<ApiResponse<List<PromotionDTO>>> getAllPromotions() {
         List<PromotionDTO> promotions = adminService.getAllPromotions().stream()

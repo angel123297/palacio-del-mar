@@ -98,6 +98,40 @@ public class AdminService {
         return bookingRepository.findAll(pageable);
     }
 
+    public byte[] exportBookingsToCsv() {
+        List<Booking> allBookings = bookingRepository.findAll();
+        StringBuilder csv = new StringBuilder();
+        csv.append("ID,Codigo,Huesped,Email,Check-In,Check-Out,Noches,Habitacion,Estado,Total,Moneda\n");
+        for (Booking b : allBookings) {
+            String guestName = (b.getGuestDetails() != null && b.getGuestDetails().getFullName() != null) ? b.getGuestDetails().getFullName() : "";
+            String guestEmail = (b.getGuestDetails() != null && b.getGuestDetails().getEmail() != null) ? b.getGuestDetails().getEmail() : "";
+
+            // Escape comas en campos de texto
+            guestName = guestName.replace(",", " ");
+            guestEmail = guestEmail.replace(",", " ");
+
+            long nights = 0;
+            if (b.getCheckIn() != null && b.getCheckOut() != null) {
+                nights = java.time.temporal.ChronoUnit.DAYS.between(b.getCheckIn(), b.getCheckOut());
+            }
+
+            csv.append(String.format("%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,%s\n",
+                    b.getId(),
+                    b.getBookingCode() != null ? b.getBookingCode() : "",
+                    guestName,
+                    guestEmail,
+                    b.getCheckIn() != null ? b.getCheckIn().toString() : "",
+                    b.getCheckOut() != null ? b.getCheckOut().toString() : "",
+                    nights,
+                    b.getSuite() != null ? b.getSuite() : "",
+                    b.getStatus() != null ? b.getStatus() : "",
+                    b.getTotalPrice() != null ? b.getTotalPrice().toString() : "0",
+                    "COP"
+            ));
+        }
+        return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     public Booking updateBookingStatus(String bookingId, String newStatus) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
