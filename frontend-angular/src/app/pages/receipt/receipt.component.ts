@@ -153,6 +153,10 @@ import { renderSVG } from '../../utils/qr.js';
                       rows="3"
                       style="width: 100%; border: 1px solid #ddd; border-radius: 4px; padding: 8px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box;"></textarea>
 
+            <div *ngIf="reviewError" style="color: #e74c3c; font-size: 0.85rem; margin-top: 8px;">
+              {{ reviewError }}
+            </div>
+
             <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
               <button (click)="submitReview()" 
                       [disabled]="reviewSubmitting || !reviewComment.trim()"
@@ -209,6 +213,7 @@ export class ReceiptComponent implements OnInit {
   reviewComment = '';
   reviewSubmitting = false;
   reviewSubmitted = false;
+  reviewError = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -241,8 +246,10 @@ export class ReceiptComponent implements OnInit {
   generateQr(): void {
     if (!this.booking) return;
     try {
-      const code = this.booking.bookingCode || this.booking.id || this.booking._id || 'RESERVA';
-      const pin = this.booking.smartLockPin || 'PENDIENTE';
+      const rawCode = String(this.booking.bookingCode || this.booking.id || this.booking._id || 'RESERVA');
+      const rawPin = String(this.booking.smartLockPin || 'PENDIENTE');
+      const code = rawCode.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'RESERVA';
+      const pin = rawPin.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 16) || 'PENDIENTE';
       const payload = `PDM:BK:${code}:PIN:${pin}`;
       const svg = renderSVG(payload, { border: 1 });
       this.qrSvgSafe = this.sanitizer.bypassSecurityTrustHtml(svg);
@@ -287,8 +294,9 @@ export class ReceiptComponent implements OnInit {
   }
 
   submitReview(): void {
-    if (!this.bookingId || !this.reviewComment.trim()) return;
+    if (this.reviewSubmitting || !this.bookingId || !this.reviewComment.trim()) return;
     this.reviewSubmitting = true;
+    this.reviewError = '';
 
     this.api.post('/reviews/verified', {
       bookingId: this.booking._id || this.booking.id || this.bookingId,
@@ -300,8 +308,9 @@ export class ReceiptComponent implements OnInit {
         this.reviewSubmitted = true;
         this.cdr.detectChanges();
       },
-      error: () => {
+      error: (err) => {
         this.reviewSubmitting = false;
+        this.reviewError = err?.error?.message || 'No se pudo enviar la reseña. Inténtalo de nuevo.';
         this.cdr.detectChanges();
       }
     });

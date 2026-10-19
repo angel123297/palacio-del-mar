@@ -1,7 +1,6 @@
 package co.palaciodelmar.backend.webhook;
 
 import co.palaciodelmar.backend.event.BookingDomainEvent;
-import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.WebhookDelivery;
 import co.palaciodelmar.backend.model.WebhookSubscription;
 import co.palaciodelmar.backend.repository.WebhookDeliveryRepository;
@@ -22,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@SuppressWarnings("unchecked")
 class WebhookDispatcherTest {
 
     private WebhookSubscriptionRepository subscriptionRepository;

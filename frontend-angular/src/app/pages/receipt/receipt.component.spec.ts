@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { SecurityContext } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { ReceiptComponent } from './receipt.component';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, ActivatedRoute, convertToParamMap } from '@angular/router';
 import { ApiService } from '../../services/api.service';
-import { of } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 describe('ReceiptComponent', () => {
   let component: ReceiptComponent;
@@ -69,8 +71,63 @@ describe('ReceiptComponent', () => {
     expect(qrContainer).toBeTruthy();
   });
 
+  it('debe eliminar caracteres peligrosos del código de reserva y PIN antes de generar el QR', () => {
+    component.booking = {
+      ...mockBooking,
+      bookingCode: '<img src=x onerror=alert(1)>AB #1',
+      smartLockPin: '12<script>alert(1)</script>#34'
+    };
+
+    component.generateQr();
+    const sanitizer = TestBed.inject(DomSanitizer);
+    const generatedFromUntrustedValues = sanitizer.sanitize(SecurityContext.HTML, component.qrSvgSafe);
+
+    component.booking = {
+      ...mockBooking,
+      bookingCode: 'imgsrcxonerroralert1AB1',
+      smartLockPin: '12scriptalert1script34'
+    };
+    component.generateQr();
+
+    expect(sanitizer.sanitize(SecurityContext.HTML, component.qrSvgSafe)).toBe(
+      generatedFromUntrustedValues
+    );
+  });
+
   it('debe permitir calificar la estadía cuando el estado es checked_out', () => {
     expect(component.canLeaveReview).toBe(true);
+  });
+
+  it('debe mostrar el error HTTP devuelto al enviar una reseña', () => {
+    apiServiceMock.post.mockReturnValue(
+      throwError(() => ({ error: { message: 'La reseña ya existe' } }))
+    );
+    component.reviewComment = 'Una estadía excelente';
+
+    component.submitReview();
+    fixture.detectChanges();
+
+    expect(component.reviewError).toBe('La reseña ya existe');
+    expect(component.reviewSubmitting).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('La reseña ya existe');
+  });
+
+  it('debe bloquear envíos repetidos mientras la reseña sigue en curso', () => {
+    const response = new Subject<{ success: boolean }>();
+    apiServiceMock.post.mockReturnValue(response.asObservable());
+    component.reviewComment = 'Una estadía excelente';
+
+    component.submitReview();
+    component.submitReview();
+
+    expect(apiServiceMock.post).toHaveBeenCalledTimes(1);
+    expect(component.reviewSubmitting).toBe(true);
+
+    response.next({ success: true });
+    response.complete();
+
+    expect(component.reviewSubmitting).toBe(false);
+    expect(component.reviewSubmitted).toBe(true);
   });
 
   it('debe mostrar "Pendiente de asignación" cuando smartLockPin no está asignado', () => {

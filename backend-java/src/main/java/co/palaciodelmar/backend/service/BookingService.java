@@ -429,6 +429,10 @@ public class BookingService {
             }
         }
         if (!nightsLocked) {
+            originalNights.forEach(sn -> {
+                sn.setId(null);
+                sn.setVersion(null);
+            });
             suiteNightRepository.saveAll(originalNights);
             throw new IllegalStateException("Hubo una colisión concurrente al modificar. Las fechas ya no están disponibles.");
         }
@@ -899,6 +903,9 @@ public class BookingService {
         }
 
         booking.setStatus(newStatus.name().toLowerCase());
+        if (booking.getStatusHistory() == null) {
+            booking.setStatusHistory(new ArrayList<>());
+        }
         booking.getStatusHistory().add(Booking.StatusHistoryEntry.builder()
                 .status(newStatus.name().toLowerCase())
                 .timestamp(Instant.now())
