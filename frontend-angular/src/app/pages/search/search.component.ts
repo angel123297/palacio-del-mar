@@ -53,7 +53,7 @@ import { Suite, ApiResponse } from '../../models/types';
             <!-- 360 Virtual Tour Hover Container -->
             <div class="h-64 overflow-hidden relative" style="perspective: 1000px;">
               <div class="w-full h-full relative transition-transform duration-700 ease-out group-hover:[transform:rotateY(10deg)_scale(1.05)]" style="transform-style: preserve-3d;">
-                <img [src]="suite.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" [alt]="suite.name" class="w-full h-full object-cover opacity-80 group-hover:opacity-100" loading="lazy">
+                <img [src]="getSuiteImage(suite)" (error)="onImageError($event)" [alt]="suite.name" class="w-full h-full object-cover opacity-80 group-hover:opacity-100" loading="lazy">
               </div>
 
               <div class="absolute top-4 left-4 bg-[#c9a96e] text-[#0d0d0d] text-xs font-bold px-3 py-1 uppercase tracking-widest rounded-sm z-10 shadow-lg">
@@ -106,6 +106,31 @@ export class SearchComponent implements OnInit {
       'fiesta': 'Fiesta'
     };
     return map[v] || 'Magia';
+  }
+
+  getSuiteImage(suite: Suite): string {
+    const fallbacks = [
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
+      'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+      'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800',
+      'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'
+    ];
+    const brokenIds = ['photo-1591088398332', 'photo-1595526114035', 'photo-1522771739844', 'photo-1566665797739'];
+    const raw = suite?.mainImage || '';
+    if (!raw || brokenIds.some(id => raw.includes(id))) {
+      const seed = (suite?.name || '').length;
+      return fallbacks[seed % fallbacks.length];
+    }
+    return raw;
+  }
+
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (img && !img.dataset['fallbackApplied']) {
+      img.dataset['fallbackApplied'] = 'true';
+      img.src = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
+    }
   }
 
   fetchResults() {

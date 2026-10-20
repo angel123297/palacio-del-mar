@@ -1,9 +1,9 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { SearchStateService } from '../../services/search-state.service';
 import { Suite, Branch } from '../../models/types';
-import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-rooms-section',
@@ -75,7 +75,7 @@ import { Router } from '@angular/router';
       <div class="rooms-grid" *ngIf="!loading && visibleSuites.length > 0">
         <div class="room-card" *ngFor="let suite of visibleSuites">
           <div class="room-img-wrap">
-            <img [src]="suite.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" [alt]="suite.name" loading="lazy" />
+            <img [src]="getSuiteImage(suite)" (error)="onImageError($event, suite)" [alt]="suite.name" loading="lazy" />
             <span class="room-avail badge-ok" *ngIf="suite.featured">Recomendada</span>
           </div>
 
@@ -119,15 +119,23 @@ import { Router } from '@angular/router';
   `
 })
 export class RoomsSectionComponent implements OnInit {
+  private searchState = inject(SearchStateService);
   suites: Suite[] = [];
   branches: Branch[] = [];
   types: any[] = [];
-  selectedBranch: string = '';
   selectedType: string = '';
   loading = true;
   loadError = false;
 
   constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
+
+  get selectedBranch(): string {
+    return this.searchState.filters().branchSlug;
+  }
+
+  set selectedBranch(slug: string) {
+    this.searchState.updateBranch(slug);
+  }
 
   ngOnInit(): void {
     this.fetchData();
@@ -136,7 +144,8 @@ export class RoomsSectionComponent implements OnInit {
   fetchData(): void {
     this.api.get<any>('/branches').subscribe({
       next: (res) => {
-        this.branches = res.data || res;
+        const list: Branch[] = res.data || res || [];
+        this.branches = list.filter(b => !this.isJunkBranch(b.name, b.slug));
         this.cdr.detectChanges();
       }
     });
@@ -185,5 +194,37 @@ export class RoomsSectionComponent implements OnInit {
   getShortBranch(name?: string): string {
     if (!name || typeof name !== 'string') return '';
     return name.replace(/^Palacio del Mar\s*·\s*/i, '');
+  }
+
+  private isJunkBranch(name?: string, slug?: string): boolean {
+    const n = (name || '').trim().toLowerCase();
+    const s = (slug || '').trim().toLowerCase();
+    return n === 'waos' || n === 'si' || s === 'waos' || s === 'si' || n.length <= 2;
+  }
+
+  getSuiteImage(suite: Suite): string {
+    const fallbacks = [
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
+      'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+      'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800',
+      'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800',
+      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800'
+    ];
+    const brokenIds = ['photo-1591088398332', 'photo-1595526114035', 'photo-1522771739844', 'photo-1566665797739'];
+    const raw = suite?.mainImage || '';
+    if (!raw || brokenIds.some(id => raw.includes(id))) {
+      const seed = (suite?.name || '').length;
+      return fallbacks[seed % fallbacks.length];
+    }
+    return raw;
+  }
+
+  onImageError(event: Event, suite?: Suite): void {
+    const img = event.target as HTMLImageElement;
+    if (img && !img.dataset['fallbackApplied']) {
+      img.dataset['fallbackApplied'] = 'true';
+      img.src = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
+    }
   }
 }

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 
 const bogotaTodayIso = (): string => {
   try {
@@ -33,8 +34,8 @@ const addDaysIso = (iso: string, days: number): string => {
             <h1 class="text-3xl font-bold text-white mt-2">Cartagena Luxury Beach Resort</h1>
             <p class="text-sm text-slate-400">Demostración de Sincronización Automática e Inventario en Tiempo Real con Palacio del Mar</p>
           </div>
-          <a routerLink="/anfitrion" class="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-lg hover:bg-amber-500/20 transition">
-            &larr; Volver al Panel de Anfitrión
+          <a [routerLink]="isAdmin() ? '/admin' : '/anfitrion'" class="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-lg hover:bg-amber-500/20 transition">
+            &larr; {{ isAdmin() ? 'Volver al Panel de Administración' : 'Volver al Panel de Anfitrión' }}
           </a>
         </header>
 
@@ -152,6 +153,11 @@ const addDaysIso = (iso: string, days: number): string => {
 })
 export class ExternalHotelComponent implements OnInit {
   api = inject(ApiService);
+  auth = inject(AuthService);
+
+  isAdmin(): boolean {
+    return (this.auth.currentUserValue?.role || '').toLowerCase() === 'admin';
+  }
 
   apiKey = '';
 

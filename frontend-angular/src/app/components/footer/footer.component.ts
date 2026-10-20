@@ -5,14 +5,14 @@ import { RouterModule } from '@angular/router';
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
   template: `
     <footer>
       <div class="footer-top">
         <div class="footer-col">
           <p class="footer-logo">Palacio del Mar</p>
           <p class="footer-desc">
-            Marketplace de hospedaje con comisión baja en Cartagena de Indias.
+            Colección exclusiva de suites y casonas de autor en Cartagena de Indias.
           </p>
         </div>
 

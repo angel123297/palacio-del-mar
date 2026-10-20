@@ -13,7 +13,7 @@ import { environment } from '../../../environments/environment';
     <div class="modal-backdrop" *ngIf="isOpen" (click)="close()" role="dialog" aria-modal="true" aria-label="Iniciar sesión o crear cuenta" tabindex="-1" (keydown.escape)="close()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
       <div class="modal-content" (click)="$event.stopPropagation()" style="background: var(--dark); border: 1px solid var(--gold); border-radius: 12px; padding: 2rem; width: 100%; max-width: 440px; color: var(--cream); position: relative;">
         
-        <button (click)="close()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer;">×</button>
+        <button type="button" aria-label="Cerrar modal" (click)="close()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer;">×</button>
 
         <!-- LOGIN FORM -->
         <form *ngIf="mode === 'login'" (ngSubmit)="submitLogin()" class="auth-form">

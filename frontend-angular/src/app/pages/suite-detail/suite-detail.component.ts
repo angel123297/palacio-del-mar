@@ -119,6 +119,38 @@ export class SuiteDetailComponent implements OnInit {
     return b?.id || b?._id || b?.slug || this.suite.propertyId || (typeof b === 'string' ? b : '') || '';
   }
 
+  getSuiteImage(suite: Suite | null): string {
+    const brokenIds = ['photo-1591088398332', 'photo-1595526114035', 'photo-1522771739844', 'photo-1566665797739'];
+    const raw = suite?.mainImage || '';
+    if (!raw || brokenIds.some(id => raw.includes(id))) {
+      return 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
+    }
+    return raw;
+  }
+
+  getExperienceImage(exp: Experience): string {
+    if (exp?.mainImage || exp?.image) return (exp.mainImage || exp.image)!;
+    const name = (exp?.name || '').toLowerCase();
+    if (name.includes('cena') || name.includes('romántic') || name.includes('gastronom')) {
+      return 'https://images.unsplash.com/photo-1544148103-0773bf10d330?w=800';
+    }
+    if (name.includes('spa') || name.includes('masaje') || name.includes('relax')) {
+      return 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800';
+    }
+    if (name.includes('yate') || name.includes('isla') || name.includes('rosario') || name.includes('barco')) {
+      return 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800';
+    }
+    return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800';
+  }
+
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (img && !img.dataset['fallbackApplied']) {
+      img.dataset['fallbackApplied'] = 'true';
+      img.src = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
+    }
+  }
+
   ngOnInit(): void {
     const filters = this.searchState.filters();
     if (filters.checkIn) this.checkIn = filters.checkIn;
