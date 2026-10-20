@@ -46,18 +46,18 @@ export interface RefundItem {
             <p class="text-xs text-[#f5f0e8] opacity-60 tracking-widest uppercase mt-1">Gestión Central Palacio del Mar</p>
           </div>
           <!-- Tabs Switcher -->
-          <div class="flex gap-2 bg-[#111] p-1.5 rounded-lg border border-[rgba(201,169,110,0.3)]">
-            <button (click)="activeTab.set('bookings')" 
+          <div class="flex gap-2 bg-[#111] p-1.5 rounded-lg border border-[rgba(201,169,110,0.3)]" role="tablist" aria-label="Secciones del panel">
+            <button (click)="activeTab.set('bookings')" role="tab" [attr.aria-selected]="activeTab() === 'bookings'" tabindex="0" 
                     [ngClass]="activeTab() === 'bookings' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Reservas
             </button>
-            <button (click)="activeTab.set('promotions')" 
+            <button (click)="activeTab.set('promotions')" role="tab" [attr.aria-selected]="activeTab() === 'promotions'" tabindex="0" 
                     [ngClass]="activeTab() === 'promotions' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Promociones & Ofertas
             </button>
-            <button (click)="activeTab.set('properties')" 
+            <button (click)="activeTab.set('properties')" role="tab" [attr.aria-selected]="activeTab() === 'properties'" tabindex="0" 
                     [ngClass]="activeTab() === 'properties' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-2">
               Alojamientos / Marketplace
@@ -65,7 +65,7 @@ export interface RefundItem {
                 {{ pendingPropertiesCount() }}
               </span>
             </button>
-            <button (click)="activeTab.set('refunds')" 
+            <button (click)="activeTab.set('refunds')" role="tab" [attr.aria-selected]="activeTab() === 'refunds'" tabindex="0" 
                     [ngClass]="activeTab() === 'refunds' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-2">
               Reembolsos
@@ -220,10 +220,9 @@ export interface RefundItem {
                   <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Sede de Aplicación</label>
                   <select [(ngModel)]="newPromo.branchId" name="promoBranch" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                     <option value="all">Todas las sedes (Global)</option>
-                    <option value="branch-1">Palacio del Mar · Centro Histórico</option>
-                    <option value="branch-2">Palacio del Mar · Getsemaní</option>
-                    <option value="branch-3">Palacio del Mar · Bocagrande</option>
-                    <option value="branch-4">Palacio del Mar · La Boquilla</option>
+                    <option *ngFor="let prop of properties()" [value]="prop.id || prop._id">
+                      {{ prop.name }} · {{ prop.city }}
+                    </option>
                   </select>
                 </div>
 
@@ -447,6 +446,13 @@ export interface RefundItem {
               </button>
             </div>
 
+            <div class="mb-6 p-4 bg-[rgba(255,255,255,0.02)] border border-[rgba(201,169,110,0.15)] rounded-lg flex flex-wrap items-end gap-3">
+              <div class="flex flex-col flex-1 min-w-[240px]">
+                <label for="refundNotes" class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Observación aplicable a la próxima acción (opcional)</label>
+                <input id="refundNotes" type="text" [(ngModel)]="refundNotes" name="refundNotes" placeholder="Ej: Reembolso procesado vía transferencia bancaria" class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none focus:border-[#c9a96e]">
+              </div>
+            </div>
+
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse">
                 <thead>
@@ -548,6 +554,7 @@ export class AdminDashboardComponent implements OnInit {
 
   // Refunds state
   refunds = signal<RefundItem[]>([]);
+  refundNotes = '';
   pendingRefundsCount = computed(() => this.refunds().filter(r => r.status === 'requires_refund').length);
 
   filteredProperties = computed(() => {
@@ -689,7 +696,8 @@ export class AdminDashboardComponent implements OnInit {
 
   approveBooking(b: Booking) {
     const id = b.id || b._id;
-    this.api.post<any>(`/admin/bookings/${id}/approve`, {}).subscribe({
+    // Endpoint real: PUT /admin/bookings/{id}/status (el frontend anterior llamaba a /approve, que no existe en el backend).
+    this.api.put<any>(`/admin/bookings/${id}/status`, { status: 'confirmed' }).subscribe({
       next: () => {
         this.fetchBookings();
         this.fetchMetrics();
@@ -722,13 +730,9 @@ export class AdminDashboardComponent implements OnInit {
 
   getBranchName(id?: string): string {
     if (!id || id === 'all') return 'Todas las sedes (Global)';
-    const map: Record<string, string> = {
-      'branch-1': 'Centro Histórico',
-      'branch-2': 'Getsemaní',
-      'branch-3': 'Bocagrande',
-      'branch-4': 'La Boquilla'
-    };
-    return map[id] || id;
+    // Resuelve el nombre desde las properties reales (antes: mapa hardcodeado branch-1..4).
+    const prop = this.properties().find(p => (p.id || p._id) === id);
+    return prop ? `${prop.name} · ${prop.city}` : id;
   }
 
   updateStatus(status: string) {
@@ -792,11 +796,12 @@ export class AdminDashboardComponent implements OnInit {
 
   resolveRefund(paymentId: string, action: 'mark_refunded' | 'dismiss') {
     if (!paymentId) return;
-    const notes = prompt('Ingrese una observación para esta acción (opcional):') || '';
+    const notes = this.refundNotes.trim();
     this.api.put<ApiResponse<any>>(`/admin/payments/${paymentId}/resolve-refund`, { action, notes }).subscribe({
       next: () => {
         const actionText = action === 'mark_refunded' ? 'marcado como reembolsado' : 'descartado';
         this.actionMessage.set(`Pago ${actionText} exitosamente.`);
+        this.refundNotes = '';
         setTimeout(() => this.actionMessage.set(''), 4000);
         this.fetchRefunds();
       },

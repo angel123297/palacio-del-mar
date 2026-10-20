@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property, WebhookSubscription, WebhookDelivery, ApiKeyItem } from '../../models/types';
+import { environment } from '../../../environments/environment';
 
 export interface HostPromotionItem {
   id: string;
@@ -33,33 +34,33 @@ export interface HostPromotionItem {
             <p class="text-[#f5f0e8] opacity-70 text-xs tracking-widest uppercase mt-1">Marketplace de Hospedaje</p>
           </div>
           <!-- Tabs Switcher -->
-          <div class="flex gap-2 bg-[#111] p-1.5 rounded-lg border border-[rgba(201,169,110,0.3)]">
-            <button (click)="activeTab.set('bookings')" 
+          <div class="flex gap-2 bg-[#111] p-1.5 rounded-lg border border-[rgba(201,169,110,0.3)]" role="tablist" aria-label="Secciones del panel">
+            <button (click)="activeTab.set('bookings')" role="tab" [attr.aria-selected]="activeTab() === 'bookings'" tabindex="0" 
                     [ngClass]="activeTab() === 'bookings' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Reservas & Recepción
             </button>
-            <button (click)="activeTab.set('properties')" 
+            <button (click)="activeTab.set('properties')" role="tab" [attr.aria-selected]="activeTab() === 'properties'" tabindex="0" 
                     [ngClass]="activeTab() === 'properties' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Mis Alojamientos
             </button>
-            <button (click)="activeTab.set('webhooks'); fetchSubscriptions(); fetchDeliveries();" 
+            <button (click)="activeTab.set('webhooks'); fetchSubscriptions(); fetchDeliveries();" role="tab" [attr.aria-selected]="activeTab() === 'webhooks'" tabindex="0" 
                     [ngClass]="activeTab() === 'webhooks' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Notificaciones en Vivo
             </button>
-            <button (click)="activeTab.set('apikeys'); fetchApiKeys();" 
+            <button (click)="activeTab.set('apikeys'); fetchApiKeys();" role="tab" [attr.aria-selected]="activeTab() === 'apikeys'" tabindex="0" 
                     [ngClass]="activeTab() === 'apikeys' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Conexión PMS / Integración
             </button>
-            <button (click)="activeTab.set('promotions')" 
+            <button (click)="activeTab.set('promotions')" role="tab" [attr.aria-selected]="activeTab() === 'promotions'" tabindex="0" 
                     [ngClass]="activeTab() === 'promotions' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Promociones
             </button>
-            <button (click)="activeTab.set('payouts'); fetchPayouts();" 
+            <button (click)="activeTab.set('payouts'); fetchPayouts();" role="tab" [attr.aria-selected]="activeTab() === 'payouts'" tabindex="0" 
                     [ngClass]="activeTab() === 'payouts' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
                     class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
               Liquidaciones (92%)
@@ -378,7 +379,7 @@ export interface HostPromotionItem {
           </div>
 
           <!-- Modal: Gestión de Habitaciones de la Propiedad -->
-          <div *ngIf="suiteModalOpen() && selectedPropertyForSuites" class="fixed inset-0 bg-black/85 z-[1000] flex items-center justify-center p-4">
+          <div *ngIf="suiteModalOpen() && selectedPropertyForSuites" class="fixed inset-0 bg-black/85 z-[1000] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Gestionar habitaciones del alojamiento" (keydown.escape)="closeSuitesModal()" tabindex="-1">
             <div class="bg-[#111] border border-[#c9a96e] rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
               <!-- Modal Header -->
               <div class="p-6 border-b border-[rgba(201,169,110,0.3)] flex justify-between items-center bg-[rgba(201,169,110,0.05)]">
@@ -574,7 +575,13 @@ export interface HostPromotionItem {
                     <div class="bg-[rgba(0,0,0,0.4)] border border-[rgba(255,255,255,0.06)] rounded p-2.5 mb-3 flex flex-wrap justify-between items-center text-xs">
                       <div class="flex items-center gap-2">
                         <span class="text-[#c9a96e] font-semibold uppercase text-[10px]">Secret:</span>
-                        <code class="text-[#f5f0e8] font-mono select-all bg-[rgba(255,255,255,0.05)] px-2 py-0.5 rounded">{{ sub.secret }}</code>
+                        <code class="text-[#f5f0e8] font-mono bg-[rgba(255,255,255,0.05)] px-2 py-0.5 rounded">{{ revealedSecretId() === sub.id ? sub.secret : maskedSecret(sub.secret) }}</code>
+                        <button (click)="toggleSecret(sub.id)" class="text-[10px] text-[#c9a96e] hover:underline uppercase tracking-wider px-1.5" [attr.aria-label]="revealedSecretId() === sub.id ? 'Ocultar secret' : 'Mostrar secret'">
+                          {{ revealedSecretId() === sub.id ? 'Ocultar' : 'Mostrar' }}
+                        </button>
+                        <button (click)="copySecret(sub.secret)" class="text-[10px] text-[#c9a96e] hover:underline uppercase tracking-wider px-1.5" aria-label="Copiar secret al portapapeles">
+                          Copiar
+                        </button>
                       </div>
                       <div class="flex gap-1 flex-wrap mt-1 md:mt-0">
                         <span *ngFor="let ev of sub.events" class="bg-[rgba(201,169,110,0.15)] text-[#c9a96e] text-[10px] font-mono px-2 py-0.5 rounded">
@@ -1063,6 +1070,31 @@ export class HostDashboardComponent implements OnInit {
     });
   }
 
+  // A9: el secret de webhook se muestra enmascarado y solo se revela a petición.
+  revealedSecretId = signal<string>('');
+
+  toggleSecret(subId: string): void {
+    if (this.revealedSecretId() === subId) {
+      this.revealedSecretId.set('');
+    } else {
+      this.revealedSecretId.set(subId);
+    }
+  }
+
+  maskedSecret(secret: string): string {
+    if (!secret) return '••••••••';
+    return '••••••••••••' + secret.slice(-4);
+  }
+
+  copySecret(secret: string): void {
+    if (secret && navigator.clipboard) {
+      navigator.clipboard.writeText(secret).then(() => {
+        this.actionMessage.set('Secret copiado al portapapeles');
+        setTimeout(() => this.actionMessage.set(''), 3000);
+      });
+    }
+  }
+
   copyRecentlyCreatedKey() {
     if (this.recentlyCreatedKey()) {
       navigator.clipboard.writeText(this.recentlyCreatedKey());
@@ -1090,7 +1122,9 @@ export class HostDashboardComponent implements OnInit {
   }
 
   useDemoReceiver() {
-    const defaultUrl = 'http://localhost:5000/api/demo/webhook-receiver';
+    // URL absoluta: la llama el backend contra sí mismo (auto-llamada del receptor demo).
+    // En docker compose se resuelve como backend-java:5000; en dev como localhost:5000.
+    const defaultUrl = environment.demoWebhookUrl;
     this.newWebhook.url = defaultUrl;
     if (this.properties().length > 0 && !this.newWebhook.propertyId) {
       this.newWebhook.propertyId = this.properties()[0].id || (this.properties()[0] as any)._id || '';
@@ -1455,7 +1489,8 @@ export class HostDashboardComponent implements OnInit {
     const id = b.id || b._id;
     this.api.post<any>(`/host/bookings/${id}/checkin`, {}).subscribe({
       next: () => {
-        this.bookings.update(list => list.map(item => (item.id || item._id) === id ? { ...item, checkedIn: true } : item));
+        // L9: el estado real lo decide el servidor; refrescamos en vez de inventarlo localmente.
+        this.fetchBookings();
         this.fetchMetrics();
         this.actionMessage.set(`Check-in registrado con éxito para ${b.guestName || 'el huésped'}.`);
         setTimeout(() => this.actionMessage.set(''), 4000);
@@ -1471,7 +1506,8 @@ export class HostDashboardComponent implements OnInit {
     const id = b.id || b._id;
     this.api.post<any>(`/host/bookings/${id}/checkout`, {}).subscribe({
       next: () => {
-        this.bookings.update(list => list.map(item => (item.id || item._id) === id ? { ...item, checkedOut: true, status: 'completed' } : item));
+        // L9: refrescamos desde el servidor (estado, depósito y liquidación los calcula el backend).
+        this.fetchBookings();
         this.fetchMetrics();
         this.actionMessage.set('Check-out completado. Habitación liberada para aseo.');
         setTimeout(() => this.actionMessage.set(''), 4000);

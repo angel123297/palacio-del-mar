@@ -9,7 +9,18 @@
     <a routerLink="/" style="color: var(--gold); text-decoration: none; margin-top: 1rem; display: inline-block;">← Volver al inicio</a>
   </div>
 
-  <div *ngIf="!loading && suite">
+  <div *ngIf="!loading && suite && isOwnSuite" style="text-align: center; padding: 4rem 1.5rem;">
+    <div style="max-width: 560px; margin: 0 auto; background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.35); border-radius: 12px; padding: 2rem;">
+      <h3 style="color: var(--gold); margin: 0 0 0.75rem 0;">Esta suite es de tu propio alojamiento</h3>
+      <p style="color: #ccc; margin: 0 0 1.5rem 0;">Como anfitrión no puedes reservar tu propia propiedad desde el marketplace. Gestiona su disponibilidad y precios desde tu panel.</p>
+      <a routerLink="/anfitrion" class="btn-primary" style="padding: 10px 20px; text-decoration: none;">Ir a mi panel de anfitrión</a>
+    </div>
+  </div>
+
+  <div *ngIf="!loading && suite && !isOwnSuite">
+    <div *ngIf="availabilityConflict" style="background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.4); color: #e74c3c; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem;">
+      {{ availabilityConflict }}
+    </div>
     <div class="step-indicator">
       <div class="step-item" [class.active]="step === 1" [class.completed]="step > 1">1. Detalles</div>
       <div class="step-item" [class.active]="step === 2" [class.completed]="step > 2">2. Experiencias</div>
@@ -232,31 +243,11 @@
            <button class="btn-secondary" (click)="prevStep()">← Atrás</button>
         </div>
 
-        <!-- Trust Badges -->
-        <div style="margin-top: 3rem; text-align: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 2rem;">
-          <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; color: #888;">
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; max-width: 150px;">
-              <span style="font-size: 1.5rem;">🔒</span>
-              <span style="font-size: 0.8rem; font-weight: bold; color: #aaa;">PAGO 100% SEGURO</span>
-              <span style="font-size: 0.7rem;">Encriptación SSL de 256 bits</span>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; max-width: 150px;">
-              <span style="font-size: 1.5rem;">✨</span>
-              <span style="font-size: 0.8rem; font-weight: bold; color: #aaa;">RESERVA FLEXIBLE</span>
-              <span style="font-size: 0.7rem;">Modifica tus fechas sin costo adicional</span>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; max-width: 150px;">
-              <span style="font-size: 1.5rem;">🎧</span>
-              <span style="font-size: 0.8rem; font-weight: bold; color: #aaa;">SOPORTE 24/7</span>
-              <span style="font-size: 0.7rem;">Asistencia personalizada con nuestro Concierge</span>
-            </div>
-          </div>
-          <div style="margin-top: 1.5rem; display: flex; justify-content: center; gap: 1rem; opacity: 0.5;">
-            <span style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">VISA</span>
-            <span style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">MASTERCARD</span>
-            <span style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">AMEX</span>
-            <span style="font-size: 1.2rem; font-weight: bold; font-family: monospace;">PSE</span>
-          </div>
+        <!-- Nota de proceso de pago -->
+        <div style="margin-top: 3rem; text-align: center; border-top: 1px solid rgba(212,175,55,0.15); padding-top: 2rem;">
+          <p style="color: #888; font-size: 0.8rem; margin: 0;">
+            El pago se procesa con la pasarela en modo demostración del marketplace. El precio final lo confirma el sistema al crear la reserva.
+          </p>
         </div>
       </div>
     </div>

@@ -2,7 +2,21 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import { ApiService } from '../../services/api.service';
+
+const bogotaTodayIso = (): string => {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  }
+};
+
+const addDaysIso = (iso: string, days: number): string => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+};
 
 @Component({
   selector: 'app-external-hotel',
@@ -27,17 +41,13 @@ import { HttpClient } from '@angular/common/http';
         <!-- Configuration Bar -->
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-3">
           <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Configuración de la Conexión</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs text-slate-400 mb-1">Servidor Central de Palacio del Mar</label>
-              <input [(ngModel)]="apiBase" type="text" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500">
-            </div>
+          <div class="grid grid-cols-1 gap-4">
             <div>
               <label class="block text-xs text-slate-400 mb-1">Clave de Conexión del Hotel (Clave de Sincronización)</label>
               <input [(ngModel)]="apiKey" type="text" placeholder="pdm_live_..." class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-amber-300 focus:outline-none focus:border-amber-400">
             </div>
           </div>
-          <p class="text-xs text-slate-500">Copia tu clave desde el Panel del Anfitrión (Pestaña "Conexión PMS / Integración").</p>
+          <p class="text-xs text-slate-500">Copia tu clave desde el Panel del Anfitrión (Pestaña "Conexión PMS / Integración"). El servidor destino se toma de la configuración del entorno.</p>
         </div>
 
         <!-- Main Actions Grid -->
@@ -141,9 +151,8 @@ import { HttpClient } from '@angular/common/http';
   `
 })
 export class ExternalHotelComponent implements OnInit {
-  http = inject(HttpClient);
+  api = inject(ApiService);
 
-  apiBase = 'http://localhost:5000/api';
   apiKey = '';
 
   room = {
@@ -169,14 +178,9 @@ export class ExternalHotelComponent implements OnInit {
   availSuccess = signal<boolean>(true);
 
   ngOnInit(): void {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const checkout = new Date(today);
-    checkout.setDate(checkout.getDate() + 4);
-
-    this.avail.startDate = tomorrow.toISOString().split('T')[0];
-    this.avail.endDate = checkout.toISOString().split('T')[0];
+    // L13: fechas por defecto calculadas en la zona horaria del negocio (America/Bogotá).
+    this.avail.startDate = addDaysIso(bogotaTodayIso(), 1);
+    this.avail.endDate = addDaysIso(bogotaTodayIso(), 4);
   }
 
   syncRoom() {
@@ -203,7 +207,7 @@ export class ExternalHotelComponent implements OnInit {
       amenities: ['Vista al mar', 'WiFi Alta Velocidad', 'Aire Acondicionado', 'Balcón Privado']
     };
 
-    this.http.post<any>(`${this.apiBase}/integration/rooms`, payload, { headers }).subscribe({
+    this.api.post<any>(`/integration/rooms`, payload, headers).subscribe({
       next: (res) => {
         this.loadingRoom = false;
         this.roomSuccess.set(true);
@@ -231,7 +235,7 @@ export class ExternalHotelComponent implements OnInit {
       'X-Palacio-Api-Key': this.apiKey.trim()
     };
 
-    this.http.put<any>(`${this.apiBase}/integration/availability`, this.avail, { headers }).subscribe({
+    this.api.put<any>(`/integration/availability`, this.avail, headers).subscribe({
       next: (res) => {
         this.loadingAvail = false;
         this.availSuccess.set(true);

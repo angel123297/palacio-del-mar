@@ -50,7 +50,7 @@ import { DateRangePickerComponent } from '../date-range-picker/date-range-picker
           </select>
         </div>
 
-        <!-- AI Vibe Matcher -->
+        <!-- Filtro por ambiente / Vibe -->
         <div class="flex-1 min-w-[150px] p-4 hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center">
           <label class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1 flex items-center gap-1">
             <span>✨ Vibe</span>
@@ -66,8 +66,8 @@ import { DateRangePickerComponent } from '../date-range-picker/date-range-picker
 
         <!-- Botón de Búsqueda -->
         <div class="flex items-center justify-center p-0">
-          <button type="submit" class="w-full h-full min-h-[60px] bg-[#c9a96e] text-[#0d0d0d] px-8 text-sm tracking-[0.24em] uppercase font-semibold hover:bg-[#e8d5a3] transition-colors whitespace-nowrap">
-            Buscar Suites
+          <button type="submit" [disabled]="!canSearch" [attr.aria-disabled]="!canSearch" class="w-full h-full min-h-[60px] bg-[#c9a96e] text-[#0d0d0d] px-8 text-sm tracking-[0.24em] uppercase font-semibold hover:bg-[#e8d5a3] transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ canSearch ? 'Buscar Suites' : 'Elige tus fechas' }}
           </button>
         </div>
 
@@ -112,7 +112,14 @@ export class BookingBarComponent implements OnInit {
     this.searchState.updateGuests(val, this.searchState.filters().children);
   }
 
+  get canSearch(): boolean {
+    const f = this.searchState.filters();
+    return !!(f.checkIn && f.checkOut && f.checkOut > f.checkIn);
+  }
+
   submit(): void {
+    // L4: no buscamos sin un rango de fechas válido y completo.
+    if (!this.canSearch) return;
     this.router.navigate(['/buscar']);
   }
 }
