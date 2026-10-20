@@ -21,15 +21,18 @@ import { CommonModule } from '@angular/common';
             <button
               type="button"
               (click)="toggle(idx)"
+              [attr.aria-expanded]="openIdx === idx"
+              [attr.aria-controls]="'faq-panel-' + idx"
               style="width: 100%; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; background: none; border: none; color: #ffffff; font-size: 1.05rem; font-weight: 600; cursor: pointer; text-align: left;"
             >
               <span>{{ faq.q }}</span>
-              <span style="color: var(--gold); font-size: 1.3rem; margin-left: 1rem;">
+              <span style="color: var(--gold); font-size: 1.3rem; margin-left: 1rem;" aria-hidden="true">
                 {{ openIdx === idx ? '−' : '+' }}
               </span>
             </button>
             <div
               *ngIf="openIdx === idx"
+              [attr.id]="'faq-panel-' + idx"
               style="padding: 0 1.5rem 1.25rem 1.5rem; color: #cccccc; line-height: 1.6; border-top: 1px solid rgba(255, 255, 255, 0.05);"
             >
               <p style="margin: 0;">{{ faq.a }}</p>

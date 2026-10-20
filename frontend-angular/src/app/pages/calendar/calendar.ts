@@ -4,6 +4,16 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { finalize } from 'rxjs';
 
+const bogotaTodayIso = (): string => {
+  // M7: "hoy" en la zona horaria del negocio (America/Bogotá), igual que el resto de la app.
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  }
+};
+
 @Component({
   selector: 'app-calendar',
   standalone: true,
@@ -24,7 +34,12 @@ import { finalize } from 'rxjs';
           <p class="luxury-loader-text">Cargando disponibilidad...</p>
         </div>
 
-        <div *ngIf="!loading" style="border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; overflow: hidden;">
+        <div *ngIf="!loading && loadError" style="text-align: center; padding: 3rem 1rem; background: rgba(231,76,60,0.05); border: 1px solid rgba(231,76,60,0.3); border-radius: 12px;">
+          <p style="color: #ff4d4d; margin: 0 0 1rem 0;">No pudimos consultar la disponibilidad. Revisa tu conexión.</p>
+          <button (click)="loadData()" class="btn-outline" style="padding: 8px 16px; cursor: pointer;">Reintentar</button>
+        </div>
+
+        <div *ngIf="!loading && !loadError" style="border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; overflow: hidden;">
           <div style="display: grid; grid-template-columns: repeat(7, 1fr); background: rgba(212,175,55,0.1); border-bottom: 1px solid rgba(212,175,55,0.2); text-align: center;">
             <div *ngFor="let d of ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']" style="padding: 1rem 0; font-weight: bold; color: var(--gold); font-size: 0.9rem; text-transform: uppercase;">{{d}}</div>
           </div>
@@ -50,8 +65,10 @@ export class CalendarComponent implements OnInit {
   currentDate = new Date();
   year = this.currentDate.getFullYear();
   month = this.currentDate.getMonth() + 1; // 1-12
+  todayIso = bogotaTodayIso();
   
   loading = false;
+  loadError = false;
   availabilityData: any = {};
   
   constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
@@ -71,9 +88,8 @@ export class CalendarComponent implements OnInit {
   }
 
   get isCurrentOrPastMonth(): boolean {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth() + 1;
+    const currentYear = Number(this.todayIso.slice(0, 4));
+    const currentMonth = Number(this.todayIso.slice(5, 7));
     if (this.year < currentYear) return true;
     if (this.year === currentYear && this.month <= currentMonth) return true;
     return false;
@@ -82,8 +98,7 @@ export class CalendarComponent implements OnInit {
   get calendarDays(): any[] {
     const daysInMonth = new Date(this.year, this.month, 0).getDate();
     const days = [];
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayStr = this.todayIso;
 
     for (let i = 1; i <= daysInMonth; i++) {
       const dateStr = `${this.year}-${String(this.month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
@@ -107,6 +122,7 @@ export class CalendarComponent implements OnInit {
 
   loadData() {
     this.loading = true;
+    this.loadError = false;
     this.api.get<any>(`/availability/monthly?year=${this.year}&month=${this.month}`).pipe(
       finalize(() => {
         this.loading = false;
@@ -123,7 +139,9 @@ export class CalendarComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: () => {
+        // C6: ante error mostramos estado de fallo real; nunca "todo ocupado".
         this.availabilityData = {};
+        this.loadError = true;
         this.cdr.detectChanges();
       }
     });

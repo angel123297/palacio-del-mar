@@ -30,7 +30,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         if (!isAuthEndpoint && authService.isLoggedIn()) {
           authService.clearLocalData();
           const currentUrl = router.url;
-          const isProtectedPage = ['/mis-reservas', '/admin', '/anfitrion', '/perfil'].some(p => currentUrl.startsWith(p));
+          const isProtectedPage = ['/mis-reservas', '/reservas', '/checkout', '/admin', '/anfitrion', '/perfil'].some(p => currentUrl.startsWith(p));
           if (isProtectedPage) {
             router.navigate(['/']);
           }

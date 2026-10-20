@@ -95,10 +95,10 @@ import { FormsModule } from '@angular/forms';
           </div>
 
           <button class="btn-primary" type="submit" [disabled]="busy">
-            {{ busy ? 'Enviando solicitud…' : 'Enviar Mensaje' }}
+            Enviar solicitud por correo
           </button>
           <p *ngIf="sentSuccess" style="color: #6fcf97; font-size: 0.9rem; margin: 0; text-align: center;">
-            ¡Gracias por contactarnos! Un asesor se comunicará contigo en breve.
+            Se abrió tu correo con la solicitud lista. Si no se abrió, escríbenos directo a reservas&#64;palaciomar.co.
           </p>
         </form>
       </div>
@@ -117,12 +117,29 @@ export class ContactSectionComponent {
   sentSuccess = false;
 
   handleSubmit(): void {
-    this.busy = true;
-    setTimeout(() => {
-      this.busy = false;
-      this.sentSuccess = true;
-      this.formData = { name: '', email: '', phone: '', eventType: 'consulta', message: '' };
-      setTimeout(() => this.sentSuccess = false, 5000);
-    }, 800);
+    // Envío real por correo del cliente: abre el gestor de email con la solicitud ya redactada.
+    const subject = `Solicitud ${this.labelForEventType()} — Palacio del Mar`;
+    const body = [
+      `Nombre: ${this.formData.name}`,
+      `Correo: ${this.formData.email}`,
+      `Teléfono: ${this.formData.phone || 'No indicado'}`,
+      `Tipo de solicitud: ${this.labelForEventType()}`,
+      '',
+      'Mensaje:',
+      this.formData.message
+    ].join('\n');
+
+    window.location.href = `mailto:reservas@palaciomar.co?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    this.sentSuccess = true;
+  }
+
+  labelForEventType(): string {
+    const map: Record<string, string> = {
+      'consulta': 'Consulta General',
+      'boda': 'Boda o Aniversario',
+      'corporativo': 'Evento Corporativo',
+      'yate': 'Alquiler Privado de Yate'
+    };
+    return map[this.formData.eventType] || this.formData.eventType;
   }
 }

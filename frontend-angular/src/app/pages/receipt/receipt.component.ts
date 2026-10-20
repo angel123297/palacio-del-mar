@@ -1,9 +1,10 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, Optional } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 // @ts-ignore
 import { renderSVG } from '../../utils/qr.js';
 
@@ -219,7 +220,8 @@ export class ReceiptComponent implements OnInit {
     private route: ActivatedRoute,
     private api: ApiService,
     private cdr: ChangeDetectorRef,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    @Optional() private auth?: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -290,7 +292,20 @@ export class ReceiptComponent implements OnInit {
 
   get canLeaveReview(): boolean {
     const s = this.booking?.status?.toLowerCase();
-    return s === 'checked_out' || s === 'completed';
+    const isCompleted = s === 'checked_out' || s === 'completed';
+    if (!isCompleted) return false;
+    const user = this.auth?.currentUserValue;
+    if (user) {
+      const role = (user.role || '').toLowerCase();
+      if (role === 'host' || role === 'anfitrion' || role === 'admin') {
+        const uId = user.id || user._id;
+        const bUser = typeof this.booking?.user === 'object' ? (this.booking.user?.id || this.booking.user?._id) : (this.booking?.user || this.booking?.userId);
+        if (uId && bUser && uId !== bUser) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   submitReview(): void {

@@ -97,6 +97,9 @@ public class BookingService {
             if (property == null || Boolean.FALSE.equals(property.getActive()) || !"APPROVED".equalsIgnoreCase(property.getStatus())) {
                 throw new IllegalArgumentException("El alojamiento no está disponible para reservas porque la propiedad no está aprobada o está inactiva");
             }
+            if (userId != null && property.getOwnerId() != null && userId.equals(property.getOwnerId())) {
+                throw new IllegalArgumentException("Un anfitrión no puede reservar su propia propiedad");
+            }
         }
 
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
