@@ -13,6 +13,29 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-10-20 — Revisión diaria de Vibe: sin cambios en el día
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** ninguno nuevo. El único commit reciente es el propio [docs(qa): reporte diario 2026-10-19](https://github.com/angel123297/palacio-del-mar/commit/6fb9b5c6db36796aa80a0531a1f214a8a2f13063) (19 oct, 14:55 UTC), ya fuera de la ventana de esta revisión. **Sin cambios de código ni actividad de agentes (Gemini CLI/Jules/Antigravity) en el día.**
+
+**Pull requests abiertos (sin cambios de estado):**
+- [#22 — feat(admin): implement missing bookings export and approve endpoints](https://github.com/angel123297/palacio-del-mar/pull/22) (Jules, base `plan/marketplace-webhooks`, sin actividad desde el 19 oct). Pendiente de revisión y fusión.
+- [#20 — Plan/marketplace webhooks](https://github.com/angel123297/palacio-del-mar/pull/20) (`plan/marketplace-webhooks` → `proyecto-angular-java`). **PR de entrega a la rama original; no fusionar sin decisión explícita del usuario.**
+- [#19 — Add GET /promotions endpoint for HostController](https://github.com/angel123297/palacio-del-mar/pull/19) (draft). Ya resuelto vía `GET /api/host/promotions` en 876d3ced; candidata a cerrar.
+- Drafts con base `proyecto-angular-java` (rama protegida, NO tocar): [#21](https://github.com/angel123297/palacio-del-mar/pull/21), [#18](https://github.com/angel123297/palacio-del-mar/pull/18), [#12](https://github.com/angel123297/palacio-del-mar/pull/12), [#4](https://github.com/angel123297/palacio-del-mar/pull/4), [#3](https://github.com/angel123297/palacio-del-mar/pull/3).
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones) — funcionalmente implementada; la actividad actual es depuración intensiva y orden del repositorio (post-Fase 5). Sin avance medible hoy por inactividad de agentes.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — siguen confirmados como corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`).
+
+**Tests esperados en verde:** 263 de backend (256 verificados el 18 oct + 7 pruebas intensivas de b1a284) y 13 de frontend. **El conteo de 263 sigue pendiente de verificación local/CI** (Vibe no pudo consultar la corrida del workflow en esta revisión; el conector de GitHub no expone las corridas de Actions).
+
+**Riesgos / problemas detectados:**
+- ⚠️ Persiste el riesgo del conteo de 263 tests reportado por agente sin verificación en CI.
+- ⚠️ PR #22 (endpoints admin de exportación/aprobación de reservas) sigue abierto y sin revisión; puede quedar desactualizado frente a la rama de trabajo.
+- ⚠️ `AGENTS.md` sigue removido del repositorio (df2c2e0, ignorado vía .gitignore); si las reglas para agentes siguen siendo requeridas, restaurar fuera del repo o des-ignorar.
+- ⚠️ Acumulación de PRs draft sin triaje (#22, #19, #21, #18, #12, #4, #3).
+- ⚠️ #20 apunta a `proyecto-angular-java` (rama original del usuario): cualquier fusión requiere aprobación explícita del usuario.
+
 ### 📅 2026-10-19 — Revisión diaria de Vibe (depuración intensiva cerrada, 263 tests backend esperados)
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`, todos de Gemini CLI del 18–19 oct):**
