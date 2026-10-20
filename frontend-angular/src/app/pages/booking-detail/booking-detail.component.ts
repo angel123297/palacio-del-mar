@@ -32,7 +32,7 @@ import { Booking } from '../../models/types';
               <p style="color: var(--gold); font-size: 1.1rem; letter-spacing: 1px;">Código: {{ booking.bookingCode || booking._id?.substring(0,8) | uppercase }}</p>
             </div>
             <div>
-              <span class="status-badge" [ngClass]="booking.status">{{ booking.status | uppercase }}</span>
+              <span class="status-badge" [ngClass]="booking.status">{{ getStatusLabel(booking.status) }}</span>
             </div>
           </div>
 
@@ -43,7 +43,7 @@ import { Booking } from '../../models/types';
                 <span>🔑</span> {{ isGuestOwner ? 'Llave Digital & Self Check-in' : 'Control de Acceso Digital' }}
               </h3>
               <span class="status-badge" [ngClass]="booking.status === 'checked_in' ? 'checked_in' : 'confirmed'">
-                {{ booking.status === 'checked_in' ? '🟢 CHECK-IN ACTIVO' : '⏰ PROGRAMADO 15:00 COP' }}
+                {{ booking.status === 'checked_in' ? '🟢 EN ESTANCIA ACTIVA' : '⏰ PROGRAMADO 15:00 HRS' }}
               </span>
             </div>
             <p style="font-size: 0.95rem; color: #ddd; margin: 0.4rem 0;">
@@ -59,8 +59,8 @@ import { Booking } from '../../models/types';
             </div>
 
             <div style="margin-top: 1rem; font-size: 0.85rem; color: #bbb; background: rgba(0,0,0,0.3); padding: 0.9rem; border-radius: 6px; display: flex; flex-direction: column; gap: 0.4rem;">
-              <div>🕒 <strong>Check-in automático:</strong> 15:00 COP del día de llegada. El PIN se activará para la cerradura.</div>
-              <div>🕒 <strong>Check-out automático:</strong> 12:00 COP del día de salida. El PIN se desactiva y se libera el depósito.</div>
+              <div>🕒 <strong>Check-in automático:</strong> 15:00 hrs (hora local) del día de llegada. El PIN se activará para la cerradura.</div>
+              <div>🕒 <strong>Check-out automático:</strong> 12:00 hrs (hora local) del día de salida. El PIN se desactiva y se libera el depósito.</div>
               <div *ngIf="booking.guaranteeDeposit">
                 🛡️ <strong>Depósito de Garantía:</strong> $ {{ booking.guaranteeDeposit | number:'1.0-0' }} COP
                 <span *ngIf="booking.guaranteeRefunded" style="color: #2ecc71; font-weight: bold;">(Reembolsado automáticamente)</span>
@@ -109,9 +109,15 @@ import { Booking } from '../../models/types';
 
               <div style="margin-bottom: 1rem;">
                 <label style="display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 0.4rem;">Calificación:</label>
-                <div style="display: flex; gap: 0.6rem; font-size: 1.8rem; cursor: pointer; user-select: none;">
+                <div role="radiogroup" aria-label="Calificación con estrellas" style="display: flex; gap: 0.6rem; font-size: 1.8rem; cursor: pointer; user-select: none;">
                   <span *ngFor="let star of [1,2,3,4,5]" 
+                        role="radio"
+                        tabindex="0"
+                        [attr.aria-label]="star + ' estrellas'"
+                        [attr.aria-checked]="reviewRating === star"
                         (click)="reviewRating = star"
+                        (keydown.enter)="reviewRating = star"
+                        (keydown.space)="reviewRating = star; $event.preventDefault()"
                         [style.color]="star <= reviewRating ? 'var(--gold)' : '#444'">
                     ★
                   </span>
@@ -174,21 +180,21 @@ import { Booking } from '../../models/types';
             <!-- Info de la estancia -->
             <div class="bd-section">
               <h3 class="bd-section-title">Estancia</h3>
-              <p><strong>Suite:</strong> {{ suiteName }}</p>
-              <p *ngIf="booking.propertyId || booking.branch"><strong>Alojamiento:</strong> {{ booking.branch?.name || 'Sede Principal' }}</p>
-              <p><strong>Check-in:</strong> {{ booking.checkIn | date:'longDate' }}</p>
-              <p><strong>Check-out:</strong> {{ booking.checkOut | date:'longDate' }}</p>
-              <p><strong>Noches:</strong> {{ booking.nights || 1 }}</p>
+              <p><strong>Suite:</strong>&nbsp;{{ suiteName }}</p>
+              <p *ngIf="booking.propertyId || booking.branch"><strong>Alojamiento:</strong>&nbsp;{{ booking.branch?.name || 'Sede Principal' }}</p>
+              <p><strong>Llegada:</strong>&nbsp;{{ booking.checkIn | date:'dd/MM/yyyy' }}</p>
+              <p><strong>Salida:</strong>&nbsp;{{ booking.checkOut | date:'dd/MM/yyyy' }}</p>
+              <p><strong>Noches:</strong>&nbsp;{{ booking.nights || 1 }}</p>
             </div>
 
             <!-- Información del Huésped (operativo para Anfitrión / Admin) -->
             <div class="bd-section" *ngIf="isHostOrAdmin">
               <h3 class="bd-section-title">Datos del Huésped</h3>
-              <p><strong>Huésped:</strong> {{ guestNameDisplay }}</p>
-              <p *ngIf="guestEmailDisplay"><strong>Email:</strong> <a [href]="'mailto:' + guestEmailDisplay" style="color: var(--gold); text-decoration: none;">{{ guestEmailDisplay }}</a></p>
-              <p *ngIf="guestPhoneDisplay"><strong>Teléfono:</strong> <a [href]="'tel:' + guestPhoneDisplay" style="color: var(--gold); text-decoration: none;">{{ guestPhoneDisplay }}</a></p>
-              <p><strong>Capacidad:</strong> {{ booking.guests || 1 }} adulto(s)<span *ngIf="booking.children">, {{ booking.children }} niño(s)</span></p>
-              <p *ngIf="booking.needsCrib"><strong>Cuna para bebé:</strong> <span style="color: #2ecc71;">Solicitada</span></p>
+              <p><strong>Huésped:</strong>&nbsp;{{ guestNameDisplay }}</p>
+              <p *ngIf="guestEmailDisplay"><strong>Email:</strong>&nbsp;<a [href]="'mailto:' + guestEmailDisplay" style="color: var(--gold); text-decoration: none;">{{ guestEmailDisplay }}</a></p>
+              <p *ngIf="guestPhoneDisplay"><strong>Teléfono:</strong>&nbsp;<a [href]="'tel:' + guestPhoneDisplay" style="color: var(--gold); text-decoration: none;">{{ guestPhoneDisplay }}</a></p>
+              <p><strong>Capacidad:</strong>&nbsp;{{ booking.guests || 1 }} adulto(s)<span *ngIf="booking.children">, {{ booking.children }} niño(s)</span></p>
+              <p *ngIf="booking.needsCrib"><strong>Cuna para bebé:</strong>&nbsp;<span style="color: #2ecc71;">Solicitada</span></p>
             </div>
 
             <!-- Servicios Adicionales -->
@@ -209,9 +215,9 @@ import { Booking } from '../../models/types';
               
               <!-- Para Anfitrión / Admin: desglose de comisión y pago neto -->
               <div *ngIf="isHostOrAdmin && !isGuestOwner" style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem;">
-                <p style="margin: 0;"><strong>Comisión Plataforma (8%):</strong> <span style="color: #ff9f43;">- $ {{ (booking.platformFee || (booking.totalPrice * 0.08)) | number:'1.0-0' }} COP</span></p>
-                <p style="margin: 0;"><strong>Pago Neto al Anfitrión:</strong> <span style="color: #2ecc71; font-weight: bold; font-size: 1.1rem;">$ {{ (booking.hostPayout || (booking.totalPrice * 0.92)) | number:'1.0-0' }} COP</span></p>
-                <p style="margin: 0.4rem 0 0;"><strong>Estado del Pago:</strong> <span class="status-badge" [ngClass]="booking.paymentStatus || 'pending'" style="font-size: 0.75rem; padding: 3px 10px;">{{ (booking.paymentStatus || 'Pendiente') | uppercase }}</span></p>
+                <p style="margin: 0;"><strong>Comisión Plataforma (8%):</strong>&nbsp;<span style="color: #ff9f43;">- $ {{ (booking.platformFee || (booking.totalPrice * 0.08)) | number:'1.0-0' }} COP</span></p>
+                <p style="margin: 0;"><strong>Pago Neto al Anfitrión:</strong>&nbsp;<span style="color: #2ecc71; font-weight: bold; font-size: 1.1rem;">$ {{ (booking.hostPayout || (booking.totalPrice * 0.92)) | number:'1.0-0' }} COP</span></p>
+                <p style="margin: 0.4rem 0 0;"><strong>Estado del Pago:</strong>&nbsp;<span class="status-badge" [ngClass]="booking.paymentStatus || 'pending'" style="font-size: 0.75rem; padding: 3px 10px;">{{ getPaymentStatusLabel(booking.paymentStatus) }}</span></p>
               </div>
 
               <!-- Para Huésped: acciones de pago y factura -->
@@ -437,6 +443,30 @@ export class BookingDetailComponent implements OnInit {
   get suiteName(): string {
     if (!this.booking?.suite) return 'Suite Desconocida';
     return typeof this.booking.suite === 'string' ? this.booking.suite : this.booking.suite.name;
+  }
+
+  getStatusLabel(status?: string): string {
+    switch ((status || '').toLowerCase()) {
+      case 'confirmed': return 'Confirmada';
+      case 'pending': return 'Pendiente de Pago';
+      case 'checked_in': return 'Hospedado';
+      case 'checked_out': return 'Estancia Finalizada';
+      case 'completed': return 'Completada';
+      case 'cancelled': return 'Cancelada';
+      case 'expired': return 'Expirada';
+      default: return status || 'Pendiente';
+    }
+  }
+
+  getPaymentStatusLabel(status?: string): string {
+    switch ((status || '').toLowerCase()) {
+      case 'paid': return 'Pagado';
+      case 'pending': return 'Pendiente';
+      case 'refunded': return 'Reembolsado';
+      case 'requires_refund': return 'Reembolso Pendiente';
+      case 'failed': return 'Fallido';
+      default: return status || 'Pendiente';
+    }
   }
 
   hasExtraServices(): boolean {

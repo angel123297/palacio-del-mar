@@ -87,7 +87,7 @@ export interface HostPromotionItem {
               <p class="font-serif text-4xl text-[#f5f0e8]">{{ metrics()?.pendingCheckins || 0 }}</p>
             </div>
             <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
-              <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Reservas Activas de mi Sucursal</p>
+              <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Reservas Activas en mis Alojamientos</p>
               <p class="font-serif text-4xl text-[#f5f0e8]">{{ metrics()?.activeBookings || 0 }}</p>
             </div>
             <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
@@ -123,6 +123,7 @@ export interface HostPromotionItem {
                     <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Huésped</th>
                     <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Llegada / Salida</th>
                     <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Suite</th>
+                    <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">Estado</th>
                     <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold">PIN Cerradura</th>
                     <th class="py-4 px-6 text-[11px] uppercase tracking-widest text-[#c9a96e] font-semibold text-right">Recepción / Gestión</th>
                   </tr>
@@ -137,6 +138,17 @@ export interface HostPromotionItem {
                     <td class="py-4 px-6 text-sm text-[#f5f0e8] opacity-80">{{ b.checkIn | date:'dd/MM' }} &rarr; {{ b.checkOut | date:'dd/MM' }}</td>
                     <td class="py-4 px-6 text-sm text-[#f5f0e8]">{{ b.suite?.name || 'Suite' }}</td>
                     <td class="py-4 px-6">
+                      <span [ngClass]="{
+                        'bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border-[#2ecc71]': b.status === 'confirmed',
+                        'bg-[rgba(0,206,201,0.15)] text-[#00cec9] border-[#00cec9]': b.status === 'checked_in' || b.checkedIn,
+                        'bg-[rgba(108,92,231,0.15)] text-[#a29bfe] border-[#a29bfe]': b.status === 'checked_out' || b.status === 'completed',
+                        'bg-[rgba(241,196,15,0.15)] text-[#f1c40f] border-[#f1c40f]': b.status === 'pending',
+                        'bg-[rgba(231,76,60,0.15)] text-[#e74c3c] border-[#e74c3c]': b.status === 'cancelled'
+                      }" class="px-2.5 py-0.5 text-[10px] uppercase tracking-wider font-bold rounded-full border">
+                        {{ getBookingStatusLabel(b) }}
+                      </span>
+                    </td>
+                    <td class="py-4 px-6">
                       <div class="flex items-center gap-2">
                         <span class="font-mono text-sm px-2 py-0.5 bg-[rgba(255,255,255,0.08)] border border-[rgba(201,169,110,0.3)] text-[#c9a96e] rounded">
                           {{ b.smartLockPin || '----' }}
@@ -146,11 +158,11 @@ export interface HostPromotionItem {
                     </td>
                     <td class="py-4 px-6 text-right">
                       <div class="flex items-center justify-end gap-2">
-                        <button *ngIf="!b.checkedIn" (click)="markCheckIn(b)" class="px-2.5 py-1 bg-[rgba(46,204,113,0.15)] text-[#2ecc71] hover:bg-[#2ecc71] hover:text-[#0d0d0d] rounded text-xs font-semibold transition border border-[#2ecc71]">
-                          Check-in
+                        <button *ngIf="b.status === 'confirmed' && !b.checkedIn" (click)="markCheckIn(b)" class="px-2.5 py-1 bg-[rgba(46,204,113,0.15)] text-[#2ecc71] hover:bg-[#2ecc71] hover:text-[#0d0d0d] rounded text-xs font-semibold transition border border-[#2ecc71] cursor-pointer">
+                          Registrar Check-in
                         </button>
-                        <button *ngIf="b.checkedIn && !b.checkedOut" (click)="markCheckOut(b)" class="px-2.5 py-1 bg-[rgba(230,126,34,0.15)] text-[#e67e22] hover:bg-[#e67e22] hover:text-[#0d0d0d] rounded text-xs font-semibold transition border border-[#e67e22]">
-                          Check-out
+                        <button *ngIf="(b.status === 'checked_in' || b.checkedIn) && b.status !== 'checked_out' && b.status !== 'completed' && !b.checkedOut" (click)="markCheckOut(b)" class="px-2.5 py-1 bg-[rgba(230,126,34,0.15)] text-[#e67e22] hover:bg-[#e67e22] hover:text-[#0d0d0d] rounded text-xs font-semibold transition border border-[#e67e22] cursor-pointer">
+                          Registrar Check-out
                         </button>
                         <a [routerLink]="['/reservas', b.id || b._id]" class="bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] hover:text-white transition px-3 py-1 rounded text-xs font-semibold tracking-wider uppercase border border-[rgba(201,169,110,0.5)]">
                           Gestionar
@@ -159,7 +171,7 @@ export interface HostPromotionItem {
                     </td>
                   </tr>
                   <tr *ngIf="bookings().length === 0">
-                    <td colspan="6" class="py-12 text-center text-[#f5f0e8] opacity-50 text-sm">No hay reservas recientes para tu sucursal.</td>
+                    <td colspan="7" class="py-12 text-center text-[#f5f0e8] opacity-50 text-sm">No hay reservas recientes para tus alojamientos.</td>
                   </tr>
                 </tbody>
               </table>
@@ -184,8 +196,8 @@ export interface HostPromotionItem {
             
             <!-- Create Promo Form for Host -->
             <div class="bg-[#111] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 lg:col-span-1">
-              <h2 class="font-serif text-2xl text-[#c9a96e] mb-4">Promoción Local de Sede</h2>
-              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Lanza una promoción con rango de fechas para estimular la ocupación en tu sucursal.</p>
+              <h2 class="font-serif text-2xl text-[#c9a96e] mb-4">Promoción de mi Alojamiento</h2>
+              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Lanza una promoción por temporada o fechas específicas para impulsar las reservas en tus alojamientos.</p>
 
               <form (ngSubmit)="submitPromotion()" class="space-y-4">
                 <div>
@@ -233,7 +245,7 @@ export interface HostPromotionItem {
                 </div>
 
                 <button type="submit" [disabled]="submittingPromo" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2">
-                  {{ submittingPromo ? 'Publicando...' : 'Publicar Oferta de Sede' }}
+                  {{ submittingPromo ? 'Publicando...' : 'Publicar Oferta' }}
                 </button>
               </form>
             </div>
@@ -241,12 +253,12 @@ export interface HostPromotionItem {
             <!-- List of Branch Promos -->
             <div class="lg:col-span-2 space-y-4">
               <div class="flex justify-between items-center mb-2">
-                <h2 class="font-serif text-2xl text-[#c9a96e]">Ofertas Activas de Sede ({{ promotions().length }})</h2>
+                <h2 class="font-serif text-2xl text-[#c9a96e]">Ofertas Activas de mis Alojamientos ({{ promotions().length }})</h2>
                 <button (click)="fetchPromotions()" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Refrescar</button>
               </div>
 
               <div *ngIf="promotions().length === 0" class="border border-[rgba(201,169,110,0.2)] rounded-xl bg-[#111] p-12 text-center text-[#f5f0e8] opacity-60 text-sm">
-                No hay promociones locales registradas para tu sede en este momento.
+                No hay promociones registradas para tus alojamientos en este momento.
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -282,10 +294,13 @@ export interface HostPromotionItem {
         <ng-container *ngIf="activeTab() === 'properties'">
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            <!-- Register Property Form -->
+            <!-- Register / Edit Property Form -->
             <div class="bg-[#111] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 h-fit">
-              <h2 class="font-serif text-2xl text-[#c9a96e] mb-1">Publicar Alojamiento</h2>
-              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Registra tu hotel, suite o habitación con comisión baja (8%)</p>
+              <div class="flex justify-between items-center mb-1">
+                <h2 class="font-serif text-2xl text-[#c9a96e]">{{ editingPropertyId() ? 'Editar Alojamiento' : 'Publicar Alojamiento' }}</h2>
+                <button *ngIf="editingPropertyId()" type="button" (click)="cancelEditProperty()" class="text-[11px] text-[#e74c3c] hover:underline cursor-pointer">Cancelar edición</button>
+              </div>
+              <p class="text-xs text-[#f5f0e8] opacity-70 mb-6">Registra o actualiza tu hotel, suite o casona con comisión preferencial (8%)</p>
 
               <form (ngSubmit)="submitProperty()" class="space-y-4">
                 <div>
@@ -320,8 +335,14 @@ export interface HostPromotionItem {
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">URL Imagen Principal</label>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Fotografía Principal (Enlace o Galería)</label>
                   <input type="url" [(ngModel)]="newProperty.mainImage" name="propImg" placeholder="https://..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <div class="flex flex-wrap gap-1.5 mt-2">
+                    <span class="text-[10px] text-[#f5f0e8] opacity-60 w-full">Fotos sugeridas en alta resolución:</span>
+                    <button type="button" (click)="newProperty.mainImage = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800'" class="text-[10px] px-2 py-1 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🏨 Casona Colonial</button>
+                    <button type="button" (click)="newProperty.mainImage = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" class="text-[10px] px-2 py-1 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🌴 Resort Frente al Mar</button>
+                    <button type="button" (click)="newProperty.mainImage = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800'" class="text-[10px] px-2 py-1 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🏡 Villa de Lujo</button>
+                  </div>
                 </div>
 
                 <div *ngIf="propertyError" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
@@ -332,7 +353,7 @@ export interface HostPromotionItem {
                 </div>
 
                 <button type="submit" [disabled]="submittingProperty" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2">
-                  {{ submittingProperty ? 'Guardando...' : 'Publicar Alojamiento' }}
+                  {{ submittingProperty ? 'Guardando...' : (editingPropertyId() ? 'Guardar Cambios' : 'Publicar Alojamiento') }}
                 </button>
               </form>
             </div>
@@ -365,11 +386,16 @@ export interface HostPromotionItem {
                       <p *ngIf="prop.description" class="text-xs text-[#f5f0e8] opacity-75 line-clamp-2 mb-3">{{ prop.description }}</p>
                     </div>
 
-                    <div class="pt-3 border-t border-[rgba(255,255,255,0.08)] flex justify-between items-center text-xs">
+                    <div class="pt-3 border-t border-[rgba(255,255,255,0.08)] flex justify-between items-center text-xs gap-2">
                       <span class="text-[#f5f0e8] opacity-60">Comisión: <strong class="text-[#c9a96e]">8%</strong></span>
-                      <button type="button" (click)="openSuitesModal(prop)" class="px-3 py-1 bg-[rgba(201,169,110,0.15)] hover:bg-[#c9a96e] text-[#c9a96e] hover:text-[#0d0d0d] font-semibold rounded border border-[rgba(201,169,110,0.4)] transition flex items-center gap-1.5 cursor-pointer">
-                        <span>🛌</span> Habitaciones ({{ prop.suitesCount || 0 }})
-                      </button>
+                      <div class="flex items-center gap-2">
+                        <button type="button" (click)="startEditProperty(prop)" class="px-2.5 py-1 bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(201,169,110,0.2)] text-[#f5f0e8] hover:text-[#c9a96e] font-semibold rounded border border-[rgba(255,255,255,0.15)] transition flex items-center gap-1 cursor-pointer">
+                          <span>✏️</span> Editar
+                        </button>
+                        <button type="button" (click)="openSuitesModal(prop)" class="px-3 py-1 bg-[rgba(201,169,110,0.15)] hover:bg-[#c9a96e] text-[#c9a96e] hover:text-[#0d0d0d] font-semibold rounded border border-[rgba(201,169,110,0.4)] transition flex items-center gap-1.5 cursor-pointer">
+                          <span>🛌</span> Habitaciones ({{ prop.suitesCount || 0 }})
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -437,8 +463,13 @@ export interface HostPromotionItem {
                     </div>
 
                     <div>
-                      <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">URL Imagen de la Habitación</label>
+                      <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Fotografía de la Habitación (Enlace o Galería)</label>
                       <input type="url" [(ngModel)]="newSuite.mainImage" name="suiteImg" placeholder="https://images.unsplash.com/..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                      <div class="flex flex-wrap gap-1.5 mt-1.5">
+                        <button type="button" (click)="newSuite.mainImage = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" class="text-[10px] px-2 py-0.5 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🛏️ Suite Presidencial</button>
+                        <button type="button" (click)="newSuite.mainImage = 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800'" class="text-[10px] px-2 py-0.5 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🌊 Suite Vista al Mar</button>
+                        <button type="button" (click)="newSuite.mainImage = 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'" class="text-[10px] px-2 py-0.5 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🌴 Bungalow Jardín</button>
+                      </div>
                     </div>
 
                     <div class="flex justify-end pt-2">
@@ -574,18 +605,18 @@ export interface HostPromotionItem {
                     <!-- Secret & Events tags -->
                     <div class="bg-[rgba(0,0,0,0.4)] border border-[rgba(255,255,255,0.06)] rounded p-2.5 mb-3 flex flex-wrap justify-between items-center text-xs">
                       <div class="flex items-center gap-2">
-                        <span class="text-[#c9a96e] font-semibold uppercase text-[10px]">Secret:</span>
+                        <span class="text-[#c9a96e] font-semibold uppercase text-[10px]">Clave de Firma:</span>
                         <code class="text-[#f5f0e8] font-mono bg-[rgba(255,255,255,0.05)] px-2 py-0.5 rounded">{{ revealedSecretId() === sub.id ? sub.secret : maskedSecret(sub.secret) }}</code>
-                        <button (click)="toggleSecret(sub.id)" class="text-[10px] text-[#c9a96e] hover:underline uppercase tracking-wider px-1.5" [attr.aria-label]="revealedSecretId() === sub.id ? 'Ocultar secret' : 'Mostrar secret'">
+                        <button (click)="toggleSecret(sub.id)" class="text-[10px] text-[#c9a96e] hover:underline uppercase tracking-wider px-1.5" [attr.aria-label]="revealedSecretId() === sub.id ? 'Ocultar clave' : 'Mostrar clave'">
                           {{ revealedSecretId() === sub.id ? 'Ocultar' : 'Mostrar' }}
                         </button>
-                        <button (click)="copySecret(sub.secret)" class="text-[10px] text-[#c9a96e] hover:underline uppercase tracking-wider px-1.5" aria-label="Copiar secret al portapapeles">
+                        <button (click)="copySecret(sub.secret)" class="text-[10px] text-[#c9a96e] hover:underline uppercase tracking-wider px-1.5" aria-label="Copiar clave al portapapeles">
                           Copiar
                         </button>
                       </div>
                       <div class="flex gap-1 flex-wrap mt-1 md:mt-0">
                         <span *ngFor="let ev of sub.events" class="bg-[rgba(201,169,110,0.15)] text-[#c9a96e] text-[10px] font-mono px-2 py-0.5 rounded">
-                          {{ ev }}
+                          {{ getWebhookEventLabel(ev) }}
                         </span>
                       </div>
                     </div>
@@ -594,7 +625,7 @@ export interface HostPromotionItem {
                   <!-- Actions -->
                   <div class="pt-3 border-t border-[rgba(255,255,255,0.08)] flex justify-end gap-3 text-xs">
                     <button (click)="testWebhook(sub.id)" class="px-3 py-1.5 bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.35)] text-[#c9a96e] rounded text-xs font-semibold uppercase tracking-wider transition">
-                      🧪 Enviar Evento de Prueba
+                      🧪 Enviar Aviso de Prueba
                     </button>
                     <button (click)="deleteWebhook(sub.id)" class="px-3 py-1.5 bg-[rgba(231,76,60,0.15)] hover:bg-[rgba(231,76,60,0.3)] text-[#e74c3c] rounded text-xs font-semibold uppercase tracking-wider transition">
                       Eliminar
@@ -609,26 +640,26 @@ export interface HostPromotionItem {
           <div class="bg-[#111] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 shadow-xl mb-8">
             <div class="flex justify-between items-center mb-4">
               <div>
-                <h2 class="font-serif text-2xl text-[#c9a96e]">Historial de Entregas & Reintentos</h2>
-                <p class="text-xs text-[#f5f0e8] opacity-70">Monitoreo de entregas en tiempo real con políticas de reintento exponencial (1m / 5m / 30m).</p>
+                <h2 class="font-serif text-2xl text-[#c9a96e]">Historial de Avisos Enviados</h2>
+                <p class="text-xs text-[#f5f0e8] opacity-70">Si tu sistema está temporalmente fuera de línea, reintentamos enviar el aviso automáticamente a los 1, 5 y 30 minutos.</p>
               </div>
-              <button (click)="fetchDeliveries()" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Actualizar Logs</button>
+              <button (click)="fetchDeliveries()" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Actualizar Historial</button>
             </div>
 
             <div *ngIf="deliveries().length === 0" class="p-8 text-center text-[#f5f0e8] opacity-60 text-sm">
-              No hay registros de entregas para tus propiedades aún.
+              No hay registros de avisos enviados para tus alojamientos aún.
             </div>
 
             <div class="overflow-x-auto" *ngIf="deliveries().length > 0">
               <table class="w-full text-left text-xs">
                 <thead>
                   <tr class="border-b border-[rgba(255,255,255,0.1)] text-[#c9a96e] uppercase tracking-wider text-[10px]">
-                    <th class="pb-3">ID Evento</th>
+                    <th class="pb-3">ID Aviso</th>
                     <th class="pb-3">Tipo de Aviso</th>
                     <th class="pb-3">Destino</th>
                     <th class="pb-3 text-center">Estado</th>
                     <th class="pb-3 text-center">Intentos</th>
-                    <th class="pb-3 text-center">Código HTTP</th>
+                    <th class="pb-3 text-center">Respuesta</th>
                     <th class="pb-3">Fecha</th>
                     <th class="pb-3 text-right">Acción</th>
                   </tr>
@@ -636,21 +667,21 @@ export interface HostPromotionItem {
                 <tbody class="divide-y divide-[rgba(255,255,255,0.05)] text-[#f5f0e8]">
                   <tr *ngFor="let del of deliveries()" class="hover:bg-[rgba(255,255,255,0.02)] transition">
                     <td class="py-3 font-mono text-[11px] text-[#c9a96e]">{{ del.eventId }}</td>
-                    <td class="py-3 font-mono font-semibold">{{ del.eventType }}</td>
+                    <td class="py-3 font-semibold">{{ getWebhookEventLabel(del.eventType) }}</td>
                     <td class="py-3 truncate max-w-xs text-[#f5f0e8] opacity-80" [title]="del.targetUrl">{{ del.targetUrl }}</td>
                     <td class="py-3 text-center">
                       <span [ngClass]="del.status === 'SUCCESS' ? 'bg-[rgba(46,204,113,0.2)] text-[#2ecc71]' : (del.status === 'PENDING' ? 'bg-[rgba(241,196,15,0.2)] text-[#f1c40f]' : 'bg-[rgba(231,76,60,0.2)] text-[#e74c3c]')" class="px-2 py-0.5 font-bold text-[9px] tracking-wider uppercase rounded-full">
-                        {{ del.status === 'SUCCESS' ? '✔ Exitoso' : (del.status === 'PENDING' ? '⏳ Reintentando' : '✖ Fallido') }}
+                        {{ del.status === 'SUCCESS' ? '✔ Entregado' : (del.status === 'PENDING' ? '⏳ Reintentando' : '✖ Fallido') }}
                       </span>
                     </td>
                     <td class="py-3 text-center font-mono">{{ del.attempts }} / {{ del.maxAttempts }}</td>
                     <td class="py-3 text-center font-mono" [ngClass]="del.responseCode && del.responseCode >= 200 && del.responseCode < 300 ? 'text-[#2ecc71]' : 'text-[#e74c3c]'">
-                      {{ del.responseCode || 'N/A' }}
+                      {{ del.responseCode && del.responseCode >= 200 && del.responseCode < 300 ? 'Recibido (OK)' : (del.responseCode ? 'Error ' + del.responseCode : 'Sin respuesta') }}
                     </td>
-                    <td class="py-3 text-[#f5f0e8] opacity-60">{{ del.createdAt | date:'short' }}</td>
+                    <td class="py-3 text-[#f5f0e8] opacity-60">{{ del.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
                     <td class="py-3 text-right">
                       <button (click)="redeliver(del.id)" class="px-2.5 py-1 bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded text-[10px] uppercase tracking-wider font-semibold transition">
-                        Reintentar Envío
+                        Reenviar Aviso
                       </button>
                     </td>
                   </tr>
@@ -667,11 +698,11 @@ export interface HostPromotionItem {
                   <span>📡 Simulador de Recepción Externa en Tiempo Real</span>
                   <span class="text-xs bg-[rgba(201,169,110,0.2)] px-2 py-0.5 rounded text-[#c9a96e] font-sans font-normal">Demostración en vivo</span>
                 </h3>
-                <p class="text-xs text-[#f5f0e8] opacity-75 mt-1">Este simulador emula la recepción de un hotel o sistema externo para comprobar la llegada de alertas automáticas y la tolerancia a fallos.</p>
+                <p class="text-xs text-[#f5f0e8] opacity-75 mt-1">Este simulador emula la recepción de tu hotel o sistema externo para comprobar la llegada instantánea de avisos de reservas.</p>
               </div>
               <div class="flex items-center gap-3">
                 <button (click)="toggleDemoFailure()" [ngClass]="demoSimulateFailure() ? 'bg-[#e74c3c] text-white' : 'bg-[rgba(255,255,255,0.08)] text-[#f5f0e8] hover:bg-[rgba(255,255,255,0.15)]'" class="px-4 py-2 rounded-md text-xs font-semibold uppercase tracking-wider transition border border-[rgba(255,255,255,0.2)]">
-                  {{ demoSimulateFailure() ? '🔴 Simulación de Fallo Activa (Prueba de Reintentos)' : '🟢 Sistema Receptor Saludable (HTTP 200)' }}
+                  {{ demoSimulateFailure() ? '🔴 Simular Caída de Recepción (Probar Reintentos)' : '🟢 Recepción Operativa (En Línea)' }}
                 </button>
                 <button (click)="fetchDemoEvents()" class="px-3 py-2 bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded text-xs font-semibold uppercase tracking-wider transition">
                   Actualizar Bandeja de Alertas
@@ -820,19 +851,62 @@ export interface HostPromotionItem {
         <!-- ==================== TAB 6: LIQUIDACIONES Y DESEMBOLSOS (92%) ==================== -->
         <ng-container *ngIf="activeTab() === 'payouts'">
           <div class="space-y-6">
-            <!-- Header explicativo y botón de acción -->
+            <!-- Header explicativo -->
             <div class="bg-[#141414] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <h3 class="text-xl font-bold text-[#c9a96e] mb-1">Cortes y Liquidaciones Automáticas a Anfitriones</h3>
+                <h3 class="text-xl font-bold text-[#c9a96e] mb-1">Tus Liquidaciones y Desembolsos (92% Neto)</h3>
                 <p class="text-xs text-[#f5f0e8] opacity-75 max-w-2xl">
-                  Proceso desatendido por lotes: El sistema agrupa reservas finalizadas, descuenta automáticamente la comisión del 
-                  <strong class="text-[#c9a96e]">8%</strong> de la plataforma y genera el saldo neto a transferir (<strong class="text-[#2ecc71]">92%</strong>). 
-                  Cada liquidación emite el evento y webhook <code class="text-[#2ecc71] bg-black/40 px-1 py-0.5 rounded">payout.processed</code>.
+                  Tus ganancias se liquidan automáticamente al concluir cada estancia. Recibes el <strong class="text-[#2ecc71]">92%</strong> del valor total de cada reserva directamente en tu cuenta bancaria registrada (descontando únicamente el <strong class="text-[#c9a96e]">8%</strong> de comisión de uso de la plataforma).
                 </p>
               </div>
-              <button (click)="triggerImmediatePayout()" class="px-5 py-2.5 bg-[#c9a96e] hover:bg-[#b5955a] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider rounded-lg transition shadow-lg flex items-center gap-2 whitespace-nowrap cursor-pointer">
-                <span>⚡</span> Ejecutar Corte de Liquidación Ahora
-              </button>
+              <div class="px-4 py-2.5 bg-[rgba(46,204,113,0.12)] border border-[rgba(46,204,113,0.4)] text-[#2ecc71] font-semibold text-xs rounded-lg flex items-center gap-2 whitespace-nowrap">
+                <span>🏦</span> Desembolso automático programado (Días 1 y 15 de cada mes)
+              </div>
+            </div>
+
+            <!-- Tarjeta de Datos Bancarios para Desembolsos -->
+            <div class="bg-[#111] border border-[rgba(201,169,110,0.3)] rounded-xl p-6">
+              <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                <div>
+                  <h4 class="font-serif text-xl text-[#c9a96e]">Cuenta Bancaria para Desembolsos</h4>
+                  <p class="text-xs text-[#f5f0e8] opacity-70">Indica la cuenta donde deseas recibir las transferencias automáticas de tus reservas liquidadas.</p>
+                </div>
+                <span class="text-[11px] px-3 py-1 rounded-full bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border border-[rgba(46,204,113,0.3)] font-semibold">
+                  ✔ Cuenta Verificada para Transferencias ACH
+                </span>
+              </div>
+              <form (ngSubmit)="saveBankAccount()" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                  <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Entidad Bancaria *</label>
+                  <select [(ngModel)]="bankAccount.bankName" name="bankName" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <option value="Bancolombia">Bancolombia</option>
+                    <option value="Davivienda">Davivienda</option>
+                    <option value="Banco de Bogotá">Banco de Bogotá</option>
+                    <option value="BBVA Colombia">BBVA Colombia</option>
+                    <option value="Nequi / DaviPlata">Nequi / DaviPlata</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Tipo de Cuenta *</label>
+                  <select [(ngModel)]="bankAccount.accountType" name="accountType" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <option value="Ahorros">Cuenta de Ahorros</option>
+                    <option value="Corriente">Cuenta Corriente</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Número de Cuenta *</label>
+                  <input type="text" [(ngModel)]="bankAccount.accountNumber" name="accountNumber" required placeholder="Ej: 450-982341-01" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] font-mono outline-none focus:border-[#c9a96e]">
+                </div>
+                <div class="flex gap-2">
+                  <div class="flex-1">
+                    <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Titular / NIT *</label>
+                    <input type="text" [(ngModel)]="bankAccount.holderName" name="holderName" required placeholder="Nombre o Razón Social" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  </div>
+                  <button type="submit" class="px-4 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md text-xs uppercase tracking-wider transition cursor-pointer h-[34px]">
+                    Guardar
+                  </button>
+                </div>
+              </form>
             </div>
 
             <!-- Listado de Liquidaciones -->
@@ -952,6 +1026,7 @@ export class HostDashboardComponent implements OnInit {
   promoSuccess = '';
 
   // Host Property Form
+  editingPropertyId = signal<string>('');
   newProperty = {
     name: '',
     type: 'HOTEL',
@@ -964,6 +1039,44 @@ export class HostDashboardComponent implements OnInit {
   submittingProperty = false;
   propertyError = '';
   propertySuccess = '';
+
+  // Host Bank Account for Payouts
+  bankAccount = {
+    bankName: 'Bancolombia',
+    accountType: 'Ahorros',
+    accountNumber: '614-890234-77',
+    holderName: 'Inversiones Hotelera del Caribe SAS'
+  };
+
+  saveBankAccount() {
+    try {
+      localStorage.setItem('pdm_host_bank_account', JSON.stringify(this.bankAccount));
+    } catch {}
+    this.actionMessage.set(`Datos bancarios actualizados (${this.bankAccount.bankName} - ${this.bankAccount.accountType} ${this.bankAccount.accountNumber}).`);
+    setTimeout(() => this.actionMessage.set(''), 4000);
+  }
+
+  getBookingStatusLabel(b: Booking): string {
+    const st = (b.status || '').toLowerCase();
+    if (st === 'checked_in' || (b.checkedIn && !b.checkedOut && st !== 'checked_out' && st !== 'completed')) return 'Hospedado';
+    if (st === 'checked_out' || b.checkedOut) return 'Estancia Finalizada';
+    if (st === 'confirmed') return 'Confirmada';
+    if (st === 'pending') return 'Pendiente Pago';
+    if (st === 'completed') return 'Completada';
+    if (st === 'cancelled') return 'Cancelada';
+    return b.status || 'Pendiente';
+  }
+
+  getWebhookEventLabel(ev?: string): string {
+    switch (ev) {
+      case 'booking.created': return 'Nueva Reserva';
+      case 'booking.confirmed': return 'Pago Confirmado';
+      case 'booking.cancelled': return 'Reserva Cancelada';
+      case 'payout.processed': return 'Liquidación Procesada';
+      case 'webhook.test': return 'Aviso de Prueba';
+      default: return ev || 'Aviso';
+    }
+  }
 
   // Host Webhook Form
   newWebhook = {
@@ -1009,6 +1122,12 @@ export class HostDashboardComponent implements OnInit {
   };
 
   ngOnInit(): void {
+    try {
+      const savedBank = localStorage.getItem('pdm_host_bank_account');
+      if (savedBank) {
+        this.bankAccount = { ...this.bankAccount, ...JSON.parse(savedBank) };
+      }
+    } catch {}
     this.fetchMetrics();
     this.fetchBookings();
     this.fetchPromotions();
@@ -1269,6 +1388,37 @@ export class HostDashboardComponent implements OnInit {
     });
   }
 
+  startEditProperty(prop: Property) {
+    this.editingPropertyId.set(prop.id || prop._id || '');
+    this.newProperty = {
+      name: prop.name || '',
+      type: prop.type || 'HOTEL',
+      city: prop.city || 'Cartagena',
+      address: prop.address || '',
+      description: prop.description || '',
+      phone: prop.phone || '',
+      mainImage: prop.mainImage || ''
+    };
+    this.propertyError = '';
+    this.propertySuccess = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  cancelEditProperty() {
+    this.editingPropertyId.set('');
+    this.newProperty = {
+      name: '',
+      type: 'HOTEL',
+      city: 'Cartagena',
+      address: '',
+      description: '',
+      phone: '',
+      mainImage: ''
+    };
+    this.propertyError = '';
+    this.propertySuccess = '';
+  }
+
   submitProperty() {
     this.propertyError = '';
     this.propertySuccess = '';
@@ -1279,10 +1429,18 @@ export class HostDashboardComponent implements OnInit {
     }
 
     this.submittingProperty = true;
-    this.api.post<ApiResponse<Property>>('/host/properties', this.newProperty).subscribe({
-      next: (res) => {
+    const editId = this.editingPropertyId();
+    const req$ = editId
+      ? this.api.put<ApiResponse<Property>>(`/host/properties/${editId}`, this.newProperty)
+      : this.api.post<ApiResponse<Property>>('/host/properties', this.newProperty);
+
+    req$.subscribe({
+      next: () => {
         this.submittingProperty = false;
-        this.propertySuccess = '¡Alojamiento registrado exitosamente! En revisión por administración.';
+        this.propertySuccess = editId
+          ? '¡Alojamiento actualizado exitosamente!'
+          : '¡Alojamiento registrado exitosamente! En revisión por administración.';
+        this.editingPropertyId.set('');
         this.newProperty = {
           name: '',
           type: 'HOTEL',
@@ -1296,7 +1454,7 @@ export class HostDashboardComponent implements OnInit {
       },
       error: (err) => {
         this.submittingProperty = false;
-        this.propertyError = err?.error?.message || 'Error al registrar el alojamiento';
+        this.propertyError = err?.error?.message || 'Error al guardar el alojamiento';
       }
     });
   }

@@ -32,9 +32,9 @@
     <div class="panel" *ngIf="step === 1">
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2.5rem;">
         <div>
-          <img [src]="suite.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" style="width: 100%; height: 380px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.2);">
+          <img [src]="getSuiteImage(suite)" (error)="onImageError($event)" [alt]="suite.name" style="width: 100%; height: 380px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.2);">
           <div *ngIf="suite.images && suite.images.length > 0" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; margin-top: 1rem;">
-            <img *ngFor="let img of suite.images.slice(0,4)" [src]="img" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2); cursor: pointer; opacity: 0.7;" (click)="suite.mainImage = img">
+            <img *ngFor="let img of suite.images.slice(0,4)" [src]="img" (error)="onImageError($event)" [alt]="suite.name" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2); cursor: pointer; opacity: 0.7;" (click)="suite.mainImage = img">
           </div>
           <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{ suite.name }}</h1>
           <p style="color: var(--gold);">{{ suite.type }} · {{ suite.size || 45 }} m² · Máx {{ suite.maxGuests || 2 }} huéspedes</p>
@@ -108,12 +108,12 @@
     <!-- PANEL 2: Experiences -->
     <div class="panel" *ngIf="step === 2">
       <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 2rem;">Mejora tu estancia con Experiencias</h2>
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem;">
         <div *ngFor="let exp of experiences" class="exp-card" [class.selected]="isExperienceSelected(exp)" (click)="toggleExperience(exp)">
           <div>
-            <img [src]="exp.mainImage || exp.image || 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=800'" style="width: 100%; height: 150px; object-fit: cover; border-radius: 6px; margin-bottom: 1rem;">
+            <img [src]="getExperienceImage(exp)" (error)="onImageError($event)" [alt]="exp.name" style="width: 100%; height: 160px; object-fit: cover; border-radius: 6px; margin-bottom: 1rem;">
             <h3 style="margin: 0 0 0.5rem 0; font-size: 1.1rem;">{{exp.name}}</h3>
-            <p style="font-size: 0.85rem; color: #aaa;">{{exp.description?.substring(0,60)}}...</p>
+            <p style="font-size: 0.85rem; color: #bbb; line-height: 1.45;">{{exp.description}}</p>
           </div>
           <div class="flex-between" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
             <strong style="color: var(--gold);">$ {{exp.price | number:'1.0-0'}}</strong>
@@ -138,7 +138,7 @@
             <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Servicio de transporte privado desde el aeropuerto hasta tu suite.</p>
           </div>
           <div style="text-align: right;">
-            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ 150.000</div>
+            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ {{ 150000 | number:'1.0-0' }}</div>
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
               <input type="checkbox" [(ngModel)]="airportPickup" style="width: 20px; height: 20px; accent-color: var(--gold);">
               <span>Agregar</span>
@@ -154,7 +154,7 @@
             <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Selecciona tu almuerzo y disfruta de los mejores platillos.</p>
           </div>
           <div style="text-align: right;">
-            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ 80.000</div>
+            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ {{ 80000 | number:'1.0-0' }}</div>
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
               <input type="checkbox" [(ngModel)]="wantFood" style="width: 20px; height: 20px; accent-color: var(--gold);">
               <span>Agregar Comida</span>
@@ -176,11 +176,11 @@
           <div *ngIf="foodType" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed rgba(212,175,55,0.3);">
             <div class="flex-between">
               <div>
-                <strong style="color: var(--gold);">☕ Combo Desayuno Incluido</strong>
-                <p style="font-size: 0.85rem; color: #aaa; margin: 0.3rem 0 0 0;">Estas comidas se sirven en el almuerzo. Agrega el desayuno completamente gratis por un monto extra mínimo.</p>
+                <strong style="color: var(--gold);">☕ Combo Desayuno Gourmet</strong>
+                <p style="font-size: 0.85rem; color: #aaa; margin: 0.3rem 0 0 0;">Añade el desayuno tradicional cartagenero en tu suite por una tarifa preferencial.</p>
               </div>
               <div style="text-align: right;">
-                <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ 35.000</div>
+                <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ {{ 35000 | number:'1.0-0' }}</div>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; justify-content: flex-end;">
                   <input type="checkbox" [(ngModel)]="breakfastCombo" style="width: 18px; height: 18px; accent-color: var(--gold);">
                   <span>Añadir</span>
@@ -205,7 +205,7 @@
         
         <!-- Minimal Summary -->
         <div class="card" style="margin-bottom: 2rem; text-align: center;">
-          <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1rem;">Confirmación</h3>
+          <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1rem;">Detalles de tu Estancia</h3>
           <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 1.5rem;">Estás a un paso de confirmar tu estadía en <strong>{{suite.name}}</strong>.</p>
           
           <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem;">
@@ -230,8 +230,8 @@
             <button class="btn-primary" style="width: 100%; max-width: 300px;" (click)="openAuth()">Iniciar Sesión / Registrarse</button>
           </div>
           <div *ngIf="auth.isLoggedIn()">
-            <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1rem;">Confirmación</h3>
-            <p style="color: #ccc; font-size: 0.95rem; margin-bottom: 1.5rem;">Al continuar, se creará tu reserva y serás redirigido a nuestro Centro de Pago seguro para completarla.</p>
+            <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1rem;">Proceder al Pago Seguro</h3>
+            <p style="color: #ccc; font-size: 0.95rem; margin-bottom: 1.5rem;">Al continuar, se registrará tu reserva y serás redirigido a nuestro Centro de Pago seguro para completarla.</p>
             <p *ngIf="message" [style.color]="isError ? '#ff4d4d' : 'var(--gold)'" style="font-size: 0.9rem; margin-bottom: 1rem;">{{message}}</p>
             <button class="btn-primary" style="width: 100%; max-width: 300px; font-size: 1.1rem; padding: 1rem;" (click)="createBooking()" [disabled]="bookingBusy">
               {{ bookingBusy ? 'Creando Reserva...' : 'Pagar →' }}

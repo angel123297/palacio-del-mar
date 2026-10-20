@@ -114,9 +114,11 @@ export interface RefundItem {
               <div class="flex flex-col">
                 <label class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Estado</label>
                 <select [ngModel]="statusFilter()" (ngModelChange)="updateStatus($event)" class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none">
-                  <option value="">Todos</option>
-                  <option value="pending">Pendientes</option>
+                  <option value="">Todos los estados</option>
+                  <option value="pending">Pendientes de Pago</option>
                   <option value="confirmed">Confirmadas</option>
+                  <option value="checked_in">Hospedados (En Estancia)</option>
+                  <option value="checked_out">Estancias Finalizadas</option>
                   <option value="cancelled">Canceladas</option>
                 </select>
               </div>
@@ -165,11 +167,12 @@ export interface RefundItem {
                     <td class="py-4 px-6">
                       <span class="px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold"
                             [ngClass]="{
-                              'bg-[rgba(46,204,113,0.15)] text-[#2ecc71]': b.status === 'confirmed' || b.status === 'CONFIRMED',
-                              'bg-[rgba(241,196,15,0.15)] text-[#f1c40f]': b.status === 'pending' || b.status === 'PENDING',
-                              'bg-[rgba(231,76,60,0.15)] text-[#e74c3c]': b.status === 'cancelled' || b.status === 'CANCELLED'
+                              'bg-[rgba(46,204,113,0.15)] text-[#2ecc71]': (b.status || '').toLowerCase() === 'confirmed' || (b.status || '').toLowerCase() === 'checked_in',
+                              'bg-[rgba(241,196,15,0.15)] text-[#f1c40f]': (b.status || '').toLowerCase() === 'pending',
+                              'bg-[rgba(201,169,110,0.15)] text-[#c9a96e]': (b.status || '').toLowerCase() === 'checked_out' || (b.status || '').toLowerCase() === 'completed',
+                              'bg-[rgba(231,76,60,0.15)] text-[#e74c3c]': (b.status || '').toLowerCase() === 'cancelled'
                             }">
-                        {{ b.status }}
+                        {{ getStatusLabel(b.status) }}
                       </span>
                     </td>
                     <td class="py-4 px-6 text-right">
@@ -217,9 +220,9 @@ export interface RefundItem {
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Sede de Aplicación</label>
+                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Alojamiento de Aplicación</label>
                   <select [(ngModel)]="newPromo.branchId" name="promoBranch" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
-                    <option value="all">Todas las sedes (Global)</option>
+                    <option value="all">Todos los alojamientos (Global)</option>
                     <option *ngFor="let prop of properties()" [value]="prop.id || prop._id">
                       {{ prop.name }} · {{ prop.city }}
                     </option>
@@ -283,7 +286,7 @@ export interface RefundItem {
                     </div>
 
                     <div class="space-y-1 text-xs text-[#f5f0e8] opacity-75 mb-4">
-                      <p><strong class="text-[#c9a96e]">Sede:</strong> {{ getBranchName(p.branchId || p.branch) }}</p>
+                      <p><strong class="text-[#c9a96e]">Alojamiento:</strong> {{ getBranchName(p.branchId || p.branch) }}</p>
                       <p><strong class="text-[#c9a96e]">Vigencia:</strong> {{ p.startDate }} &rarr; {{ p.endDate }}</p>
                       <p *ngIf="p.code"><strong class="text-[#c9a96e]">Código:</strong> <span class="font-mono bg-[rgba(255,255,255,0.05)] px-2 py-0.5 rounded">{{ p.code }}</span></p>
                     </div>
@@ -375,8 +378,8 @@ export interface RefundItem {
                       <div class="flex items-center gap-3">
                         <div *ngIf="p.mainImage" class="w-10 h-10 rounded-lg bg-cover bg-center shrink-0 border border-[rgba(201,169,110,0.2)]" [style.background-image]="'url(' + p.mainImage + ')'"></div>
                         <div>
-                          <p class="text-sm font-semibold text-[#f5f0e8]">{{ p.name }}</p>
-                          <p class="text-[10px] text-[#f5f0e8] opacity-50 font-mono">ID: {{ p.id || p._id }}</p>
+                          <p class="text-sm font-semibold text-[#f5f0e8]" [title]="'ID: ' + (p.id || p._id)">{{ p.name }}</p>
+                          <p class="text-[11px] text-[#f5f0e8] opacity-60 line-clamp-1 max-w-xs">{{ p.shortDescription || p.description || 'Propiedad registrada en el marketplace' }}</p>
                         </div>
                       </div>
                     </td>
@@ -386,7 +389,7 @@ export interface RefundItem {
                     </td>
                     <td class="py-4 px-6">
                       <span class="px-2 py-0.5 rounded text-[10px] uppercase font-mono tracking-wider bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[#c9a96e]">
-                        {{ p.type || 'HOTEL' }}
+                        {{ getPropertyTypeLabel(p.type) }}
                       </span>
                     </td>
                     <td class="py-4 px-6 font-mono text-sm text-[#f5f0e8]">
@@ -439,7 +442,7 @@ export interface RefundItem {
             <div class="flex justify-between items-center mb-6">
               <div>
                 <h2 class="font-serif text-2xl text-[#c9a96e]">Pagos Pendientes de Reembolso</h2>
-                <p class="text-xs text-[#f5f0e8] opacity-60">Cobros marcados como requires_refund por cancelaciones, expiración o pagos tardíos</p>
+                <p class="text-xs text-[#f5f0e8] opacity-60">Cobros pendientes de devolución monetaria al huésped por cancelación o expiración de reserva</p>
               </div>
               <button (click)="fetchRefunds()" class="px-4 py-2 border border-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded-md text-xs uppercase tracking-widest hover:bg-[rgba(201,169,110,0.1)] transition">
                 ↻ Actualizar
@@ -729,10 +732,34 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   getBranchName(id?: string): string {
-    if (!id || id === 'all') return 'Todas las sedes (Global)';
-    // Resuelve el nombre desde las properties reales (antes: mapa hardcodeado branch-1..4).
+    if (!id || id === 'all') return 'Todos los alojamientos (Global)';
     const prop = this.properties().find(p => (p.id || p._id) === id);
     return prop ? `${prop.name} · ${prop.city}` : id;
+  }
+
+  getStatusLabel(status?: string): string {
+    const s = (status || '').toLowerCase();
+    const map: Record<string, string> = {
+      confirmed: 'Confirmada',
+      pending: 'Pendiente de Pago',
+      checked_in: 'Hospedado',
+      checked_out: 'Finalizada',
+      completed: 'Finalizada',
+      cancelled: 'Cancelada'
+    };
+    return map[s] || status || 'Pendiente';
+  }
+
+  getPropertyTypeLabel(type?: string): string {
+    const t = (type || 'HOTEL').toUpperCase();
+    const map: Record<string, string> = {
+      HOTEL: 'Hotel Boutique',
+      CASONA: 'Casona Colonial',
+      VILLA: 'Villa Privada',
+      APARTAMENTO: 'Apartamento',
+      HOSTAL: 'Hostal de Autor'
+    };
+    return map[t] || t;
   }
 
   updateStatus(status: string) {
@@ -767,6 +794,9 @@ export class AdminDashboardComponent implements OnInit {
 
   updatePropertyStatus(propertyId: string, status: 'APPROVED' | 'REJECTED') {
     if (!propertyId) return;
+    if (status === 'REJECTED' && !confirm('¿Estás seguro de suspender/rechazar este alojamiento del catálogo público?')) {
+      return;
+    }
     this.api.put<ApiResponse<any>>(`/admin/properties/${propertyId}/status`, { status }).subscribe({
       next: () => {
         const actionText = status === 'APPROVED' ? 'aprobado y publicado en el marketplace' : 'rechazado';

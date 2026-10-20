@@ -756,16 +756,18 @@ section {
   color: #6fcf97;
   font-size: 0.68rem;
 }
-#rooms {
+#rooms,
+#habitaciones {
   background: #0a0a08;
   padding: 96px 48px;
 }
 .rooms-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  max-width: 1200px;
-  margin: 0 auto 16px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 32px;
 }
 .compare-hint {
   font-size: 0.63rem;
@@ -822,8 +824,9 @@ section {
   color: #fff;
 }
 .badge-ok {
-  background: #27ae60d1;
-  color: #fff;
+  background: var(--gold);
+  color: var(--dark);
+  font-weight: 600;
 }
 .room-info {
   position: absolute;
@@ -1849,7 +1852,9 @@ footer {
   }
   section,
   #about,
-  #location {
+  #location,
+  #rooms,
+  #habitaciones {
     padding: 56px 18px;
   }
   #about,

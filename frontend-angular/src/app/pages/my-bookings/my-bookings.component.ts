@@ -31,8 +31,8 @@ import { finalize } from 'rxjs';
             <h3 style="margin: 0 0 6px 0; color: #ffffff;">{{ booking.suite?.name || 'Suite Palacio del Mar' }}</h3>
             <p style="color: #aaa; font-size: 0.85rem; margin: 0 0 10px 0;">Código: {{ booking.bookingCode || booking.id || booking._id }}</p>
             <div style="display: flex; gap: 1.5rem; font-size: 0.95rem; color: #ddd;">
-              <span><strong>Check-in:</strong> {{ booking.checkIn | date:'shortDate' }}</span>
-              <span><strong>Check-out:</strong> {{ booking.checkOut | date:'shortDate' }}</span>
+              <span><strong>Llegada:</strong> {{ booking.checkIn | date:'dd/MM/yyyy' }}</span>
+              <span><strong>Salida:</strong> {{ booking.checkOut | date:'dd/MM/yyyy' }}</span>
             </div>
           </div>
 
@@ -157,8 +157,10 @@ export class MyBookingsComponent implements OnInit {
     });
   }
 
-  fetchMyBookings(): void {
-    this.loading = true;
+  fetchMyBookings(isBackgroundRefresh = false): void {
+    if (!isBackgroundRefresh) {
+      this.loading = true;
+    }
     this.api.get<any>('/bookings').pipe(
       finalize(() => {
         this.loading = false;
@@ -169,6 +171,9 @@ export class MyBookingsComponent implements OnInit {
         const raw = res.data || res;
         this.bookings = Array.isArray(raw) ? raw : (raw.bookings || []);
         this.cdr.detectChanges();
+        if (!isBackgroundRefresh && this.bookings.some(b => b.status === 'pending' && !this.isExpired(b))) {
+          setTimeout(() => this.fetchMyBookings(true), 2500);
+        }
       },
       error: () => {
         this.cdr.detectChanges();

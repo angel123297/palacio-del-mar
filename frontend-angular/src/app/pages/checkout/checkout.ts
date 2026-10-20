@@ -12,7 +12,7 @@ import { finalize, switchMap } from 'rxjs';
   imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule],
   template: `
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 4rem 1.5rem; display: flex; justify-content: center;">
-      <div style="max-width: 1100px; width: 100%; display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 3rem;">
+      <div class="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-8 lg:gap-12" style="max-width: 1100px; width: 100%;">
         
         <!-- Left: Payment Methods -->
         <div>
@@ -176,12 +176,12 @@ import { finalize, switchMap } from 'rxjs';
                
                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                  <div>
-                   <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">Check-in</span>
-                   <span style="font-weight: 500;">{{ booking.checkIn | date:'longDate' }}</span>
+                   <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">Llegada</span>
+                   <span style="font-weight: 500;">{{ booking.checkIn | date:'dd/MM/yyyy' }}</span>
                  </div>
                  <div>
-                   <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">Check-out</span>
-                   <span style="font-weight: 500;">{{ booking.checkOut | date:'longDate' }}</span>
+                   <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">Salida</span>
+                   <span style="font-weight: 500;">{{ booking.checkOut | date:'dd/MM/yyyy' }}</span>
                  </div>
                </div>
 
@@ -546,7 +546,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
         if (status === 'processing' || !data.transactionId) {
           // Asynchronous flow with webhook: start polling payment status
-          this.processingMessage = 'Esperando confirmación de pasarela via webhook...';
+          this.processingMessage = 'Procesando tu pago de forma segura con el banco...';
           this.cdr.detectChanges();
           this.pollPaymentStatus(createdIntentId, targetBookingId!);
         } else {
