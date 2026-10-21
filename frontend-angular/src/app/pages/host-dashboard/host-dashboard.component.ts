@@ -153,7 +153,7 @@ export interface HostPromotionItem {
                         <span class="font-mono text-sm px-2 py-0.5 bg-[rgba(255,255,255,0.08)] border border-[rgba(201,169,110,0.3)] text-[#c9a96e] rounded">
                           {{ b.smartLockPin || '----' }}
                         </span>
-                        <button (click)="regeneratePin(b)" title="Regenerar PIN" class="text-xs text-[#f5f0e8] opacity-60 hover:opacity-100 hover:text-[#c9a96e]">🔄</button>
+                        <button (click)="regeneratePin(b)" title="Regenerar PIN" aria-label="Regenerar PIN" class="min-w-[28px] min-h-[28px] inline-flex items-center justify-center p-1 text-xs text-[#f5f0e8] opacity-60 hover:opacity-100 hover:text-[#c9a96e]">🔄</button>
                       </div>
                     </td>
                     <td class="py-4 px-6 text-right">
