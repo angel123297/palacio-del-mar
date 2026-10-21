@@ -50,13 +50,13 @@ import { DateRangePickerComponent } from '../date-range-picker/date-range-picker
           </select>
         </div>
 
-        <!-- Filtro por ambiente / Vibe -->
+        <!-- Filtro por ambiente / Experiencia -->
         <div class="flex-1 min-w-[150px] p-4 hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center">
           <label for="booking-vibe" class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1 flex items-center gap-1.5">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-            <span>Vibe</span>
+            <span>Experiencia</span>
           </label>
-          <select id="booking-vibe" [ngModel]="searchState.filters().vibe" (ngModelChange)="searchState.updateVibe($event)" name="vibe" aria-label="Filtrar por experiencia o vibe" class="bg-transparent border-none text-[#f5f0e8] font-serif text-lg md:text-xl font-medium outline-none cursor-pointer appearance-none">
+          <select id="booking-vibe" [ngModel]="searchState.filters().vibe" (ngModelChange)="searchState.updateVibe($event)" name="vibe" aria-label="Filtrar por experiencia" class="bg-transparent border-none text-[#f5f0e8] font-serif text-lg md:text-xl font-medium outline-none cursor-pointer appearance-none">
             <option value="" class="bg-[#161311]">Cualquiera</option>
             <option value="romantico" class="bg-[#161311]">Romántico</option>
             <option value="aventura" class="bg-[#161311]">Aventura</option>
@@ -83,16 +83,25 @@ export class BookingBarComponent implements OnInit {
 
   branches: Branch[] = [];
 
+  private defaultBranches: Branch[] = [
+    { id: 'b-bocagrande', name: 'Palacio Bocagrande', slug: 'bocagrande', zone: 'Bocagrande · Mar Caribe' } as Branch,
+    { id: 'b-getsemani', name: 'Casona Colonial Getsemaní', slug: 'getsemani', zone: 'Getsemaní · Histórico' } as Branch,
+    { id: 'b-centro', name: 'Palacio Imperial San Diego', slug: 'centro-historico', zone: 'Ciudad Amurallada' } as Branch,
+    { id: 'b-boquilla', name: 'Reserva Manglares & Sol', slug: 'la-boquilla', zone: 'La Boquilla · Privacidad' } as Branch
+  ];
+
   ngOnInit(): void {
     this.api.get<ApiResponse<Branch[]> | Branch[]>('/branches').subscribe({
       next: (res) => {
-        if (Array.isArray(res)) {
-          this.branches = res;
-        } else if (res.data) {
-          this.branches = res.data;
-        } else {
-          this.branches = [];
-        }
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        const filtered = list.filter(b => {
+          const n = (b.name || '').trim().toLowerCase();
+          return n !== 'waos' && n !== 'si' && n.length > 2;
+        });
+        this.branches = filtered.length > 0 ? filtered : this.defaultBranches;
+      },
+      error: () => {
+        this.branches = this.defaultBranches;
       }
     });
   }

@@ -31,6 +31,15 @@ import { CommonModule } from '@angular/common';
 })
 export class HeroComponent {
   scrollTo(selector: string): void {
-    document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth' });
+    const el = document.querySelector(selector);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+      if (selector === '#booking-bar') {
+        setTimeout(() => {
+          const target = document.querySelector<HTMLElement>('#booking-bar input, #booking-bar select, #booking-bar button');
+          target?.focus();
+        }, 600);
+      }
+    }
   }
 }
