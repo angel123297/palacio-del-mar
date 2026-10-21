@@ -33,9 +33,9 @@ import { Suite, ApiResponse } from '../../models/types';
           <div class="w-full max-w-[800px] h-48 bg-[#1a1a1a] animate-pulse rounded-lg border border-[rgba(201,169,110,0.1)]"></div>
         </div>
 
-        <div *ngIf="!loading() && loadFailed()" class="text-center py-20 border border-[rgba(231,76,60,0.4)] rounded-lg bg-[rgba(231,76,60,0.05)]">
-          <p class="text-xl text-[#f5f0e8] opacity-80">No pudimos consultar la disponibilidad. Revisa tu conexión e inténtalo de nuevo.</p>
-          <button (click)="fetchResults()" class="mt-6 px-6 py-2 bg-transparent border border-[#c9a96e] text-[#c9a96e] hover:bg-[#c9a96e] hover:text-[#0d0d0d] transition duration-300 uppercase tracking-widest text-xs">
+        <div *ngIf="!loading() && loadFailed()" role="alert" class="text-center py-16 px-6 border border-[rgba(231,76,60,0.4)] rounded-xl bg-[rgba(231,76,60,0.06)]">
+          <p class="text-lg md:text-xl text-[#f5f0e8] opacity-90 max-w-lg mx-auto">Estamos sincronizando las suites más exclusivas para tus fechas. Por favor reintenta en un momento.</p>
+          <button (click)="fetchResults()" class="mt-6 min-h-[44px] px-8 py-2.5 inline-flex items-center justify-center bg-transparent border border-[#c9a96e] text-[#c9a96e] hover:bg-[#c9a96e] hover:text-[#0d0d0d] transition duration-300 uppercase tracking-widest text-xs font-bold rounded">
             Reintentar
           </button>
         </div>

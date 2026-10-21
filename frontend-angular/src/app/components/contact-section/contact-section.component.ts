@@ -33,12 +33,14 @@ import { FormsModule } from '@angular/forms';
 
         <form
           (ngSubmit)="handleSubmit()"
+          aria-label="Formulario de contacto y eventos exclusivos"
           style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 12px; padding: 2rem; display: flex; flex-direction: column; gap: 1rem;"
         >
           <h3 style="color: #ffffff; margin: 0 0 0.5rem 0;">Envíanos tu solicitud</h3>
           <div>
-            <label class="field-label">Nombre completo</label>
+            <label for="contact-name" class="field-label">Nombre completo</label>
             <input
+              id="contact-name"
               type="text"
               required
               placeholder="Ej: Alejandro Silva"
@@ -50,8 +52,9 @@ import { FormsModule } from '@angular/forms';
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div>
-              <label class="field-label">Correo electrónico</label>
+              <label for="contact-email" class="field-label">Correo electrónico</label>
               <input
+                id="contact-email"
                 type="email"
                 required
                 placeholder="ejemplo@correo.com"
@@ -61,8 +64,9 @@ import { FormsModule } from '@angular/forms';
               />
             </div>
             <div>
-              <label class="field-label">Teléfono</label>
+              <label for="contact-phone" class="field-label">Teléfono</label>
               <input
+                id="contact-phone"
                 type="tel"
                 placeholder="+57 300..."
                 [(ngModel)]="formData.phone"
@@ -73,8 +77,8 @@ import { FormsModule } from '@angular/forms';
           </div>
 
           <div>
-            <label class="field-label">Tipo de solicitud</label>
-            <select [(ngModel)]="formData.eventType" name="eventType" style="width: 100%;">
+            <label for="contact-event-type" class="field-label">Tipo de solicitud</label>
+            <select id="contact-event-type" [(ngModel)]="formData.eventType" name="eventType" style="width: 100%;">
               <option value="consulta">Consulta General</option>
               <option value="boda">Boda o Aniversario</option>
               <option value="corporativo">Evento Corporativo</option>
@@ -83,8 +87,9 @@ import { FormsModule } from '@angular/forms';
           </div>
 
           <div>
-            <label class="field-label">Mensaje o requerimientos especiales</label>
+            <label for="contact-message" class="field-label">Mensaje o requerimientos especiales</label>
             <textarea
+              id="contact-message"
               rows="4"
               required
               placeholder="Cuéntanos sobre tus fechas estimadas, número de invitados o requerimientos..."
@@ -94,10 +99,10 @@ import { FormsModule } from '@angular/forms';
             ></textarea>
           </div>
 
-          <button class="btn-primary" type="submit" [disabled]="busy">
+          <button class="btn-primary" type="submit" [disabled]="busy" aria-label="Enviar solicitud por correo electrónico" style="min-height: 48px;">
             Enviar solicitud por correo
           </button>
-          <p *ngIf="sentSuccess" style="color: #6fcf97; font-size: 0.9rem; margin: 0; text-align: center;">
+          <p *ngIf="sentSuccess" role="status" aria-live="polite" style="color: #6fcf97; font-size: 0.9rem; margin: 0; text-align: center;">
             Se abrió tu correo con la solicitud lista. Si no se abrió, escríbenos directo a reservas&#64;palaciomar.co.
           </p>
         </form>

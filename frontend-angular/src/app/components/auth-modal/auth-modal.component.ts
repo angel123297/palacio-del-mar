@@ -10,28 +10,28 @@ import { environment } from '../../../environments/environment';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="modal-backdrop" *ngIf="isOpen" (click)="close()" role="dialog" aria-modal="true" aria-label="Iniciar sesión o crear cuenta" tabindex="-1" (keydown.escape)="close()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
+    <div class="modal-backdrop" *ngIf="isOpen" (click)="close()" role="dialog" aria-modal="true" [attr.aria-labelledby]="mode === 'login' ? 'login-modal-title' : (mode === 'register' ? 'reg-modal-title' : 'forgot-modal-title')" tabindex="-1" (keydown.escape)="close()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
       <div class="modal-content" (click)="$event.stopPropagation()" style="background: var(--dark); border: 1px solid var(--gold); border-radius: 12px; padding: 2rem; width: 100%; max-width: 440px; color: var(--cream); position: relative;">
         
-        <button type="button" aria-label="Cerrar modal" (click)="close()" style="position: absolute; top: 16px; right: 16px; background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer;">×</button>
+        <button type="button" aria-label="Cerrar modal de autenticación" (click)="close()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;">×</button>
 
         <!-- LOGIN FORM -->
         <form *ngIf="mode === 'login'" (ngSubmit)="submitLogin()" class="auth-form">
           <p class="modal-eyebrow" style="color: var(--gold); font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">Bienvenido de nuevo</p>
-          <h2 class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1.5rem 0; color: #fff;">Iniciar sesión</h2>
+          <h2 id="login-modal-title" class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1.5rem 0; color: #fff;">Iniciar sesión</h2>
           
           <div style="margin-bottom: 1rem;">
-            <label class="field-label">Correo electrónico</label>
-            <input type="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
+            <label for="auth-login-email" class="field-label">Correo electrónico</label>
+            <input id="auth-login-email" type="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
           </div>
 
           <div style="margin-bottom: 1rem;">
-            <label class="field-label">Contraseña</label>
-            <input type="password" [(ngModel)]="password" name="password" required placeholder="••••••••" style="width: 100%;" />
+            <label for="auth-login-password" class="field-label">Contraseña</label>
+            <input id="auth-login-password" type="password" [(ngModel)]="password" name="password" required placeholder="••••••••" style="width: 100%;" />
           </div>
 
           <div style="text-align: right; margin-bottom: 1rem;">
-            <button type="button" class="link-btn" (click)="mode = 'forgot'" style="background: none; border: none; color: var(--gold); font-size: 0.85rem; cursor: pointer;">
+            <button type="button" class="link-btn" (click)="mode = 'forgot'" style="background: none; border: none; color: var(--gold); font-size: 0.85rem; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center;">
               ¿Olvidaste tu contraseña?
             </button>
           </div>
@@ -40,7 +40,7 @@ import { environment } from '../../../environments/environment';
             {{ busy ? 'Entrando…' : 'Iniciar sesión' }}
           </button>
 
-          <p *ngIf="message" [style.color]="isSuccess ? '#2ecc71' : '#ff4d4d'" [style.background]="isSuccess ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="isSuccess ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 8px 12px; border-radius: 6px; border-width: 1px; border-style: solid; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <p *ngIf="message" [attr.role]="isSuccess ? 'status' : 'alert'" aria-live="polite" [style.color]="isSuccess ? '#2ecc71' : '#ff4d4d'" [style.background]="isSuccess ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="isSuccess ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 8px 12px; border-radius: 6px; border-width: 1px; border-style: solid; display: flex; flex-direction: column; align-items: center; gap: 8px;">
             <span>{{ message }}</span>
             <button *ngIf="showForceVerifyButton" type="button" (click)="forceVerify()" style="background: var(--gold); color: var(--dark); border: none; padding: 6px 12px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 0.85rem; margin-top: 4px;">
               Verificar ahora
@@ -49,7 +49,7 @@ import { environment } from '../../../environments/environment';
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿No tienes cuenta?
-            <button type="button" class="link-btn" (click)="mode = 'register'" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px;">
+            <button type="button" class="link-btn" (click)="mode = 'register'" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
               Regístrate
             </button>
           </p>
@@ -58,44 +58,44 @@ import { environment } from '../../../environments/environment';
         <!-- REGISTER FORM -->
         <form *ngIf="mode === 'register'" (ngSubmit)="submitRegister()" class="auth-form">
           <p class="modal-eyebrow" style="color: var(--gold); font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">Únete a Palacio del Mar</p>
-          <h2 class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1.5rem 0; color: #fff;">Crear cuenta</h2>
+          <h2 id="reg-modal-title" class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1.5rem 0; color: #fff;">Crear cuenta</h2>
           
           <div style="margin-bottom: 1rem;">
-            <label class="field-label">Nombre completo</label>
-            <input type="text" [(ngModel)]="name" name="name" required placeholder="Tu nombre completo" style="width: 100%;" />
+            <label for="auth-reg-name" class="field-label">Nombre completo</label>
+            <input id="auth-reg-name" type="text" [(ngModel)]="name" name="name" required placeholder="Tu nombre completo" style="width: 100%;" />
           </div>
 
           <div style="margin-bottom: 1rem;">
-            <label class="field-label">Correo electrónico</label>
-            <input type="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
+            <label for="auth-reg-email" class="field-label">Correo electrónico</label>
+            <input id="auth-reg-email" type="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
           </div>
 
           <div style="margin-bottom: 1rem;">
-            <label class="field-label">Teléfono celular</label>
-            <input type="tel" [(ngModel)]="phone" name="phone" required placeholder="300 123 4567" style="width: 100%;" />
+            <label for="auth-reg-phone" class="field-label">Teléfono celular</label>
+            <input id="auth-reg-phone" type="tel" [(ngModel)]="phone" name="phone" required placeholder="300 123 4567" style="width: 100%;" />
           </div>
 
           <div style="margin-bottom: 1rem;">
-            <label class="field-label">Contraseña</label>
-            <input type="password" [(ngModel)]="password" name="password" required placeholder="Mínimo 8 caracteres" style="width: 100%;" />
+            <label for="auth-reg-password" class="field-label">Contraseña</label>
+            <input id="auth-reg-password" type="password" [(ngModel)]="password" name="password" required placeholder="Mínimo 8 caracteres" style="width: 100%;" />
           </div>
 
           <div style="margin-bottom: 1.5rem;">
-            <label class="field-label">Confirmar contraseña</label>
-            <input type="password" [(ngModel)]="confirmPassword" name="confirmPassword" required placeholder="••••••••" style="width: 100%;" />
+            <label for="auth-reg-confirm" class="field-label">Confirmar contraseña</label>
+            <input id="auth-reg-confirm" type="password" [(ngModel)]="confirmPassword" name="confirmPassword" required placeholder="••••••••" style="width: 100%;" />
           </div>
 
           <button type="submit" class="btn-primary" [disabled]="busy" style="width: 100%; padding: 12px; font-size: 1rem;">
             {{ busy ? 'Creando cuenta…' : 'Crear cuenta' }}
           </button>
 
-          <p *ngIf="message" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.9rem; font-weight: 500; background: rgba(255, 77, 77, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 77, 77, 0.3);">
+          <p *ngIf="message" role="alert" aria-live="assertive" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.9rem; font-weight: 500; background: rgba(255, 77, 77, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 77, 77, 0.3);">
             {{ message }}
           </p>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿Ya tienes cuenta?
-            <button type="button" class="link-btn" (click)="mode = 'login'" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px;">
+            <button type="button" class="link-btn" (click)="mode = 'login'" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
               Inicia sesión
             </button>
           </p>
@@ -104,22 +104,22 @@ import { environment } from '../../../environments/environment';
         <!-- FORGOT FORM -->
         <form *ngIf="mode === 'forgot'" (ngSubmit)="submitForgot()" class="auth-form">
           <p class="modal-eyebrow" style="color: var(--gold); font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">Recuperar acceso</p>
-          <h2 class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1rem 0; color: #fff;">¿Olvidaste tu contraseña?</h2>
+          <h2 id="forgot-modal-title" class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1rem 0; color: #fff;">¿Olvidaste tu contraseña?</h2>
           <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 1.5rem;">Escribe tu correo y te enviaremos las instrucciones para restablecerla.</p>
 
           <div style="margin-bottom: 1.5rem;">
-            <label class="field-label">Correo electrónico</label>
-            <input type="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
+            <label for="auth-forgot-email" class="field-label">Correo electrónico</label>
+            <input id="auth-forgot-email" type="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
           </div>
 
           <button type="submit" class="btn-primary" [disabled]="busy" style="width: 100%; padding: 12px; font-size: 1rem;">
             {{ busy ? 'Enviando…' : 'Enviar enlace de recuperación' }}
           </button>
 
-          <p *ngIf="message" style="margin-top: 1rem; text-align: center; font-size: 0.85rem;" [style.color]="sentForgot ? '#6fcf97' : '#ff4d4d'">{{ message }}</p>
+          <p *ngIf="message" role="status" aria-live="polite" style="margin-top: 1rem; text-align: center; font-size: 0.85rem;" [style.color]="sentForgot ? '#6fcf97' : '#ff4d4d'">{{ message }}</p>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem;">
-            <button type="button" class="link-btn" (click)="mode = 'login'" style="background: none; border: none; color: var(--gold); cursor: pointer;">
+            <button type="button" class="link-btn" (click)="mode = 'login'" style="background: none; border: none; color: var(--gold); cursor: pointer; min-height: 44px; display: inline-flex; align-items: center;">
               ← Volver a iniciar sesión
             </button>
           </p>
