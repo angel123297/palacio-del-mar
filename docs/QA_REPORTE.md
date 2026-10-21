@@ -13,6 +13,30 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-10-21 — Revisión diaria de Vibe: actividad masiva, PR #20 fusionado y cierre de PRs
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`, todos del usuario/agentes):**
+- [fix(marketplace): resolver roles de reservas, blindaje de reseñas y depuracion del frontend](https://github.com/angel123297/palacio-del-mar/commit/2870c09df6c7dd73903e938bb903e238e6a2a010) (20 oct, 16:55 UTC)
+- [fix(frontend): mejoras integrales por rol (admin, anfitrion y turista), edicion de alojamientos y actualizacion de diagramas](https://github.com/angel123297/palacio-del-mar/commit/f4d508c326a028d9ac600c1cc0a47f7ef33b433f) (20 oct, 23:03 UTC) — 628 adiciones/206 eliminaciones en dashboards, calendario, checkout y diagramas de docs.
+- [feat(tests): agregar pruebas unitarias CrearUsuarioUnitTest y ProductoControllerUnitTest y mejoras de accesibilidad WCAG 2.2 AA](https://github.com/angel123297/palacio-del-mar/commit/3f3aeec7857471d6088442423bf8c9ec56a852a7) (21 oct, 01:38 UTC) — nuevos tests backend (`CrearUsuarioUnitTest`, `ProductoControllerUnitTest`), nuevo `accessibility.spec.ts` frontend y atributos ARIA/estilos enfocados a WCAG 2.2 AA.
+
+**Pull requests: sin PRs abiertos. Cambios de estado relevantes:**
+- ✅ [#20 — Plan/marketplace webhooks](https://github.com/angel123297/palacio-del-mar/pull/20) fue **FUSIONADO a `proyecto-angular-java`** (rama original) el 21 oct, 01:42 UTC, con head 3f3aeec. El trabajo del marketplace ya está entregado a la rama original.
+- 🧹 Se cerraron todos los PRs pendientes: [#22](https://github.com/angel123297/palacio-del-mar/pull/22) (endpoints admin), [#19](https://github.com/angel123297/palacio-del-mar/pull/19), [#21](https://github.com/angel123297/palacio-del-mar/pull/21), [#18](https://github.com/angel123297/palacio-del-mar/pull/18), [#12](https://github.com/angel123297/palacio-del-mar/pull/12), [#4](https://github.com/angel123297/palacio-del-mar/pull/4), [#3](https://github.com/angel123297/palacio-del-mar/pull/3). Backlog de PRs limpio.
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones) funcionalmente completada. La actividad actual es post-plan: mejoras de rol en frontend (admin/anfitrión/turista), accesibilidad WCAG 2.2 AA y ampliación de cobertura de tests. Con la fusión de #20, el plan de 5 fases queda entregado en la rama original.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — siguen confirmados como corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`).
+
+**Tests esperados en verde:** ~263+ de backend (256 verificados el 18 oct + 7 intensivas de b1a284 + los nuevos `CrearUsuarioUnitTest`/`ProductoControllerUnitTest`, conteo exacto por verificar) y ~14+ de frontend (13 verificados + `accessibility.spec.ts`). **Pendiente verificación local/CI.**
+
+**Riesgos / problemas detectados:**
+- ⚠️ La fusión de #20 tocó la rama original `proyecto-angular-java`: confirmar que era intencional y que el resultado (3f3aeec + merge) es el estado deseado.
+- ⚠️ Los nuevos tests y el conteo total no están verificados en CI por Vibe en esta revisión.
+- ⚠️ PR #22 cerrado sin fusión: confirmar si sus endpoints de exportación/aprobación de reservas ya existen en la rama (los mensajes de f4d508c/2870c09 sugieren mejoras de admin relacionadas, pero no está auditado).
+- ⚠️ `AGENTS.md` sigue fuera del repositorio (df2c2e0, ignorado vía .gitignore).
+- ℹ️ Riesgo anterior de PRs draft acumulados: **resuelto** (todos cerrados).
+
 ### 📅 2026-10-20 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** ninguno nuevo. El único commit reciente es el propio [docs(qa): reporte diario 2026-10-19](https://github.com/angel123297/palacio-del-mar/commit/6fb9b5c6db36796aa80a0531a1f214a8a2f13063) (19 oct, 14:55 UTC), ya fuera de la ventana de esta revisión. **Sin cambios de código ni actividad de agentes (Gemini CLI/Jules/Antigravity) en el día.**
