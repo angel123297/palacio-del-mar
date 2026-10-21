@@ -44,70 +44,70 @@ import { finalize, switchMap } from 'rxjs';
             <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.3rem; border-bottom: 1px solid rgba(212,175,55,0.2); padding-bottom: 0.5rem;">Elige tu método de pago</h3>
 
             <!-- Payment Method Selector -->
-            <div style="display: flex; gap: 1rem; margin-bottom: 2rem; overflow-x: auto; padding-bottom: 0.5rem;">
-              <button type="button" (click)="selectedMethod = 'CARD'" 
+            <div role="radiogroup" aria-label="Métodos de pago disponibles" style="display: flex; gap: 1rem; margin-bottom: 2rem; overflow-x: auto; padding-bottom: 0.5rem;">
+              <button type="button" role="radio" [attr.aria-checked]="selectedMethod === 'CARD'" aria-label="Pagar con tarjeta de crédito o débito" (click)="selectedMethod = 'CARD'" 
                 [style.border-color]="selectedMethod === 'CARD' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
                 [style.background]="selectedMethod === 'CARD' ? 'rgba(212,175,55,0.1)' : 'transparent'"
-                style="flex: 1; min-width: 140px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <span style="font-size: 2rem;">💳</span>
+                style="flex: 1; min-width: 140px; min-height: 80px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-size: 2rem;" aria-hidden="true">💳</span>
                 <span style="font-weight: 600;">Tarjeta de Crédito</span>
               </button>
 
-              <button type="button" (click)="selectedMethod = 'PSE'"
+              <button type="button" role="radio" [attr.aria-checked]="selectedMethod === 'PSE'" aria-label="Pagar con PSE transferencias bancarias en Colombia" (click)="selectedMethod = 'PSE'"
                 [style.border-color]="selectedMethod === 'PSE' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
                 [style.background]="selectedMethod === 'PSE' ? 'rgba(212,175,55,0.1)' : 'transparent'"
-                style="flex: 1; min-width: 140px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <span style="font-size: 2rem;">🏦</span>
+                style="flex: 1; min-width: 140px; min-height: 80px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-size: 2rem;" aria-hidden="true">🏦</span>
                 <span style="font-weight: 600;">PSE / Bancos</span>
               </button>
 
-              <button type="button" (click)="selectedMethod = 'PAYPAL'"
+              <button type="button" role="radio" [attr.aria-checked]="selectedMethod === 'PAYPAL'" aria-label="Pagar internacionalmente con PayPal" (click)="selectedMethod = 'PAYPAL'"
                 [style.border-color]="selectedMethod === 'PAYPAL' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
                 [style.background]="selectedMethod === 'PAYPAL' ? 'rgba(212,175,55,0.1)' : 'transparent'"
-                style="flex: 1; min-width: 140px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <span style="font-size: 2rem;">🅿️</span>
+                style="flex: 1; min-width: 140px; min-height: 80px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-size: 2rem;" aria-hidden="true">🅿️</span>
                 <span style="font-weight: 600;">PayPal</span>
               </button>
             </div>
 
             <!-- CREDIT CARD FORM -->
-            <form *ngIf="selectedMethod === 'CARD'" [formGroup]="paymentForm" (ngSubmit)="processPayment()">
+            <form *ngIf="selectedMethod === 'CARD'" [formGroup]="paymentForm" (ngSubmit)="processPayment()" aria-label="Formulario de pago con tarjeta de crédito">
               <div style="background: rgba(0,0,0,0.3); padding: 1.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 2rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                   <h4 style="margin: 0; color: #ccc;">Detalles de la Tarjeta</h4>
                   <div style="display: flex; gap: 8px;">
-                    <div style="width: 35px; height: 22px; background: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #000; font-weight: bold; font-size: 0.6rem; font-style: italic;">VISA</div>
-                    <div style="width: 35px; height: 22px; background: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #eb001b; font-weight: bold; font-size: 0.6rem;">MC</div>
+                    <div style="width: 35px; height: 22px; background: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #000; font-weight: bold; font-size: 0.6rem; font-style: italic;" aria-hidden="true">VISA</div>
+                    <div style="width: 35px; height: 22px; background: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #eb001b; font-weight: bold; font-size: 0.6rem;" aria-hidden="true">MC</div>
                   </div>
                 </div>
 
                 <div style="margin-bottom: 1.2rem;">
-                  <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Titular de la tarjeta</label>
-                  <input type="text" formControlName="cardName" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;" [style.border-color]="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="Como aparece en la tarjeta">
+                  <label for="checkout-card-name" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Titular de la tarjeta</label>
+                  <input id="checkout-card-name" type="text" formControlName="cardName" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;" [style.border-color]="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="Como aparece en la tarjeta">
                   <div *ngIf="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Campo requerido</div>
                 </div>
 
                 <div style="margin-bottom: 1.2rem;">
-                  <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Número de Tarjeta</label>
-                  <input type="text" formControlName="cardNumber" maxlength="19" (input)="formatCardNumber($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; letter-spacing: 2px;" [style.border-color]="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="0000 0000 0000 0000">
+                  <label for="checkout-card-number" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Número de Tarjeta</label>
+                  <input id="checkout-card-number" type="text" formControlName="cardNumber" maxlength="19" (input)="formatCardNumber($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; letter-spacing: 2px;" [style.border-color]="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="0000 0000 0000 0000">
                   <div *ngIf="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Número inválido</div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
                   <div>
-                    <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Expiración</label>
-                    <input type="text" formControlName="expiry" maxlength="5" (input)="formatExpiry($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center;" [style.border-color]="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="MM/AA">
+                    <label for="checkout-card-expiry" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Expiración</label>
+                    <input id="checkout-card-expiry" type="text" formControlName="expiry" maxlength="5" (input)="formatExpiry($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center;" [style.border-color]="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="MM/AA">
                     <div *ngIf="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Formato MM/AA</div>
                   </div>
                   <div>
-                    <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">CVV / CVC</label>
-                    <input type="password" formControlName="cvv" maxlength="4" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center; letter-spacing: 3px;" [style.border-color]="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="•••">
+                    <label for="checkout-card-cvv" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">CVV / CVC</label>
+                    <input id="checkout-card-cvv" type="password" formControlName="cvv" maxlength="4" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center; letter-spacing: 3px;" [style.border-color]="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="•••">
                     <div *ngIf="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">CVV inválido</div>
                   </div>
                 </div>
               </div>
 
-              <button type="submit" [disabled]="processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+              <button type="submit" [disabled]="processing" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                 <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
@@ -121,8 +121,8 @@ import { finalize, switchMap } from 'rxjs';
                 <h4 style="margin: 0 0 1.5rem 0; color: #ccc;">Pago Seguro en Línea (PSE)</h4>
                 
                 <div style="text-align: left; margin-bottom: 1.5rem;">
-                  <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Selecciona tu banco</label>
-                  <select [(ngModel)]="pseBank" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
+                  <label for="checkout-pse-bank" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Selecciona tu banco</label>
+                  <select id="checkout-pse-bank" [(ngModel)]="pseBank" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
                     <option value="">-- Elige un banco --</option>
                     <option value="bancolombia">Bancolombia</option>
                     <option value="davivienda">Davivienda</option>
@@ -136,7 +136,7 @@ import { finalize, switchMap } from 'rxjs';
                 <p style="font-size: 0.85rem; color: #888;">Al continuar, serás redirigido a la pasarela segura de tu banco para confirmar la transacción.</p>
               </div>
 
-              <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+              <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                 <span *ngIf="!processing">Ir al Banco a pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
@@ -150,14 +150,14 @@ import { finalize, switchMap } from 'rxjs';
                 <div style="font-size: 3rem; color: #0070ba; font-weight: 800; font-style: italic; letter-spacing: -2px; margin-bottom: 1rem;">PayPal</div>
                 <p style="color: #ccc; margin-bottom: 2rem;">Paga de forma rápida y segura con tu cuenta de PayPal.</p>
                 
-                <button type="button" (click)="processPayPal()" [disabled]="processing" style="background: #ffc439; color: #000; border: none; border-radius: 24px; padding: 12px 30px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 250px;">
+                <button type="button" (click)="processPayPal()" [disabled]="processing" style="background: #ffc439; color: #000; border: none; border-radius: 24px; min-height: 48px; padding: 12px 30px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 250px;">
                   <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }} con PayPal</span>
                   <span *ngIf="processing">Abriendo PayPal...</span>
                 </button>
               </div>
             </div>
 
-            <p *ngIf="errorMsg" style="color: #ff4d4d; margin-top: 1.5rem; text-align: center; font-size: 0.95rem; background: rgba(255,77,77,0.1); padding: 10px; border-radius: 6px;">
+            <p *ngIf="errorMsg" role="alert" aria-live="assertive" style="color: #ff4d4d; margin-top: 1.5rem; text-align: center; font-size: 0.95rem; background: rgba(255,77,77,0.1); padding: 10px; border-radius: 6px;">
               {{ errorMsg }}
             </p>
           </div>

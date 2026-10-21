@@ -112,8 +112,8 @@ export interface RefundItem {
           <div class="flex flex-wrap gap-4 justify-between items-end mb-6 p-4 bg-[rgba(255,255,255,0.02)] border border-[rgba(201,169,110,0.1)] rounded-lg">
             <div class="flex flex-wrap gap-4 items-center">
               <div class="flex flex-col">
-                <label class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Estado</label>
-                <select [ngModel]="statusFilter()" (ngModelChange)="updateStatus($event)" class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none">
+                <label for="admin-filter-status" class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Estado</label>
+                <select id="admin-filter-status" aria-label="Filtrar reservas por estado" [ngModel]="statusFilter()" (ngModelChange)="updateStatus($event)" class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none">
                   <option value="">Todos los estados</option>
                   <option value="pending">Pendientes de Pago</option>
                   <option value="confirmed">Confirmadas</option>
@@ -123,9 +123,9 @@ export interface RefundItem {
                 </select>
               </div>
               <div class="flex flex-col">
-                <label class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Buscar</label>
+                <label for="admin-search-bookings" class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Buscar</label>
                 <div class="flex gap-2">
-                  <input type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Email o Código..." class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none w-64 placeholder-[rgba(255,255,255,0.2)]">
+                  <input id="admin-search-bookings" aria-label="Buscar reservas por email o código" type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Email o Código..." class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none w-64 placeholder-[rgba(255,255,255,0.2)]">
                   <button (click)="applySearch()" class="bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] hover:text-white transition px-4 py-2 rounded-md text-xs font-semibold tracking-widest uppercase border border-[rgba(201,169,110,0.5)]">Buscar</button>
                 </div>
               </div>
@@ -333,8 +333,8 @@ export interface RefundItem {
           <div class="flex flex-wrap gap-4 justify-between items-end mb-6 p-4 bg-[rgba(255,255,255,0.02)] border border-[rgba(201,169,110,0.1)] rounded-lg">
             <div class="flex flex-wrap gap-4 items-center">
               <div class="flex flex-col">
-                <label class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Estado de Aprobación</label>
-                <select [ngModel]="propertyStatusFilter()" (ngModelChange)="propertyStatusFilter.set($event)" class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none">
+                <label for="admin-filter-property-status" class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Estado de Aprobación</label>
+                <select id="admin-filter-property-status" aria-label="Filtrar por estado de aprobación de alojamiento" [ngModel]="propertyStatusFilter()" (ngModelChange)="propertyStatusFilter.set($event)" class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none">
                   <option value="">Todos los alojamientos</option>
                   <option value="PENDING">Pendientes de Revisión (Requieren Aprobación)</option>
                   <option value="APPROVED">Aprobados (Visibles al Público)</option>
@@ -342,8 +342,8 @@ export interface RefundItem {
                 </select>
               </div>
               <div class="flex flex-col">
-                <label class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Buscar</label>
-                <input type="text" [ngModel]="propertySearch()" (ngModelChange)="propertySearch.set($event)" placeholder="Nombre, ciudad o dirección..." class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none w-72 placeholder-[rgba(255,255,255,0.2)]">
+                <label for="admin-search-properties" class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Buscar</label>
+                <input id="admin-search-properties" aria-label="Buscar propiedades por nombre o ciudad" type="text" [ngModel]="propertySearch()" (ngModelChange)="propertySearch.set($event)" placeholder="Nombre, ciudad o dirección..." class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none w-72 placeholder-[rgba(255,255,255,0.2)]">
               </div>
             </div>
 

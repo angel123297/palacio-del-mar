@@ -21,11 +21,11 @@
     <div *ngIf="availabilityConflict" style="background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.4); color: #e74c3c; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem;">
       {{ availabilityConflict }}
     </div>
-    <div class="step-indicator">
-      <div class="step-item" [class.active]="step === 1" [class.completed]="step > 1">1. Detalles</div>
-      <div class="step-item" [class.active]="step === 2" [class.completed]="step > 2">2. Experiencias</div>
-      <div class="step-item" [class.active]="step === 3" [class.completed]="step > 3">3. VIP & Comida</div>
-      <div class="step-item" [class.active]="step === 4">4. Pago</div>
+    <div class="step-indicator" role="progressbar" [attr.aria-valuenow]="step" aria-valuemin="1" aria-valuemax="4" aria-label="Progreso de la reserva">
+      <div class="step-item" [class.active]="step === 1" [class.completed]="step > 1" [attr.aria-current]="step === 1 ? 'step' : null">1. Detalles</div>
+      <div class="step-item" [class.active]="step === 2" [class.completed]="step > 2" [attr.aria-current]="step === 2 ? 'step' : null">2. Experiencias</div>
+      <div class="step-item" [class.active]="step === 3" [class.completed]="step > 3" [attr.aria-current]="step === 3 ? 'step' : null">3. VIP & Comida</div>
+      <div class="step-item" [class.active]="step === 4" [attr.aria-current]="step === 4 ? 'step' : null">4. Pago</div>
     </div>
 
     <!-- PANEL 1: Suite Info -->
@@ -34,7 +34,7 @@
         <div>
           <img [src]="getSuiteImage(suite)" (error)="onImageError($event)" [alt]="suite.name" style="width: 100%; height: 380px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.2);">
           <div *ngIf="suite.images && suite.images.length > 0" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; margin-top: 1rem;">
-            <img *ngFor="let img of suite.images.slice(0,4)" [src]="img" (error)="onImageError($event)" [alt]="suite.name" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2); cursor: pointer; opacity: 0.7;" (click)="suite.mainImage = img">
+            <img *ngFor="let img of suite.images.slice(0,4); let imgIdx = index" [src]="img" (error)="onImageError($event)" [alt]="suite.name + ' foto ' + (imgIdx + 1)" role="button" tabindex="0" (keydown.enter)="suite.mainImage = img" (keydown.space)="suite.mainImage = img; $event.preventDefault()" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2); cursor: pointer; opacity: 0.7;" (click)="suite.mainImage = img">
           </div>
           <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{ suite.name }}</h1>
           <p style="color: var(--gold);">{{ suite.type }} · {{ suite.size || 45 }} m² · Máx {{ suite.maxGuests || 2 }} huéspedes</p>
@@ -54,8 +54,8 @@
               <app-date-range-picker [checkIn]="checkIn" [checkOut]="checkOut" [guests]="guests" [branch]="branchIdentifier" [suiteId]="suite?.id || suite?._id || suite?.slug || ''" (rangeChange)="checkIn = $event.checkIn; checkOut = $event.checkOut; validateDates()"></app-date-range-picker>
             </div>
             <div>
-              <label style="color: var(--gold); font-size: 0.85rem;">Huéspedes</label>
-              <select [(ngModel)]="guests" class="form-control">
+              <label for="suite-guests-select" style="color: var(--gold); font-size: 0.85rem;">Huéspedes</label>
+              <select id="suite-guests-select" [(ngModel)]="guests" class="form-control" aria-label="Cantidad de huéspedes">
                 <option *ngFor="let i of [1,2,3,4,5,6,7,8].slice(0, suite.maxGuests || 2)" [value]="i">{{i}}</option>
               </select>
             </div>

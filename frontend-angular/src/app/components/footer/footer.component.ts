@@ -7,7 +7,7 @@ import { RouterModule } from '@angular/router';
   standalone: true,
   imports: [CommonModule, RouterModule],
   template: `
-    <footer>
+    <footer role="contentinfo" aria-label="Pie de página Palacio del Mar">
       <div class="footer-top">
         <div class="footer-col">
           <p class="footer-logo">Palacio del Mar</p>
@@ -29,8 +29,8 @@ import { RouterModule } from '@angular/router';
         <div class="footer-col">
           <h4>Contacto</h4>
           <ul>
-            <li><a href="mailto:reservas@palaciomar.co" class="footer-link">reservas&#64;palaciomar.co</a></li>
-            <li><a href="https://wa.me/573009876543" target="_blank" rel="noreferrer" class="footer-link">+57 300 987 6543</a></li>
+            <li><a href="mailto:reservas@palaciomar.co" class="footer-link" aria-label="Escribir correo a reservas@palaciomar.co">reservas&#64;palaciomar.co</a></li>
+            <li><a href="https://wa.me/573009876543" target="_blank" rel="noopener noreferrer" class="footer-link" aria-label="Escribir por WhatsApp al +57 300 987 6543 (abre en nueva pestaña)">+57 300 987 6543</a></li>
             <li>Calle del Santísimo # 8-12, Centro Histórico</li>
           </ul>
         </div>
@@ -42,7 +42,7 @@ import { RouterModule } from '@angular/router';
     </footer>
   `,
   styles: [`
-    .footer-link { color: inherit; text-decoration: none; cursor: pointer; }
+    .footer-link { color: inherit; text-decoration: none; cursor: pointer; display: inline-block; padding: 4px 0; min-height: 28px; }
     .footer-link:hover { color: var(--gold); }
   `]
 })

@@ -20,11 +20,12 @@ import { Suite, Branch } from '../../models/types';
       </div>
 
       <!-- Sucursales Filter -->
-      <div class="filter-row" *ngIf="branches.length > 0">
+      <div class="filter-row" *ngIf="branches.length > 0" role="group" aria-label="Filtrar por sucursal">
         <button
           type="button"
           class="filter-btn"
           [class.is-active]="selectedBranch === ''"
+          [attr.aria-pressed]="selectedBranch === ''"
           (click)="selectBranch('')"
         >
           Todas las sucursales
@@ -34,6 +35,7 @@ import { Suite, Branch } from '../../models/types';
           type="button"
           class="filter-btn"
           [class.is-active]="selectedBranch === b.slug"
+          [attr.aria-pressed]="selectedBranch === b.slug"
           (click)="selectBranch(b.slug)"
         >
           {{ getShortBranch(b.name) }}
@@ -41,11 +43,12 @@ import { Suite, Branch } from '../../models/types';
       </div>
 
       <!-- Tipos Filter -->
-      <div class="filter-row" *ngIf="types.length > 0" style="margin-top: 10px;">
+      <div class="filter-row" *ngIf="types.length > 0" style="margin-top: 10px;" role="group" aria-label="Filtrar por tipo de suite">
         <button
           type="button"
           class="filter-btn"
           [class.is-active]="selectedType === ''"
+          [attr.aria-pressed]="selectedType === ''"
           (click)="selectedType = ''"
         >
           Todas
@@ -55,6 +58,7 @@ import { Suite, Branch } from '../../models/types';
           type="button"
           class="filter-btn"
           [class.is-active]="selectedType === t.name"
+          [attr.aria-pressed]="selectedType === t.name"
           (click)="selectedType = t.name"
         >
           {{ t.name }} ({{ t.count }})
@@ -105,11 +109,11 @@ import { Suite, Branch } from '../../models/types';
               <span> / noche</span>
             </div>
 
-            <a class="room-detail-link" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
+            <a class="room-detail-link" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]" [attr.aria-label]="'Ver detalles de ' + suite.name">
               Ver detalles
             </a>
 
-            <a class="btn-book room-cta" style="text-decoration: none; display: inline-block; text-align: center;" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
+            <a class="btn-book room-cta" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; text-align: center; min-height: 44px;" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]" [attr.aria-label]="'Reservar ' + suite.name">
               Reservar
             </a>
           </div>

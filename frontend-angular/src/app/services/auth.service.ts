@@ -21,6 +21,11 @@ export class AuthService {
   }
 
   constructor(private http: HttpClient) {
+    this.loadCachedUser();
+    this.fetchMe();
+  }
+
+  loadCachedUser() {
     const cachedUser = localStorage.getItem('user');
     if (cachedUser) {
       try {
@@ -28,8 +33,9 @@ export class AuthService {
       } catch (e) {
         localStorage.removeItem('user');
       }
+    } else {
+      this.currentUserSignal.set(null);
     }
-    this.fetchMe();
   }
 
   private fetchMe() {

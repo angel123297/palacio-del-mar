@@ -100,9 +100,9 @@ export interface HostPromotionItem {
           <div class="flex flex-wrap gap-4 justify-between items-end mb-6 p-4 bg-[rgba(255,255,255,0.02)] border border-[rgba(201,169,110,0.1)] rounded-lg">
             <div class="flex gap-4 items-center">
               <div class="flex flex-col">
-                <label class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Buscar Reserva</label>
+                <label for="host-search-bookings" class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Buscar Reserva</label>
                 <div class="flex gap-2">
-                  <input type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Email o Código..." class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none w-64 placeholder-[rgba(255,255,255,0.2)] focus:border-[#c9a96e] transition">
+                  <input id="host-search-bookings" aria-label="Buscar reservas por email o código" type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Email o Código..." class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none w-64 placeholder-[rgba(255,255,255,0.2)] focus:border-[#c9a96e] transition">
                   <button (click)="applySearch()" class="bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] hover:text-white transition px-4 py-2 rounded-md text-xs font-semibold tracking-widest uppercase border border-[rgba(201,169,110,0.5)]">Buscar</button>
                 </div>
               </div>
@@ -171,7 +171,14 @@ export interface HostPromotionItem {
                     </td>
                   </tr>
                   <tr *ngIf="bookings().length === 0">
-                    <td colspan="7" class="py-12 text-center text-[#f5f0e8] opacity-50 text-sm">No hay reservas recientes para tus alojamientos.</td>
+                    <td colspan="7" class="py-12 text-center text-[#f5f0e8] text-sm">
+                      <div class="flex flex-col items-center justify-center gap-3">
+                        <p class="opacity-70">No hay reservas recientes para tus alojamientos.</p>
+                        <button type="button" (click)="activeTab.set('properties')" class="min-h-[38px] px-4 py-2 bg-[rgba(201,169,110,0.15)] hover:bg-[rgba(201,169,110,0.3)] text-[#c9a96e] border border-[rgba(201,169,110,0.4)] rounded-md text-xs font-semibold uppercase tracking-wider transition cursor-pointer">
+                          Publicar o Gestionar Alojamientos &rarr;
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -192,6 +199,20 @@ export interface HostPromotionItem {
 
         <!-- ==================== TAB 2: PROMOTIONS DE SUCURSAL ==================== -->
         <ng-container *ngIf="activeTab() === 'promotions'">
+          <!-- Helpful guidance if host has no properties yet -->
+          <div *ngIf="properties().length === 0" class="mb-6 p-5 rounded-xl bg-[rgba(201,169,110,0.08)] border border-[#c9a96e] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl" aria-hidden="true">🏨</span>
+              <div>
+                <p class="text-sm font-bold text-[#c9a96e]">Aún no tienes alojamientos registrados</p>
+                <p class="text-xs text-[#f5f0e8] opacity-80">Para crear promociones estacionales y cupones de descuento, primero registra tu propiedad.</p>
+              </div>
+            </div>
+            <button type="button" (click)="activeTab.set('properties')" class="min-h-[40px] px-4 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider rounded-md whitespace-nowrap cursor-pointer">
+              Registrar mi Alojamiento &rarr;
+            </button>
+          </div>
+
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             <!-- Create Promo Form for Host -->
@@ -201,13 +222,13 @@ export interface HostPromotionItem {
 
               <form (ngSubmit)="submitPromotion()" class="space-y-4">
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Título de la Oferta *</label>
-                  <input type="text" [(ngModel)]="newPromo.title" name="promoTitle" required placeholder="Ej: Fin de Semana Bohemio en Getsemaní" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <label for="host-promo-title" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Título de la Oferta *</label>
+                  <input id="host-promo-title" type="text" [(ngModel)]="newPromo.title" name="promoTitle" required placeholder="Ej: Fin de Semana Bohemio en Getsemaní" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Alojamiento Asignado *</label>
-                  <select [(ngModel)]="newPromo.branchId" name="promoBranch" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <label for="host-promo-branch" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Alojamiento Asignado *</label>
+                  <select id="host-promo-branch" aria-label="Seleccionar alojamiento para la promoción" [(ngModel)]="newPromo.branchId" name="promoBranch" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                     <option *ngIf="properties().length === 0" value="" disabled>No tienes alojamientos disponibles</option>
                     <option *ngFor="let prop of properties()" [value]="prop.id || prop._id">
                       {{ prop.name }} ({{ prop.city }})
@@ -217,23 +238,23 @@ export interface HostPromotionItem {
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Fecha Inicio *</label>
-                    <input type="date" [(ngModel)]="newPromo.startDate" name="promoStartDate" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <label for="host-promo-start" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Fecha Inicio *</label>
+                    <input id="host-promo-start" type="date" [(ngModel)]="newPromo.startDate" name="promoStartDate" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                   </div>
                   <div>
-                    <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Fecha Fin *</label>
-                    <input type="date" [(ngModel)]="newPromo.endDate" name="promoEndDate" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <label for="host-promo-end" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Fecha Fin *</label>
+                    <input id="host-promo-end" type="date" [(ngModel)]="newPromo.endDate" name="promoEndDate" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                   </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Descuento (%) *</label>
-                    <input type="number" min="5" max="50" [(ngModel)]="newPromo.discountPercent" name="promoDiscount" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <label for="host-promo-discount" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Descuento (%) *</label>
+                    <input id="host-promo-discount" type="number" min="5" max="50" [(ngModel)]="newPromo.discountPercent" name="promoDiscount" required class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                   </div>
                   <div>
-                    <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Código Cupón</label>
-                    <input type="text" [(ngModel)]="newPromo.code" name="promoCode" placeholder="Ej: HOST15" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] uppercase outline-none focus:border-[#c9a96e]">
+                    <label for="host-promo-code" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Código Cupón</label>
+                    <input id="host-promo-code" type="text" [(ngModel)]="newPromo.code" name="promoCode" placeholder="Ej: HOST15" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] uppercase outline-none focus:border-[#c9a96e]">
                   </div>
                 </div>
 
@@ -244,7 +265,7 @@ export interface HostPromotionItem {
                   {{ promoSuccess }}
                 </div>
 
-                <button type="submit" [disabled]="submittingPromo" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2">
+                <button type="submit" [disabled]="submittingPromo" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2 min-h-[44px]">
                   {{ submittingPromo ? 'Publicando...' : 'Publicar Oferta' }}
                 </button>
               </form>
@@ -304,14 +325,14 @@ export interface HostPromotionItem {
 
               <form (ngSubmit)="submitProperty()" class="space-y-4">
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Nombre del Alojamiento *</label>
-                  <input type="text" [(ngModel)]="newProperty.name" name="propName" required placeholder="Ej: Cabaña Las Olas" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <label for="host-prop-name" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Nombre del Alojamiento *</label>
+                  <input id="host-prop-name" type="text" [(ngModel)]="newProperty.name" name="propName" required placeholder="Ej: Cabaña Las Olas" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Tipo *</label>
-                    <select [(ngModel)]="newProperty.type" name="propType" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <label for="host-prop-type" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Tipo *</label>
+                    <select id="host-prop-type" [(ngModel)]="newProperty.type" name="propType" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                       <option value="HOTEL">Hotel</option>
                       <option value="ROOM">Habitación</option>
                       <option value="APARTMENT">Apartamento</option>
@@ -319,40 +340,40 @@ export interface HostPromotionItem {
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Ciudad *</label>
-                    <input type="text" [(ngModel)]="newProperty.city" name="propCity" required placeholder="Cartagena" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <label for="host-prop-city" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Ciudad *</label>
+                    <input id="host-prop-city" type="text" [(ngModel)]="newProperty.city" name="propCity" required placeholder="Cartagena" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                   </div>
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Dirección *</label>
-                  <input type="text" [(ngModel)]="newProperty.address" name="propAddress" required placeholder="Calle 30 # 8B-25, Getsemaní" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <label for="host-prop-address" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Dirección *</label>
+                  <input id="host-prop-address" type="text" [(ngModel)]="newProperty.address" name="propAddress" required placeholder="Calle 30 # 8B-25, Getsemaní" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Descripción</label>
-                  <textarea [(ngModel)]="newProperty.description" name="propDesc" rows="2" placeholder="Hermoso espacio frente al mar..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]"></textarea>
+                  <label for="host-prop-desc" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Descripción</label>
+                  <textarea id="host-prop-desc" [(ngModel)]="newProperty.description" name="propDesc" rows="2" placeholder="Hermoso espacio frente al mar..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]"></textarea>
                 </div>
 
                 <div>
-                  <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1">Fotografía Principal (Enlace o Galería)</label>
-                  <input type="url" [(ngModel)]="newProperty.mainImage" name="propImg" placeholder="https://..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
-                  <div class="flex flex-wrap gap-1.5 mt-2">
-                    <span class="text-[10px] text-[#f5f0e8] opacity-60 w-full">Fotos sugeridas en alta resolución:</span>
-                    <button type="button" (click)="newProperty.mainImage = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800'" class="text-[10px] px-2 py-1 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🏨 Casona Colonial</button>
-                    <button type="button" (click)="newProperty.mainImage = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" class="text-[10px] px-2 py-1 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🌴 Resort Frente al Mar</button>
-                    <button type="button" (click)="newProperty.mainImage = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800'" class="text-[10px] px-2 py-1 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🏡 Villa de Lujo</button>
+                  <label for="host-prop-img" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Fotografía Principal (Enlace o Galería)</label>
+                  <input id="host-prop-img" type="url" [(ngModel)]="newProperty.mainImage" name="propImg" placeholder="https://..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-sm text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <div class="flex flex-wrap gap-2 mt-2">
+                    <span class="text-xs text-[#f5f0e8] opacity-60 w-full">Fotos sugeridas en alta resolución:</span>
+                    <button type="button" (click)="newProperty.mainImage = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800'" class="min-h-[36px] text-xs px-3 py-1.5 inline-flex items-center bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🏨 Casona Colonial</button>
+                    <button type="button" (click)="newProperty.mainImage = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" class="min-h-[36px] text-xs px-3 py-1.5 inline-flex items-center bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🌴 Resort Frente al Mar</button>
+                    <button type="button" (click)="newProperty.mainImage = 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800'" class="min-h-[36px] text-xs px-3 py-1.5 inline-flex items-center bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🏡 Villa de Lujo</button>
                   </div>
                 </div>
 
-                <div *ngIf="propertyError" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
+                <div *ngIf="propertyError" role="alert" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
                   {{ propertyError }}
                 </div>
-                <div *ngIf="propertySuccess" class="p-3 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded text-xs">
+                <div *ngIf="propertySuccess" role="status" class="p-3 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded text-xs">
                   {{ propertySuccess }}
                 </div>
 
-                <button type="submit" [disabled]="submittingProperty" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2">
+                <button type="submit" [disabled]="submittingProperty" class="w-full py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md uppercase tracking-wider text-xs transition duration-200 mt-2 min-h-[44px]">
                   {{ submittingProperty ? 'Guardando...' : (editingPropertyId() ? 'Guardar Cambios' : 'Publicar Alojamiento') }}
                 </button>
               </form>
@@ -362,7 +383,7 @@ export interface HostPromotionItem {
             <div class="lg:col-span-2 space-y-4">
               <div class="flex justify-between items-center mb-2">
                 <h2 class="font-serif text-2xl text-[#c9a96e]">Mis Alojamientos ({{ properties().length }})</h2>
-                <button (click)="fetchProperties()" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Refrescar</button>
+                <button (click)="fetchProperties()" class="min-h-[36px] px-3 py-1.5 inline-flex items-center border border-[rgba(201,169,110,0.3)] bg-[rgba(201,169,110,0.08)] hover:bg-[rgba(201,169,110,0.2)] text-xs text-[#c9a96e] rounded uppercase tracking-wider font-semibold transition cursor-pointer">Refrescar</button>
               </div>
 
               <div *ngIf="properties().length === 0" class="border border-[rgba(201,169,110,0.2)] rounded-xl bg-[#111] p-12 text-center text-[#f5f0e8] opacity-60 text-sm">
@@ -432,12 +453,12 @@ export interface HostPromotionItem {
                   <form (ngSubmit)="submitSuite()" class="space-y-3">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Nombre de la Habitación *</label>
-                        <input type="text" [(ngModel)]="newSuite.name" name="suiteName" required placeholder="Ej: Suite Vista al Mar" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                        <label for="host-suite-name" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Nombre de la Habitación *</label>
+                        <input id="host-suite-name" type="text" [(ngModel)]="newSuite.name" name="suiteName" required placeholder="Ej: Suite Vista al Mar" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                       </div>
                       <div>
-                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Tipo *</label>
-                        <select [(ngModel)]="newSuite.type" name="suiteType" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                        <label for="host-suite-type" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Tipo *</label>
+                        <select id="host-suite-type" [(ngModel)]="newSuite.type" name="suiteType" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                           <option value="Habitación">Habitación Estándar</option>
                           <option value="Suite Deluxe">Suite Deluxe</option>
                           <option value="Suite Imperial">Suite Imperial</option>
@@ -449,31 +470,31 @@ export interface HostPromotionItem {
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Precio por Noche (COP) *</label>
-                        <input type="number" [(ngModel)]="newSuite.basePrice" name="suitePrice" required min="50000" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                        <label for="host-suite-price" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Precio por Noche (COP) *</label>
+                        <input id="host-suite-price" type="number" [(ngModel)]="newSuite.basePrice" name="suitePrice" required min="50000" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                       </div>
                       <div>
-                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Máx Huéspedes *</label>
-                        <input type="number" [(ngModel)]="newSuite.maxGuests" name="suiteGuests" required min="1" max="10" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                        <label for="host-suite-guests" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Máx Huéspedes *</label>
+                        <input id="host-suite-guests" type="number" [(ngModel)]="newSuite.maxGuests" name="suiteGuests" required min="1" max="10" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                       </div>
                       <div>
-                        <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Tamaño (m²)</label>
-                        <input type="number" [(ngModel)]="newSuite.size" name="suiteSize" min="10" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                        <label for="host-suite-size" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Tamaño (m²)</label>
+                        <input id="host-suite-size" type="number" [(ngModel)]="newSuite.size" name="suiteSize" min="10" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                       </div>
                     </div>
 
                     <div>
-                      <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Fotografía de la Habitación (Enlace o Galería)</label>
-                      <input type="url" [(ngModel)]="newSuite.mainImage" name="suiteImg" placeholder="https://images.unsplash.com/..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-1.5 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
-                      <div class="flex flex-wrap gap-1.5 mt-1.5">
-                        <button type="button" (click)="newSuite.mainImage = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" class="text-[10px] px-2 py-0.5 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🛏️ Suite Presidencial</button>
-                        <button type="button" (click)="newSuite.mainImage = 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800'" class="text-[10px] px-2 py-0.5 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🌊 Suite Vista al Mar</button>
-                        <button type="button" (click)="newSuite.mainImage = 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'" class="text-[10px] px-2 py-0.5 bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🌴 Bungalow Jardín</button>
+                      <label for="host-suite-img" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Fotografía de la Habitación (Enlace o Galería)</label>
+                      <input id="host-suite-img" type="url" [(ngModel)]="newSuite.mainImage" name="suiteImg" placeholder="https://images.unsplash.com/..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                      <div class="flex flex-wrap gap-2 mt-2">
+                        <button type="button" (click)="newSuite.mainImage = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" class="min-h-[34px] text-xs px-3 py-1.5 inline-flex items-center bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🛏️ Suite Presidencial</button>
+                        <button type="button" (click)="newSuite.mainImage = 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800'" class="min-h-[34px] text-xs px-3 py-1.5 inline-flex items-center bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🌊 Suite Vista al Mar</button>
+                        <button type="button" (click)="newSuite.mainImage = 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'" class="min-h-[34px] text-xs px-3 py-1.5 inline-flex items-center bg-[rgba(201,169,110,0.12)] hover:bg-[rgba(201,169,110,0.25)] text-[#c9a96e] rounded border border-[rgba(201,169,110,0.3)] cursor-pointer">🌴 Bungalow Jardín</button>
                       </div>
                     </div>
 
                     <div class="flex justify-end pt-2">
-                      <button type="submit" [disabled]="submittingSuite" class="px-5 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded uppercase tracking-wider text-xs transition duration-200 cursor-pointer">
+                      <button type="submit" [disabled]="submittingSuite" class="min-h-[40px] px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded uppercase tracking-wider text-xs transition duration-200 cursor-pointer">
                         {{ submittingSuite ? 'Guardando...' : '➕ Guardar Habitación' }}
                       </button>
                     </div>
@@ -643,7 +664,7 @@ export interface HostPromotionItem {
                 <h2 class="font-serif text-2xl text-[#c9a96e]">Historial de Avisos Enviados</h2>
                 <p class="text-xs text-[#f5f0e8] opacity-70">Si tu sistema está temporalmente fuera de línea, reintentamos enviar el aviso automáticamente a los 1, 5 y 30 minutos.</p>
               </div>
-              <button (click)="fetchDeliveries()" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Actualizar Historial</button>
+              <button (click)="fetchDeliveries()" class="min-h-[36px] px-3 py-1.5 inline-flex items-center border border-[rgba(201,169,110,0.3)] bg-[rgba(201,169,110,0.08)] hover:bg-[rgba(201,169,110,0.2)] text-xs text-[#c9a96e] rounded uppercase tracking-wider font-semibold transition cursor-pointer">Actualizar Historial</button>
             </div>
 
             <div *ngIf="deliveries().length === 0" class="p-8 text-center text-[#f5f0e8] opacity-60 text-sm">
@@ -680,7 +701,7 @@ export interface HostPromotionItem {
                     </td>
                     <td class="py-3 text-[#f5f0e8] opacity-60">{{ del.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
                     <td class="py-3 text-right">
-                      <button (click)="redeliver(del.id)" class="px-2.5 py-1 bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded text-[10px] uppercase tracking-wider font-semibold transition">
+                      <button (click)="redeliver(del.id)" class="min-h-[32px] px-3 py-1.5 inline-flex items-center bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded text-xs uppercase tracking-wider font-semibold transition cursor-pointer">
                         Reenviar Aviso
                       </button>
                     </td>
@@ -877,8 +898,8 @@ export interface HostPromotionItem {
               </div>
               <form (ngSubmit)="saveBankAccount()" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
-                  <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Entidad Bancaria *</label>
-                  <select [(ngModel)]="bankAccount.bankName" name="bankName" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <label for="host-bank-name" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Entidad Bancaria *</label>
+                  <select id="host-bank-name" [(ngModel)]="bankAccount.bankName" name="bankName" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                     <option value="Bancolombia">Bancolombia</option>
                     <option value="Davivienda">Davivienda</option>
                     <option value="Banco de Bogotá">Banco de Bogotá</option>
@@ -887,22 +908,22 @@ export interface HostPromotionItem {
                   </select>
                 </div>
                 <div>
-                  <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Tipo de Cuenta *</label>
-                  <select [(ngModel)]="bankAccount.accountType" name="accountType" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                  <label for="host-bank-type" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Tipo de Cuenta *</label>
+                  <select id="host-bank-type" [(ngModel)]="bankAccount.accountType" name="accountType" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                     <option value="Ahorros">Cuenta de Ahorros</option>
                     <option value="Corriente">Cuenta Corriente</option>
                   </select>
                 </div>
                 <div>
-                  <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Número de Cuenta *</label>
-                  <input type="text" [(ngModel)]="bankAccount.accountNumber" name="accountNumber" required placeholder="Ej: 450-982341-01" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] font-mono outline-none focus:border-[#c9a96e]">
+                  <label for="host-bank-number" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Número de Cuenta *</label>
+                  <input id="host-bank-number" type="text" [(ngModel)]="bankAccount.accountNumber" name="accountNumber" required placeholder="Ej: 450-982341-01" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] font-mono outline-none focus:border-[#c9a96e]">
                 </div>
                 <div class="flex gap-2">
                   <div class="flex-1">
-                    <label class="block text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Titular / NIT *</label>
-                    <input type="text" [(ngModel)]="bankAccount.holderName" name="holderName" required placeholder="Nombre o Razón Social" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+                    <label for="host-bank-holder" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Titular / NIT *</label>
+                    <input id="host-bank-holder" type="text" [(ngModel)]="bankAccount.holderName" name="holderName" required placeholder="Nombre o Razón Social" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                   </div>
-                  <button type="submit" class="px-4 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md text-xs uppercase tracking-wider transition cursor-pointer h-[34px]">
+                  <button type="submit" class="px-5 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md text-xs uppercase tracking-wider transition cursor-pointer min-h-[40px] flex items-center justify-center">
                     Guardar
                   </button>
                 </div>
@@ -913,7 +934,7 @@ export interface HostPromotionItem {
             <div class="bg-[#141414] border border-[rgba(255,255,255,0.08)] rounded-xl overflow-hidden">
               <div class="p-5 border-b border-[rgba(255,255,255,0.08)] flex justify-between items-center">
                 <h4 class="text-sm font-semibold uppercase tracking-wider text-[#f5f0e8]">Historial de Liquidaciones Generadas ({{ payouts().length }})</h4>
-                <button (click)="fetchPayouts()" class="text-xs text-[#c9a96e] hover:underline flex items-center gap-1">
+                <button (click)="fetchPayouts()" class="min-h-[36px] px-3 py-1.5 inline-flex items-center gap-1.5 border border-[rgba(201,169,110,0.3)] bg-[rgba(201,169,110,0.08)] hover:bg-[rgba(201,169,110,0.2)] text-xs text-[#c9a96e] rounded uppercase tracking-wider font-semibold transition cursor-pointer">
                   <span>🔄</span> Actualizar
                 </button>
               </div>

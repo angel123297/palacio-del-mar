@@ -55,9 +55,9 @@ const bogotaTodayIso = (): string => {
           <p class="luxury-loader-text">Cargando disponibilidad...</p>
         </div>
 
-        <div *ngIf="!loading && loadError" style="text-align: center; padding: 3rem 1rem; background: rgba(231,76,60,0.05); border: 1px solid rgba(231,76,60,0.3); border-radius: 12px;">
-          <p style="color: #ff4d4d; margin: 0 0 1rem 0;">No pudimos consultar la disponibilidad. Revisa tu conexión.</p>
-          <button (click)="loadData()" class="btn-outline" style="padding: 8px 16px; cursor: pointer;">Reintentar</button>
+        <div *ngIf="!loading && loadError" role="alert" style="text-align: center; padding: 3rem 1.5rem; background: rgba(231,76,60,0.06); border: 1px solid rgba(231,76,60,0.3); border-radius: 12px;">
+          <p style="color: #ff9999; margin: 0 0 1.2rem 0; font-size: 1rem; line-height: 1.5;">Estamos sincronizando las suites más exclusivas para tus fechas. Por favor reintenta en un momento.</p>
+          <button (click)="loadData()" class="btn-outline" style="min-height: 44px; padding: 10px 24px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">Reintentar</button>
         </div>
 
         <div *ngIf="!loading && !loadError" style="border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; overflow: hidden;">

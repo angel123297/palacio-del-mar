@@ -2,6 +2,7 @@ import { Component, OnInit, ChangeDetectorRef, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 import { finalize } from 'rxjs';
 
 @Component({
@@ -24,22 +25,22 @@ import { finalize } from 'rxjs';
             <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.2rem; border-bottom: 1px solid rgba(212,175,55,0.2); padding-bottom: 0.5rem;">Datos Personales</h3>
             
             <div style="margin-bottom: 1.2rem;">
-              <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Nombre Completo</label>
-              <input type="text" formControlName="name" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
+              <label for="profile-name" style="display: block; color: #c9a96e; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500;">Nombre Completo</label>
+              <input id="profile-name" type="text" formControlName="name" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
             </div>
 
             <div style="margin-bottom: 1.5rem;">
-              <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Correo Electrónico (No modificable)</label>
-              <input type="email" formControlName="email" readonly style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #888; padding: 12px; border-radius: 6px; font-size: 1rem; cursor: not-allowed;">
+              <label for="profile-email" style="display: block; color: #c9a96e; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500;">Correo Electrónico (No modificable)</label>
+              <input id="profile-email" type="email" formControlName="email" readonly style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: #aaa; padding: 12px; border-radius: 6px; font-size: 1rem; cursor: not-allowed;">
             </div>
 
-            <button type="submit" [disabled]="profileForm.invalid || savingProfile" class="btn-primary" style="width: 100%; padding: 14px; font-size: 1rem; display: flex; justify-content: center; gap: 10px;">
+            <button type="submit" [disabled]="profileForm.invalid || savingProfile" class="btn-primary" style="width: 100%; padding: 14px; font-size: 1rem; display: flex; justify-content: center; gap: 10px; min-height: 44px;">
               <span *ngIf="!savingProfile">Actualizar Perfil</span>
               <span *ngIf="savingProfile">Guardando...</span>
               <div *ngIf="savingProfile" class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
             </button>
-            <p *ngIf="profileSuccess" style="color: #2ecc71; margin-top: 1rem; text-align: center;">{{ profileSuccess }}</p>
-            <p *ngIf="profileError" style="color: #ff4d4d; margin-top: 1rem; text-align: center;">{{ profileError }}</p>
+            <p *ngIf="profileSuccess" role="status" style="color: #2ecc71; margin-top: 1rem; text-align: center; font-size: 0.9rem;">{{ profileSuccess }}</p>
+            <p *ngIf="profileError" role="alert" style="color: #ff4d4d; margin-top: 1rem; text-align: center; font-size: 0.9rem;">{{ profileError }}</p>
           </form>
 
           <!-- Change Password Form -->
@@ -47,22 +48,22 @@ import { finalize } from 'rxjs';
             <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.2rem; border-bottom: 1px solid rgba(212,175,55,0.2); padding-bottom: 0.5rem;">Cambiar Contraseña</h3>
             
             <div style="margin-bottom: 1.2rem;">
-              <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Contraseña Actual</label>
-              <input type="password" formControlName="currentPassword" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
+              <label for="profile-current-password" style="display: block; color: #c9a96e; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500;">Contraseña Actual</label>
+              <input id="profile-current-password" type="password" formControlName="currentPassword" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
             </div>
 
             <div style="margin-bottom: 1.5rem;">
-              <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Nueva Contraseña</label>
-              <input type="password" formControlName="newPassword" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
+              <label for="profile-new-password" style="display: block; color: #c9a96e; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500;">Nueva Contraseña</label>
+              <input id="profile-new-password" type="password" formControlName="newPassword" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
             </div>
 
-            <button type="submit" [disabled]="passwordForm.invalid || savingPassword" class="btn-primary" style="width: 100%; padding: 14px; font-size: 1rem; display: flex; justify-content: center; gap: 10px;">
+            <button type="submit" [disabled]="passwordForm.invalid || savingPassword" class="btn-primary" style="width: 100%; padding: 14px; font-size: 1rem; display: flex; justify-content: center; gap: 10px; min-height: 44px;">
               <span *ngIf="!savingPassword">Cambiar Contraseña</span>
               <span *ngIf="savingPassword">Actualizando...</span>
               <div *ngIf="savingPassword" class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
             </button>
-            <p *ngIf="passwordSuccess" style="color: #2ecc71; margin-top: 1rem; text-align: center;">{{ passwordSuccess }}</p>
-            <p *ngIf="passwordError" style="color: #ff4d4d; margin-top: 1rem; text-align: center;">{{ passwordError }}</p>
+            <p *ngIf="passwordSuccess" role="status" style="color: #2ecc71; margin-top: 1rem; text-align: center; font-size: 0.9rem;">{{ passwordSuccess }}</p>
+            <p *ngIf="passwordError" role="alert" style="color: #ff4d4d; margin-top: 1rem; text-align: center; font-size: 0.9rem;">{{ passwordError }}</p>
           </form>
         </div>
       </div>
@@ -84,6 +85,7 @@ export class ProfileComponent implements OnInit {
 
   constructor(
     private api: ApiService,
+    private auth: AuthService,
     private fb: FormBuilder,
     private cdr: ChangeDetectorRef,
   ) {
@@ -99,6 +101,14 @@ export class ProfileComponent implements OnInit {
   }
 
   ngOnInit() {
+    const current = this.auth.currentUser();
+    if (current) {
+      this.profileForm.patchValue({
+        name: current.name || '',
+        email: current.email || ''
+      });
+    }
+
     this.api.get<any>('/auth/me').pipe(
       finalize(() => {
         this.loading = false;
@@ -115,7 +125,9 @@ export class ProfileComponent implements OnInit {
         }
       },
       error: () => {
-         this.profileError = 'No se pudo cargar el perfil.';
+        if (!current) {
+          this.profileError = 'No se pudo cargar el perfil.';
+        }
       }
     });
   }
