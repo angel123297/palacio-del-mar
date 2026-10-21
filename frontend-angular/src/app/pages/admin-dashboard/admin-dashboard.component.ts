@@ -388,18 +388,18 @@ export interface RefundItem {
                       <p class="text-[10px] opacity-60">{{ p.address }}</p>
                     </td>
                     <td class="py-4 px-6">
-                      <span class="px-2 py-0.5 rounded text-[10px] uppercase font-mono tracking-wider bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[#c9a96e]">
+                      <span class="px-2 py-0.5 rounded text-[10px] uppercase font-mono tracking-wider bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[#c9a96e] whitespace-nowrap inline-block">
                         {{ getPropertyTypeLabel(p.type) }}
                       </span>
                     </td>
-                    <td class="py-4 px-6 font-mono text-sm text-[#f5f0e8]">
+                    <td class="py-4 px-6 font-mono text-sm text-[#f5f0e8] whitespace-nowrap">
                       {{ p.suitesCount || 0 }} suites
                     </td>
-                    <td class="py-4 px-6 font-serif text-sm text-[#c9a96e]">
+                    <td class="py-4 px-6 font-serif text-sm text-[#c9a96e] whitespace-nowrap">
                       {{ p.commissionRate ? (p.commissionRate * 100 | number:'1.0-0') + '%' : '8%' }}
                     </td>
-                    <td class="py-4 px-6">
-                      <span class="px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold"
+                    <td class="py-4 px-6 whitespace-nowrap">
+                      <span class="px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold whitespace-nowrap inline-block"
                             [ngClass]="{
                               'bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border border-[#2ecc71]': p.status === 'APPROVED',
                               'bg-[rgba(241,196,15,0.15)] text-[#f1c40f] border border-[#f1c40f]': p.status === 'PENDING',
@@ -408,18 +408,21 @@ export interface RefundItem {
                         {{ p.status === 'APPROVED' ? 'Aprobado / En Vivo' : (p.status === 'PENDING' ? 'En Revisión' : 'Rechazado') }}
                       </span>
                     </td>
-                    <td class="py-4 px-6 text-right">
+                    <td class="py-4 px-6 text-right whitespace-nowrap">
                       <div class="flex items-center justify-end gap-2">
+                        <button type="button" (click)="previewProperty.set(p)" class="px-2.5 py-1.5 rounded text-xs font-semibold uppercase tracking-wider bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(201,169,110,0.2)] text-[#c9a96e] border border-[rgba(201,169,110,0.3)] transition cursor-pointer whitespace-nowrap">
+                          👁️ Ver Ficha
+                        </button>
                         <!-- Action to Approve -->
                         <button *ngIf="p.status !== 'APPROVED'"
-                                (click)="updatePropertyStatus(p.id || p._id || '', 'APPROVED')"
-                                class="px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wider bg-[rgba(46,204,113,0.15)] hover:bg-[#2ecc71] text-[#2ecc71] hover:text-[#0d0d0d] border border-[#2ecc71] transition">
+                                (click)="openApproveModal(p)"
+                                class="px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wider bg-[rgba(46,204,113,0.15)] hover:bg-[#2ecc71] text-[#2ecc71] hover:text-[#0d0d0d] border border-[#2ecc71] transition cursor-pointer whitespace-nowrap">
                           ✔ Aprobar
                         </button>
                         <!-- Action to Reject -->
                         <button *ngIf="p.status !== 'REJECTED'"
-                                (click)="updatePropertyStatus(p.id || p._id || '', 'REJECTED')"
-                                class="px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wider bg-[rgba(231,76,60,0.15)] hover:bg-[#e74c3c] text-[#e74c3c] hover:text-white border border-[#e74c3c] transition">
+                                (click)="openRejectModal(p)"
+                                class="px-3 py-1.5 rounded text-xs font-semibold uppercase tracking-wider bg-[rgba(231,76,60,0.15)] hover:bg-[#e74c3c] text-[#e74c3c] hover:text-white border border-[#e74c3c] transition cursor-pointer whitespace-nowrap">
                           ✖ Rechazar
                         </button>
                       </div>
@@ -444,16 +447,9 @@ export interface RefundItem {
                 <h2 class="font-serif text-2xl text-[#c9a96e]">Pagos Pendientes de Reembolso</h2>
                 <p class="text-xs text-[#f5f0e8] opacity-60">Cobros pendientes de devolución monetaria al huésped por cancelación o expiración de reserva</p>
               </div>
-              <button (click)="fetchRefunds()" class="px-4 py-2 border border-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded-md text-xs uppercase tracking-widest hover:bg-[rgba(201,169,110,0.1)] transition">
+              <button (click)="fetchRefunds()" class="px-4 py-2 border border-[rgba(201,169,110,0.4)] text-[#c9a96e] rounded-md text-xs uppercase tracking-widest hover:bg-[rgba(201,169,110,0.1)] transition cursor-pointer">
                 ↻ Actualizar
               </button>
-            </div>
-
-            <div class="mb-6 p-4 bg-[rgba(255,255,255,0.02)] border border-[rgba(201,169,110,0.15)] rounded-lg flex flex-wrap items-end gap-3">
-              <div class="flex flex-col flex-1 min-w-[240px]">
-                <label for="refundNotes" class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-1">Observación aplicable a la próxima acción (opcional)</label>
-                <input id="refundNotes" type="text" [(ngModel)]="refundNotes" name="refundNotes" placeholder="Ej: Reembolso procesado vía transferencia bancaria" class="bg-[#111] border border-[rgba(255,255,255,0.1)] text-[#f5f0e8] rounded-md px-3 py-2 text-sm outline-none focus:border-[#c9a96e]">
-              </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -475,24 +471,24 @@ export interface RefundItem {
                     <td class="py-4 px-4 font-mono text-xs text-[#c9a96e]">{{ r.bookingId || 'N/A' }}</td>
                     <td class="py-4 px-4 font-serif text-[#f5f0e8] font-bold">$ {{ r.amount | number:'1.0-0' }} {{ r.currency }}</td>
                     <td class="py-4 px-4">
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[rgba(231,76,60,0.2)] text-[#e74c3c] border border-[rgba(231,76,60,0.4)]">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[rgba(231,76,60,0.2)] text-[#e74c3c] border border-[rgba(231,76,60,0.4)] whitespace-nowrap">
                         Requiere Reembolso
                       </span>
                     </td>
                     <td class="py-4 px-4 text-xs text-[#f5f0e8] opacity-80 max-w-xs truncate" [title]="r.notes || ''">
                       {{ r.notes || 'Pago tardío o reserva cancelada' }}
                     </td>
-                    <td class="py-4 px-4 text-xs text-[#f5f0e8] opacity-60">
+                    <td class="py-4 px-4 text-xs text-[#f5f0e8] opacity-60 whitespace-nowrap">
                       {{ r.createdAt | date:'short' }}
                     </td>
-                    <td class="py-4 px-4 text-right">
+                    <td class="py-4 px-4 text-right whitespace-nowrap">
                       <div class="flex gap-2 justify-end">
-                        <button (click)="resolveRefund(r.id, 'mark_refunded')" 
-                                class="px-3 py-1.5 bg-[#2ecc71] hover:bg-[#27ae60] text-[#0d0d0d] font-bold rounded text-xs transition">
+                        <button (click)="openRefundModal(r, 'mark_refunded')" 
+                                class="px-3 py-1.5 bg-[#2ecc71] hover:bg-[#27ae60] text-[#0d0d0d] font-bold rounded text-xs transition whitespace-nowrap cursor-pointer">
                           ✔ Reembolsar
                         </button>
-                        <button (click)="resolveRefund(r.id, 'dismiss')" 
-                                class="px-3 py-1.5 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)] text-[#f5f0e8] rounded text-xs transition">
+                        <button (click)="openRefundModal(r, 'dismiss')" 
+                                class="px-3 py-1.5 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)] text-[#f5f0e8] rounded text-xs transition whitespace-nowrap cursor-pointer">
                           ✕ Descartar
                         </button>
                       </div>
@@ -508,6 +504,114 @@ export interface RefundItem {
             </div>
           </div>
         </ng-container>
+
+        <!-- Modal: Ficha Detallada de Propiedad -->
+        <div *ngIf="previewProperty()" class="fixed inset-0 bg-black/85 z-[1000] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Ficha de moderación del alojamiento">
+          <div class="bg-[#111] border border-[#c9a96e] rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="p-5 border-b border-[rgba(201,169,110,0.3)] flex justify-between items-center bg-[rgba(201,169,110,0.05)]">
+              <div>
+                <h3 class="font-serif text-2xl text-[#c9a96e] mb-0.5">{{ previewProperty()!.name }}</h3>
+                <p class="text-xs text-[#f5f0e8] opacity-75">📍 {{ previewProperty()!.city }} &bull; {{ previewProperty()!.address }}</p>
+              </div>
+              <button (click)="previewProperty.set(null)" class="text-2xl text-[#f5f0e8] opacity-70 hover:opacity-100 px-3 py-1 cursor-pointer">&times;</button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-4">
+              <div *ngIf="previewProperty()!.mainImage" class="h-56 rounded-lg overflow-hidden bg-[#222] border border-[rgba(201,169,110,0.2)]">
+                <img [src]="previewProperty()!.mainImage" [alt]="previewProperty()!.name" class="w-full h-full object-cover">
+              </div>
+
+              <div class="grid grid-cols-2 gap-4 text-xs">
+                <div class="p-3 bg-[rgba(255,255,255,0.03)] rounded border border-[rgba(255,255,255,0.06)]">
+                  <span class="text-[10px] uppercase tracking-wider text-[#c9a96e] font-semibold block mb-1">Tipo de Alojamiento</span>
+                  <span class="text-sm font-semibold text-white">{{ getPropertyTypeLabel(previewProperty()!.type) }}</span>
+                </div>
+                <div class="p-3 bg-[rgba(255,255,255,0.03)] rounded border border-[rgba(255,255,255,0.06)]">
+                  <span class="text-[10px] uppercase tracking-wider text-[#c9a96e] font-semibold block mb-1">Comisión Pactada</span>
+                  <span class="text-sm font-semibold text-[#2ecc71]">8% Plataforma</span>
+                </div>
+              </div>
+
+              <div>
+                <h4 class="text-xs uppercase tracking-wider text-[#c9a96e] font-semibold mb-1">Descripción del Anfitrión</h4>
+                <p class="text-xs text-[#f5f0e8] opacity-85 leading-relaxed bg-[rgba(255,255,255,0.02)] p-3 rounded border border-[rgba(255,255,255,0.05)]">
+                  {{ previewProperty()!.description || 'Sin descripción detallada por el anfitrión.' }}
+                </p>
+              </div>
+            </div>
+
+            <div class="p-4 border-t border-[rgba(201,169,110,0.2)] bg-[#0d0d0d] flex justify-between items-center">
+              <button type="button" (click)="previewProperty.set(null)" class="px-4 py-2 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)] text-white rounded text-xs uppercase tracking-wider cursor-pointer">
+                Cerrar
+              </button>
+              <div class="flex gap-2">
+                <button *ngIf="previewProperty()!.status !== 'APPROVED'"
+                        (click)="openApproveModal(previewProperty()!)"
+                        class="px-4 py-2 rounded text-xs font-semibold uppercase tracking-wider bg-[#2ecc71] text-[#0d0d0d] hover:bg-[#27ae60] transition cursor-pointer">
+                  ✔ Aprobar Alojamiento
+                </button>
+                <button *ngIf="previewProperty()!.status !== 'REJECTED'"
+                        (click)="openRejectModal(previewProperty()!)"
+                        class="px-4 py-2 rounded text-xs font-semibold uppercase tracking-wider bg-[#e74c3c] text-white hover:bg-[#c0392b] transition cursor-pointer">
+                  ✖ Rechazar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: Confirmar Aprobación -->
+        <div *ngIf="approvalModalProperty()" class="fixed inset-0 bg-black/85 z-[1050] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Confirmar aprobación de propiedad">
+          <div class="bg-[#111] border border-[#2ecc71] rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="font-serif text-xl text-[#2ecc71] mb-2">¿Aprobar y publicar alojamiento?</h3>
+            <p class="text-xs text-[#f5f0e8] opacity-85 mb-4">
+              Estás a punto de aprobar <strong>{{ approvalModalProperty()!.name }}</strong>. Quedará visible inmediatamente para reservas en el catálogo de Palacio del Mar.
+            </p>
+            <div class="flex justify-end gap-3">
+              <button (click)="approvalModalProperty.set(null)" class="px-4 py-2 bg-[rgba(255,255,255,0.1)] text-white rounded text-xs uppercase tracking-wider cursor-pointer">Cancelar</button>
+              <button (click)="executeApproveProperty()" class="px-4 py-2 bg-[#2ecc71] text-[#0d0d0d] font-bold rounded text-xs uppercase tracking-wider hover:bg-[#27ae60] transition cursor-pointer">Confirmar Aprobación</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: Confirmar Rechazo con Motivo -->
+        <div *ngIf="rejectionModalProperty()" class="fixed inset-0 bg-black/85 z-[1050] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Confirmar rechazo de propiedad">
+          <div class="bg-[#111] border border-[#e74c3c] rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <h3 class="font-serif text-xl text-[#e74c3c] mb-2">Rechazar o Suspender Alojamiento</h3>
+            <p class="text-xs text-[#f5f0e8] opacity-85 mb-3">
+              Indica el motivo por el cual no se aprueba <strong>{{ rejectionModalProperty()!.name }}</strong>:
+            </p>
+            <textarea [(ngModel)]="rejectionReason" name="rejectionReason" rows="3" placeholder="Ej: Las fotografías no cumplen con el estándar de resolución o la dirección requiere verificación..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md p-3 text-xs text-[#f5f0e8] outline-none focus:border-[#e74c3c] mb-4"></textarea>
+            <div class="flex justify-end gap-3">
+              <button (click)="rejectionModalProperty.set(null)" class="px-4 py-2 bg-[rgba(255,255,255,0.1)] text-white rounded text-xs uppercase tracking-wider cursor-pointer">Cancelar</button>
+              <button (click)="executeRejectProperty()" class="px-4 py-2 bg-[#e74c3c] text-white font-bold rounded text-xs uppercase tracking-wider hover:bg-[#c0392b] transition cursor-pointer">Confirmar Rechazo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: Procesar Reembolso Específico -->
+        <div *ngIf="activeRefundItem()" class="fixed inset-0 bg-black/85 z-[1050] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Confirmar acción de reembolso">
+          <div class="bg-[#111] border rounded-xl max-w-md w-full p-6 shadow-2xl" [ngClass]="activeRefundAction() === 'mark_refunded' ? 'border-[#2ecc71]' : 'border-[rgba(255,255,255,0.3)]'">
+            <h3 class="font-serif text-xl mb-2" [ngClass]="activeRefundAction() === 'mark_refunded' ? 'text-[#2ecc71]' : 'text-white'">
+              {{ activeRefundAction() === 'mark_refunded' ? '✔ Confirmar Reembolso Bancario' : '✕ Descartar Reembolso' }}
+            </h3>
+            <p class="text-xs text-[#f5f0e8] opacity-85 mb-3">
+              Reserva: <strong class="text-[#c9a96e]">{{ activeRefundItem()!.bookingId || activeRefundItem()!.id }}</strong> &bull; Monto: <strong class="text-white">$ {{ activeRefundItem()!.amount | number:'1.0-0' }} COP</strong>
+            </p>
+            <div class="mb-4">
+              <label for="modalRefundNotes" class="block text-[10px] uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">
+                {{ activeRefundAction() === 'mark_refunded' ? 'Referencia bancaria / Observación (opcional)' : 'Motivo del descarte (opcional)' }}
+              </label>
+              <input id="modalRefundNotes" type="text" [(ngModel)]="activeRefundNotes" name="activeRefundNotes" placeholder="Ej: Transf. Bancolombia Ref #902148" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
+            </div>
+            <div class="flex justify-end gap-3">
+              <button (click)="closeRefundModal()" class="px-4 py-2 bg-[rgba(255,255,255,0.1)] text-white rounded text-xs uppercase tracking-wider cursor-pointer">Cancelar</button>
+              <button (click)="executeResolveRefund()" class="px-4 py-2 font-bold rounded text-xs uppercase tracking-wider transition cursor-pointer" [ngClass]="activeRefundAction() === 'mark_refunded' ? 'bg-[#2ecc71] text-[#0d0d0d] hover:bg-[#27ae60]' : 'bg-[rgba(255,255,255,0.2)] text-white hover:bg-[rgba(255,255,255,0.3)]'">
+                {{ activeRefundAction() === 'mark_refunded' ? 'Procesar Reembolso' : 'Confirmar Descarte' }}
+              </button>
+            </div>
+          </div>
+        </div>
 
       </div>
     </div>
@@ -552,12 +656,19 @@ export class AdminDashboardComponent implements OnInit {
   propertyStatusFilter = signal<string>('');
   propertySearch = signal<string>('');
   
+  previewProperty = signal<Property | null>(null);
+  approvalModalProperty = signal<Property | null>(null);
+  rejectionModalProperty = signal<Property | null>(null);
+  rejectionReason = '';
+
   pendingPropertiesCount = computed(() => this.properties().filter(p => p.status === 'PENDING').length);
   approvedPropertiesCount = computed(() => this.properties().filter(p => p.status === 'APPROVED').length);
 
   // Refunds state
   refunds = signal<RefundItem[]>([]);
-  refundNotes = '';
+  activeRefundItem = signal<RefundItem | null>(null);
+  activeRefundAction = signal<'mark_refunded' | 'dismiss'>('mark_refunded');
+  activeRefundNotes = '';
   pendingRefundsCount = computed(() => this.refunds().filter(r => r.status === 'requires_refund').length);
 
   filteredProperties = computed(() => {
@@ -792,12 +903,37 @@ export class AdminDashboardComponent implements OnInit {
     });
   }
 
-  updatePropertyStatus(propertyId: string, status: 'APPROVED' | 'REJECTED') {
+  openApproveModal(p: Property) {
+    this.approvalModalProperty.set(p);
+  }
+
+  executeApproveProperty() {
+    const p = this.approvalModalProperty();
+    if (!p) return;
+    const propertyId = p.id || p._id || '';
+    this.approvalModalProperty.set(null);
+    this.previewProperty.set(null);
+    this.updatePropertyStatus(propertyId, 'APPROVED');
+  }
+
+  openRejectModal(p: Property) {
+    this.rejectionReason = '';
+    this.rejectionModalProperty.set(p);
+  }
+
+  executeRejectProperty() {
+    const p = this.rejectionModalProperty();
+    if (!p) return;
+    const propertyId = p.id || p._id || '';
+    const reason = this.rejectionReason.trim();
+    this.rejectionModalProperty.set(null);
+    this.previewProperty.set(null);
+    this.updatePropertyStatus(propertyId, 'REJECTED', reason);
+  }
+
+  updatePropertyStatus(propertyId: string, status: 'APPROVED' | 'REJECTED', reason?: string) {
     if (!propertyId) return;
-    if (status === 'REJECTED' && !confirm('¿Estás seguro de suspender/rechazar este alojamiento del catálogo público?')) {
-      return;
-    }
-    this.api.put<ApiResponse<any>>(`/admin/properties/${propertyId}/status`, { status }).subscribe({
+    this.api.put<ApiResponse<any>>(`/admin/properties/${propertyId}/status`, { status, reason }).subscribe({
       next: () => {
         const actionText = status === 'APPROVED' ? 'aprobado y publicado en el marketplace' : 'rechazado';
         this.actionMessage.set(`Alojamiento ${actionText} exitosamente.`);
@@ -824,14 +960,28 @@ export class AdminDashboardComponent implements OnInit {
     });
   }
 
-  resolveRefund(paymentId: string, action: 'mark_refunded' | 'dismiss') {
-    if (!paymentId) return;
-    const notes = this.refundNotes.trim();
+  openRefundModal(r: RefundItem, action: 'mark_refunded' | 'dismiss') {
+    this.activeRefundItem.set(r);
+    this.activeRefundAction.set(action);
+    this.activeRefundNotes = '';
+  }
+
+  closeRefundModal() {
+    this.activeRefundItem.set(null);
+  }
+
+  executeResolveRefund() {
+    const r = this.activeRefundItem();
+    if (!r) return;
+    const action = this.activeRefundAction();
+    const notes = this.activeRefundNotes.trim();
+    const paymentId = r.id;
+    this.closeRefundModal();
+
     this.api.put<ApiResponse<any>>(`/admin/payments/${paymentId}/resolve-refund`, { action, notes }).subscribe({
       next: () => {
         const actionText = action === 'mark_refunded' ? 'marcado como reembolsado' : 'descartado';
         this.actionMessage.set(`Pago ${actionText} exitosamente.`);
-        this.refundNotes = '';
         setTimeout(() => this.actionMessage.set(''), 4000);
         this.fetchRefunds();
       },

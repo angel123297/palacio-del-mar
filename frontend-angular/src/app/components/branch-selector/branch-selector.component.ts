@@ -4,6 +4,53 @@ import { ApiService } from '../../services/api.service';
 import { SearchStateService } from '../../services/search-state.service';
 import { Branch } from '../../models/types';
 
+const LUXURY_DEFAULT_BRANCHES: Branch[] = [
+  {
+    id: 'b-bocagrande',
+    name: 'Palacio Bocagrande',
+    slug: 'bocagrande',
+    zone: 'Bocagrande · Mar Caribe',
+    tagline: 'Vanguardia arquitectónica con acceso directo a playa y vista panorámica al mar.',
+    vibe: ['romantico', 'relax'],
+    mainImage: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800',
+    address: 'Cra. 1 # 5-40, Bocagrande',
+    city: 'Cartagena de Indias'
+  } as Branch,
+  {
+    id: 'b-getsemani',
+    name: 'Casona Colonial Getsemaní',
+    slug: 'getsemani',
+    zone: 'Getsemaní · Histórico',
+    tagline: 'Auténtico encanto colonial del siglo XVIII con patio andaluz y piscina privada.',
+    vibe: ['romantico', 'aventura'],
+    mainImage: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
+    address: 'Calle de la Sierpe # 29-11',
+    city: 'Cartagena de Indias'
+  } as Branch,
+  {
+    id: 'b-centro',
+    name: 'Palacio Imperial San Diego',
+    slug: 'centro-historico',
+    zone: 'Ciudad Amurallada',
+    tagline: 'Exclusividad amurallada entre plazas coloniales y restaurantes de alta cocina.',
+    vibe: ['relax', 'romantico'],
+    mainImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+    address: 'Calle del Curato # 38-99',
+    city: 'Cartagena de Indias'
+  } as Branch,
+  {
+    id: 'b-boquilla',
+    name: 'Reserva Manglares & Sol',
+    slug: 'la-boquilla',
+    zone: 'La Boquilla · Privacidad',
+    tagline: 'Desconexión total, brisa marina y villas exclusivas frente al horizonte caribeño.',
+    vibe: ['relax', 'aventura'],
+    mainImage: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800',
+    address: 'Anillo Vial Km 7',
+    city: 'Cartagena de Indias'
+  } as Branch
+];
+
 @Component({
   selector: 'app-branch-selector',
   standalone: true,
@@ -165,13 +212,16 @@ export class BranchSelectorComponent implements OnInit {
     this.api.get<any>('/branches').subscribe({
       next: (res) => {
         const list: Branch[] = res.data || res || [];
-        this.branches = list.filter(b => {
+        const filtered = list.filter(b => {
           const n = (b.name || '').trim().toLowerCase();
           const s = (b.slug || '').trim().toLowerCase();
           return n !== 'waos' && n !== 'si' && s !== 'waos' && s !== 'si' && n.length > 2;
         });
+        this.branches = filtered.length > 0 ? filtered : LUXURY_DEFAULT_BRANCHES;
       },
-      error: () => {}
+      error: () => {
+        this.branches = LUXURY_DEFAULT_BRANCHES;
+      }
     });
   }
 

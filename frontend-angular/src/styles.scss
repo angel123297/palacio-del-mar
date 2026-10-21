@@ -3120,7 +3120,7 @@ input:focus, select:focus, textarea:focus {
 .crumbs a { color: var(--gold-light); text-decoration: none; }
 .room-name a { color: inherit; text-decoration: none; }
 .room-name a:hover { color: var(--gold-light); }
-.room-detail-link { display: inline-block; margin: 6px 0 10px; color: var(--gold-light); font-size: 0.9rem; }
+.room-detail-link { display: inline-flex; align-items: center; min-height: 28px; min-width: 28px; margin: 4px 0 8px; color: var(--gold-light); font-size: 0.9rem; }
 
 .gallery-main {
   position: relative; display: block; width: 100%; padding: 0; border: 0; cursor: zoom-in;
