@@ -27,6 +27,12 @@ public class ReviewService {
     private final UserRepository userRepository;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.repository.SuiteRepository suiteRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.repository.PropertyRepository propertyRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private co.palaciodelmar.backend.webhook.WebhookDispatcher webhookDispatcher;
 
     public List<ReviewDTO> getSuiteReviews(String suiteId) {
@@ -39,6 +45,18 @@ public class ReviewService {
     public ReviewDTO addReview(String suiteId, String userId, String userName, Integer rating, String comment) {
         if (rating == null || rating < 1 || rating > 5) {
             throw new IllegalArgumentException("La calificación debe estar entre 1 y 5 estrellas");
+        }
+
+        if (userId != null && !"anonymous".equalsIgnoreCase(userId) && suiteRepository != null && propertyRepository != null) {
+            suiteRepository.findById(suiteId).ifPresent(s -> {
+                if (s.getPropertyId() != null) {
+                    propertyRepository.findById(s.getPropertyId()).ifPresent(p -> {
+                        if (userId.equals(p.getOwnerId())) {
+                            throw new IllegalArgumentException("Un anfitrión no puede calificar su propia propiedad");
+                        }
+                    });
+                }
+            });
         }
 
         AnalysisResult analysis = analyzeTextSentiment(comment, rating);
@@ -137,9 +155,60 @@ public class ReviewService {
         return dto;
     }
 
+    /**
+     * Obtiene la reseña de una reserva verificando permisos (huésped titular, anfitrión de la propiedad o admin).
+     */
+    public ReviewDTO getReviewByBookingId(String bookingId, User user) {
+        if (bookingId == null || bookingId.isBlank()) return null;
+        Booking booking = bookingRepository.findById(bookingId).orElse(null);
+        if (booking == null) return null;
+
+        if (user != null) {
+            boolean isAdmin = "ADMIN".equalsIgnoreCase(user.getRole()) || "ROLE_ADMIN".equalsIgnoreCase(user.getRole());
+            boolean isGuest = user.getId() != null && user.getId().equals(booking.getUser());
+            boolean isHost = false;
+            if (("HOST".equalsIgnoreCase(user.getRole()) || "ROLE_HOST".equalsIgnoreCase(user.getRole())) && booking.getPropertyId() != null && propertyRepository != null) {
+                isHost = propertyRepository.findById(booking.getPropertyId())
+                        .map(p -> user.getId().equals(p.getOwnerId()))
+                        .orElse(false);
+            }
+            if (!isAdmin && !isGuest && !isHost) {
+                return null;
+            }
+        }
+
+        return reviewRepository.findByBookingId(bookingId)
+                .map(this::toDTO)
+                .orElse(null);
+    }
+
     public ReviewDTO resolveMaintenanceAlert(String reviewId, String userId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new IllegalArgumentException("Reseña no encontrada: " + reviewId));
+
+        if (review.getMaintenanceAlert() == null || review.getMaintenanceAlert().isBlank()) {
+            throw new IllegalStateException("La reseña no tiene ninguna alerta de mantenimiento activa");
+        }
+
+        // Validación Anti-IDOR: Host debe ser dueño de la propiedad (o ser Administrador)
+        User user = (userId != null && userRepository != null) ? userRepository.findById(userId).orElse(null) : null;
+        boolean isAdmin = user != null && ("ADMIN".equalsIgnoreCase(user.getRole()) || "ROLE_ADMIN".equalsIgnoreCase(user.getRole()));
+
+        if (!isAdmin) {
+            co.palaciodelmar.backend.model.Suite suite = (review.getSuite() != null && suiteRepository != null)
+                    ? suiteRepository.findById(review.getSuite()).orElse(null)
+                    : null;
+            if (suite == null || suite.getPropertyId() == null) {
+                throw new org.springframework.security.access.AccessDeniedException("No tienes permiso para gestionar alertas de esta habitación");
+            }
+            co.palaciodelmar.backend.model.Property property = (propertyRepository != null)
+                    ? propertyRepository.findById(suite.getPropertyId()).orElse(null)
+                    : null;
+            if (property == null || property.getOwnerId() == null || !property.getOwnerId().equals(userId)) {
+                throw new org.springframework.security.access.AccessDeniedException("No tienes permiso para gestionar alertas de una propiedad ajena");
+            }
+        }
+
         review.setMaintenanceResolvedAt(Instant.now());
         review.setMaintenanceResolvedBy(userId);
         return toDTO(reviewRepository.save(review));

@@ -1,14 +1,14 @@
 <div class="drp">
   <div class="drp-triggers">
     <div class="bf">
-      <label class="bf-label">Llegada</label>
-      <button type="button" class="drp-trigger" [class.is-active]="open() && step() === 'in'" (click)="openPicker('in')">
+      <label for="booking-checkin" class="bf-label">Llegada</label>
+      <button id="booking-checkin" type="button" class="drp-trigger" [class.is-active]="open() && step() === 'in'" (click)="openPicker('in')" [attr.aria-label]="'Fecha de llegada: ' + prettyDate(checkIn)">
         {{ prettyDate(checkIn) }}
       </button>
     </div>
     <div class="bf">
-      <label class="bf-label">Salida</label>
-      <button type="button" class="drp-trigger" [class.is-active]="open() && step() === 'out'" (click)="openPicker(checkIn ? 'out' : 'in')">
+      <label for="booking-checkout" class="bf-label">Salida</label>
+      <button id="booking-checkout" type="button" class="drp-trigger" [class.is-active]="open() && step() === 'out'" (click)="openPicker(checkIn ? 'out' : 'in')" [attr.aria-label]="'Fecha de salida: ' + prettyDate(checkOut)">
         {{ prettyDate(checkOut) }}
       </button>
     </div>

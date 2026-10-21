@@ -83,6 +83,24 @@ public class AvailabilityService {
         private MonthlySummary summary;
     }
 
+    private List<Suite> getApprovedActiveSuites() {
+        Map<String, co.palaciodelmar.backend.model.Property> propMap = propertyRepository.findAll().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        co.palaciodelmar.backend.model.Property::getId,
+                        java.util.function.Function.identity(),
+                        (a, b) -> a
+                ));
+        return suiteRepository.findByActiveTrue().stream()
+                .filter(s -> {
+                    if (s.getPropertyId() == null) {
+                        return true;
+                    }
+                    co.palaciodelmar.backend.model.Property p = propMap.get(s.getPropertyId());
+                    return p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                })
+                .toList();
+    }
+
     public AvailabilityResponseData checkAvailability(LocalDate checkIn, LocalDate checkOut, Integer guests, String branchId, String suiteType) {
         long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
         if (nights <= 0) {
@@ -96,7 +114,7 @@ public class AvailabilityService {
             resolvedPropertyId = propertyRepository.findBySlug(branchId).map(p -> p.getId()).orElse(branchId);
         }
 
-        List<Suite> allSuites = suiteRepository.findByActiveTrue();
+        List<Suite> allSuites = getApprovedActiveSuites();
         List<SuiteAvailabilityResult> availableSuites = new ArrayList<>();
         List<SuiteAvailabilityResult> unavailableSuites = new ArrayList<>();
 
@@ -176,14 +194,22 @@ public class AvailabilityService {
             resolvedPropertyId = propertyRepository.findBySlug(branchId).map(p -> p.getId()).orElse(branchId);
         }
 
-        List<Suite> allSuites = suiteRepository.findByActiveTrue();
+        List<Suite> allSuites = getApprovedActiveSuites();
         List<Suite> filteredSuites = new ArrayList<>();
 
         if (suiteId != null && !suiteId.isBlank()) {
             Optional<Suite> specificSuite = suiteRepository.findById(suiteId)
                     .or(() -> suiteRepository.findBySlug(suiteId.toLowerCase()));
-            if (specificSuite.isPresent()) {
-                filteredSuites.add(specificSuite.get());
+            if (specificSuite.isPresent() && !Boolean.FALSE.equals(specificSuite.get().getActive())) {
+                Suite s = specificSuite.get();
+                boolean approved = true;
+                if (s.getPropertyId() != null) {
+                    co.palaciodelmar.backend.model.Property p = propertyRepository.findById(s.getPropertyId()).orElse(null);
+                    approved = p != null && !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus());
+                }
+                if (approved) {
+                    filteredSuites.add(s);
+                }
             }
         }
 

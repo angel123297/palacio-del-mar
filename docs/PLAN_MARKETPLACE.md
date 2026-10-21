@@ -85,8 +85,8 @@
 - [ ] `[NEW]` `ApiKeyService`: generación/revocación de API keys por propiedad (hash almacenado, prefijo `pdm_`)
 - [ ] `[NEW]` Endpoints de integración autenticados por API key (no JWT): `POST /api/integration/rooms` (upsert por `externalId` con `source=EXTERNAL`), `PUT /api/integration/availability` (bloqueo de noches)
 - [ ] Anti-overbooking: los bloqueos entrantes usan `SuiteNight` igual que las reservas nativas
-- [ ] `[NEW]` Sitio externo de ejemplo (HTML+JS simple en `/demo/external-hotel`) que llama a la API y recibe webhooks
-- [ ] Fuera de alcance de esta entrega (no hacer): widget embebible y feed iCal
+- [x] `[NEW]` Sincronización iCal RFC 5545 (`ICalService`): exportación de feeds .ics para Airbnb/Google Calendar
+- [ ] Fuera de alcance residual de esta entrega (no hacer): widget embebible, pasarela de pago real, chat de IA
 
 **Criterios de aceptación**
 1. El sitio externo crea/actualiza una habitación vía API key.

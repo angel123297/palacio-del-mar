@@ -54,14 +54,33 @@ public class JwtService {
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        boolean valid = (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        if (!valid) {
+            return false;
+        }
+
+        if (userDetails instanceof UserPrincipal principal && principal.getUser() != null) {
+            java.time.Instant passwordChangedAt = principal.getUser().getPasswordChangedAt();
+            if (passwordChangedAt != null) {
+                Date issuedAt = extractClaim(token, Claims::getIssuedAt);
+                if (issuedAt != null) {
+                    long issuedAtSec = issuedAt.getTime() / 1000;
+                    long pwdChangedSec = passwordChangedAt.getEpochSecond();
+                    // JWT 'iat' tiene resolución en segundos (RFC 7519). Se invalidan los tokens emitidos en segundos anteriores
+                    if (issuedAtSec < pwdChangedSec) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     private boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 
-    private Date extractExpiration(String token) {
+    public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
 

@@ -3,13 +3,26 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { DateRangePickerComponent } from '../../components/date-range-picker.component';
+import { DateRangePickerComponent } from '../../components/date-range-picker/date-range-picker.component';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { SearchStateService } from '../../services/search-state.service';
 import { Suite, Experience } from '../../models/types';
 import { format } from 'date-fns';
 import { AuthModalComponent } from '../../components/auth-modal/auth-modal.component';
+
+const bogotaTodayIso = (): string => {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch {
+    return format(new Date(), 'yyyy-MM-dd');
+  }
+};
+
+const addDaysIso = (iso: string, days: number): string => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+};
 
 @Component({
   selector: 'app-suite-detail',
@@ -24,10 +37,10 @@ export class SuiteDetailComponent implements OnInit {
   step = 1;
   
   // Step 1: Basic Booking Info
-  checkIn = format(new Date(), 'yyyy-MM-dd');
-  checkOut = format(new Date(Date.now() + 86400000 * 2), 'yyyy-MM-dd');
+  today = bogotaTodayIso();
+  checkIn = this.today;
+  checkOut = addDaysIso(this.today, 2);
   guests = 2;
-  today = format(new Date(), 'yyyy-MM-dd');
 
   // Step 2: Experiences
   experiences: Experience[] = [];
@@ -53,6 +66,11 @@ export class SuiteDetailComponent implements OnInit {
   
   authModalOpen = false;
   authMode: 'login' | 'register' = 'login';
+
+  // L1: evita que un HOST reserve su propio alojamiento
+  isOwnSuite = false;
+  checkingOwnership = false;
+  availabilityConflict = '';
   
   openAuth() {
     this.authModalOpen = true;
@@ -101,6 +119,38 @@ export class SuiteDetailComponent implements OnInit {
     return b?.id || b?._id || b?.slug || this.suite.propertyId || (typeof b === 'string' ? b : '') || '';
   }
 
+  getSuiteImage(suite: Suite | null): string {
+    const brokenIds = ['photo-1591088398332', 'photo-1595526114035', 'photo-1522771739844', 'photo-1566665797739'];
+    const raw = suite?.mainImage || '';
+    if (!raw || brokenIds.some(id => raw.includes(id))) {
+      return 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
+    }
+    return raw;
+  }
+
+  getExperienceImage(exp: Experience): string {
+    if (exp?.mainImage || exp?.image) return (exp.mainImage || exp.image)!;
+    const name = (exp?.name || '').toLowerCase();
+    if (name.includes('cena') || name.includes('romántic') || name.includes('gastronom')) {
+      return 'https://images.unsplash.com/photo-1544148103-0773bf10d330?w=800';
+    }
+    if (name.includes('spa') || name.includes('masaje') || name.includes('relax')) {
+      return 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800';
+    }
+    if (name.includes('yate') || name.includes('isla') || name.includes('rosario') || name.includes('barco')) {
+      return 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800';
+    }
+    return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800';
+  }
+
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (img && !img.dataset['fallbackApplied']) {
+      img.dataset['fallbackApplied'] = 'true';
+      img.src = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
+    }
+  }
+
   ngOnInit(): void {
     const filters = this.searchState.filters();
     if (filters.checkIn) this.checkIn = filters.checkIn;
@@ -122,6 +172,7 @@ export class SuiteDetailComponent implements OnInit {
         next: (res) => {
           this.suite = res.data || res;
           this.loading = false;
+          this.checkOwnSuite();
           this.fetchLiveQuote();
           this.cdr.detectChanges();
         },
@@ -172,8 +223,8 @@ export class SuiteDetailComponent implements OnInit {
   }
 
   get nights(): number {
-    const diffTime = Math.abs(new Date(this.checkOut).getTime() - new Date(this.checkIn).getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+    const diffTime = new Date(this.checkOut).getTime() - new Date(this.checkIn).getTime();
+    return Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)));
   }
 
   get totalRoomPrice(): number {
@@ -213,17 +264,47 @@ export class SuiteDetailComponent implements OnInit {
     return this.totalRoomPrice + this.totalExperiencesPrice + this.totalVipPrice + this.extraGuestsFee + this.guaranteeDeposit;
   }
 
+  // L1: si el usuario autenticado es HOST dueño de esta propiedad, no puede reservarla aquí.
+  private checkOwnSuite(): void {
+    const user = this.auth.currentUserValue;
+    const role = (user?.role || '').toLowerCase();
+    const propertyId = this.suite?.propertyId || this.suite?.branchId;
+    if (!user || role !== 'host' || !propertyId) return;
+
+    this.checkingOwnership = true;
+    this.api.get<any>('/host/properties').subscribe({
+      next: (res) => {
+        const owned: any[] = res?.data || res || [];
+        const ownedIds = new Set(owned.map((p: any) => p?.id || p?._id).filter(Boolean));
+        this.isOwnSuite = ownedIds.has(propertyId);
+        this.checkingOwnership = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        // Ante la duda no bloqueamos: el backend tiene la última palabra.
+        this.checkingOwnership = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  private expId(exp: Experience): string {
+    return (exp.id || exp._id || '') as string;
+  }
+
   toggleExperience(exp: Experience) {
-    const idx = this.selectedExperiences.findIndex(e => e.exp.id === exp.id);
+    const expKey = this.expId(exp) || exp.name;
+    const idx = this.selectedExperiences.findIndex(e => (this.expId(e.exp) || e.exp.name) === expKey);
     if (idx > -1) {
       this.selectedExperiences.splice(idx, 1);
     } else {
       this.selectedExperiences.push({ exp, qty: 1 });
     }
   }
-  
+
   isExperienceSelected(exp: Experience): boolean {
-    return this.selectedExperiences.findIndex(e => e.exp.id === exp.id) > -1;
+    const expKey = this.expId(exp) || exp.name;
+    return this.selectedExperiences.findIndex(e => (this.expId(e.exp) || e.exp.name) === expKey) > -1;
   }
 
   nextStep() {
@@ -241,16 +322,63 @@ export class SuiteDetailComponent implements OnInit {
     window.scrollTo(0,0);
   }
 
+  // Re-chequeo de disponibilidad contra el servidor justo antes de crear la reserva (L1).
+  // El snapshot del calendario puede estar desactualizado si otro huésped reservó mientras tanto.
+  private ensureStillAvailable(): Promise<boolean> {
+    const sId = this.suite?.id || this.suite?._id;
+    if (!sId) return Promise.resolve(true);
+    return new Promise(resolve => {
+      this.api.get<any>('/availability', {
+        checkIn: this.checkIn,
+        checkOut: this.checkOut,
+        guests: Number(this.guests)
+      }).subscribe({
+        next: (res) => {
+          const data = res?.data || res;
+          const available: any[] = data?.availableSuites || [];
+          const stillThere = available.some((a: any) => {
+            const s = a?.suite || a;
+            return (s?.id || s?._id || s?.slug) === (sId || this.suite?.slug);
+          });
+          resolve(stillThere);
+        },
+        error: () => resolve(true) // si el chequeo falla, dejamos pasar: el backend valida al crear
+      });
+    });
+  }
+
   createBooking(): void {
     if (!this.auth.isLoggedIn()) {
       this.message = 'Debes iniciar sesión para confirmar la reserva.';
       this.isError = true;
       return;
     }
-    
+
+    if (this.isOwnSuite) {
+      this.message = 'Esta suite pertenece a tu propio alojamiento. Gestiónala desde tu panel de anfitrión.';
+      this.isError = true;
+      return;
+    }
+
     this.bookingBusy = true;
     this.message = '';
+    this.availabilityConflict = '';
 
+    this.ensureStillAvailable().then(ok => {
+      if (!ok) {
+        this.bookingBusy = false;
+        this.availabilityConflict = 'Alguien reservó estas fechas hace un momento. Elige otras fechas en el paso 1.';
+        this.message = this.availabilityConflict;
+        this.isError = true;
+        this.goToStep(1);
+        this.cdr.detectChanges();
+        return;
+      }
+      this.submitBooking();
+    });
+  }
+
+  private submitBooking(): void {
     const foodOrders = [];
     if (this.wantFood && this.foodType) {
        const selectedDish = this.foodType === 'other' ? this.customFood : this.foodOptions.find(f => f.id === this.foodType)?.name;
@@ -272,7 +400,7 @@ export class SuiteDetailComponent implements OnInit {
       petFriendly: this.petFriendly,
       needsCrib: this.needsCrib,
       foodOrders: foodOrders,
-      experiences: this.selectedExperiences.map(e => e.exp.id),
+      experiences: this.selectedExperiences.map(e => this.expId(e.exp)),
       guestName: this.guestName,
       guestEmail: this.guestEmail,
       guestPhone: this.guestPhone
@@ -288,8 +416,16 @@ export class SuiteDetailComponent implements OnInit {
       },
       error: (err) => {
         this.bookingBusy = false;
-        this.message = err.error?.message || 'Error al procesar la reserva.';
+        const msg: string = err?.error?.message || '';
+        const isConflict = /ocupad|disponib|conflict|no se puede reservar|ya está reservad/i.test(msg) || err?.status === 409;
+        this.message = isConflict
+          ? 'Alguien reservó estas fechas hace un momento. Elige otras fechas en el paso 1.'
+          : (msg || 'Error al procesar la reserva.');
         this.isError = true;
+        if (isConflict) {
+          this.availabilityConflict = this.message;
+          this.goToStep(1);
+        }
         this.cdr.detectChanges();
       }
     });

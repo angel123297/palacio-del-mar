@@ -14,4 +14,6 @@ public interface SuiteNightRepository extends MongoRepository<SuiteNight, String
     List<SuiteNight> findByBooking(String bookingId);
     void deleteByBooking(String bookingId);
     List<SuiteNight> findByStatusAndExpiresAtBefore(String status, java.time.Instant expiresAt);
+    List<SuiteNight> findBySuite(String suiteId);
+    List<SuiteNight> findBySuiteIn(List<String> suiteIds);
 }

@@ -181,4 +181,27 @@ class HostWebhookServiceTest {
         assertNotNull(result);
         verify(webhookDispatcher).executeDelivery(delivery, "sec_test");
     }
+
+    @Test
+    void testRejectSsrfAndInternalUrls() {
+        when(propertyRepository.findById("prop_01")).thenReturn(Optional.of(prop1));
+
+        WebhookSubscriptionRequest ssrfMeta = WebhookSubscriptionRequest.builder()
+                .propertyId("prop_01")
+                .url("http://169.254.169.254/latest/meta-data/")
+                .build();
+        assertThrows(IllegalArgumentException.class, () ->
+                hostWebhookService.createSubscription(hostUser1, ssrfMeta)
+        );
+
+        WebhookSubscriptionRequest internalMongo = WebhookSubscriptionRequest.builder()
+                .propertyId("prop_01")
+                .url("http://mongo:27017/palacio_db")
+                .build();
+        assertThrows(IllegalArgumentException.class, () ->
+                hostWebhookService.createSubscription(hostUser1, internalMongo)
+        );
+
+        verify(subscriptionRepository, never()).save(any());
+    }
 }
