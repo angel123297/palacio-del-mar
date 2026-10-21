@@ -6,12 +6,15 @@ import co.palaciodelmar.backend.dto.PropertyDTO;
 import co.palaciodelmar.backend.dto.PropertyRequest;
 import co.palaciodelmar.backend.exception.GlobalExceptionHandler;
 import co.palaciodelmar.backend.exception.ResourceNotFoundException;
+import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Property;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.BookingRepository;
+import co.palaciodelmar.backend.repository.BranchRepository;
 import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
+import co.palaciodelmar.backend.repository.UserRepository;
 import co.palaciodelmar.backend.service.AdminService;
 import co.palaciodelmar.backend.service.BookingService;
 import co.palaciodelmar.backend.service.PropertyService;
@@ -249,5 +252,185 @@ class RoleAndIdorSecurityTest {
         Property adminAccess = realService.getPropertyEntityWithOwnership("prop-victim-100", "admin-123", true);
         assertNotNull(adminAccess);
         assertEquals("prop-victim-100", adminAccess.getId());
+    }
+
+    @Test
+    @DisplayName("Anti-IDOR PDM-03: Host con branches vacío no puede acceder a reserva si no es dueño de la propiedad")
+    void hostWithoutBranchesCannotAccessBookingUnlessOwnerOfProperty() {
+        BookingRepository bRepo = mock(BookingRepository.class);
+        PropertyRepository pRepo = mock(PropertyRepository.class);
+        UserRepository uRepo = mock(UserRepository.class);
+        SuiteRepository sRepo = mock(SuiteRepository.class);
+        BranchRepository brRepo = mock(BranchRepository.class);
+
+        BookingService realBookingService = new BookingService(
+                bRepo, sRepo, brRepo, mock(co.palaciodelmar.backend.repository.ExperienceRepository.class),
+                mock(co.palaciodelmar.backend.repository.SuiteNightRepository.class), uRepo,
+                mock(co.palaciodelmar.backend.repository.PromotionRepository.class),
+                mock(co.palaciodelmar.backend.service.PricingService.class),
+                mock(co.palaciodelmar.backend.service.PaymentGateway.class)
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(realBookingService, "propertyRepository", pRepo);
+
+        Booking booking = Booking.builder()
+                .id("bk-target-1")
+                .propertyId("prop-target-1")
+                .user("user-guest")
+                .build();
+        when(bRepo.findById("bk-target-1")).thenReturn(Optional.of(booking));
+
+        Property property = Property.builder()
+                .id("prop-target-1")
+                .ownerId("real-host-owner")
+                .build();
+        when(pRepo.findById("prop-target-1")).thenReturn(Optional.of(property));
+
+        // Host atacante sin sedes legacy
+        User attackerHost = User.builder()
+                .id("attacker-host")
+                .role("HOST")
+                .branches(List.of())
+                .build();
+
+        assertThrows(IllegalArgumentException.class, () ->
+                realBookingService.getBookingByIdSecure("bk-target-1", attackerHost)
+        );
+
+        // Host dueño legítimo de la propiedad
+        User legitimateHost = User.builder()
+                .id("real-host-owner")
+                .role("HOST")
+                .branches(List.of())
+                .build();
+
+        assertDoesNotThrow(() ->
+                realBookingService.getBookingByIdSecure("bk-target-1", legitimateHost)
+        );
+    }
+
+    @Test
+    @DisplayName("HostController + PDM-07: Anfitrión del marketplace (propertyId) puede hacer check-in y regenerar PIN criptográfico de 6 dígitos; otro host recibe 403")
+    void marketplaceHostCanCheckInAndRegenerateSecurePinOnOwnedPropertyOnly() throws Exception {
+        co.palaciodelmar.backend.repository.PromotionRepository promoRepo = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        co.palaciodelmar.backend.controller.HostController hostOpsController =
+                new co.palaciodelmar.backend.controller.HostController(
+                        bookingRepository, suiteRepository, bookingService, promoRepo, propertyRepository);
+
+        MockMvc opsMvc = MockMvcBuilders.standaloneSetup(hostOpsController)
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        Booking marketplaceBooking = Booking.builder()
+                .id("bk-mkt-1")
+                .propertyId("prop-mkt-1")
+                .status("confirmed")
+                .build();
+        when(bookingRepository.findById("bk-mkt-1")).thenReturn(Optional.of(marketplaceBooking));
+
+        Property ownedProperty = Property.builder()
+                .id("prop-mkt-1")
+                .ownerId("host-owner-1")
+                .build();
+        when(propertyRepository.findById("prop-mkt-1")).thenReturn(Optional.of(ownedProperty));
+
+        // 1. Host atacante sin acceso a la propiedad -> 403 Forbidden
+        authenticateUser("host-attacker", "attacker@palacio.co", "HOST");
+        opsMvc.perform(post("/api/host/bookings/bk-mkt-1/checkin"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+
+        opsMvc.perform(post("/api/host/bookings/bk-mkt-1/regenerate-pin"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+
+        // 2. Host propietario legítimo (branches vacío, dueño por propertyId) -> 200 OK y PIN de 6 dígitos >= 100000
+        authenticateUser("host-owner-1", "owner@palacio.co", "HOST");
+        opsMvc.perform(post("/api/host/bookings/bk-mkt-1/checkin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        opsMvc.perform(post("/api/host/bookings/bk-mkt-1/regenerate-pin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.smartLockPin").isString());
+
+        assertNotNull(marketplaceBooking.getSmartLockPin());
+        assertEquals(6, marketplaceBooking.getSmartLockPin().length());
+        int pinValue = Integer.parseInt(marketplaceBooking.getSmartLockPin());
+        assertTrue(pinValue >= 100000 && pinValue <= 999999, "El PIN debe estar en el rango [100000, 999999]");
+    }
+
+    @Test
+    @DisplayName("PDM-08: AdminController.createPromotion usa PromotionRequest DTO validado e ignora mass assignment")
+    void adminCreatePromotionValidatesDtoAndPreventsMassAssignment() throws Exception {
+        authenticateUser("admin-1", "admin@palacio.co", "ADMIN");
+
+        // Payload inválido (descuento fuera de rango y título vacío) -> 400 Bad Request
+        adminMockMvc.perform(post("/api/admin/promotions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"\",\"discountPercent\":150}"))
+                .andExpect(status().isBadRequest());
+
+        // Payload válido con intento de inyectar id e isSample -> se ignoran campos internos
+        co.palaciodelmar.backend.model.Promotion savedPromo = co.palaciodelmar.backend.model.Promotion.builder()
+                .id("generated-id")
+                .title("Promo Caribe")
+                .branch("all")
+                .discountPercent(20)
+                .active(true)
+                .isSample(false)
+                .build();
+        when(adminService.createPromotion(any())).thenReturn(savedPromo);
+
+        adminMockMvc.perform(post("/api/admin/promotions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":\"hacked-id\",\"isSample\":true,\"title\":\"Promo Caribe\",\"branchId\":\"all\",\"discountPercent\":20}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.title").value("Promo Caribe"))
+                .andExpect(jsonPath("$.data.branch").value("all"))
+                .andExpect(jsonPath("$.data.isSample").value(false));
+    }
+
+    @Test
+    @DisplayName("Host iCal Sync: Propietario legítimo obtiene feeds e instrucciones, anfitrión ajeno recibe 404 (Anti-IDOR)")
+    void hostIcalSyncAntiIdorProtection() throws Exception {
+        authenticateUser("host-legit", "legit@palacio.co", "HOST");
+
+        PropertyDTO myProp = PropertyDTO.builder()
+                .id("prop-mine")
+                .name("Villa Privada")
+                .active(true)
+                .build();
+
+        Suite suiteA = Suite.builder()
+                .id("suite-a")
+                .name("Master Suite")
+                .propertyId("prop-mine")
+                .build();
+
+        when(propertyService.getPropertyByOwner("prop-mine", "host-legit", false)).thenReturn(myProp);
+        when(propertyService.getPropertySuitesForHost("prop-mine", "host-legit", false)).thenReturn(List.of(suiteA));
+
+        // 1. Host legítimo accede con éxito
+        hostMockMvc.perform(get("/api/host/properties/prop-mine/sync/ical"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.propertyId").value("prop-mine"))
+                .andExpect(jsonPath("$.data.propertyIcalUrl").value("/api/properties/prop-mine/calendar.ics"))
+                .andExpect(jsonPath("$.data.suiteFeeds[0].suiteId").value("suite-a"))
+                .andExpect(jsonPath("$.data.suiteFeeds[0].icalUrl").value("/api/suites/suite-a/calendar.ics"))
+                .andExpect(jsonPath("$.data.instructions.airbnb").exists())
+                .andExpect(jsonPath("$.data.instructions.booking").exists());
+
+        // 2. Anfitrión ajeno intenta acceder -> 404 No encontrado (Anti-IDOR)
+        authenticateUser("host-attacker", "attacker@palacio.co", "HOST");
+        when(propertyService.getPropertyByOwner("prop-mine", "host-attacker", false))
+                .thenThrow(new ResourceNotFoundException("Propiedad no encontrada"));
+
+        hostMockMvc.perform(get("/api/host/properties/prop-mine/sync/ical"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
     }
 }

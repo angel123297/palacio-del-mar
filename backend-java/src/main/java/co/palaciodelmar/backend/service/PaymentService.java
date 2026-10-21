@@ -182,6 +182,7 @@ public class PaymentService {
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
              emailService.sendBookingConfirmation(updatedBooking);
+             emailService.sendHostBookingNotification(updatedBooking);
         }
 
         java.util.Map<String, Object> returnMap = new java.util.HashMap<>();

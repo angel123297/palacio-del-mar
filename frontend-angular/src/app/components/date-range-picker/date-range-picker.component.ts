@@ -1,9 +1,9 @@
 import { Component, Input, Output, EventEmitter, ElementRef, HostListener, OnInit, OnChanges, SimpleChanges, computed, signal, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ApiService } from '../services/api.service';
+import { ApiService } from '../../services/api.service';
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const MAX_NIGHTS = 90;
 const MAX_YEAR = 2030;
 
@@ -14,8 +14,12 @@ const addDays = (iso: string, n: number) => {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 };
 const localToday = () => {
-  const t = new Date();
-  return toISO(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch {
+    const t = new Date();
+    return toISO(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  }
 };
 const nightsBetween = (a: string, b: string) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 const prettyDate = (iso: string) => {

@@ -11,9 +11,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 class SimulatedPaymentGatewayTest {
@@ -116,6 +122,47 @@ class SimulatedPaymentGatewayTest {
     }
 
     @Test
+    void concurrentConfirmationOfProcessingIntentSchedulesOnlyOneSimulation() throws Exception {
+        gateway = new SimulatedPaymentGateway(paymentIntentRepository, paymentWebhookService, objectMapper);
+        ReflectionTestUtils.setField(gateway, "simulationDelaySeconds", 30);
+        ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
+        ReflectionTestUtils.setField(gateway, "scheduler", scheduler);
+
+        CyclicBarrier simultaneousLookups = new CyclicBarrier(2);
+        AtomicInteger lookupCount = new AtomicInteger();
+        when(paymentIntentRepository.findById("pi_concurrent")).thenAnswer(invocation -> {
+            int lookup = lookupCount.incrementAndGet();
+            if (lookup <= 2) {
+                simultaneousLookups.await(5, TimeUnit.SECONDS);
+                return Optional.of(PaymentIntent.builder()
+                        .id("pi_concurrent")
+                        .amount(new BigDecimal("125000"))
+                        .status("requires_payment_method")
+                        .bookingId("booking_concurrent")
+                        .build());
+            }
+            return Optional.empty();
+        });
+        when(paymentIntentRepository.save(any(PaymentIntent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var callers = Executors.newFixedThreadPool(2);
+        try {
+            var first = callers.submit(() -> gateway.confirmIntent("pi_concurrent", "tok_success"));
+            var second = callers.submit(() -> gateway.confirmIntent("pi_concurrent", "tok_success"));
+
+            assertTrue(first.get(5, TimeUnit.SECONDS).success());
+            assertTrue(second.get(5, TimeUnit.SECONDS).success());
+        } finally {
+            callers.shutdownNow();
+        }
+
+        assertAll(
+                () -> verify(paymentIntentRepository, times(1)).save(any(PaymentIntent.class)),
+                () -> verify(scheduler, times(1)).schedule(any(Runnable.class), anyLong(), any(TimeUnit.class))
+        );
+    }
+
+    @Test
     void testSimulationHandlesTestCards() {
         // Tarjeta rechazada (0002)
         PaymentIntent intent1 = PaymentIntent.builder()
@@ -196,5 +243,33 @@ class SimulatedPaymentGatewayTest {
         assertEquals("refunded", res4.status());
         assertNotNull(res4.refundId());
         assertEquals("refunded", succeededIntent.getStatus());
+    }
+
+    @Test
+    void testRefundResolvesByTxBookingIdPrefix() {
+        PaymentIntent failedAttempt = PaymentIntent.builder()
+                .id("pi_fail_1")
+                .bookingId("book_cancel_123")
+                .amount(new BigDecimal("400000"))
+                .status("failed")
+                .build();
+
+        PaymentIntent succeededAttempt = PaymentIntent.builder()
+                .id("pi_succ_2")
+                .bookingId("book_cancel_123")
+                .transactionId("ch_real_999")
+                .amount(new BigDecimal("400000"))
+                .status("succeeded")
+                .build();
+
+        when(paymentIntentRepository.findByTransactionId("tx_book_cancel_123")).thenReturn(Optional.empty());
+        when(paymentIntentRepository.findById("tx_book_cancel_123")).thenReturn(Optional.empty());
+        when(paymentIntentRepository.findAllByBookingId("book_cancel_123"))
+                .thenReturn(java.util.List.of(failedAttempt, succeededAttempt));
+
+        PaymentGateway.PaymentRefundResponse res = gateway.refund("tx_book_cancel_123", new BigDecimal("360000"));
+        assertTrue(res.success());
+        assertEquals("refunded", res.status());
+        assertEquals("refunded", succeededAttempt.getStatus());
     }
 }

@@ -12,7 +12,6 @@ import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -38,7 +37,7 @@ import static org.mockito.Mockito.when;
 /**
  * Tests intensivos de integridad de precios en createBooking.
  * Verifican que el CLIENTE no pueda manipular precios/cantidades de experiencias ni de órdenes de comida.
- * Generados por la auditoría de seguridad del 2026-10-15 (ver /AUDITORIA_SEGURIDAD.md).
+ * Generados por la auditoría de seguridad del 2026-10-15 (ver docs/AUDITORIA_SEGURIDAD.md).
  *
  * Regla de oro: todo precio usado para calcular el total debe venir del backend (BD),
  * nunca del body de la petición.
@@ -140,9 +139,6 @@ class PriceIntegritySecurityTest {
     }
 
     @Test
-    @Disabled("BUG-PDM-01: Booking.FoodOrder.price llega del cliente y se usa directo en el total. " +
-              "Un huésped puede pedir comida con price=0 (gratis) sin límite de órdenes. " +
-              "Fix: ignorar price del DTO y cobrar desde catálogo del backend; quitar @Disabled al corregir.")
     @DisplayName("BUG-PDM-01: una orden de comida con price=0 debe cobrarse con el precio del catálogo (80000)")
     void testFoodOrderWithZeroPriceMustChargeDefaultPrice() {
         Booking.FoodOrder freeLunch = Booking.FoodOrder.builder()
@@ -164,9 +160,6 @@ class PriceIntegritySecurityTest {
     }
 
     @Test
-    @Disabled("BUG-PDM-02 (defensa en profundidad): parseExperiences acepta instancias de SelectedExperience " +
-              "tal cual (precio y cantidad del cliente). Hoy por JSON llega como Map (ruta segura), pero la rama " +
-              "instanceof confía en el objeto. Fix: eliminar la rama instanceof y resolver SIEMPRE desde BD.")
     @DisplayName("BUG-PDM-02: una SelectedExperience inyectada con price=0 debe re-cotizarse desde la BD")
     void testSelectedExperienceInstanceMustBeRepricedFromDatabase() {
         Experience yate = Experience.builder().id("exp-1").name("Yate").price(EXP_PRICE).build();

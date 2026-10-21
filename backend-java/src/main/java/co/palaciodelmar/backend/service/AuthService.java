@@ -222,6 +222,7 @@ public class AuthService {
             throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
         }
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
     }

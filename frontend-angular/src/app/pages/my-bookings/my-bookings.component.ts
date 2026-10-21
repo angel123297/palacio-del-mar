@@ -1,9 +1,8 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
-import { LoyaltyService } from '../../services/loyalty.service';
 import { Booking } from '../../models/types';
 import { finalize } from 'rxjs';
 
@@ -20,37 +19,38 @@ import { finalize } from 'rxjs';
         <p class="luxury-loader-text">Cargando...</p>
       </div>
 
-      <div *ngIf="!loading && bookings.length === 0" style="text-align: center; padding: 4rem 1rem; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(212,175,55,0.2);">
-        <p style="color: #aaa; font-size: 1.1rem; margin-bottom: 1.5rem;">No tienes reservas registradas en tu cuenta.</p>
-        <a routerLink="/" style="background: var(--gold); color: #0d0d0d; font-weight: 700; padding: 12px 24px; border-radius: 6px; text-decoration: none;">Explorar Suites</a>
+      <div *ngIf="!loading && bookings.length === 0" style="text-align: center; padding: 3.5rem 1.5rem; background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px solid rgba(212,175,55,0.25);">
+        <div style="font-size: 2.5rem; margin-bottom: 0.8rem;">✨</div>
+        <h2 style="font-family: var(--font-title); font-size: 1.6rem; color: var(--gold); margin-bottom: 0.5rem;">Tu próxima experiencia inolvidable te espera</h2>
+        <p style="color: #ccc; font-size: 1rem; max-width: 500px; margin: 0 auto 2rem; line-height: 1.5;">Aún no tienes itinerarios activos en tu cuenta. Explora nuestras suites y casonas coloniales con vistas panorámicas al mar de Cartagena.</p>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; max-width: 720px; margin: 0 auto 2.5rem; text-align: left;">
+          <div style="background: rgba(0,0,0,0.5); border: 1px solid rgba(201,169,110,0.2); border-radius: 10px; padding: 1.2rem;">
+            <p style="color: var(--gold); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700; margin: 0 0 4px;">Frente al Mar</p>
+            <h4 style="color: #fff; margin: 0 0 6px; font-size: 1rem;">Palacio Bocagrande</h4>
+            <p style="color: #888; font-size: 0.8rem; margin: 0;">Piscina infinita y atardeceres dorados sobre el mar.</p>
+          </div>
+          <div style="background: rgba(0,0,0,0.5); border: 1px solid rgba(201,169,110,0.2); border-radius: 10px; padding: 1.2rem;">
+            <p style="color: var(--gold); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700; margin: 0 0 4px;">Patrimonio</p>
+            <h4 style="color: #fff; margin: 0 0 6px; font-size: 1rem;">Casona Getsemaní</h4>
+            <p style="color: #888; font-size: 0.8rem; margin: 0;">Arquitectura histórica, patios coloniales y exclusividad.</p>
+          </div>
+        </div>
+
+        <a routerLink="/" class="btn-primary" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 12px 28px; font-weight: 700; text-decoration: none; font-size: 0.95rem;">
+          Explorar Suites y Villas Exclusivas &rarr;
+        </a>
       </div>
 
       <div *ngIf="!loading && bookings.length > 0" style="display: flex; flex-direction: column; gap: 1.5rem;">
-        
-        <!-- Palace Club Summary -->
-        <div style="background: linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(0,0,0,0.8) 100%); border: 1px solid rgba(212,175,55,0.3); border-radius: 12px; padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-          <div>
-            <h2 style="font-family: var(--font-title); font-size: 1.2rem; color: var(--gold); margin: 0 0 0.5rem 0; text-transform: uppercase;">The Palace Club</h2>
-            <p style="color: #ccc; font-size: 0.9rem; margin: 0;">Nivel Actual: <strong style="color: #fff;">{{ loyalty.status().tier }}</strong></p>
-          </div>
-          <div style="flex-grow: 1; max-width: 400px;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #aaa; margin-bottom: 4px;">
-              <span>{{ loyalty.status().points | number }} pts</span>
-              <span>Faltan {{ loyalty.status().nextTierPoints - loyalty.status().points | number }} pts para el siguiente nivel</span>
-            </div>
-            <div style="background: rgba(255,255,255,0.1); border-radius: 20px; height: 8px; width: 100%; overflow: hidden;">
-              <div style="background: var(--gold); height: 100%; transition: width 1s ease-in-out;" [style.width.%]="loyalty.progressPercentage()"></div>
-            </div>
-          </div>
-        </div>
 
         <div *ngFor="let booking of bookings" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 1.5rem; display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: space-between; align-items: center;">
           <div>
             <h3 style="margin: 0 0 6px 0; color: #ffffff;">{{ booking.suite?.name || 'Suite Palacio del Mar' }}</h3>
             <p style="color: #aaa; font-size: 0.85rem; margin: 0 0 10px 0;">Código: {{ booking.bookingCode || booking.id || booking._id }}</p>
             <div style="display: flex; gap: 1.5rem; font-size: 0.95rem; color: #ddd;">
-              <span><strong>Check-in:</strong> {{ booking.checkIn | date:'shortDate' }}</span>
-              <span><strong>Check-out:</strong> {{ booking.checkOut | date:'shortDate' }}</span>
+              <span><strong>Llegada:</strong> {{ booking.checkIn | date:'dd/MM/yyyy' }}</span>
+              <span><strong>Salida:</strong> {{ booking.checkOut | date:'dd/MM/yyyy' }}</span>
             </div>
           </div>
 
@@ -63,16 +63,15 @@ import { finalize } from 'rxjs';
                 {{ getStatusLabel(booking.status) }}
               </span>
               <a [routerLink]="['/reservas', booking.id || booking._id]" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Ver Detalles</a>
-              <a *ngIf="booking.status === 'pending'" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Pagar</a>
+              <a *ngIf="booking.status === 'pending' && !isExpired(booking)" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Pagar</a>
               <a *ngIf="booking.status === 'confirmed'" [routerLink]="['/reservas', booking.id || booking._id, 'comprobante']" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #2ecc71; color: #2ecc71; text-decoration: none;">Ver Factura</a>
-              <button *ngIf="booking.status === 'confirmed' || booking.status === 'pending'" (click)="openCancelModal(booking)" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #e74c3c; color: #e74c3c; background: transparent; cursor: pointer;">Cancelar</button>
+              <button *ngIf="(booking.status === 'confirmed' || booking.status === 'pending') && !isExpired(booking)" (click)="openCancelModal(booking)" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #e74c3c; color: #e74c3c; background: transparent; cursor: pointer;">Cancelar</button>
             </div>
-            <p *ngIf="payError && (payingId === booking.id || payingId === booking._id)" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">{{ payError }}</p>
           </div>
         </div>
 
         <!-- Cancellation Policy Modal -->
-        <div *ngIf="selectedCancelBooking" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
+        <div *ngIf="selectedCancelBooking" (keydown.escape)="closeCancelModal()" tabindex="-1" role="dialog" aria-modal="true" aria-label="Confirmar cancelación de reserva" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
           <div style="background: #111; border: 1px solid #c9a96e; border-radius: 12px; max-width: 500px; width: 100%; padding: 2rem; color: #f5f0e8;">
             <h3 style="font-family: var(--font-title); font-size: 1.5rem; color: #c9a96e; margin-top: 0; margin-bottom: 1rem;">Confirmar Cancelación</h3>
             <p style="font-size: 0.95rem; line-height: 1.5; color: #ccc; margin-bottom: 1.2rem;">
@@ -102,21 +101,24 @@ import { finalize } from 'rxjs';
 export class MyBookingsComponent implements OnInit {
   bookings: Booking[] = [];
   loading = true;
-  payingId: string | null = null;
-  payError: string = '';
 
   selectedCancelBooking: Booking | null = null;
   cancelling = false;
   cancelRefundInfo = '';
   cancelRefundAmount = 0;
+  cancelError = '';
 
   constructor(
     private api: ApiService,
     private auth: AuthService,
-    private cdr: ChangeDetectorRef,
-    private router: Router,
-    public loyalty: LoyaltyService
+    private cdr: ChangeDetectorRef
   ) {}
+
+  /** L8: una reserva pending con TTL vencido ya no debe ofrecer pago ni cancelación. */
+  isExpired(b: Booking): boolean {
+    if (b.status !== 'pending' || !b.expiresAt) return false;
+    return new Date(b.expiresAt).getTime() < Date.now();
+  }
 
   getStatusLabel(status?: string): string {
     switch (status?.toLowerCase()) {
@@ -143,11 +145,9 @@ export class MyBookingsComponent implements OnInit {
       this.cancelRefundInfo = 'Reembolso total del 100% sin retención por anticipación superior a 7 días.';
     } else {
       this.cancelRefundAmount = Math.round(paid * 0.9);
-      this.cancelRefundInfo = 'Reembolso del 90% con 10% de retención por gastos operativos al cancelar con 7 días o menos.';
+      this.cancelRefundInfo = 'Reembolso del 90% con 10% de retención por gastos operativos al cancelar con 7 días o menos. El monto final lo calcula el sistema al procesar la cancelación.';
     }
   }
-
-  cancelError = '';
 
   closeCancelModal(): void {
     this.selectedCancelBooking = null;
@@ -175,8 +175,10 @@ export class MyBookingsComponent implements OnInit {
     });
   }
 
-  fetchMyBookings(): void {
-    this.loading = true;
+  fetchMyBookings(isBackgroundRefresh = false): void {
+    if (!isBackgroundRefresh) {
+      this.loading = true;
+    }
     this.api.get<any>('/bookings').pipe(
       finalize(() => {
         this.loading = false;
@@ -187,25 +189,14 @@ export class MyBookingsComponent implements OnInit {
         const raw = res.data || res;
         this.bookings = Array.isArray(raw) ? raw : (raw.bookings || []);
         this.cdr.detectChanges();
+        if (!isBackgroundRefresh && this.bookings.some(b => b.status === 'pending' && !this.isExpired(b))) {
+          setTimeout(() => this.fetchMyBookings(true), 2500);
+        }
       },
       error: () => {
         this.cdr.detectChanges();
       }
     });
-  }
-
-  printInvoice(booking: any) {
-    const id = booking?.id || booking?._id;
-    if (id) {
-      this.router.navigate(['/reservas', id, 'comprobante']);
-    } else {
-      window.print();
-    }
-  }
-
-  payBooking(booking: any): void {
-    const id = booking.id || booking._id;
-    this.router.navigate(['/checkout', id]);
   }
 
   ngOnInit(): void {
@@ -214,10 +205,6 @@ export class MyBookingsComponent implements OnInit {
       this.cdr.detectChanges();
       return;
     }
-    this.fetchMyMyBookings();
-  }
-
-  private fetchMyMyBookings(): void {
     this.fetchMyBookings();
   }
 }

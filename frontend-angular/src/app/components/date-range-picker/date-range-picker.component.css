@@ -20,7 +20,7 @@
 .drp-trigger:hover::before, .drp-trigger.is-active::before { transform: translateY(-50%) rotate(45deg) scale(1); }
 
 .drp-pop {
-  position: absolute; top: 100%; left: 0; z-index: 300; width: 360px; margin-top: 18px; padding: 36px 24px 20px;
+  position: absolute; top: 100%; left: 0; z-index: 1000; width: 370px; margin-top: 18px; padding: 36px 24px 20px;
   background:
     radial-gradient(circle at 12% 30%, rgba(232, 213, 163, 0.45) 0 1px, transparent 1.6px),
     radial-gradient(circle at 86% 22%, rgba(232, 213, 163, 0.35) 0 1px, transparent 1.6px),
@@ -108,10 +108,10 @@
 .drp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; position: relative; z-index: 2; animation: drp-page 0.32s ease-out both; }
 @keyframes drp-page { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.drp-wd { font-family: 'Cinzel', 'Cormorant Garamond', serif; font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; text-align: center; color: var(--gold, #c9a96e); opacity: 0.8; padding-bottom: 10px; }
+.drp-wd { font-family: 'Cinzel', 'Cormorant Garamond', serif; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; color: var(--gold, #c9a96e); opacity: 0.95; font-weight: 600; padding-bottom: 10px; }
 .drp-day {
-  position: relative; isolation: isolate; background: transparent; border: none; color: rgba(245, 240, 232, 0.84); cursor: pointer;
-  aspect-ratio: 1; font-family: 'Cinzel', 'Cormorant Garamond', serif; font-size: 0.92rem; font-weight: 500;
+  position: relative; isolation: isolate; background: transparent; border: none; color: #f5f0e8; cursor: pointer;
+  aspect-ratio: 1; font-family: 'Cinzel', 'Cormorant Garamond', serif; font-size: 0.95rem; font-weight: 600;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   transition: color 0.2s, text-shadow 0.2s, background 0.2s;
 }

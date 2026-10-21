@@ -10,6 +10,8 @@ import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +29,11 @@ public class IntegrationService {
     private final SuiteRepository suiteRepository;
     private final SuiteNightRepository suiteNightRepository;
 
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public Suite upsertRoom(ApiKey apiKey, IntegrationRoomRequest request) {
         String propertyId = apiKey.getPropertyId();
         String externalId = request.getExternalId().trim();
@@ -156,6 +163,7 @@ public class IntegrationService {
             List<SuiteNight> toRemove = occupied.stream()
                     .filter(sn -> sn.getUnitSlot() != null && sn.getUnitSlot() == slot)
                     .filter(sn -> "blocked".equalsIgnoreCase(sn.getStatus()))
+                    .filter(sn -> sn.getBooking() == null || sn.getBooking().startsWith("EXT_BLOCK_"))
                     .toList();
 
             suiteNightRepository.deleteAll(toRemove);

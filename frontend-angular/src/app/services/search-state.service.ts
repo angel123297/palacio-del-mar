@@ -12,7 +12,15 @@ export interface SearchFilters {
 
 @Injectable({ providedIn: 'root' })
 export class SearchStateService {
-  private today = new Date();
+  private today = (() => {
+    try {
+      const iso = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(y, m - 1, d, 12, 0, 0);
+    } catch {
+      return new Date();
+    }
+  })();
   
   // Default: checkIn tomorrow, checkOut in 3 days
   private defaultCheckIn = new Date(this.today.getFullYear(), this.today.getMonth(), this.today.getDate() + 1, 12, 0, 0);
@@ -40,9 +48,10 @@ export class SearchStateService {
     const start = this.parseToMidday(this.filters().checkIn);
     const end = this.parseToMidday(this.filters().checkOut);
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return 1;
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)); 
-    return diffDays > 0 ? diffDays : 1;
+    // Sin Math.abs: un rango invertido (salida antes que llegada) no cuenta noches positivas.
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
   });
 
   updateDates(checkIn: Date, checkOut: Date) {

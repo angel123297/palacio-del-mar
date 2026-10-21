@@ -37,11 +37,11 @@ public class HostPayoutService {
 
     /**
      * Proceso batch automático de liquidación de ingresos a anfitriones.
-     * Agrupa reservas elegibles (check-in iniciado o finalizado, no canceladas, no liquidadas) por propiedad.
+     * Agrupa reservas elegibles (solo estancias finalizadas: checked_out o completed, no canceladas, no liquidadas) por propiedad.
      */
-    public List<HostPayoutDTO> processAutomatedPayouts() {
+    public synchronized List<HostPayoutDTO> processAutomatedPayouts() {
         LocalDate today = LocalDate.now(BOGOTA);
-        List<String> eligibleStatuses = List.of("confirmed", "checked_in", "checked_out", "completed");
+        List<String> eligibleStatuses = List.of("checked_out", "completed");
 
         List<Booking> candidates = bookingRepository.findByStatusIn(eligibleStatuses).stream()
                 .filter(b -> b.getPayoutId() == null)
@@ -70,6 +70,19 @@ public class HostPayoutService {
             String propId = entry.getKey();
             List<Booking> propBookings = entry.getValue();
 
+            // Verificación atómica anti-doble liquidación: re-verificar estado en base de datos
+            List<Booking> validBookings = new ArrayList<>();
+            for (Booking b : propBookings) {
+                Booking fresh = bookingRepository.findById(b.getId()).orElse(b);
+                if (fresh.getPayoutId() == null && fresh.getStatus() != null && eligibleStatuses.contains(fresh.getStatus().toLowerCase())) {
+                    validBookings.add(fresh);
+                }
+            }
+
+            if (validBookings.isEmpty()) {
+                continue;
+            }
+
             Property property = propertyRepository.findById(propId).orElse(null);
             String ownerId = property != null && property.getOwnerId() != null ? property.getOwnerId() : "system";
             String propName = property != null ? property.getName() : "Alojamiento (" + propId + ")";
@@ -81,10 +94,13 @@ public class HostPayoutService {
             LocalDate maxDate = null;
             List<String> bIds = new ArrayList<>();
 
-            for (Booking b : propBookings) {
-                BigDecimal roomPrice = b.getSubtotal() != null ? b.getSubtotal() : b.getTotalPrice();
-                BigDecimal bookingFee = b.getPlatformFee() != null ? b.getPlatformFee() : roomPrice.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
-                BigDecimal bookingNet = b.getHostPayout() != null ? b.getHostPayout() : roomPrice.subtract(bookingFee);
+            for (Booking b : validBookings) {
+                BigDecimal fallbackRoom = b.getSubtotal() != null ? b.getSubtotal() : (b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
+                BigDecimal bookingFee = b.getPlatformFee() != null ? b.getPlatformFee() : fallbackRoom.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal bookingNet = b.getHostPayout() != null ? b.getHostPayout() : fallbackRoom.subtract(bookingFee);
+                BigDecimal roomPrice = (b.getPlatformFee() != null && b.getHostPayout() != null)
+                        ? bookingFee.add(bookingNet)
+                        : fallbackRoom;
 
                 gross = gross.add(roomPrice);
                 fee = fee.add(bookingFee);
@@ -121,7 +137,7 @@ public class HostPayoutService {
             HostPayout savedPayout = hostPayoutRepository.save(payout);
 
             // Marcar las reservas con el ID de la liquidación
-            for (Booking b : propBookings) {
+            for (Booking b : validBookings) {
                 b.setPayoutId(savedPayout.getId());
                 b.setUpdatedAt(Instant.now());
                 bookingRepository.save(b);

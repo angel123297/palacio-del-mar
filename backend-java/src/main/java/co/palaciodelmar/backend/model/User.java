@@ -60,6 +60,7 @@ public class User {
     private Instant updatedAt = Instant.now();
 
     private Instant deletedAt;
+    private Instant passwordChangedAt;
 
     @Data
     @Builder

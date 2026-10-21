@@ -57,7 +57,7 @@ jobs:
           retention-days: 14
 
   frontend:
-    name: Frontend Build & Lint (Angular 18)
+    name: Frontend Build & Lint (Angular)
     runs-on: ubuntu-latest
 
     steps:
@@ -78,3 +78,7 @@ jobs:
       - name: Build Angular Application
         working-directory: frontend-angular
         run: npm run build
+
+      - name: Run Frontend Unit Tests
+        working-directory: frontend-angular
+        run: npm test -- --watch=false
