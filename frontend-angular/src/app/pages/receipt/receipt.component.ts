@@ -6,7 +6,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 // @ts-ignore
-import { renderSVG } from '../../utils/qr.js';
+import { renderSVG } from '../../utils/qr';
 
 @Component({
   selector: 'app-receipt',
