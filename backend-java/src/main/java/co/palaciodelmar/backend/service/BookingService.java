@@ -28,6 +28,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -84,8 +85,14 @@ public class BookingService {
             userId = guest.getId();
         }
 
-        Suite suite = suiteRepository.findById(request.getSuiteId())
-                .or(() -> suiteRepository.findBySlug(request.getSuiteId().toLowerCase()))
+        String rawSuiteId = request.getSuiteId().trim();
+        String lowerSuiteId = rawSuiteId.toLowerCase();
+        Suite suite = suiteRepository.findById(rawSuiteId)
+                .or(() -> suiteRepository.findBySlug(lowerSuiteId))
+                .or(() -> {
+                    String alias = AvailabilityService.SLUG_ALIASES.get(lowerSuiteId);
+                    return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
+                })
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: esta habitación no existe o ya no está disponible"));
 
         if ((suite.getActive() != null && !suite.getActive()) || (suite.getAvailable() != null && !suite.getAvailable())) {
@@ -300,8 +307,14 @@ public class BookingService {
             throw new IllegalArgumentException("No se puede modificar una reserva en estado " + booking.getStatus());
         }
 
-        Suite suite = suiteRepository.findById(booking.getSuite())
-                .or(() -> suiteRepository.findBySlug(booking.getSuite().toLowerCase()))
+        String rawSuiteId = booking.getSuite() != null ? booking.getSuite().trim() : "";
+        String lowerSuiteId = rawSuiteId.toLowerCase();
+        Suite suite = suiteRepository.findById(rawSuiteId)
+                .or(() -> suiteRepository.findBySlug(lowerSuiteId))
+                .or(() -> {
+                    String alias = AvailabilityService.SLUG_ALIASES.get(lowerSuiteId);
+                    return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
+                })
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada"));
 
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
@@ -750,7 +763,10 @@ public class BookingService {
 
         Suite suite = null;
         if (booking.getSuite() != null) {
-            suite = suiteRepository.findById(booking.getSuite()).orElse(null);
+            String sId = booking.getSuite().trim();
+            suite = suiteRepository.findById(sId)
+                    .or(() -> suiteRepository.findBySlug(sId.toLowerCase()))
+                    .orElse(null);
         }
 
         Branch branch = null;
