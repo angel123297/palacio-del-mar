@@ -15,7 +15,7 @@ import { FooterComponent } from './components/footer/footer.component';
     </main>
     <app-footer></app-footer>
   `,
-  styleUrls: ['./app.css']
+  styleUrls: ['./app.scss']
 })
 export class App {
   title = 'frontend-angular';

@@ -29,7 +29,7 @@ const addDaysIso = (iso: string, days: number): string => {
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule, DateRangePickerComponent, AuthModalComponent],
   templateUrl: './suite-detail.component.html',
-  styleUrls: ['./suite-detail.component.css']
+  styleUrls: ['./suite-detail.component.scss']
 })
 export class SuiteDetailComponent implements OnInit {
   suite: Suite | null = null;
