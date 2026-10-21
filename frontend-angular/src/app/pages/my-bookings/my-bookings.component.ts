@@ -25,12 +25,12 @@ import { finalize } from 'rxjs';
         <p style="color: #ccc; font-size: 1rem; max-width: 500px; margin: 0 auto 2rem; line-height: 1.5;">Aún no tienes itinerarios activos en tu cuenta. Explora nuestras suites y casonas coloniales con vistas panorámicas al mar de Cartagena.</p>
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; max-width: 720px; margin: 0 auto 2.5rem; text-align: left;">
-          <a [routerLink]="['/habitaciones/suite-presidencial-mar']" style="text-decoration: none; display: block; background: rgba(0,0,0,0.5); border: 1px solid rgba(201,169,110,0.2); border-radius: 10px; padding: 1.2rem; transition: transform 0.2s, border-color 0.2s; cursor: pointer;">
+          <a [routerLink]="['/habitaciones/penthouse-bocagrande']" style="text-decoration: none; display: block; background: rgba(0,0,0,0.5); border: 1px solid rgba(201,169,110,0.2); border-radius: 10px; padding: 1.2rem; transition: transform 0.2s, border-color 0.2s; cursor: pointer;">
             <p style="color: var(--gold); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700; margin: 0 0 4px;">Frente al Mar</p>
             <h4 style="color: #fff; margin: 0 0 6px; font-size: 1rem;">Palacio Bocagrande &rarr;</h4>
             <p style="color: #888; font-size: 0.8rem; margin: 0;">Piscina infinita y atardeceres dorados sobre el mar.</p>
           </a>
-          <a [routerLink]="['/habitaciones/casona-colonial-getsemani']" style="text-decoration: none; display: block; background: rgba(0,0,0,0.5); border: 1px solid rgba(201,169,110,0.2); border-radius: 10px; padding: 1.2rem; transition: transform 0.2s, border-color 0.2s; cursor: pointer;">
+          <a [routerLink]="['/habitaciones/suite-arte-patio-getsemani']" style="text-decoration: none; display: block; background: rgba(0,0,0,0.5); border: 1px solid rgba(201,169,110,0.2); border-radius: 10px; padding: 1.2rem; transition: transform 0.2s, border-color 0.2s; cursor: pointer;">
             <p style="color: var(--gold); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 700; margin: 0 0 4px;">Patrimonio</p>
             <h4 style="color: #fff; margin: 0 0 6px; font-size: 1rem;">Casona Getsemaní &rarr;</h4>
             <p style="color: #888; font-size: 0.8rem; margin: 0;">Arquitectura histórica, patios coloniales y exclusividad.</p>
