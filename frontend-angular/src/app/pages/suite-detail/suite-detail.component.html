@@ -55,7 +55,7 @@
             </div>
             <div>
               <label for="suite-guests-select" style="color: var(--gold); font-size: 0.85rem;">Huéspedes</label>
-              <select id="suite-guests-select" [(ngModel)]="guests" class="form-control" aria-label="Cantidad de huéspedes">
+              <select id="suite-guests-select" [(ngModel)]="guests" (ngModelChange)="validateDates()" class="form-control" aria-label="Cantidad de huéspedes">
                 <option *ngFor="let i of [1,2,3,4,5,6,7,8].slice(0, suite.maxGuests || 2)" [value]="i">{{i}}</option>
               </select>
             </div>

@@ -77,9 +77,21 @@ public class DemoWebhookReceiverController {
         )));
     }
 
+    @GetMapping("/simulate-failure")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getSimulateFailure() {
+        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+                "simulateFailure", this.simulateFailure,
+                "message", this.simulateFailure ? "Fallo 500 activado" : "Receptor funcionando normalmente"
+        )));
+    }
+
     @PostMapping("/simulate-failure")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> setSimulateFailure(@RequestBody Map<String, Boolean> body) {
-        this.simulateFailure = Boolean.TRUE.equals(body.get("enabled"));
+    public ResponseEntity<ApiResponse<Map<String, Object>>> setSimulateFailure(
+            @RequestParam(required = false) Boolean enabled,
+            @RequestBody(required = false) Map<String, Boolean> body
+    ) {
+        boolean nextVal = enabled != null ? enabled : (body != null && Boolean.TRUE.equals(body.get("enabled")));
+        this.simulateFailure = nextVal;
         log.info("Receptor Demo: Simulación de fallo establecida en: {}", this.simulateFailure);
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
                 "simulateFailure", this.simulateFailure,
