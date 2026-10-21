@@ -132,9 +132,11 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
           const nextSoldOut = { ...this.soldOut() };
           const nextAvail = { ...this.dayAvailability() };
           days.forEach((d: any) => {
-            if (d.soldOut) nextSoldOut[d.date] = true;
+            if (d.soldOut && (d.totalSuites === undefined || d.totalSuites > 0)) {
+              nextSoldOut[d.date] = true;
+            }
             nextAvail[d.date] = {
-              soldOut: !!d.soldOut,
+              soldOut: !!d.soldOut && (d.totalSuites === undefined || d.totalSuites > 0),
               availableSuites: d.availableSuites,
               totalSuites: d.totalSuites,
               occupancyRate: d.occupancyRate
@@ -163,9 +165,21 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
       next: (res) => {
         if (this.reqId !== currentReq) return;
         const d = res?.data || res || {};
-        const ranges = [...(d.highSeason || []), ...(d.peakSeason || [])];
+        const rawRanges = [...(d.highSeason || []), ...(d.peakSeason || [])];
+        const ranges = rawRanges.map((r: any) => ({
+          start: r.start || r.startDate,
+          end: r.end || r.endDate,
+          name: r.name || r.label || 'Temporada alta'
+        }));
+        const rawHolidays = d.holidays || [];
+        const holidays = rawHolidays.map((h: any) => {
+          if (typeof h === 'string') {
+            return { date: h, name: 'Día festivo' };
+          }
+          return { date: h.date, name: h.name || 'Día festivo' };
+        });
         this.peakRanges.set([...this.peakRanges(), ...ranges]);
-        this.holidays.set([...this.holidays(), ...(d.holidays || [])]);
+        this.holidays.set([...this.holidays(), ...holidays]);
       },
       error: () => {
         if (this.reqId !== currentReq) return;
@@ -232,7 +246,8 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
     const seen = new Set();
     const promos = this.promoMonths()[`${v.year}-${v.month}`] || [];
     [...promos].sort((a, b) => b.discountPercent - a.discountPercent).forEach(p => {
-      items.push({ key: `p${p.id}`, kind: 'promo', name: p.title, sub: p.branch?.name, when: shortRange(p.startDate, p.endDate), badge: `-${p.discountPercent}%` });
+      const branchLabel = p.branch?.name || p.branchName || (typeof p.branch === 'string' ? p.branch : '');
+      items.push({ key: `p${p.id}`, kind: 'promo', name: p.title, sub: branchLabel, when: shortRange(p.startDate, p.endDate), badge: `-${p.discountPercent}%` });
     });
     this.peakRanges().filter(r => r.start <= last && r.end >= first).forEach(r => {
       const k = `s${r.name}${r.start}`;
@@ -273,22 +288,26 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
   }
 
   pick(iso: string) {
-    if (this.soldOut()[iso] || iso < this.today) return;
+    if (iso < this.today) return;
 
     if (this.step() === 'out' && this.checkIn) {
-      if (iso > this.checkIn && this.canCheckOut(this.checkIn, iso)) {
-        this.rangeChange.emit({ checkIn: this.checkIn, checkOut: iso });
-        this.open.set(false);
-        this.step.set('in');
+      if (iso > this.checkIn) {
+        if (this.canCheckOut(this.checkIn, iso)) {
+          this.rangeChange.emit({ checkIn: this.checkIn, checkOut: iso });
+          this.open.set(false);
+          this.step.set('in');
+        }
         return;
       } else if (iso <= this.checkIn) {
-        // Change check-in date directly
+        // Change check-in date directly if available
+        if (this.soldOut()[iso]) return;
         this.rangeChange.emit({ checkIn: iso, checkOut: '' });
         this.step.set('out');
         return;
       }
     }
 
+    if (this.soldOut()[iso]) return;
     this.rangeChange.emit({ checkIn: iso, checkOut: '' });
     this.step.set('out');
   }
