@@ -269,7 +269,7 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
                       </span>
                     </td>
                     <td class="py-4 px-6 text-right">
-                      <button [routerLink]="['/reservas', b.id || b._id]" class="text-xs text-[#c9a96e] hover:text-white transition px-2">Ver</button>
+                      <button [routerLink]="['/reservas', b.id || b._id]" class="text-xs text-[#c9a96e] hover:text-white transition px-2.5 py-1 min-h-[28px] min-w-[36px] inline-flex items-center justify-center rounded border border-[rgba(201,169,110,0.3)]">Ver</button>
                       <button *ngIf="b.status === 'pending' || b.status === 'PENDING'" 
                               (click)="approveBooking(b)" 
                               class="text-xs text-[#2ecc71] hover:text-white transition px-2 font-semibold border border-[#2ecc71] rounded py-1 bg-[rgba(46,204,113,0.1)]">

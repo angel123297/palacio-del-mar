@@ -26,6 +26,21 @@ const addDaysIso = (iso: string, days: number): string => {
 
 const FALLBACK_SUITES_CATALOG: Suite[] = [
   {
+    id: 'penthouse-bocagrande',
+    name: 'Penthouse Ocean Front',
+    slug: 'penthouse-bocagrande',
+    type: 'Suite Presidencial',
+    description: 'Penthouse exclusivo de dos niveles con piscina privada infiniti al Caribe, ventanales panorámicos y mayordomo personal 24/7.',
+    propertyId: 'bocagrande',
+    branch: { name: 'Palacio del Mar · Bocagrande', slug: 'bocagrande', address: 'Avenida San Martín, Bocagrande, Cartagena' } as any,
+    basePrice: 2450000,
+    pricePerNight: 2450000,
+    size: 160,
+    maxGuests: 4,
+    amenities: ['Piscina privada', 'Vista al mar', 'Mayordomo 24/7', 'Terraza', 'Wi-Fi 500Mbps', 'Cava de vinos'],
+    mainImage: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800'
+  } as Suite,
+  {
     id: 'suite-presidencial-mar',
     name: 'Suite Presidencial Mar Caribe',
     slug: 'suite-presidencial-mar',
@@ -41,6 +56,21 @@ const FALLBACK_SUITES_CATALOG: Suite[] = [
     mainImage: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'
   } as Suite,
   {
+    id: 'suite-arte-patio-getsemani',
+    name: 'Suite Arte & Patio',
+    slug: 'suite-arte-patio-getsemani',
+    type: 'Suite Deluxe',
+    description: 'Suite con galería de arte contemporáneo independiente y zona de descanso en patio interior privado.',
+    propertyId: 'getsemani',
+    branch: { name: 'Palacio del Mar · Getsemaní', slug: 'getsemani', address: 'Calle del Arsenal, Getsemaní, Cartagena' } as any,
+    basePrice: 1150000,
+    pricePerNight: 1150000,
+    size: 58,
+    maxGuests: 2,
+    amenities: ['Patio privado', 'Colección de arte', 'Tina hidromasaje', 'Minibar gourmet'],
+    mainImage: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'
+  } as Suite,
+  {
     id: 'casona-colonial-getsemani',
     name: 'Casona Colonial Getsemaní',
     slug: 'casona-colonial-getsemani',
@@ -54,6 +84,21 @@ const FALLBACK_SUITES_CATALOG: Suite[] = [
     maxGuests: 4,
     amenities: ['Piscina interior', 'Patio colonial', 'Desayuno de autor', 'Camas King artesanales'],
     mainImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800'
+  } as Suite,
+  {
+    id: 'suite-colonial-centro',
+    name: 'Suite Colonial Imperial',
+    slug: 'suite-colonial-centro',
+    type: 'Suite Deluxe',
+    description: 'Suite histórica con patio colonial, arcos originales del siglo XVIII, tina hidromasaje y balcón.',
+    propertyId: 'centro-historico',
+    branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico', address: 'Calle de la Factoría, Centro Histórico, Cartagena' } as any,
+    basePrice: 1310000,
+    pricePerNight: 1310000,
+    size: 65,
+    maxGuests: 2,
+    amenities: ['Patio colonial', 'Tina hidromasaje', 'Balcón', 'Desayuno de autor'],
+    mainImage: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800'
   } as Suite,
   {
     id: 'suite-colonial-patio',
@@ -376,7 +421,8 @@ export class SuiteDetailComponent implements OnInit {
   // El snapshot del calendario puede estar desactualizado si otro huésped reservó mientras tanto.
   private ensureStillAvailable(): Promise<boolean> {
     const sId = this.suite?.id || this.suite?._id;
-    if (!sId) return Promise.resolve(true);
+    const currentSlug = this.suite?.slug;
+    if (!sId && !currentSlug) return Promise.resolve(true);
     return new Promise(resolve => {
       this.api.get<any>('/availability', {
         checkIn: this.checkIn,
@@ -386,9 +432,25 @@ export class SuiteDetailComponent implements OnInit {
         next: (res) => {
           const data = res?.data || res;
           const available: any[] = data?.availableSuites || [];
+          if (!Array.isArray(available) || available.length === 0) {
+            // Si la consulta no devuelve suites o el backend no tiene inventario cargado,
+            // no bloqueamos preventivamente aquí: el backend validará atómicamente al reservar.
+            resolve(true);
+            return;
+          }
+          const aliases: Record<string, string> = {
+            'suite-presidencial-mar': 'penthouse-bocagrande',
+            'casona-colonial-getsemani': 'suite-arte-patio-getsemani',
+            'loft-getsemani-art': 'habitacion-bohemia-getsemani',
+            'suite-colonial-patio': 'suite-colonial-centro',
+            'villa-playa-boquilla': 'master-villa-boquilla'
+          };
+          const targetSlug = currentSlug ? (aliases[currentSlug] || currentSlug) : null;
           const stillThere = available.some((a: any) => {
             const s = a?.suite || a;
-            return (s?.id || s?._id || s?.slug) === (sId || this.suite?.slug);
+            const candId = s?.id || s?._id;
+            const candSlug = s?.slug ? (aliases[s.slug] || s.slug) : null;
+            return (candId && candId === sId) || (targetSlug && candSlug && targetSlug === candSlug);
           });
           resolve(stillThere);
         },
