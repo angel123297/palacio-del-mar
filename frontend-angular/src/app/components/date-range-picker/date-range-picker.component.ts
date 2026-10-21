@@ -38,7 +38,7 @@ const shortRange = (a: string, b: string) => (a === b ? shortDate(a) : `${shortD
   standalone: true,
   imports: [CommonModule],
   templateUrl: './date-range-picker.component.html',
-  styleUrls: ['./date-range-picker.component.css']
+  styleUrls: ['./date-range-picker.component.scss']
 })
 export class DateRangePickerComponent implements OnInit, OnChanges {
   @Input() checkIn: string = '';
