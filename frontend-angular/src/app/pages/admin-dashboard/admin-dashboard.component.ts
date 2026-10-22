@@ -817,31 +817,31 @@ export class AdminDashboardComponent implements OnInit {
       next: (res) => {
         const payload: any = (res as any).data || res;
         
-        if (payload && payload.content && payload.content.length > 0) {
+        if (payload && Array.isArray(payload.content)) {
           this.bookings.set(payload.content);
           this.currentPage.set((payload.number || 0) + 1);
           this.totalPages.set(payload.totalPages || 1);
           this.totalItems.set(payload.totalElements || 0);
-        } else if (payload && Array.isArray(payload.data) && payload.data.length > 0) {
+        } else if (payload && Array.isArray(payload.data)) {
           this.bookings.set(payload.data);
           this.currentPage.set(payload.page || 1);
           this.totalPages.set(payload.totalPages || 1);
           this.totalItems.set(payload.total || 0);
-        } else if (Array.isArray(payload) && payload.length > 0) {
+        } else if (Array.isArray(payload)) {
           this.bookings.set(payload);
           this.totalPages.set(1);
           this.totalItems.set(payload.length);
         } else {
-          this.bookings.set(DEFAULT_ADMIN_BOOKINGS);
+          this.bookings.set([]);
           this.totalPages.set(1);
-          this.totalItems.set(DEFAULT_ADMIN_BOOKINGS.length);
+          this.totalItems.set(0);
         }
         this.loading.set(false);
       },
       error: () => {
-        this.bookings.set(DEFAULT_ADMIN_BOOKINGS);
+        this.bookings.set([]);
         this.totalPages.set(1);
-        this.totalItems.set(DEFAULT_ADMIN_BOOKINGS.length);
+        this.totalItems.set(0);
         this.loading.set(false);
       }
     });

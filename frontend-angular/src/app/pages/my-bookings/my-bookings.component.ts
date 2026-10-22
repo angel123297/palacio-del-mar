@@ -1,6 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Booking } from '../../models/types';
@@ -111,7 +111,8 @@ export class MyBookingsComponent implements OnInit {
   constructor(
     private api: ApiService,
     private auth: AuthService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private router: Router
   ) {}
 
   /** L8: una reserva pending con TTL vencido ya no debe ofrecer pago ni cancelación. */
@@ -203,6 +204,15 @@ export class MyBookingsComponent implements OnInit {
     if (!this.auth.isLoggedIn()) {
       this.loading = false;
       this.cdr.detectChanges();
+      return;
+    }
+    const role = (this.auth.currentUser()?.role || '').toLowerCase();
+    if (role === 'host' || role === 'anfitrion') {
+      this.router.navigate(['/anfitrion']);
+      return;
+    }
+    if (role === 'admin') {
+      this.router.navigate(['/admin']);
       return;
     }
     this.fetchMyBookings();

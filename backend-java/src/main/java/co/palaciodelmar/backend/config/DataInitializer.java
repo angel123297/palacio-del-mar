@@ -659,5 +659,77 @@ public class DataInitializer implements CommandLineRunner {
                 }
             }
         }
+
+        if (bookingRepository.findById("bk-adm-01").isEmpty() && bookingRepository.findByBookingCode("BK-2026-001").isEmpty()) {
+            User guestUser = userRepository.findByEmail("huesped@palaciodelmar.co").orElse(null);
+            Suite suite1 = suiteRepository.findBySlug("penthouse-bocagrande").orElse(null);
+            if (suite1 == null) {
+                suite1 = suiteRepository.findAll().stream().findFirst().orElse(null);
+            }
+
+            if (guestUser != null && suite1 != null) {
+                Booking sampleBooking1 = Booking.builder()
+                        .id("bk-adm-01")
+                        .bookingCode("BK-2026-001")
+                        .user(guestUser.getId())
+                        .suite(suite1.getId())
+                        .propertyId(suite1.getPropertyId())
+                        .branch(suite1.getBranch())
+                        .checkIn(java.time.LocalDate.now().plusDays(2))
+                        .checkOut(java.time.LocalDate.now().plusDays(5))
+                        .nights(3)
+                        .guests(2)
+                        .totalPrice(new BigDecimal("2550000"))
+                        .paidAmount(new BigDecimal("2550000"))
+                        .status("confirmed")
+                        .paymentStatus("paid")
+                        .smartLockPin("849201")
+                        .guestDetails(Booking.GuestDetails.builder()
+                                .fullName("Valentina Restrepo")
+                                .email("valentina.r@ejemplo.co")
+                                .phone("+57 300 123 4567")
+                                .build())
+                        .createdAt(Instant.now().minusSeconds(86400))
+                        .updatedAt(Instant.now().minusSeconds(86400))
+                        .build();
+                bookingRepository.save(sampleBooking1);
+            }
+        }
+
+        if (bookingRepository.findById("bk-adm-02").isEmpty() && bookingRepository.findByBookingCode("BK-2026-002").isEmpty()) {
+            User guestUser = userRepository.findByEmail("huesped@palaciodelmar.co").orElse(null);
+            Suite suite2 = suiteRepository.findBySlug("suite-presidencial-mar").orElse(null);
+            if (suite2 == null) {
+                suite2 = suiteRepository.findAll().stream().findFirst().orElse(null);
+            }
+
+            if (guestUser != null && suite2 != null) {
+                Booking sampleBooking2 = Booking.builder()
+                        .id("bk-adm-02")
+                        .bookingCode("BK-2026-002")
+                        .user(guestUser.getId())
+                        .suite(suite2.getId())
+                        .propertyId(suite2.getPropertyId())
+                        .branch(suite2.getBranch())
+                        .checkIn(java.time.LocalDate.now().plusDays(4))
+                        .checkOut(java.time.LocalDate.now().plusDays(8))
+                        .nights(4)
+                        .guests(2)
+                        .totalPrice(new BigDecimal("1890000"))
+                        .paidAmount(BigDecimal.ZERO)
+                        .status("pending")
+                        .paymentStatus("pending")
+                        .expiresAt(Instant.now().plus(java.time.Duration.ofDays(2)))
+                        .guestDetails(Booking.GuestDetails.builder()
+                                .fullName("Carlos Mario Mendoza")
+                                .email("carlos.m@ejemplo.com")
+                                .phone("+57 311 987 6543")
+                                .build())
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                bookingRepository.save(sampleBooking2);
+            }
+        }
     }
 }
