@@ -28,7 +28,7 @@ services:
       MONGO_HOST: mongo
       MONGODB_URI: mongodb://mongo:27017/palacio_db
       SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/palacio_db
-      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en el archivo .env (copia .env.example)}
+      JWT_SECRET: "${JWT_SECRET:-super_secret_jwt_key_palacio_del_mar_2026_dev_min32chars}"
       JWT_EXPIRATION: "604800000"
       # Solo desarrollo local: habilita el botón "Verificar ahora" (force-verify). En otros entornos definir APP_DEV_FORCE_VERIFY_ENABLED=false
       APP_DEV_FORCE_VERIFY_ENABLED: "${APP_DEV_FORCE_VERIFY_ENABLED:-true}"
