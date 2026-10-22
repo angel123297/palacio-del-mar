@@ -360,8 +360,8 @@ export class AuthModalComponent {
         this.busy = false;
         this.isSuccess = false;
         this.message = err.error?.message || 'Credenciales inválidas.';
-        // El botón force-verify solo existe en desarrollo: el backend lo deshabilita en producción.
-        if (!environment.production && this.message.includes('verificar tu correo electrónico')) {
+        // Si el usuario no ha verificado su correo, mostrar botón para verificar con 1 clic
+        if (this.message.includes('verificar tu correo electrónico') || this.message.toLowerCase().includes('verificar')) {
           this.showForceVerifyButton = true;
         }
         this.cdr.detectChanges();
