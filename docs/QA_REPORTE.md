@@ -1,3 +1,4 @@
+successfully downloaded text file (SHA: f85828abc2922def7fd842577b2bad56179689a1)
 # 🧪 QA Report — Palacio del Mar
 
 Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (Colombia) con la tarea programada de Vibe. Aquí se registran los resultados de Jules y de Vibe.
@@ -12,6 +13,35 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 - Todos los bloqueantes y hallazgos reportados han sido completamente solucionados.
 
 ## 🗓️ Reporte diario (bitácora)
+
+### 📅 2026-10-22 — Revisión diaria de Vibe: migración TS/SCSS, plan de carga JMeter y fixes de calendario; sin PRs abiertos
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`, todos del usuario/agentes):**
+- [docs(qa): reporte diario 2026-10-21](https://github.com/angel123297/palacio-del-mar/commit/ed5a1835c6809f58f2e952ca0e7117d2e8ca2935) (21 oct, 14:57 UTC) — reporte diario previo de Vibe.
+- [feat(perf): agregar plan de pruebas de carga jmeter y benchmark de concurrencia](https://github.com/angel123297/palacio-del-mar/commit/b65df4989dd57ea113694806fa2f9554c956e462) (21 oct, 16:55 UTC) — plan de pruebas de carga JMeter y benchmark de concurrencia.
+- [Merge branch 'plan/marketplace-webhooks' into proyecto-angular-java](https://github.com/angel123297/palacio-del-mar/commit/f5302db901062934f552efb5b67f8c95e4a22616) (21 oct, 16:56 UTC) — ⚠️ **segunda fusión de la rama de trabajo sobre la rama original `proyecto-angular-java`** (ya se había fusionado #20 el 21 oct). Ver riesgos.
+- [refactor(styles): migrar todos los estilos de css a scss y eliminar archivos huerfanos](https://github.com/angel123297/palacio-del-mar/commit/5183c621f4747fc44ed84bde97136f4f5d8d249c) (21 oct, 17:28 UTC).
+- [refactor(lang): migrar utilidades y configuraciones de javascript a typescript puro](https://github.com/angel123297/palacio-del-mar/commit/dc1292b5381b009ac4c41ccb564df110c134d59e) (21 oct, 17:40 UTC).
+- [feat(ux): polish guest, host and admin experiences for 10/10 bot rating](https://github.com/angel123297/palacio-del-mar/commit/b34ab94ab8ad4a7dd62c14a3758108ed4a4929fa) (21 oct, 19:19 UTC) — fallback de suites/sedes, barra de reserva, tarjetas de recomendación, creación unificada propiedad/suite, ACH limpio, calculadora 92%, moderación admin con motivos, modal de reembolsos.
+- [feat(host): sync initial suite in suites modal and support digital wallets in ACH setup](https://github.com/angel123297/palacio-del-mar/commit/badf886a9e3a6c492b89412ac18598e501dc5cda) (21 oct, 19:30 UTC).
+- [fix(calendar): resolver disponibilidad falsa de días ocupados, alias de suites y contratos de api](https://github.com/angel123297/palacio-del-mar/commit/d9f7c527453ae2f37211ee83c09ba44f82ebd07c) (21 oct, 20:52 UTC).
+- [Merge branch 'fix/calendar-availability-logic-audit' into plan/marketplace-webhooks](https://github.com/angel123297/palacio-del-mar/commit/2189a62b86492f2041cee0b9c794601f67c5b508) (21 oct, 20:52 UTC) — integración del fix de calendario (HEAD actual de la rama).
+
+**Pull requests:** **0 PRs abiertos.** El backlog quedó limpio tras el cierre de drafts del 21 oct (#22, #19, #21, #18, #12, #4, #3) y la fusión de #20. Sin cambios de estado hoy.
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones) **completada**; el plan de 5 fases está entregado (fusionado a `proyecto-angular-java` vía #20 y merge f5302db). La actividad del día es post-plan: calidad/UX (polish 10/10), migración técnica CSS→SCSS y JS→TypeScript puro, plan de pruebas de carga JMeter y corrección de disponibilidad de calendario.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — confirmados corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`). Los 10 hallazgos de AUDITORIA_SEGURIDAD.md permanecen cerrados.
+
+**Tests esperados en verde:** ~263+ de backend y ~14+ de frontend (cifras heredadas del 21 oct; hoy no se agregaron ni quitaron suites de tests según los mensajes de commit, pero la migración SCSS/TS y el fix de calendario tocan código frontend/backend cubierto por tests). **Pendiente verificación local/CI** (el conector no expone corridas de Actions).
+
+**Riesgos / problemas detectados:**
+- ⚠️ **Fusión f5302db sobre `proyecto-angular-java`:** es la segunda vez que la rama original recibe merges de la rama de trabajo (la primera fue #20). Si la regla del proyecto es no modificar la rama original, este commit la viola; confirmar si fue intencional.
+- ⚠️ Refactors grandes (CSS→SCSS, JS→TS) sin reporte de corrida de tests en los mensajes de commit: verificar que `npm run build`, Vitest y `./mvnw test` estén verdes antes de la sustentación.
+- ⚠️ Fix de calendario (d9f7c52) corrige "disponibilidad falsa de días ocupados" y "contratos de api": revisar que `AvailabilityController`/`/api/availability/monthly` mantenga los tests de disponibilidad en verde.
+- ⚠️ PR #22 (endpoints admin de exportación/aprobación de reservas) sigue cerrado sin fusión: pendiente confirmar si ya existe en la rama (sin auditar).
+- ⚠️ `AGENTS.md` sigue fuera del repositorio (df2c2e0, ignorado vía .gitignore).
+- ℹ️ Riesgo de conteo de tests (~263) reportado por agentes sin verificación en CI por Vibe: sigue pendiente.
 
 ### 📅 2026-10-21 — Revisión diaria de Vibe: actividad masiva, PR #20 fusionado y cierre de PRs
 
