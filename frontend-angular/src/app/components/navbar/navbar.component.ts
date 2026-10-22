@@ -57,14 +57,11 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
           </ng-container>
           <ng-template #notLogged>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;">
-              <button class="link-btn" (click)="openAuth('login', 'guest')" aria-label="Abrir inicio de sesión" style="background: none; border: none; color: #f5f0e8; cursor: pointer; font-size: 0.82rem; white-space: nowrap; min-height: 44px; display: inline-flex; align-items: center; padding: 0 8px;">
+              <button class="btn-outline" (click)="openAuth('login')" aria-label="Abrir inicio de sesión" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; cursor: pointer; white-space: nowrap; font-size: 0.82rem;">
                 Iniciar sesión
               </button>
-              <button class="btn-outline" (click)="openAuth('register')" aria-label="Abrir registro de nueva cuenta" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; cursor: pointer; white-space: nowrap; font-size: 0.82rem;">
+              <button class="btn-outline" (click)="openAuth('register')" aria-label="Abrir registro de nueva cuenta" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; cursor: pointer; white-space: nowrap; font-size: 0.82rem; background: rgba(226, 201, 155, 0.15); border-color: #e2c99b; color: #e2c99b; font-weight: 600;">
                 Regístrate
-              </button>
-              <button (click)="openAuth('login', 'host')" aria-label="Acceso corporativo para anfitriones y administración" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; background: rgba(226, 201, 155, 0.08); border: 1px solid rgba(226, 201, 155, 0.4); color: #e2c99b; border-radius: 6px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; white-space: nowrap;">
-                🏢 Portal Corporativo
               </button>
             </div>
           </ng-template>
