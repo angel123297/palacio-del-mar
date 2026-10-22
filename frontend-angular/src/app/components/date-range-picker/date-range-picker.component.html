@@ -56,8 +56,9 @@
       <ng-container *ngFor="let iso of cells; let i = index">
         <span *ngIf="!iso" [attr.key]="'e' + i"></span>
         <button *ngIf="iso" type="button" class="drp-day"
-                [class.is-full]="soldOut()[iso] && iso >= today"
-                [class.is-avail]="!soldOut()[iso] && iso >= today"
+                [class.is-full]="soldOut()[iso] && iso >= today && !isTurnoverDate(iso)"
+                [class.is-turnover]="isTurnoverDate(iso)"
+                [class.is-avail]="(!soldOut()[iso] || isTurnoverDate(iso)) && iso >= today"
                 [class.is-peak]="isPeak(iso) && !soldOut()[iso]"
                 [class.is-sel]="iso === checkIn || iso === checkOut"
                 [class.is-range]="checkIn && checkOut && iso > checkIn && iso < checkOut"
@@ -67,7 +68,8 @@
                 [title]="dayTitle(iso, !!soldOut()[iso])"
                 (click)="pick(iso)">
           <span class="drp-day-num">{{ iso | slice:8 }}</span>
-          <span *ngIf="soldOut()[iso] && iso >= today" class="drp-day-dot dot-occupied" title="Ocupado"></span>
+          <span *ngIf="isTurnoverDate(iso)" class="drp-day-dot dot-turnover" title="Salida matutina disponible (Rotación)"></span>
+          <span *ngIf="soldOut()[iso] && !isTurnoverDate(iso) && iso >= today" class="drp-day-dot dot-occupied" title="Ocupado"></span>
           <span *ngIf="!soldOut()[iso] && iso >= today && iso !== checkIn && iso !== checkOut" class="drp-day-dot dot-free" title="Disponible"></span>
           <i class="drp-mark mk-promo" aria-hidden="true" *ngIf="promosByDay()[iso] && iso >= today"></i>
           <i class="drp-mark mk-holiday" aria-hidden="true" *ngIf="holidayByDay()[iso] && iso >= today"></i>
@@ -92,6 +94,7 @@
     
     <div class="drp-legend">
       <span><i class="drp-dot dot-avail"></i> Disponible</span>
+      <span><i class="drp-dot dot-turnover"></i> Salida / Rotación</span>
       <span><i class="drp-dot dot-full"></i> Ocupado</span>
       <span><i class="drp-dot dot-peak"></i> Temporada alta</span>
       <span><i class="drp-dot dot-promo"></i> Descuento</span>

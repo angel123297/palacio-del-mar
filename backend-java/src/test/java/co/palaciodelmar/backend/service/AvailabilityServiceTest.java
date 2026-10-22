@@ -216,4 +216,84 @@ class AvailabilityServiceTest {
         assertTrue(firstSeason.containsKey("name"));
         assertTrue(firstSeason.containsKey("label"));
     }
+
+    @Test
+    @DisplayName("Rotación hotelera (Turnover): Huésped saliente puede hacer checkout en la misma fecha en que ingresa otro huésped por la tarde")
+    void checkAvailability_allowsTurnoverCheckout_whenAnotherGuestChecksInSameAfternoon() {
+        when(propertyRepository.findAll()).thenReturn(List.of(bocagrandeProp));
+        when(suiteRepository.findByActiveTrue()).thenReturn(List.of(penthouseSuite));
+        when(branchRepository.findBySlug("bocagrande")).thenReturn(Optional.of(bocagrandeBranch));
+
+        // Reserva existente: entra el 15-octubre por la tarde y sale el 18-octubre (noches ocupadas: 15, 16, 17)
+        SuiteNight incomingGuestNight15 = SuiteNight.builder()
+                .suite("suite-boca-penthouse")
+                .status("confirmed")
+                .dates(List.of(LocalDate.of(2026, 10, 15), LocalDate.of(2026, 10, 16), LocalDate.of(2026, 10, 17)))
+                .build();
+
+        // Consulta de disponibilidad para huésped saliente: check-in 12-oct, check-out 15-oct (noches requeridas: 12, 13, 14)
+        // El repositorio busca entre checkIn (12) y checkOut.minusDays(1) (14). No debe encontrar colisión con la noche del 15.
+        when(suiteNightRepository.findBySuiteAndDatesBetween(eq("suite-boca-penthouse"), eq(LocalDate.of(2026, 10, 12)), eq(LocalDate.of(2026, 10, 14))))
+                .thenReturn(Collections.emptyList());
+
+        AvailabilityService.AvailabilityResponseData res =
+                availabilityService.checkAvailability(LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 15), 2, "bocagrande", null);
+
+        assertNotNull(res);
+        assertEquals(3, res.getNights());
+        assertEquals(1, res.getAvailableSuites().size(), "La suite debe estar disponible para checkout matutino el 15");
+        assertTrue(res.getAvailableSuites().get(0).getIsAvailable());
+        assertEquals("suite-boca-penthouse", res.getAvailableSuites().get(0).getSuite().getId());
+    }
+
+    @Test
+    @DisplayName("Rotación hotelera (Turnover): Huésped entrante puede hacer checkin en la misma fecha en que sale el huésped anterior por la mañana")
+    void checkAvailability_allowsTurnoverCheckin_whenPreviousGuestChecksOutSameMorning() {
+        when(propertyRepository.findAll()).thenReturn(List.of(bocagrandeProp));
+        when(suiteRepository.findByActiveTrue()).thenReturn(List.of(penthouseSuite));
+        when(branchRepository.findBySlug("bocagrande")).thenReturn(Optional.of(bocagrandeBranch));
+
+        // Reserva existente: salió la mañana del 15 (noches 12, 13, 14)
+        // Consulta del nuevo huésped: check-in 15-oct tarde, check-out 18-oct mañana (noches requeridas: 15, 16, 17)
+        when(suiteNightRepository.findBySuiteAndDatesBetween(eq("suite-boca-penthouse"), eq(LocalDate.of(2026, 10, 15)), eq(LocalDate.of(2026, 10, 17))))
+                .thenReturn(Collections.emptyList());
+
+        AvailabilityService.AvailabilityResponseData res =
+                availabilityService.checkAvailability(LocalDate.of(2026, 10, 15), LocalDate.of(2026, 10, 18), 2, "bocagrande", null);
+
+        assertNotNull(res);
+        assertEquals(3, res.getNights());
+        assertEquals(1, res.getAvailableSuites().size(), "La suite debe estar disponible para checkin vespertino el 15");
+        assertTrue(res.getAvailableSuites().get(0).getIsAvailable());
+    }
+
+    @Test
+    @DisplayName("Colisión real: Si se intenta reservar una noche ya ocupada por el huésped entrante (ej. checkout el 16), se bloquea")
+    void checkAvailability_blocksWhenOverlappingByEvenOneNight() {
+        when(propertyRepository.findAll()).thenReturn(List.of(bocagrandeProp));
+        when(suiteRepository.findByActiveTrue()).thenReturn(List.of(penthouseSuite));
+        when(branchRepository.findBySlug("bocagrande")).thenReturn(Optional.of(bocagrandeBranch));
+
+        // Noche del 15 ocupada por el otro huésped
+        SuiteNight occupiedNight15 = SuiteNight.builder()
+                .suite("suite-boca-penthouse")
+                .status("confirmed")
+                .unitSlot(1)
+                .dates(List.of(LocalDate.of(2026, 10, 15)))
+                .build();
+
+        // Consulta que abarca hasta el 16-oct: requiere noches 12, 13, 14 y 15.
+        // La noche del 15 colisiona.
+        when(suiteNightRepository.findBySuiteAndDatesBetween(eq("suite-boca-penthouse"), eq(LocalDate.of(2026, 10, 12)), eq(LocalDate.of(2026, 10, 15))))
+                .thenReturn(List.of(occupiedNight15));
+
+        AvailabilityService.AvailabilityResponseData res =
+                availabilityService.checkAvailability(LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 16), 2, "bocagrande", null);
+
+        assertNotNull(res);
+        assertEquals(4, res.getNights());
+        assertEquals(0, res.getAvailableSuites().size(), "No debe haber suites disponibles porque la noche del 15 está ocupada");
+        assertEquals(1, res.getUnavailableSuites().size());
+        assertFalse(res.getUnavailableSuites().get(0).getIsAvailable());
+    }
 }
