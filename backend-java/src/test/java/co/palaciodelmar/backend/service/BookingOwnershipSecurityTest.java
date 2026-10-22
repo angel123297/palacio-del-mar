@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -265,6 +266,43 @@ class BookingOwnershipSecurityTest {
         co.palaciodelmar.backend.dto.BookingDTO result = assertDoesNotThrow(() -> bookingService.createBooking("user-1", req));
         assertNotNull(result);
         assertEquals(2, result.getUnitSlot(), "Debe asignar automáticamente el slot 2 tras la colisión en el slot 1");
+    }
+
+    @Test
+    @DisplayName("createBooking rechaza que usuarios con rol anfitrión o administrador realicen reservas")
+    void testCreateBookingRejectsCorporateRoles() {
+        co.palaciodelmar.backend.model.User hostUser = co.palaciodelmar.backend.model.User.builder()
+                .id("host-corp-1")
+                .role("host")
+                .build();
+        co.palaciodelmar.backend.model.User adminUser = co.palaciodelmar.backend.model.User.builder()
+                .id("admin-corp-1")
+                .role("admin")
+                .build();
+
+        when(userRepository.findById("host-corp-1")).thenReturn(Optional.of(hostUser));
+        when(userRepository.findById("admin-corp-1")).thenReturn(Optional.of(adminUser));
+
+        co.palaciodelmar.backend.model.Suite suite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-corp-test")
+                .maxGuests(2)
+                .build();
+        when(suiteRepository.findById("suite-corp-test")).thenReturn(Optional.of(suite));
+
+        BookingRequest req = BookingRequest.builder()
+                .suiteId("suite-corp-test")
+                .checkIn(LocalDate.now().plusDays(10))
+                .checkOut(LocalDate.now().plusDays(12))
+                .guests(2)
+                .build();
+
+        IllegalArgumentException exHost = assertThrows(IllegalArgumentException.class, () ->
+                bookingService.createBooking("host-corp-1", req));
+        assertTrue(exHost.getMessage().contains("perfil corporativo"));
+
+        IllegalArgumentException exAdmin = assertThrows(IllegalArgumentException.class, () ->
+                bookingService.createBooking("admin-corp-1", req));
+        assertTrue(exAdmin.getMessage().contains("perfil corporativo"));
     }
 
     @Test

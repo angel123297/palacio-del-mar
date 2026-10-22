@@ -37,6 +37,7 @@ public class BookingService {
 
     private static final ZoneId BOGOTA_ZONE = ZoneId.of("America/Bogota");
     private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BookingService.class);
 
     private final BookingRepository bookingRepository;
     private final SuiteRepository suiteRepository;
@@ -56,6 +57,9 @@ public class BookingService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private co.palaciodelmar.backend.repository.PropertyRepository propertyRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private EmailService emailService;
 
     public BookingDTO createBooking(String userId, BookingRequest request) {
 
@@ -106,6 +110,16 @@ public class BookingService {
             }
             if (userId != null && property.getOwnerId() != null && userId.equals(property.getOwnerId())) {
                 throw new IllegalArgumentException("Un anfitrión no puede reservar su propia propiedad");
+            }
+        }
+
+        if (userId != null && !userId.isBlank()) {
+            User bookingUser = userRepository.findById(userId).orElse(null);
+            if (bookingUser != null) {
+                String role = bookingUser.getRole() != null ? bookingUser.getRole().toLowerCase() : "";
+                if ("host".equals(role) || "anfitrion".equals(role) || "admin".equals(role)) {
+                    throw new IllegalArgumentException("Las cuentas de Anfitrión y Administrador tienen un perfil corporativo y no pueden realizar reservas de hospedaje. Utiliza una cuenta de huésped.");
+                }
             }
         }
 
@@ -296,6 +310,13 @@ public class BookingService {
                     dto,
                     Instant.now()
             ));
+        }
+        if (emailService != null) {
+            try {
+                emailService.sendBookingCreatedNotification(savedBooking);
+            } catch (Exception ex) {
+                log.warn("Fallo al despachar notificación de reserva creada {}: {}", savedBooking.getId(), ex.getMessage());
+            }
         }
         return dto;
     }
@@ -553,6 +574,7 @@ public class BookingService {
 
     public Booking getBookingEntityById(String id) {
         return bookingRepository.findById(id)
+                .or(() -> bookingRepository.findByBookingCode(id))
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada con id: " + id));
     }
 
