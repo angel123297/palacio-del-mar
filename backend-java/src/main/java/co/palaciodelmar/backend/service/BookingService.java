@@ -123,7 +123,10 @@ public class BookingService {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
         }
 
-        List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
+        java.time.Instant now = java.time.Instant.now();
+        List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1)).stream()
+                .filter(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus()) && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(now)))
+                .toList();
         assertCribAvailable(request, null);
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
@@ -331,7 +334,10 @@ public class BookingService {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
         }
 
-        List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
+        java.time.Instant now = java.time.Instant.now();
+        List<SuiteNight> occupiedNights = new ArrayList<>(suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1)).stream()
+                .filter(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus()) && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(now)))
+                .toList());
         assertCribAvailable(request, bookingId);
         occupiedNights.removeIf(sn -> bookingId.equals(sn.getBooking()));
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
