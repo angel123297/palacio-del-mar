@@ -429,7 +429,10 @@ export class AuthModalComponent {
         this.busy = false;
         this.isSuccess = false;
         const rawMsg = err.error?.message || '';
-        if (rawMsg.toLowerCase().includes('registrado') || rawMsg.toLowerCase().includes('email')) {
+        const lowerMsg = rawMsg.toLowerCase();
+        if (lowerMsg.includes('teléfono') || lowerMsg.includes('telefono') || lowerMsg.includes('phone')) {
+          this.message = rawMsg || 'El número de teléfono ya está registrado con otra cuenta.';
+        } else if (lowerMsg.includes('email') || lowerMsg.includes('correo')) {
           this.message = `El correo ${payload.email} ya está registrado. Por favor haz clic en "Inicia sesión".`;
         } else {
           this.message = rawMsg || 'No se pudo crear la cuenta. Intenta de nuevo.';
