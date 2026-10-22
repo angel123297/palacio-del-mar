@@ -275,6 +275,10 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
     return true;
   }
 
+  isTurnoverDate(iso: string): boolean {
+    return this.step() === 'out' && !!this.checkIn && iso > this.checkIn && !!this.soldOut()[iso] && this.canCheckOut(this.checkIn, iso);
+  }
+
   isDayDisabled(iso: string): boolean {
     if (iso < this.today) return true;
     if (this.step() === 'in' || !this.checkIn) {
@@ -354,7 +358,11 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
       return lines.join('\n');
     }
     const info = this.dayAvailability()[iso];
-    if (full) {
+    const isTurnover = this.isTurnoverDate(iso);
+
+    if (isTurnover) {
+      lines.push('🔄 Disponible para Salida (Check-out matutino hasta las 12:00) · Ingreso de otro huésped por la tarde');
+    } else if (full) {
       lines.push('❌ Ocupado / Sin disponibilidad para estas fechas');
     } else {
       if (info && info.availableSuites !== undefined) {

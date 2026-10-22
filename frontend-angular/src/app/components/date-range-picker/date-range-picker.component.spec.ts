@@ -91,6 +91,11 @@ describe('DateRangePickerComponent', () => {
     component.step.set('out');
     // Night of 2026-11-15 is sold out. CheckIn on 14, checkOut on 15 stays only night 14.
     expect(component.canCheckOut('2026-11-14', '2026-11-15')).toBe(true);
+    expect(component.isTurnoverDate('2026-11-15')).toBe(true);
+    expect(component.isDayDisabled('2026-11-15')).toBe(false);
+
+    const title = component.dayTitle('2026-11-15', true);
+    expect(title).toContain('Disponible para Salida');
 
     let emitted: any = null;
     component.rangeChange.subscribe((val) => { emitted = val; });
@@ -105,5 +110,7 @@ describe('DateRangePickerComponent', () => {
     component.step.set('out');
     // Night of 15 is sold out, so staying 14 to 16 requires night of 14 and night of 15.
     expect(component.canCheckOut('2026-11-14', '2026-11-16')).toBe(false);
+    expect(component.isDayDisabled('2026-11-16')).toBe(true);
+    expect(component.isTurnoverDate('2026-11-16')).toBe(false);
   });
 });

@@ -122,6 +122,9 @@
 .drp-day-dot.dot-occupied {
   width: 4px; height: 4px; background: #e74c3c; box-shadow: 0 0 5px rgba(231, 76, 60, 0.95); transform: rotate(45deg);
 }
+.drp-day-dot.dot-turnover {
+  width: 4px; height: 4px; background: #f39c12; box-shadow: 0 0 5px rgba(243, 156, 18, 0.95); border-radius: 50%;
+}
 .drp-day-dot.dot-free {
   width: 3.5px; height: 3.5px; background: #2ecc71; box-shadow: 0 0 4px rgba(46, 204, 113, 0.85); border-radius: 50%;
 }
@@ -143,6 +146,14 @@
   color: #ff7675; text-decoration: line-through; text-decoration-color: #e74c3c; text-decoration-thickness: 1.5px;
   background: rgba(231, 76, 60, 0.1); border-radius: 4px; cursor: not-allowed; opacity: 0.85;
 }
+.drp-day.is-turnover {
+  color: #f5f0e8; cursor: pointer;
+  background: rgba(243, 156, 18, 0.12); border-radius: 4px;
+}
+.drp-day.is-turnover:hover:not(:disabled) {
+  background: rgba(243, 156, 18, 0.28); color: #ffffff;
+  text-shadow: 0 0 8px rgba(243, 156, 18, 0.7);
+}
 .drp-day.is-full:disabled { opacity: 0.65; }
 .drp-day.is-sel.is-peak { background: none; }
 
@@ -156,7 +167,7 @@
 .drp-day.is-start::after { left: 50%; right: 0; }
 .drp-day.is-end::after { left: 0; right: 50%; }
 
-.drp-day.is-sel { color: #fff8e6; font-weight: 600; text-shadow: 0 0 12px rgba(232, 213, 163, 0.9); opacity: 1; }
+.drp-day.is-sel { color: #fff8e6; font-weight: 600; text-decoration: none; text-shadow: 0 0 12px rgba(232, 213, 163, 0.9); opacity: 1; }
 .drp-day.is-sel::before {
   opacity: 1; transform: rotate(45deg) scale(1); border-color: var(--gold-light, #e8d5a3); background: radial-gradient(circle, rgba(244, 236, 216, 0.3), rgba(201, 169, 110, 0.12));
   box-shadow: 0 0 14px rgba(201, 169, 110, 0.55), inset 0 0 8px rgba(201, 169, 110, 0.3);
@@ -191,6 +202,7 @@
 .drp-legend { display: flex; justify-content: center; gap: 8px 16px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(201, 169, 110, 0.15); font-size: 0.55rem; font-family: 'Cinzel', 'Cormorant Garamond', serif; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.8; flex-wrap: wrap; position: relative; z-index: 2; color: #f4ecd8; }
 .drp-dot { display: inline-block; width: 6px; height: 6px; margin-right: 7px; transform: rotate(45deg); vertical-align: middle; }
 .dot-avail { background: #2ecc71; box-shadow: 0 0 6px rgba(46, 204, 113, 0.85); }
+.dot-turnover { background: #f39c12; box-shadow: 0 0 6px rgba(243, 156, 18, 0.85); }
 .dot-full { background: #e74c3c; box-shadow: 0 0 6px rgba(231, 76, 60, 0.85); }
 .dot-peak { background: var(--gold, #c9a96e); box-shadow: 0 0 6px rgba(201, 169, 110, 0.8); }
 .dot-promo { background: var(--soul); box-shadow: 0 0 6px rgba(154, 217, 207, 0.9); }
