@@ -156,8 +156,8 @@ describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
       fixture = TestBed.createComponent(NavbarComponent);
     });
 
-    it('debe rotular consistentemente "Mis Reservas" para cualquier usuario autenticado', () => {
-      localStorage.setItem('user', JSON.stringify({ id: 'u1', name: 'Carlos', role: 'ADMIN' }));
+    it('debe rotular "Mis Reservas" para un huésped y "Panel Admin" para un administrador', () => {
+      localStorage.setItem('user', JSON.stringify({ id: 'u1', name: 'Carlos', role: 'USER' }));
       authService.loadCachedUser();
       fixture.detectChanges();
       compiled = fixture.nativeElement as HTMLElement;
@@ -165,6 +165,16 @@ describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
       const bookingsLink = compiled.querySelector('a[routerLink="/mis-reservas"]');
       expect(bookingsLink).toBeTruthy();
       expect(bookingsLink?.textContent?.trim()).toBe('Mis Reservas');
+
+      localStorage.setItem('user', JSON.stringify({ id: 'u1', name: 'Carlos', role: 'ADMIN' }));
+      authService.loadCachedUser();
+      fixture.detectChanges();
+      compiled = fixture.nativeElement as HTMLElement;
+
+      expect(compiled.querySelector('a[routerLink="/mis-reservas"]')).toBeNull();
+      const adminLink = compiled.querySelector('a[routerLink="/admin"]');
+      expect(adminLink).toBeTruthy();
+      expect(adminLink?.textContent?.trim()).toBe('Panel Admin');
 
       localStorage.removeItem('user');
     });

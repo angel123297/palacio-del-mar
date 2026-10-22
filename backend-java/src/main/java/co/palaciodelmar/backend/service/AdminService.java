@@ -100,6 +100,7 @@ public class AdminService {
 
     public Booking updateBookingStatus(String bookingId, String newStatus) {
         Booking booking = bookingRepository.findById(bookingId)
+                .or(() -> bookingRepository.findByBookingCode(bookingId))
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
 
         if (newStatus == null || newStatus.isBlank()) {

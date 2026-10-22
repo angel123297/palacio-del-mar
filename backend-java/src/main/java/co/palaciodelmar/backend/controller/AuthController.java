@@ -74,17 +74,40 @@ public class AuthController {
     }
 
     @PostMapping("/verify-email")
-    public ResponseEntity<Map<String, Object>> verifyEmail(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Object>> verifyEmail(
+            @RequestBody Map<String, String> body,
+            jakarta.servlet.http.HttpServletResponse httpResponse,
+            jakarta.servlet.http.HttpServletRequest httpRequest
+    ) {
         String token = body != null ? body.get("token") : null;
         if (token == null || token.trim().isEmpty()) {
             throw new IllegalArgumentException("Token es requerido");
         }
 
-        authService.verifyEmail(token);
+        AuthResponse authResponse = authService.verifyEmail(token);
+        addJwtCookie(httpResponse, authResponse.getToken(), httpRequest);
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "Correo verificado exitosamente");
+        response.put("token", authResponse.getToken());
+        response.put("user", authResponse.getUser());
+        response.put("data", authResponse);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body != null ? body.get("email") : null;
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email es requerido");
+        }
+
+        authService.forgotPassword(email);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Si tu correo se encuentra registrado, recibirás una contraseña temporal para acceder.");
         return ResponseEntity.ok(response);
     }
 

@@ -101,6 +101,34 @@ class EmailServiceTest {
     }
 
     @Test
+    @DisplayName("sendBookingCreatedNotification envía correo con código y enlace de pago al huésped")
+    void testSendBookingCreatedNotification_SendsEmailSuccessfully() {
+        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
+
+        User guest = User.builder()
+                .id("guest-user-1")
+                .name("Ange Kaleth")
+                .email("angekaleth633@gmail.com")
+                .build();
+        when(userRepository.findById("guest-user-1")).thenReturn(Optional.of(guest));
+
+        Booking booking = Booking.builder()
+                .id("bk-created-01")
+                .bookingCode("BK-2026-999")
+                .user("guest-user-1")
+                .suite("Penthouse Ocean Front")
+                .checkIn(LocalDate.of(2026, 11, 10))
+                .checkOut(LocalDate.of(2026, 11, 15))
+                .totalPrice(new BigDecimal("2450000"))
+                .status("pending")
+                .build();
+
+        assertDoesNotThrow(() -> emailService.sendBookingCreatedNotification(booking));
+
+        verify(javaMailSender, times(1)).send(any(MimeMessage.class));
+    }
+
+    @Test
     @DisplayName("sendBookingConfirmation usa email de GuestDetails si User id es null")
     void testSendBookingConfirmation_WithGuestDetailsFallback() {
         when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
@@ -307,6 +335,18 @@ class EmailServiceTest {
         assertDoesNotThrow(() -> emailService.sendReviewInvitation(booking));
 
         verify(javaMailSender, times(1)).send(any(MimeMessage.class));
+    }
+
+    @Test
+    @DisplayName("sendTemporaryPasswordEmail envía correo con contraseña temporal al usuario")
+    void testSendTemporaryPasswordEmail_Success() {
+        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
+
+        assertDoesNotThrow(() -> emailService.sendTemporaryPasswordEmail("usuario@ejemplo.com", "Palacio@9xK2"));
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender, times(1)).send(captor.capture());
+        assertNotNull(captor.getValue());
     }
 
     @Test

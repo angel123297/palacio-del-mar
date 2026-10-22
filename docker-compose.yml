@@ -33,8 +33,14 @@ services:
       # Solo desarrollo local: habilita el botón "Verificar ahora" (force-verify). En otros entornos definir APP_DEV_FORCE_VERIFY_ENABLED=false
       APP_DEV_FORCE_VERIFY_ENABLED: "${APP_DEV_FORCE_VERIFY_ENABLED:-true}"
       SERVER_PORT: "5000"
-      SPRING_MAIL_HOST: mailpit
-      SPRING_MAIL_PORT: 1025
+      SPRING_MAIL_HOST: "${SPRING_MAIL_HOST:-mailpit}"
+      SPRING_MAIL_PORT: "${SPRING_MAIL_PORT:-1025}"
+      SPRING_MAIL_USERNAME: "${SPRING_MAIL_USERNAME:-}"
+      SPRING_MAIL_PASSWORD: "${SPRING_MAIL_PASSWORD:-}"
+      SPRING_MAIL_AUTH: "${SPRING_MAIL_AUTH:-false}"
+      SPRING_MAIL_STARTTLS: "${SPRING_MAIL_STARTTLS:-false}"
+      SPRING_MAIL_STARTTLS_REQUIRED: "${SPRING_MAIL_STARTTLS_REQUIRED:-false}"
+      SPRING_MAIL_FROM: "${SPRING_MAIL_FROM:-reservas@palaciodelmar.co}"
       SPRING_CACHE_TYPE: redis
       REDIS_HOST: redis
       REDIS_PORT: 6379

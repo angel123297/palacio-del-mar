@@ -459,9 +459,29 @@ export class SuiteDetailComponent implements OnInit {
     });
   }
 
+  isCorporateRole(): boolean {
+    const role = (this.auth.currentUser()?.role || '').toLowerCase();
+    return role === 'host' || role === 'anfitrion' || role === 'admin';
+  }
+
+  isHost(): boolean {
+    const role = (this.auth.currentUser()?.role || '').toLowerCase();
+    return role === 'host' || role === 'anfitrion';
+  }
+
+  isAdmin(): boolean {
+    return (this.auth.currentUser()?.role || '').toLowerCase() === 'admin';
+  }
+
   createBooking(): void {
     if (!this.auth.isLoggedIn()) {
       this.message = 'Debes iniciar sesión para confirmar la reserva.';
+      this.isError = true;
+      return;
+    }
+
+    if (this.isCorporateRole()) {
+      this.message = 'Las cuentas de Anfitrión y Administrador tienen un perfil corporativo y no pueden realizar reservas de hospedaje.';
       this.isError = true;
       return;
     }
