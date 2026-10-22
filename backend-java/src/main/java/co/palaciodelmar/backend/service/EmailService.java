@@ -46,13 +46,29 @@ public class EmailService {
     @Value("${app.base-url:http://localhost:4200}")
     private String baseUrl = "http://localhost:4200";
 
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
+    @Value("${spring.mail.properties.mail.from:reservas@palaciodelmar.co}")
+    private String defaultFromAddress = "reservas@palaciodelmar.co";
+
+    private void configureSender(MimeMessageHelper helper, String defaultAlias) throws Exception {
+        if (mailUsername != null && !mailUsername.trim().isEmpty()) {
+            helper.setFrom(mailUsername, "Palacio del Mar");
+        } else if (defaultAlias != null && !defaultAlias.trim().isEmpty()) {
+            helper.setFrom(defaultAlias, "Palacio del Mar");
+        } else {
+            helper.setFrom(defaultFromAddress, "Palacio del Mar");
+        }
+    }
+
     @Async
     public void sendVerificationEmail(String toEmail, String token) {
         try {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setFrom("soporte@palaciodelmar.co");
+            configureSender(helper, "soporte@palaciodelmar.co");
             helper.setTo(toEmail);
             helper.setSubject("Verifica tu cuenta - Palacio del Mar");
 
@@ -90,7 +106,7 @@ public class EmailService {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setFrom("reservas@palaciodelmar.co");
+            configureSender(helper, "reservas@palaciodelmar.co");
             helper.setTo(email);
             helper.setSubject("Confirmación de tu reserva y voucher de acceso - Palacio del Mar");
 
@@ -141,6 +157,76 @@ public class EmailService {
     }
 
     @Async
+    public void sendBookingCreatedNotification(Booking booking) {
+        if (booking == null) return;
+        try {
+            String email = null;
+            String guestName = "Huésped";
+            if (booking.getUser() != null) {
+                User u = userRepository.findById(booking.getUser()).orElse(null);
+                if (u != null) {
+                    email = u.getEmail();
+                    if (u.getName() != null && !u.getName().isBlank()) {
+                        guestName = u.getName();
+                    }
+                }
+            }
+            if ((email == null || email.isBlank()) && booking.getGuestDetails() != null) {
+                email = booking.getGuestDetails().getEmail();
+                if (booking.getGuestDetails().getFullName() != null && !booking.getGuestDetails().getFullName().isBlank()) {
+                    guestName = booking.getGuestDetails().getFullName();
+                }
+            }
+            if (email == null || email.isBlank()) {
+                log.debug("sendBookingCreatedNotification: no se encontró correo de huésped para la reserva {}", booking.getId());
+                return;
+            }
+
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            configureSender(helper, "reservas@palaciodelmar.co");
+            helper.setTo(email);
+            String code = booking.getBookingCode() != null ? booking.getBookingCode() : booking.getId();
+            helper.setSubject("¡Tu reserva ha sido creada exitosamente! - Palacio del Mar [" + code + "]");
+
+            String payLink = (baseUrl != null ? baseUrl : "http://localhost:4200") + "/checkout/" + booking.getId();
+            String myBookingsLink = (baseUrl != null ? baseUrl : "http://localhost:4200") + "/mis-reservas";
+
+            String html = "<div style=\"background:#0d0d0d; color:#fff; font-family:'Segoe UI',sans-serif; padding:30px; border-radius:10px; max-width:600px; margin:auto; border:1px solid #c9a96e;\">"
+                    + "<div style=\"text-align:center; margin-bottom:25px;\">"
+                    + "<h1 style=\"color:#c9a96e; font-size:26px; margin:0 0 5px 0; font-family:Georgia,serif;\">Palacio del Mar</h1>"
+                    + "<p style=\"color:#e2c99b; font-size:12px; letter-spacing:2px; text-transform:uppercase; margin:0;\">Cartagena de Indias · Colombia</p>"
+                    + "</div>"
+                    + "<h2 style=\"color:#ffffff; font-size:18px; margin-top:0;\">¡Hola, " + guestName + "!</h2>"
+                    + "<p style=\"color:#ccc; font-size:14px; line-height:1.6;\">Tu solicitud de reserva ha sido registrada exitosamente en nuestro sistema. A continuación encontrarás el resumen detallado de tu itinerario:</p>"
+                    + "<div style=\"background:#141414; border:1px solid rgba(201,169,110,0.3); border-radius:8px; padding:20px; margin:20px 0;\">"
+                    + "<table style=\"width:100%; border-collapse:collapse; color:#ddd; font-size:14px;\">"
+                    + "<tr><td style=\"padding:8px 0; color:#888;\">Código de Reserva:</td><td style=\"padding:8px 0; font-weight:bold; color:#c9a96e;\">" + code + "</td></tr>"
+                    + "<tr><td style=\"padding:8px 0; color:#888;\">Suite:</td><td style=\"padding:8px 0; font-weight:bold; color:#fff;\">" + (booking.getSuite() != null ? booking.getSuite() : "Palacio del Mar") + "</td></tr>"
+                    + "<tr><td style=\"padding:8px 0; color:#888;\">Llegada (Check-in):</td><td style=\"padding:8px 0; color:#fff;\">" + booking.getCheckIn() + " (desde las 15:00)</td></tr>"
+                    + "<tr><td style=\"padding:8px 0; color:#888;\">Salida (Check-out):</td><td style=\"padding:8px 0; color:#fff;\">" + booking.getCheckOut() + " (hasta las 13:00)</td></tr>"
+                    + "<tr><td style=\"padding:8px 0; color:#888;\">Total Estimado:</td><td style=\"padding:8px 0; font-size:16px; font-weight:bold; color:#2ecc71;\">COP $" + (booking.getTotalPrice() != null ? booking.getTotalPrice() : "0") + "</td></tr>"
+                    + "<tr><td style=\"padding:8px 0; color:#888;\">Estado:</td><td style=\"padding:8px 0; color:#f1c40f; font-weight:bold;\">Pendiente de Pago</td></tr>"
+                    + "</table>"
+                    + "</div>"
+                    + "<div style=\"text-align:center; margin:30px 0;\">"
+                    + "<a href=\"" + payLink + "\" style=\"background:#c9a96e; color:#0d0d0d; padding:14px 28px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:15px; display:inline-block;\">Completar Pago Seguro &rarr;</a>"
+                    + "</div>"
+                    + "<p style=\"color:#aaa; font-size:12px; line-height:1.5;\">Nota: Tus fechas han sido bloqueadas temporalmente en el calendario. Para asegurar tu hospedaje de forma definitiva, por favor completa el pago dentro del tiempo límite estipulado.</p>"
+                    + "<p style=\"color:#888; font-size:11px; margin-top:20px; border-top:1px solid #222; padding-top:15px;\">También puedes gestionar tus itinerarios en cualquier momento desde <a href=\"" + myBookingsLink + "\" style=\"color:#c9a96e;\">Mis Reservas</a>.</p>"
+                    + "</div>";
+
+            helper.setText(html, true);
+            javaMailSender.send(message);
+            log.info("Notificación de reserva creada {} enviada exitosamente a {}", code, email);
+        } catch (Exception e) {
+            log.warn("No se pudo enviar correo de reserva creada para {} (servidor SMTP no disponible): {}",
+                    booking != null ? booking.getId() : "N/A", e.getMessage());
+        }
+    }
+
+    @Async
     public void sendHostBookingNotification(Booking booking) {
         if (booking == null) return;
         try {
@@ -164,7 +250,7 @@ public class EmailService {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setFrom("notificaciones@palaciodelmar.co");
+            configureSender(helper, "notificaciones@palaciodelmar.co");
             helper.setTo(hostEmail);
             String propertyName = property != null ? property.getName() : "Tu alojamiento";
             helper.setSubject("¡Nueva reserva confirmada en " + propertyName + "!");
@@ -215,7 +301,7 @@ public class EmailService {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setFrom("moderacion@palaciodelmar.co");
+            configureSender(helper, "moderacion@palaciodelmar.co");
             helper.setTo(hostEmail);
 
             boolean approved = "APPROVED".equalsIgnoreCase(status);
@@ -262,7 +348,7 @@ public class EmailService {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setFrom("alertas@palaciodelmar.co");
+            configureSender(helper, "alertas@palaciodelmar.co");
             helper.setTo(hostEmail);
             helper.setSubject("Alerta: Fallo persistente en entregas de Webhook - Palacio del Mar");
 
@@ -309,7 +395,7 @@ public class EmailService {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setFrom("experiencias@palaciodelmar.co");
+            configureSender(helper, "experiencias@palaciodelmar.co");
             helper.setTo(email);
             helper.setSubject("¿Cómo estuvo tu estadía? - Califica tu experiencia");
 
@@ -326,6 +412,43 @@ public class EmailService {
             javaMailSender.send(message);
         } catch (Exception e) {
             log.warn("No se pudo enviar invitación de reseña para la reserva {} (servidor SMTP no disponible): {}", booking.getId(), e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendTemporaryPasswordEmail(String toEmail, String temporaryPassword) {
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            configureSender(helper, "seguridad@palaciodelmar.co");
+            helper.setTo(toEmail);
+            helper.setSubject("Tu Contraseña Temporal de Acceso - Palacio del Mar");
+
+            String loginUrl = (baseUrl != null ? baseUrl : "http://localhost:4200");
+            String htmlMsg = "<div style=\"background:#0d0d0d; color:#fff; font-family:'Segoe UI',Roboto,Helvetica,sans-serif; padding:30px; border-radius:10px; max-width:600px; margin:auto; border:1px solid #2a2a2a;\">"
+                    + "<div style=\"text-align:center; margin-bottom:20px;\">"
+                    + "<span style=\"color:#c9a96e; letter-spacing:3px; font-size:12px; text-transform:uppercase; font-weight:600;\">Palacio del Mar • Seguridad</span>"
+                    + "<h1 style=\"color:#ffffff; font-size:24px; margin:10px 0 0 0; font-weight:400;\">Recuperación de Acceso</h1>"
+                    + "</div>"
+                    + "<p style=\"color:#ccc; font-size:15px; line-height:1.6;\">Has solicitado una contraseña temporal para ingresar a tu cuenta de Palacio del Mar. Puedes utilizar la siguiente contraseña provisional para iniciar sesión:</p>"
+                    + "<div style=\"background:#161616; border:2px dashed #c9a96e; border-radius:8px; padding:20px; text-align:center; margin:25px 0;\">"
+                    + "<span style=\"color:#aaa; font-size:11px; text-transform:uppercase; letter-spacing:2px; display:block; margin-bottom:8px;\">Contraseña Temporal</span>"
+                    + "<span style=\"color:#c9a96e; font-size:26px; font-family:monospace; letter-spacing:4px; font-weight:bold;\">" + temporaryPassword + "</span>"
+                    + "</div>"
+                    + "<p style=\"color:#e6c887; font-size:13px; line-height:1.5;\">⚠️ Por tu seguridad, una vez que inicies sesión te recomendamos ir a tu perfil y definir una nueva contraseña personalizada.</p>"
+                    + "<div style=\"text-align:center; margin:30px 0 20px 0;\">"
+                    + "<a href=\"" + loginUrl + "\" style=\"background:#c9a96e; color:#0d0d0d; font-weight:bold; padding:14px 28px; text-decoration:none; border-radius:6px; display:inline-block; font-size:15px;\">Iniciar Sesión Ahora</a>"
+                    + "</div>"
+                    + "<hr style=\"border:none; border-top:1px solid #222; margin:25px 0;\">"
+                    + "<p style=\"color:#777; font-size:12px; line-height:1.4; margin:0;\">Si no solicitaste este cambio, te sugerimos comunicarte inmediatamente con <a href=\"mailto:soporte@palaciodelmar.co\" style=\"color:#c9a96e;\">soporte@palaciodelmar.co</a>.</p>"
+                    + "</div>";
+
+            helper.setText(htmlMsg, true);
+            javaMailSender.send(message);
+            log.info("Correo con contraseña temporal enviado exitosamente a {}", toEmail);
+        } catch (Exception e) {
+            log.warn("No se pudo enviar correo con contraseña temporal a {}: {}", toEmail, e.getMessage());
         }
     }
 
