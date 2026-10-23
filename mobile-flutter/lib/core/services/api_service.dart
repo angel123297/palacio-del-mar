@@ -9,7 +9,6 @@ class ApiService {
         'email': email,
         'password': password,
       });
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['token'] != null) {
@@ -17,9 +16,9 @@ class ApiService {
         }
         return {'success': true, 'data': data};
       }
-      return {'success': false, 'error': 'Credenciales inválidas'};
+      return {'success': false, 'error': 'Credenciales invalidas'};
     } catch (e) {
-      return {'success': false, 'error': 'Error de conexión'};
+      return {'success': false, 'error': 'Error de conexion'};
     }
   }
 
@@ -39,6 +38,12 @@ class ApiService {
     } catch (e) {
       return false;
     }
+  }
+
+  static Future<void> sendAuditLog(Map<String, dynamic> auditData) async {
+    try {
+      await AuthenticatedHttpClient.post('/audit/log', auditData);
+    } catch (e) {}
   }
 
   static Future<void> logout() async {
