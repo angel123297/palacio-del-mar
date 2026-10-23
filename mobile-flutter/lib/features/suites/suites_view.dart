@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/services/api_service.dart';
+import '../../core/providers/booking_provider.dart';
 
 class SuitesCatalogView extends StatefulWidget {
   const SuitesCatalogView({super.key});
@@ -18,9 +19,7 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
       'zone': 'Centro Histórico',
       'category': 'HABITACIÓN',
       'price': '\$ 860.000',
-      'oldPrice': '\$ 1.050.000',
       'image': 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800',
-      'recommended': true,
       'amenities': ['JARDÍN PRIVADO', 'AIRE ACONDICIONADO', 'MINIBAR', '42 M²'],
     },
     {
@@ -28,9 +27,7 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
       'zone': 'Centro Histórico',
       'category': 'SUITE DELUXE',
       'price': '\$ 1.310.000',
-      'oldPrice': '\$ 1.650.000',
       'image': 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800',
-      'recommended': true,
       'amenities': ['PATIO COLONIAL', 'TINA HIDROMASAJE', 'BALCÓN', '65 M²'],
     },
     {
@@ -38,9 +35,7 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
       'zone': 'Centro Histórico',
       'category': 'SUITE PREMIUM',
       'price': '\$ 1.720.000',
-      'oldPrice': '\$ 2.150.000',
       'image': 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800',
-      'recommended': true,
       'amenities': ['VISTA A MURALLAS', 'JACUZZI', 'BALCÓN PRIVADO', '85 M²'],
     },
     {
@@ -48,9 +43,7 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
       'zone': 'Centro Histórico',
       'category': 'SUITE PRESIDENCIAL',
       'price': '\$ 2.780.000',
-      'oldPrice': '\$ 3.440.000',
       'image': 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
-      'recommended': true,
       'amenities': ['TERRAZA PRIVADA', 'JACUZZI', 'MAYORDOMO 24/7', '180 M²'],
     },
   ];
@@ -63,9 +56,7 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
       builder: (context) {
         return Padding(
           padding: EdgeInsets.only(
-            top: 24,
-            left: 24,
-            right: 24,
+            top: 24, left: 24, right: 24,
             bottom: MediaQuery.of(context).viewInsets.bottom + 24,
           ),
           child: Column(
@@ -91,23 +82,17 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  onPressed: () async {
+                  onPressed: () {
+                    context.read<BookingProvider>().addSuiteToCart(suite);
                     Navigator.pop(context);
-                    await ApiService.createBooking({
-                      'roomName': suite['title'],
-                      'zone': suite['zone'],
-                      'price': suite['price'],
-                      'status': 'CONFIRMADA',
-                    });
-                    if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('¡Reserva para "${suite['title']}" registrada en la BD!'),
+                        content: Text('"${suite['title']}" añadida a la reserva'),
                         backgroundColor: AppTheme.gold,
                       ),
                     );
                   },
-                  child: const Text('CONFIRMAR Y GUARDAR EN BD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  child: const Text('AGREGAR A LA RESERVA', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
                 ),
               ),
             ],
@@ -168,11 +153,7 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
                     child: Image.network(
-                      suite['image'],
-                      height: 190,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(height: 190, color: Colors.white10, child: const Center(child: Icon(Icons.hotel, color: AppTheme.gold, size: 40))),
+                      suite['image'], height: 190, width: double.infinity, fit: BoxFit.cover,
                     ),
                   ),
                   Padding(
@@ -185,15 +166,12 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
                         Text(suite['title'], style: const TextStyle(fontFamily: 'serif', color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 10),
                         Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: amenities.map((a) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(2), border: Border.all(color: Colors.white12)),
-                              child: Text(a, style: const TextStyle(color: Colors.white60, fontSize: 9)),
-                            );
-                          }).toList(),
+                          spacing: 6, runSpacing: 6,
+                          children: amenities.map((a) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(2), border: Border.all(color: Colors.white12)),
+                            child: Text(a, style: const TextStyle(color: Colors.white60, fontSize: 9)),
+                          )).toList(),
                         ),
                         const SizedBox(height: 14),
                         Row(
@@ -203,10 +181,8 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
                             Text('${suite['price']} / noche', style: const TextStyle(color: AppTheme.gold, fontSize: 16, fontWeight: FontWeight.bold)),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                foregroundColor: AppTheme.gold,
-                                side: const BorderSide(color: AppTheme.gold),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                backgroundColor: Colors.transparent, foregroundColor: AppTheme.gold,
+                                side: const BorderSide(color: AppTheme.gold), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                               ),
                               onPressed: () => _openBookingModal(suite),
                               child: const Text('RESERVAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),

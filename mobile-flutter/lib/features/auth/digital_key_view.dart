@@ -1,7 +1,8 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/services/api_service.dart';
+import '../../core/providers/auth_provider.dart';
 
 class DigitalKeyView extends StatefulWidget {
   const DigitalKeyView({super.key});
@@ -13,27 +14,38 @@ class DigitalKeyView extends StatefulWidget {
 class _DigitalKeyViewState extends State<DigitalKeyView> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoggedIn = false;
-  bool _isLoading = false;
+  
+  bool _isValidEmail(String email) {
+    return RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(email);
+  }
 
   void _login() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ingresa correo y contraseña')));
       return;
     }
 
-    setState(() => _isLoading = true);
-    final res = await ApiService.login(_emailController.text.trim(), _passwordController.text.trim());
-    setState(() => _isLoading = false);
+    if (!_isValidEmail(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formato de correo inválido')));
+      return;
+    }
 
-    if (res['success'] == true) {
-      setState(() => _isLoggedIn = true);
+    final success = await context.read<AuthProvider>().login(email, password);
+    
+    if (!mounted) return;
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Credenciales incorrectas o error de red')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoggedIn) {
+    final authProvider = context.watch<AuthProvider>();
+
+    if (authProvider.isAuthenticated) {
       return Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -47,7 +59,16 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
             ),
             child: Column(
               children: [
-                const Text('Gran Suite Presidencial', style: TextStyle(fontFamily: 'serif', color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Gran Suite Presidencial', style: TextStyle(fontFamily: 'serif', color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: Colors.white54, size: 20),
+                      onPressed: () => context.read<AuthProvider>().logout(),
+                    )
+                  ],
+                ),
                 const Text('Centro Histórico · Cartagena', style: TextStyle(color: AppTheme.gold, fontSize: 12)),
                 const Divider(height: 30, color: Colors.white10),
                 const Text('LLAVE DIGITAL DE ACCESO', style: TextStyle(color: AppTheme.gold, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 2)),
@@ -98,6 +119,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
               const SizedBox(height: 24),
               TextField(
                 controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(labelText: 'Correo Electrónico', border: OutlineInputBorder()),
               ),
@@ -109,7 +131,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                 decoration: const InputDecoration(labelText: 'Contraseña', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 20),
-              _isLoading
+              authProvider.isLoading
                   ? const CircularProgressIndicator(color: AppTheme.gold)
                   : ElevatedButton(
                       style: ElevatedButton.styleFrom(
