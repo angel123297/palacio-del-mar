@@ -1,109 +1,47 @@
 ﻿import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
-import 'storage_service.dart';
+import '../network/http_client.dart';
+import '../security/secure_storage.dart';
 
 class ApiService {
-  static Future<Map<String, String>> _getHeaders() async {
-    final token = await StorageService.getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  // Registrar nueva reserva en la BD
-  static Future<Map<String, dynamic>> createBooking(Map<String, dynamic> bookingData) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/bookings'),
-        headers: headers,
-        body: jsonEncode(bookingData),
-      ).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {'success': true, 'data': jsonDecode(response.body)};
-      }
-      return {'success': false, 'message': 'No se pudo registrar la reserva en la BD.'};
-    } catch (e) {
-      // Simulación de respuesta exitosa si el backend no está respondiendo
-      return {'success': true, 'message': 'Reserva guardada correctamente.'};
-    }
-  }
-
-  // Enviar mensaje de contacto VIP
-  static Future<bool> sendContactMessage(Map<String, String> contactData) async {
-    try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/contact'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(contactData),
-      ).timeout(const Duration(seconds: 5));
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (_) {
-      return true;
-    }
-  }
-
   static Future<Map<String, dynamic>> login(String email, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      ).timeout(const Duration(seconds: 5));
+      final response = await AuthenticatedHttpClient.post('/auth/login', {
+        'email': email,
+        'password': password,
+      });
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final token = data['token'] ?? data['data']?['token'] ?? 'token_jwt_valido';
-        await StorageService.saveToken(token.toString());
+        if (data['token'] != null) {
+          await SecureStorage.saveToken(data['token']);
+        }
         return {'success': true, 'data': data};
       }
-      return {'success': false, 'message': 'Credenciales no válidas.'};
+      return {'success': false, 'error': 'Credenciales inválidas'};
     } catch (e) {
-      if (email.isNotEmpty && password.length >= 4) {
-        await StorageService.saveToken('demo_jwt_token_palacio');
-        return {'success': true};
-      }
-      return {'success': false, 'message': 'Ingresa correo y contraseña válidos.'};
+      return {'success': false, 'error': 'Error de conexión'};
     }
   }
 
-  static Future<Map<String, dynamic>> register(String name, String email, String password) async {
+  static Future<bool> createBooking(Map<String, dynamic> bookingData) async {
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'nombre': name, 'email': email, 'password': password}),
-      ).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {'success': true};
-      }
-      return {'success': false, 'message': 'Error al registrar.'};
+      final response = await AuthenticatedHttpClient.post('/bookings', bookingData);
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      return {'success': true};
+      return false;
     }
   }
 
-  static Future<List<dynamic>> getMyReservations() async {
+  static Future<bool> sendContactMessage(Map<String, dynamic> messageData) async {
     try {
-      final headers = await _getHeaders();
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/bookings'),
-        headers: headers,
-      ).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data is List) return data;
-        if (data['data'] is List) return data['data'];
-      }
-      return [];
-    } catch (_) {
-      return [];
+      final response = await AuthenticatedHttpClient.post('/contact', messageData);
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
     }
+  }
+
+  static Future<void> logout() async {
+    await SecureStorage.deleteToken();
   }
 }

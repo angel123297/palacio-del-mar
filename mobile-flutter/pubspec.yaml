@@ -1,4 +1,4 @@
-﻿name: palacio_del_mar_mobile
+name: palacio_del_mar_mobile
 description: "Palacio del Mar - Hotel Booking Mobile App"
 publish_to: 'none'
 version: 1.0.0+1
@@ -10,8 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  http: ^1.2.0
-  flutter_secure_storage: ^9.2.4
+  http: ^1.6.0
+  flutter_secure_storage: ^11.2.0
   qr_flutter: ^4.1.0
   provider: ^6.1.2
 
