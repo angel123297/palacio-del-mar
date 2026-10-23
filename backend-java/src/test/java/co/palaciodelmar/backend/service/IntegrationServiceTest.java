@@ -228,4 +228,49 @@ class IntegrationServiceTest {
         assertEquals(1, result.get("recordsRemoved"));
         verify(suiteNightRepository).deleteAll(List.of(blockedNight));
     }
+
+    @Test
+    void testUnblockNeverRemovesNativeBookingNights() {
+        Suite suite = Suite.builder()
+                .id("suite_01")
+                .propertyId("prop_hotel_01")
+                .externalId("PMS-101")
+                .build();
+
+        when(suiteRepository.findByPropertyIdAndExternalId("prop_hotel_01", "PMS-101"))
+                .thenReturn(Optional.of(suite));
+
+        LocalDate start = LocalDate.now().plusDays(1);
+        LocalDate end = LocalDate.now().plusDays(3);
+
+        SuiteNight nativeBlockedNight = SuiteNight.builder()
+                .suite("suite_01")
+                .unitSlot(1)
+                .status("blocked")
+                .booking("booking_native_999")
+                .build();
+
+        SuiteNight externalBlockedNight = SuiteNight.builder()
+                .suite("suite_01")
+                .unitSlot(1)
+                .status("blocked")
+                .booking("EXT_BLOCK_xyz")
+                .build();
+
+        when(suiteNightRepository.findBySuiteAndDatesBetween(eq("suite_01"), eq(start), any(LocalDate.class)))
+                .thenReturn(List.of(nativeBlockedNight, externalBlockedNight));
+
+        IntegrationAvailabilityRequest req = IntegrationAvailabilityRequest.builder()
+                .externalId("PMS-101")
+                .startDate(start)
+                .endDate(end)
+                .action("UNBLOCK")
+                .build();
+
+        Map<String, Object> result = integrationService.manageAvailability(apiKey, req);
+
+        assertEquals("SUCCESS", result.get("status"));
+        assertEquals(1, result.get("recordsRemoved"));
+        verify(suiteNightRepository).deleteAll(List.of(externalBlockedNight));
+    }
 }

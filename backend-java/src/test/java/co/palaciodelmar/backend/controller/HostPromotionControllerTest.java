@@ -139,4 +139,63 @@ class HostPromotionControllerTest {
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         verify(promotionRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Host puede listar promociones solo de sus sedes o propiedades asignadas")
+    void hostCanGetPromotionsForOwnedScope() {
+        User hostUser = User.builder()
+                .id("host-1")
+                .role("HOST")
+                .branches(List.of("branch-alpha"))
+                .build();
+        UserPrincipal principal = new UserPrincipal(hostUser);
+
+        Property ownedProp = Property.builder()
+                .id("prop-mine")
+                .ownerId("host-1")
+                .build();
+        when(propertyRepository.findByOwnerId("host-1")).thenReturn(List.of(ownedProp));
+
+        Promotion promo1 = Promotion.builder()
+                .id("promo-1")
+                .branch("branch-alpha")
+                .title("Promo Sede")
+                .active(true)
+                .discountPercent(10)
+                .build();
+
+        Promotion promo2 = Promotion.builder()
+                .id("promo-2")
+                .branch("prop-mine")
+                .title("Promo Propiedad")
+                .active(true)
+                .discountPercent(20)
+                .build();
+
+        when(promotionRepository.findByBranchAndActiveTrue("branch-alpha")).thenReturn(List.of(promo1));
+        when(promotionRepository.findByBranchAndActiveTrue("prop-mine")).thenReturn(List.of(promo2));
+
+        ResponseEntity<ApiResponse<List<PromotionDTO>>> response = hostController.getPromotions(principal);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(2, response.getBody().getData().size());
+    }
+
+    @Test
+    @DisplayName("Host sin propiedades o sedes retorna lista vacía de promociones")
+    void hostWithNoScopeReturnsEmptyPromotionsList() {
+        User hostUser = User.builder()
+                .id("host-none")
+                .role("HOST")
+                .branches(List.of())
+                .build();
+        UserPrincipal principal = new UserPrincipal(hostUser);
+        when(propertyRepository.findByOwnerId("host-none")).thenReturn(List.of());
+
+        ResponseEntity<ApiResponse<List<PromotionDTO>>> response = hostController.getPromotions(principal);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(0, response.getBody().getData().size());
+    }
 }
+

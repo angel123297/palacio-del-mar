@@ -12,6 +12,7 @@ import co.palaciodelmar.backend.service.EmailService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -183,6 +184,32 @@ class PaymentWebhookServiceTest {
         verifyNoInteractions(bookingRepository);
         verifyNoInteractions(paymentRepository);
         verify(processedWebhookEventRepository, never()).save(any());
+    }
+
+    @Test
+    void duplicateKeyWhenSavingEventReturnsAlreadyProcessed() {
+        String eventId = "evt_concurrent_duplicate";
+        String rawBody = """
+                {
+                  "eventId": "evt_concurrent_duplicate",
+                  "eventType": "payment.event_without_effects",
+                  "data": { "intentId": "pi_duplicate" }
+                }
+                """;
+        String signature = WebhookSigner.sign(rawBody, secret);
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+
+        when(processedWebhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(processedWebhookEventRepository.save(any(ProcessedWebhookEvent.class)))
+                .thenThrow(new DuplicateKeyException("Duplicate eventId"));
+
+        Map<String, Object> result = webhookService.processWebhook(rawBody, signature, eventId, timestamp);
+
+        assertEquals("already_processed", result.get("status"));
+        assertEquals(true, result.get("idempotent"));
+        assertEquals(eventId, result.get("eventId"));
+        verify(processedWebhookEventRepository).save(any(ProcessedWebhookEvent.class));
+        verifyNoInteractions(bookingRepository, paymentRepository, bookingService, emailService);
     }
 
     @Test

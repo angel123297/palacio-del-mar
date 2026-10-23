@@ -146,9 +146,13 @@ class AuthServiceTest {
         testUser.setVerificationTokenExpiresAt(Instant.now().plus(2, ChronoUnit.HOURS));
 
         when(userRepository.findByVerificationTokenHash(hashedToken)).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(jwtService.generateToken(any())).thenReturn("mock-jwt-token");
 
-        authService.verifyEmail(token);
+        AuthResponse res = authService.verifyEmail(token);
 
+        assertNotNull(res);
+        assertEquals("mock-jwt-token", res.getToken());
         assertTrue(testUser.getEmailVerified());
         assertNull(testUser.getVerificationTokenHash());
         assertNull(testUser.getVerificationTokenExpiresAt());
@@ -175,5 +179,27 @@ class AuthServiceTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail("invalid-token"));
         assertTrue(ex.getMessage().contains("inválido"));
+    }
+
+    @Test
+    void forgotPasswordGeneratesTemporaryPasswordAndSendsEmail() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.encode(anyString())).thenReturn("hashedTempPassword");
+
+        authService.forgotPassword("TEST@example.com");
+
+        assertTrue(testUser.getEmailVerified());
+        assertEquals("hashedTempPassword", testUser.getPassword());
+        verify(userRepository).save(testUser);
+        verify(emailService).sendTemporaryPasswordEmail(eq(testUser.getEmail()), anyString());
+    }
+
+    @Test
+    void forgotPasswordHandlesUnknownEmailGracefully() {
+        when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> authService.forgotPassword("unknown@example.com"));
+
+        verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
     }
 }

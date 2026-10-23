@@ -12,11 +12,11 @@ import { finalize, switchMap } from 'rxjs';
   imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule],
   template: `
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 4rem 1.5rem; display: flex; justify-content: center;">
-      <div style="max-width: 1100px; width: 100%; display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 3rem;">
+      <div class="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-8 lg:gap-12" style="max-width: 1100px; width: 100%;">
         
         <!-- Left: Payment Methods -->
         <div>
-          <h1 style="font-family: var(--font-title); font-size: 2.2rem; color: var(--gold); margin-bottom: 2rem;">Centro de Pago Seguro</h1>
+          <h1 style="font-family: var(--font-title); font-size: 2.2rem; color: var(--gold); margin-bottom: 2rem;">Centro de Pago</h1>
           
           <div *ngIf="loading" class="luxury-loader-container" style="min-height: 200px;">
             <div class="luxury-spinner"></div>
@@ -24,106 +24,90 @@ import { finalize, switchMap } from 'rxjs';
           </div>
 
           <div *ngIf="!loading && !booking" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 2rem; text-align: center;">
-            <p style="color: #ff4d4d; margin-bottom: 1rem; font-size: 1.1rem;">No se encontró la reserva o ya ha sido pagada previamente.</p>
-            <a routerLink="/mis-reservas" class="btn-primary" style="text-decoration: none; padding: 10px 20px;">Volver a mis reservas</a>
+            @if (alreadyPaid) {
+              <p style="color: #2ecc71; margin-bottom: 1rem; font-size: 1.1rem;">Esta reserva ya está pagada y confirmada.</p>
+              <a [routerLink]="['/reservas', bookingId]" class="btn-primary" style="text-decoration: none; padding: 10px 20px;">Ver detalle de la reserva</a>
+            } @else {
+              <p style="color: #ff4d4d; margin-bottom: 1rem; font-size: 1.1rem;">No se encontró la reserva o tu sesión no tiene acceso a ella.</p>
+              <a routerLink="/mis-reservas" class="btn-primary" style="text-decoration: none; padding: 10px 20px;">Volver a mis reservas</a>
+            }
           </div>
 
           <div *ngIf="!loading && booking" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 2rem;">
             
-            <!-- 15-Minute Guaranteed Reservation TTL Countdown -->
+            <!-- Reservation TTL Countdown -->
             <div style="background: rgba(201,169,110,0.1); border: 1px solid rgba(201,169,110,0.4); border-radius: 8px; padding: 12px 18px; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 0.9rem; color: #f5f0e8;">⏱️ <strong>Tiempo restante para pagar tu reserva:</strong></span>
+              <span style="font-size: 0.9rem; color: #f5f0e8;"><strong>Tiempo restante para pagar tu reserva:</strong></span>
               <span style="font-family: monospace; font-size: 1.2rem; font-weight: bold; color: var(--gold); letter-spacing: 2px;">{{ timerText }}</span>
-            </div>
-
-            <!-- Partial / Instalment Payment Plan Selection -->
-            <div *ngIf="balanceDue > 0" style="margin-bottom: 1.5rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(201,169,110,0.3); border-radius: 8px; padding: 1.2rem;">
-              <label style="display: block; color: var(--gold); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.8rem; font-weight: 600;">Plan de Pago</label>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <button type="button" (click)="paymentMode = 'full'" 
-                  [style.border-color]="paymentMode === 'full' ? 'var(--gold)' : 'rgba(255,255,255,0.15)'"
-                  [style.background]="paymentMode === 'full' ? 'rgba(201,169,110,0.15)' : 'rgba(255,255,255,0.02)'"
-                  style="padding: 12px; border-width: 2px; border-style: solid; border-radius: 8px; color: #fff; cursor: pointer; text-align: left; transition: all 0.2s;">
-                  <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 4px;">Pago Total</div>
-                  <div style="color: var(--gold); font-size: 1.1rem; font-weight: 700;">$ {{ balanceDue | number:'1.0-0' }}</div>
-                </button>
-                <button type="button" (click)="paymentMode = 'partial'" 
-                  [style.border-color]="paymentMode === 'partial' ? 'var(--gold)' : 'rgba(255,255,255,0.15)'"
-                  [style.background]="paymentMode === 'partial' ? 'rgba(201,169,110,0.15)' : 'rgba(255,255,255,0.02)'"
-                  style="padding: 12px; border-width: 2px; border-style: solid; border-radius: 8px; color: #fff; cursor: pointer; text-align: left; transition: all 0.2s;">
-                  <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 4px;">Anticipo 50%</div>
-                  <div style="color: var(--gold); font-size: 1.1rem; font-weight: 700;">$ {{ Math.round(balanceDue / 2) | number:'1.0-0' }}</div>
-                </button>
-              </div>
             </div>
 
             <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.3rem; border-bottom: 1px solid rgba(212,175,55,0.2); padding-bottom: 0.5rem;">Elige tu método de pago</h3>
 
             <!-- Payment Method Selector -->
-            <div style="display: flex; gap: 1rem; margin-bottom: 2rem; overflow-x: auto; padding-bottom: 0.5rem;">
-              <button type="button" (click)="selectedMethod = 'CARD'" 
+            <div role="radiogroup" aria-label="Métodos de pago disponibles" style="display: flex; gap: 1rem; margin-bottom: 2rem; overflow-x: auto; padding-bottom: 0.5rem;">
+              <button type="button" role="radio" [attr.aria-checked]="selectedMethod === 'CARD'" aria-label="Pagar con tarjeta de crédito o débito" (click)="selectedMethod = 'CARD'" 
                 [style.border-color]="selectedMethod === 'CARD' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
                 [style.background]="selectedMethod === 'CARD' ? 'rgba(212,175,55,0.1)' : 'transparent'"
-                style="flex: 1; min-width: 140px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <span style="font-size: 2rem;">💳</span>
+                style="flex: 1; min-width: 140px; min-height: 80px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-size: 2rem;" aria-hidden="true">💳</span>
                 <span style="font-weight: 600;">Tarjeta de Crédito</span>
               </button>
 
-              <button type="button" (click)="selectedMethod = 'PSE'"
+              <button type="button" role="radio" [attr.aria-checked]="selectedMethod === 'PSE'" aria-label="Pagar con PSE transferencias bancarias en Colombia" (click)="selectedMethod = 'PSE'"
                 [style.border-color]="selectedMethod === 'PSE' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
                 [style.background]="selectedMethod === 'PSE' ? 'rgba(212,175,55,0.1)' : 'transparent'"
-                style="flex: 1; min-width: 140px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <span style="font-size: 2rem;">🏦</span>
+                style="flex: 1; min-width: 140px; min-height: 80px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-size: 2rem;" aria-hidden="true">🏦</span>
                 <span style="font-weight: 600;">PSE / Bancos</span>
               </button>
 
-              <button type="button" (click)="selectedMethod = 'PAYPAL'"
+              <button type="button" role="radio" [attr.aria-checked]="selectedMethod === 'PAYPAL'" aria-label="Pagar internacionalmente con PayPal" (click)="selectedMethod = 'PAYPAL'"
                 [style.border-color]="selectedMethod === 'PAYPAL' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
                 [style.background]="selectedMethod === 'PAYPAL' ? 'rgba(212,175,55,0.1)' : 'transparent'"
-                style="flex: 1; min-width: 140px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <span style="font-size: 2rem;">🅿️</span>
+                style="flex: 1; min-width: 140px; min-height: 80px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-size: 2rem;" aria-hidden="true">🅿️</span>
                 <span style="font-weight: 600;">PayPal</span>
               </button>
             </div>
 
             <!-- CREDIT CARD FORM -->
-            <form *ngIf="selectedMethod === 'CARD'" [formGroup]="paymentForm" (ngSubmit)="processPayment()">
+            <form *ngIf="selectedMethod === 'CARD'" [formGroup]="paymentForm" (ngSubmit)="processPayment()" aria-label="Formulario de pago con tarjeta de crédito">
               <div style="background: rgba(0,0,0,0.3); padding: 1.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 2rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                   <h4 style="margin: 0; color: #ccc;">Detalles de la Tarjeta</h4>
                   <div style="display: flex; gap: 8px;">
-                    <div style="width: 35px; height: 22px; background: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #000; font-weight: bold; font-size: 0.6rem; font-style: italic;">VISA</div>
-                    <div style="width: 35px; height: 22px; background: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #eb001b; font-weight: bold; font-size: 0.6rem;">MC</div>
+                    <div style="width: 35px; height: 22px; background: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #000; font-weight: bold; font-size: 0.6rem; font-style: italic;" aria-hidden="true">VISA</div>
+                    <div style="width: 35px; height: 22px; background: #fff; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #eb001b; font-weight: bold; font-size: 0.6rem;" aria-hidden="true">MC</div>
                   </div>
                 </div>
 
                 <div style="margin-bottom: 1.2rem;">
-                  <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Titular de la tarjeta</label>
-                  <input type="text" formControlName="cardName" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;" [style.border-color]="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="Como aparece en la tarjeta">
+                  <label for="checkout-card-name" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Titular de la tarjeta</label>
+                  <input id="checkout-card-name" type="text" formControlName="cardName" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;" [style.border-color]="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="Como aparece en la tarjeta">
                   <div *ngIf="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Campo requerido</div>
                 </div>
 
                 <div style="margin-bottom: 1.2rem;">
-                  <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Número de Tarjeta</label>
-                  <input type="text" formControlName="cardNumber" maxlength="19" (input)="formatCardNumber($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; letter-spacing: 2px;" [style.border-color]="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="0000 0000 0000 0000">
+                  <label for="checkout-card-number" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Número de Tarjeta</label>
+                  <input id="checkout-card-number" type="text" formControlName="cardNumber" maxlength="19" (input)="formatCardNumber($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; letter-spacing: 2px;" [style.border-color]="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="0000 0000 0000 0000">
                   <div *ngIf="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Número inválido</div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
                   <div>
-                    <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Expiración</label>
-                    <input type="text" formControlName="expiry" maxlength="5" (input)="formatExpiry($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center;" [style.border-color]="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="MM/AA">
+                    <label for="checkout-card-expiry" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Expiración</label>
+                    <input id="checkout-card-expiry" type="text" formControlName="expiry" maxlength="5" (input)="formatExpiry($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center;" [style.border-color]="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="MM/AA">
                     <div *ngIf="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Formato MM/AA</div>
                   </div>
                   <div>
-                    <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">CVV / CVC</label>
-                    <input type="password" formControlName="cvv" maxlength="4" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center; letter-spacing: 3px;" [style.border-color]="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="•••">
+                    <label for="checkout-card-cvv" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">CVV / CVC</label>
+                    <input id="checkout-card-cvv" type="password" formControlName="cvv" maxlength="4" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center; letter-spacing: 3px;" [style.border-color]="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="•••">
                     <div *ngIf="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">CVV inválido</div>
                   </div>
                 </div>
               </div>
 
-              <button type="submit" [disabled]="processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+              <button type="submit" [disabled]="processing" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                 <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
@@ -137,8 +121,8 @@ import { finalize, switchMap } from 'rxjs';
                 <h4 style="margin: 0 0 1.5rem 0; color: #ccc;">Pago Seguro en Línea (PSE)</h4>
                 
                 <div style="text-align: left; margin-bottom: 1.5rem;">
-                  <label style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Selecciona tu banco</label>
-                  <select [(ngModel)]="pseBank" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
+                  <label for="checkout-pse-bank" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Selecciona tu banco</label>
+                  <select id="checkout-pse-bank" [(ngModel)]="pseBank" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
                     <option value="">-- Elige un banco --</option>
                     <option value="bancolombia">Bancolombia</option>
                     <option value="davivienda">Davivienda</option>
@@ -152,7 +136,7 @@ import { finalize, switchMap } from 'rxjs';
                 <p style="font-size: 0.85rem; color: #888;">Al continuar, serás redirigido a la pasarela segura de tu banco para confirmar la transacción.</p>
               </div>
 
-              <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing" class="btn-primary" style="width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+              <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                 <span *ngIf="!processing">Ir al Banco a pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
@@ -166,14 +150,14 @@ import { finalize, switchMap } from 'rxjs';
                 <div style="font-size: 3rem; color: #0070ba; font-weight: 800; font-style: italic; letter-spacing: -2px; margin-bottom: 1rem;">PayPal</div>
                 <p style="color: #ccc; margin-bottom: 2rem;">Paga de forma rápida y segura con tu cuenta de PayPal.</p>
                 
-                <button type="button" (click)="processPayPal()" [disabled]="processing" style="background: #ffc439; color: #000; border: none; border-radius: 24px; padding: 12px 30px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 250px;">
+                <button type="button" (click)="processPayPal()" [disabled]="processing" style="background: #ffc439; color: #000; border: none; border-radius: 24px; min-height: 48px; padding: 12px 30px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 250px;">
                   <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }} con PayPal</span>
                   <span *ngIf="processing">Abriendo PayPal...</span>
                 </button>
               </div>
             </div>
 
-            <p *ngIf="errorMsg" style="color: #ff4d4d; margin-top: 1.5rem; text-align: center; font-size: 0.95rem; background: rgba(255,77,77,0.1); padding: 10px; border-radius: 6px;">
+            <p *ngIf="errorMsg" role="alert" aria-live="assertive" style="color: #ff4d4d; margin-top: 1.5rem; text-align: center; font-size: 0.95rem; background: rgba(255,77,77,0.1); padding: 10px; border-radius: 6px;">
               {{ errorMsg }}
             </p>
           </div>
@@ -192,12 +176,12 @@ import { finalize, switchMap } from 'rxjs';
                
                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                  <div>
-                   <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">Check-in</span>
-                   <span style="font-weight: 500;">{{ booking.checkIn | date:'longDate' }}</span>
+                   <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">Llegada</span>
+                   <span style="font-weight: 500;">{{ booking.checkIn | date:'dd/MM/yyyy' }}</span>
                  </div>
                  <div>
-                   <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">Check-out</span>
-                   <span style="font-weight: 500;">{{ booking.checkOut | date:'longDate' }}</span>
+                   <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">Salida</span>
+                   <span style="font-weight: 500;">{{ booking.checkOut | date:'dd/MM/yyyy' }}</span>
                  </div>
                </div>
 
@@ -240,12 +224,12 @@ import { finalize, switchMap } from 'rxjs';
 
              <div style="border-top: 1px dashed rgba(212,175,55,0.4); padding-top: 1.5rem; margin-bottom: 1.5rem;">
                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                 <span style="font-size: 1rem; color: #ccc;">Subtotal</span>
-                 <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice * 0.81) | number:'1.0-0' }}</span>
+                 <span style="font-size: 1rem; color: #ccc;">Subtotal (sin IVA)</span>
+                 <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice / 1.19) | number:'1.0-0' }}</span>
                </div>
                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                 <span style="font-size: 1rem; color: #ccc;">Impuestos (19%)</span>
-                 <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice * 0.19) | number:'1.0-0' }}</span>
+                 <span style="font-size: 1rem; color: #ccc;">IVA (19%)</span>
+                 <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice - (booking.totalPrice / 1.19)) | number:'1.0-0' }}</span>
                </div>
                <div *ngIf="booking.guaranteeDeposit && booking.guaranteeDeposit > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                  <span style="font-size: 1rem; color: #ccc;">Depósito Garantía (Reembolsable)</span>
@@ -262,8 +246,8 @@ import { finalize, switchMap } from 'rxjs';
                <span style="font-size: 1.8rem; font-weight: 800; color: var(--gold);">$ {{ paymentAmount | number:'1.0-0' }}</span>
              </div>
              
-             <div style="margin-top: 2rem; text-align: center; color: #666; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-               🔒 Transacción segura encriptada con SSL a 256 bits.
+             <div style="margin-top: 2rem; text-align: center; color: #666; font-size: 0.8rem;">
+               Pasarela de pago en modo demostración del marketplace. No se procesan cobros reales.
              </div>
            </div>
         </div>
@@ -273,7 +257,6 @@ import { finalize, switchMap } from 'rxjs';
   `
 })
 export class CheckoutComponent implements OnInit, OnDestroy {
-  Math = Math;
   bookingId: string | null = null;
   booking: Booking | null = null;
   loading = true;
@@ -284,8 +267,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   selectedMethod: 'CARD' | 'PSE' | 'PAYPAL' = 'CARD';
   pseBank: string = '';
+  alreadyPaid = false;
 
-  paymentMode: 'full' | 'partial' = 'full';
   timerText: string = '15:00';
   timerSeconds: number = 900;
   timerInterval: any = null;
@@ -299,9 +282,6 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   get paymentAmount(): number {
-    if (this.paymentMode === 'partial') {
-      return Math.round(this.balanceDue / 2);
-    }
     return this.balanceDue;
   }
 
@@ -342,12 +322,14 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         const raw = res.data || res;
         this.booking = raw as Booking;
         if (this.booking && (this.booking.balanceDue === 0 || this.booking.paymentStatus === 'paid')) {
-          this.booking = null; 
+          this.booking = null;
+          this.alreadyPaid = true;
         } else if (this.booking) {
           if (!this.booking.nights) {
             const d1 = new Date(this.booking.checkIn);
             const d2 = new Date(this.booking.checkOut);
-            this.booking.nights = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24)));
+            const computedNights = Math.round((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24));
+            this.booking.nights = isNaN(computedNights) || computedNights < 1 ? 1 : computedNights;
           }
           this.initTimer();
         }
@@ -413,6 +395,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   processPSE() {
     if (!this.pseBank) return;
+    if (this.timerSeconds <= 0) {
+      this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+      this.cdr.detectChanges();
+      return;
+    }
     this.processing = true;
     this.processingMessage = `Redirigiendo a pasarela ACH Colombia (${this.pseBank})...`;
     this.errorMsg = '';
@@ -428,6 +415,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   processPayPal() {
+    if (this.timerSeconds <= 0) {
+      this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+      this.cdr.detectChanges();
+      return;
+    }
     this.processing = true;
     this.processingMessage = 'Conectando con ventana segura de PayPal...';
     this.errorMsg = '';
@@ -465,6 +457,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   processPayment() {
+    if (this.timerSeconds <= 0) {
+      this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+      this.cdr.detectChanges();
+      return;
+    }
     if (this.paymentForm.invalid || !this.booking) {
       this.paymentForm.markAllAsTouched();
       return;
@@ -521,8 +518,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const currentBooking = this.booking;
     const targetBookingId = currentBooking.id || currentBooking._id || this.bookingId;
 
-    const rawNumber = methodPayload.cardNumber || '';
-    const paymentToken = rawNumber ? `tok_${rawNumber.trim()}` : 'tok_test';
+    const rawNumber = (methodPayload.cardNumber || '').trim();
+    const paymentToken = rawNumber ? `tok_${rawNumber.slice(-4)}` : 'tok_test';
 
     const checkoutPayload = {
       bookingId: targetBookingId,
@@ -549,7 +546,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
         if (status === 'processing' || !data.transactionId) {
           // Asynchronous flow with webhook: start polling payment status
-          this.processingMessage = 'Esperando confirmación de pasarela via webhook...';
+          this.processingMessage = 'Procesando tu pago de forma segura con el banco...';
           this.cdr.detectChanges();
           this.pollPaymentStatus(createdIntentId, targetBookingId!);
         } else {

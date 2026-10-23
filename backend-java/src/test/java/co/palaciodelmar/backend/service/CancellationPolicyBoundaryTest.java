@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
  * Tests intensivos de frontera sobre la política de cancelación (RN-F03):
  * <48h = retención del 100% (sin depósito); <7 días = 10%; >=7 días = gratis.
  * La retención se calcula sobre (totalPrice - guaranteeDeposit).
- * Generados por la auditoría de seguridad del 2026-10-15 (ver /AUDITORIA_SEGURIDAD.md).
+ * Generados por la auditoría de seguridad del 2026-10-15 (ver docs/AUDITORIA_SEGURIDAD.md).
  */
 class CancellationPolicyBoundaryTest {
 

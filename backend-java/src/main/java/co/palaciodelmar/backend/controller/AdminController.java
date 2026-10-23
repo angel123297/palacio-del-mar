@@ -101,6 +101,40 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok(stats));
     }
 
+    @GetMapping("/payments/refunds")
+    public ResponseEntity<ApiResponse<List<co.palaciodelmar.backend.dto.PaymentDTO>>> getPendingRefunds() {
+        List<co.palaciodelmar.backend.dto.PaymentDTO> list = adminService.getPendingRefunds().stream()
+                .map(this::toPaymentDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(ApiResponse.ok(list));
+    }
+
+    @PutMapping("/payments/{id}/resolve-refund")
+    public ResponseEntity<ApiResponse<co.palaciodelmar.backend.dto.PaymentDTO>> resolveRefund(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        String action = body.getOrDefault("action", "mark_refunded");
+        String notes = body.get("notes");
+        co.palaciodelmar.backend.model.Payment p = adminService.resolveRefund(id, action, notes);
+        return ResponseEntity.ok(ApiResponse.ok("Reembolso resuelto exitosamente", toPaymentDTO(p)));
+    }
+
+    private co.palaciodelmar.backend.dto.PaymentDTO toPaymentDTO(co.palaciodelmar.backend.model.Payment p) {
+        if (p == null) return null;
+        return co.palaciodelmar.backend.dto.PaymentDTO.builder()
+                .id(p.getId())
+                .bookingId(p.getBooking())
+                .amount(p.getAmount())
+                .currency(p.getCurrency())
+                .status(p.getStatus())
+                .provider(p.getProvider())
+                .transactionId(p.getTransactionId())
+                .paymentMethod(p.getPaymentMethod())
+                .notes(p.getNotes())
+                .createdAt(p.getCreatedAt())
+                .build();
+    }
+
     private PromotionDTO toPromotionDTO(Promotion promotion) {
         if (promotion == null) return null;
         return PromotionDTO.builder()

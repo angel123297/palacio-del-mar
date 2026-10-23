@@ -218,6 +218,43 @@ class MarketplaceCatalogSecurityTest {
     }
 
     @Test
+    @DisplayName("createBooking rechaza que un anfitrión reserve su propia propiedad")
+    void createBookingRejectsHostSelfBooking() {
+        Suite suite = Suite.builder()
+                .id("s-own-book")
+                .propertyId("prop-host-1")
+                .active(true)
+                .available(true)
+                .basePrice(new BigDecimal("300000"))
+                .build();
+
+        Property property = Property.builder()
+                .id("prop-host-1")
+                .ownerId("host-owner-id")
+                .status("APPROVED")
+                .active(true)
+                .build();
+
+        when(suiteRepository.findById("s-own-book")).thenReturn(Optional.of(suite));
+        when(propertyRepository.findById("prop-host-1")).thenReturn(Optional.of(property));
+
+        LocalDate checkIn = LocalDate.now(ZoneId.of("America/Bogota")).plusDays(2);
+        LocalDate checkOut = LocalDate.now(ZoneId.of("America/Bogota")).plusDays(5);
+
+        BookingRequest req = BookingRequest.builder()
+                .suiteId("s-own-book")
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .guests(2)
+                .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                bookingService.createBooking("host-owner-id", req)
+        );
+        assertTrue(ex.getMessage().contains("Un anfitrión no puede reservar su propia propiedad"));
+    }
+
+    @Test
     @DisplayName("AvailabilityService.checkAvailability excluye habitaciones de propiedades pendientes o rechazadas")
     void checkAvailabilityExcludesSuitesOfUnapprovedProperties() {
         LocalDate checkIn = LocalDate.now(ZoneId.of("America/Bogota")).plusDays(1);

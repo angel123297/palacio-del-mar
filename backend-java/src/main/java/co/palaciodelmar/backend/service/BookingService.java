@@ -28,6 +28,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -36,6 +37,7 @@ public class BookingService {
 
     private static final ZoneId BOGOTA_ZONE = ZoneId.of("America/Bogota");
     private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BookingService.class);
 
     private final BookingRepository bookingRepository;
     private final SuiteRepository suiteRepository;
@@ -55,6 +57,9 @@ public class BookingService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private co.palaciodelmar.backend.repository.PropertyRepository propertyRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private EmailService emailService;
 
     public BookingDTO createBooking(String userId, BookingRequest request) {
 
@@ -84,8 +89,14 @@ public class BookingService {
             userId = guest.getId();
         }
 
-        Suite suite = suiteRepository.findById(request.getSuiteId())
-                .or(() -> suiteRepository.findBySlug(request.getSuiteId().toLowerCase()))
+        String rawSuiteId = request.getSuiteId().trim();
+        String lowerSuiteId = rawSuiteId.toLowerCase();
+        Suite suite = suiteRepository.findById(rawSuiteId)
+                .or(() -> suiteRepository.findBySlug(lowerSuiteId))
+                .or(() -> {
+                    String alias = AvailabilityService.SLUG_ALIASES.get(lowerSuiteId);
+                    return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
+                })
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: esta habitación no existe o ya no está disponible"));
 
         if ((suite.getActive() != null && !suite.getActive()) || (suite.getAvailable() != null && !suite.getAvailable())) {
@@ -96,6 +107,19 @@ public class BookingService {
             co.palaciodelmar.backend.model.Property property = propertyRepository.findById(suite.getPropertyId()).orElse(null);
             if (property == null || Boolean.FALSE.equals(property.getActive()) || !"APPROVED".equalsIgnoreCase(property.getStatus())) {
                 throw new IllegalArgumentException("El alojamiento no está disponible para reservas porque la propiedad no está aprobada o está inactiva");
+            }
+            if (userId != null && property.getOwnerId() != null && userId.equals(property.getOwnerId())) {
+                throw new IllegalArgumentException("Un anfitrión no puede reservar su propia propiedad");
+            }
+        }
+
+        if (userId != null && !userId.isBlank()) {
+            User bookingUser = userRepository.findById(userId).orElse(null);
+            if (bookingUser != null) {
+                String role = bookingUser.getRole() != null ? bookingUser.getRole().toLowerCase() : "";
+                if ("host".equals(role) || "anfitrion".equals(role) || "admin".equals(role)) {
+                    throw new IllegalArgumentException("Las cuentas de Anfitrión y Administrador tienen un perfil corporativo y no pueden realizar reservas de hospedaje. Utiliza una cuenta de huésped.");
+                }
             }
         }
 
@@ -113,7 +137,10 @@ public class BookingService {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
         }
 
-        List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
+        java.time.Instant now = java.time.Instant.now();
+        List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1)).stream()
+                .filter(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus()) && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(now)))
+                .toList();
         assertCribAvailable(request, null);
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
@@ -284,6 +311,13 @@ public class BookingService {
                     Instant.now()
             ));
         }
+        if (emailService != null) {
+            try {
+                emailService.sendBookingCreatedNotification(savedBooking);
+            } catch (Exception ex) {
+                log.warn("Fallo al despachar notificación de reserva creada {}: {}", savedBooking.getId(), ex.getMessage());
+            }
+        }
         return dto;
     }
 
@@ -297,8 +331,14 @@ public class BookingService {
             throw new IllegalArgumentException("No se puede modificar una reserva en estado " + booking.getStatus());
         }
 
-        Suite suite = suiteRepository.findById(booking.getSuite())
-                .or(() -> suiteRepository.findBySlug(booking.getSuite().toLowerCase()))
+        String rawSuiteId = booking.getSuite() != null ? booking.getSuite().trim() : "";
+        String lowerSuiteId = rawSuiteId.toLowerCase();
+        Suite suite = suiteRepository.findById(rawSuiteId)
+                .or(() -> suiteRepository.findBySlug(lowerSuiteId))
+                .or(() -> {
+                    String alias = AvailabilityService.SLUG_ALIASES.get(lowerSuiteId);
+                    return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
+                })
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada"));
 
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
@@ -306,17 +346,24 @@ public class BookingService {
             throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
         }
 
+        if (request.getCheckIn().isBefore(LocalDate.now(BOGOTA_ZONE))) {
+            throw new IllegalArgumentException("La fecha de check-in no puede ser anterior a la fecha actual");
+        }
+
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
         if (nights <= 0) {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
         }
 
-        List<SuiteNight> occupiedNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1));
+        java.time.Instant now = java.time.Instant.now();
+        List<SuiteNight> occupiedNights = new ArrayList<>(suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), request.getCheckIn(), request.getCheckOut().minusDays(1)).stream()
+                .filter(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus()) && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(now)))
+                .toList());
         assertCribAvailable(request, bookingId);
         occupiedNights.removeIf(sn -> bookingId.equals(sn.getBooking()));
         int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
-        int assignedSlot = -1;
+        List<Integer> availableSlots = new ArrayList<>();
         for (int slot = 1; slot <= totalCapacity; slot++) {
             int finalSlot = slot;
             boolean isAvailable = true;
@@ -330,11 +377,10 @@ public class BookingService {
                 }
             }
             if (isAvailable) {
-                assignedSlot = slot;
-                break;
+                availableSlots.add(slot);
             }
         }
-        if (assignedSlot == -1) {
+        if (availableSlots.isEmpty()) {
             throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
         }
 
@@ -351,9 +397,11 @@ public class BookingService {
         BigDecimal totalRoomPrice = pricingResult.total();
         List<Booking.SelectedExperience> selectedExpList = request.getExperiences() != null ? parseExperiences(request.getExperiences()) : booking.getExperiences();
         BigDecimal experiencesTotal = BigDecimal.ZERO;
-        for (Booking.SelectedExperience exp : selectedExpList) {
-            if (exp.getPrice() != null && exp.getQuantity() != null) {
-                experiencesTotal = experiencesTotal.add(exp.getPrice().multiply(BigDecimal.valueOf(exp.getQuantity())));
+        if (selectedExpList != null) {
+            for (Booking.SelectedExperience exp : selectedExpList) {
+                if (exp.getPrice() != null && exp.getQuantity() != null) {
+                    experiencesTotal = experiencesTotal.add(exp.getPrice().multiply(BigDecimal.valueOf(exp.getQuantity())));
+                }
             }
         }
 
@@ -369,7 +417,6 @@ public class BookingService {
         if (request.getChildren() != null) booking.setChildren(request.getChildren());
         booking.setGuestDetails(parseGuestDetails(request));
         booking.setExperiences(selectedExpList);
-        booking.setUnitSlot(assignedSlot);
         booking.setSubtotal(pricingResult.subtotal());
         booking.setDiscount(pricingResult.discount());
         booking.setTaxes(pricingResult.taxes());
@@ -384,38 +431,51 @@ public class BookingService {
         booking.setPlatformFee(modPlatformFee);
         booking.setHostPayout(pricingResult.total().subtract(modPlatformFee));
 
-        if (booking.getPaidAmount().compareTo(newTotalPrice) >= 0) {
+        BigDecimal paidAmt = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+        if (paidAmt.compareTo(newTotalPrice) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
-            booking.setRefundedAmount(booking.getPaidAmount().subtract(newTotalPrice));
+            booking.setRefundedAmount(paidAmt.subtract(newTotalPrice));
             booking.setPaymentStatus("paid");
         } else {
-            booking.setBalanceDue(newTotalPrice.subtract(booking.getPaidAmount()));
-            booking.setPaymentStatus(booking.getPaidAmount().compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
+            booking.setBalanceDue(newTotalPrice.subtract(paidAmt));
+            booking.setPaymentStatus(paidAmt.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
         }
 
         booking.setUpdatedAt(Instant.now());
 
-        // Re-block nights
+        // Re-block nights con reintento automático en slots alternativos ante colisión concurrente
         List<SuiteNight> originalNights = suiteNightRepository.findByBooking(bookingId);
         suiteNightRepository.deleteByBooking(bookingId);
-        List<SuiteNight> insertedNights = new java.util.ArrayList<>();
-        try {
-            for (int i = 0; i < nights; i++) {
-                LocalDate date = request.getCheckIn().plusDays(i);
-                SuiteNight suiteNight = SuiteNight.builder()
-                        .suite(suite.getId())
-                        .branch(suite.getBranch())
-                        .unitSlot(assignedSlot)
-                        .dates(java.util.Collections.singletonList(date))
-                        .booking(booking.getId())
-                        .status("pending".equalsIgnoreCase(booking.getStatus()) ? "held" : "blocked")
-                        .expiresAt("pending".equalsIgnoreCase(booking.getStatus()) ? Instant.now().plusSeconds(900) : null)
-                        .createdAt(Instant.now())
-                        .build();
-                insertedNights.add(suiteNightRepository.save(suiteNight));
+        boolean nightsLocked = false;
+        for (int candidateSlot : availableSlots) {
+            List<SuiteNight> insertedNights = new java.util.ArrayList<>();
+            try {
+                for (int i = 0; i < nights; i++) {
+                    LocalDate date = request.getCheckIn().plusDays(i);
+                    SuiteNight suiteNight = SuiteNight.builder()
+                            .suite(suite.getId())
+                            .branch(suite.getBranch())
+                            .unitSlot(candidateSlot)
+                            .dates(java.util.Collections.singletonList(date))
+                            .booking(booking.getId())
+                            .status("pending".equalsIgnoreCase(booking.getStatus()) ? "held" : "confirmed")
+                            .expiresAt("pending".equalsIgnoreCase(booking.getStatus()) ? Instant.now().plusSeconds(900) : null)
+                            .createdAt(Instant.now())
+                            .build();
+                    insertedNights.add(suiteNightRepository.save(suiteNight));
+                }
+                booking.setUnitSlot(candidateSlot);
+                nightsLocked = true;
+                break;
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                suiteNightRepository.deleteAll(insertedNights);
             }
-        } catch (org.springframework.dao.DuplicateKeyException e) {
-            suiteNightRepository.deleteAll(insertedNights);
+        }
+        if (!nightsLocked) {
+            originalNights.forEach(sn -> {
+                sn.setId(null);
+                sn.setVersion(null);
+            });
             suiteNightRepository.saveAll(originalNights);
             throw new IllegalStateException("Hubo una colisión concurrente al modificar. Las fechas ya no están disponibles.");
         }
@@ -514,6 +574,7 @@ public class BookingService {
 
     public Booking getBookingEntityById(String id) {
         return bookingRepository.findById(id)
+                .or(() -> bookingRepository.findByBookingCode(id))
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada con id: " + id));
     }
 
@@ -606,12 +667,13 @@ public class BookingService {
         BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
         BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal).add(fixedCharges(booking));
         booking.setTotalPrice(newTotal);
-        if (booking.getPaidAmount().compareTo(newTotal) >= 0) {
+        BigDecimal paidAmt = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+        if (paidAmt.compareTo(newTotal) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
             booking.setPaymentStatus("paid");
         } else {
-            booking.setBalanceDue(newTotal.subtract(booking.getPaidAmount()));
-            booking.setPaymentStatus(booking.getPaidAmount().compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
+            booking.setBalanceDue(newTotal.subtract(paidAmt));
+            booking.setPaymentStatus(paidAmt.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
         }
         booking.setUpdatedAt(Instant.now());
         return toDTO(bookingRepository.save(booking));
@@ -640,12 +702,13 @@ public class BookingService {
         BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
         BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal).add(fixedCharges(booking));
         booking.setTotalPrice(newTotal);
-        if (booking.getPaidAmount().compareTo(newTotal) >= 0) {
+        BigDecimal paidAmt = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+        if (paidAmt.compareTo(newTotal) >= 0) {
             booking.setBalanceDue(BigDecimal.ZERO);
             booking.setPaymentStatus("paid");
         } else {
-            booking.setBalanceDue(newTotal.subtract(booking.getPaidAmount()));
-            booking.setPaymentStatus(booking.getPaidAmount().compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
+            booking.setBalanceDue(newTotal.subtract(paidAmt));
+            booking.setPaymentStatus(paidAmt.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
         }
         booking.setUpdatedAt(Instant.now());
         return toDTO(bookingRepository.save(booking));
@@ -728,7 +791,10 @@ public class BookingService {
 
         Suite suite = null;
         if (booking.getSuite() != null) {
-            suite = suiteRepository.findById(booking.getSuite()).orElse(null);
+            String sId = booking.getSuite().trim();
+            suite = suiteRepository.findById(sId)
+                    .or(() -> suiteRepository.findBySlug(sId.toLowerCase()))
+                    .orElse(null);
         }
 
         Branch branch = null;
@@ -884,6 +950,9 @@ public class BookingService {
         }
 
         booking.setStatus(newStatus.name().toLowerCase());
+        if (booking.getStatusHistory() == null) {
+            booking.setStatusHistory(new ArrayList<>());
+        }
         booking.getStatusHistory().add(Booking.StatusHistoryEntry.builder()
                 .status(newStatus.name().toLowerCase())
                 .timestamp(Instant.now())

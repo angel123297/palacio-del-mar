@@ -24,13 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
  * Tests intensivos de autorización (anti-IDOR) sobre BookingService.
- * Generados por la auditoría de seguridad del 2026-10-15 (ver /AUDITORIA_SEGURIDAD.md).
+ * Generados por la auditoría de seguridad del 2026-10-15 (ver docs/AUDITORIA_SEGURIDAD.md).
  * Todos deben pasar con el código actual; los que documentan bugs van @Disabled.
  */
 class BookingOwnershipSecurityTest {
@@ -265,5 +266,120 @@ class BookingOwnershipSecurityTest {
         co.palaciodelmar.backend.dto.BookingDTO result = assertDoesNotThrow(() -> bookingService.createBooking("user-1", req));
         assertNotNull(result);
         assertEquals(2, result.getUnitSlot(), "Debe asignar automáticamente el slot 2 tras la colisión en el slot 1");
+    }
+
+    @Test
+    @DisplayName("createBooking rechaza que usuarios con rol anfitrión o administrador realicen reservas")
+    void testCreateBookingRejectsCorporateRoles() {
+        co.palaciodelmar.backend.model.User hostUser = co.palaciodelmar.backend.model.User.builder()
+                .id("host-corp-1")
+                .role("host")
+                .build();
+        co.palaciodelmar.backend.model.User adminUser = co.palaciodelmar.backend.model.User.builder()
+                .id("admin-corp-1")
+                .role("admin")
+                .build();
+
+        when(userRepository.findById("host-corp-1")).thenReturn(Optional.of(hostUser));
+        when(userRepository.findById("admin-corp-1")).thenReturn(Optional.of(adminUser));
+
+        co.palaciodelmar.backend.model.Suite suite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-corp-test")
+                .maxGuests(2)
+                .build();
+        when(suiteRepository.findById("suite-corp-test")).thenReturn(Optional.of(suite));
+
+        BookingRequest req = BookingRequest.builder()
+                .suiteId("suite-corp-test")
+                .checkIn(LocalDate.now().plusDays(10))
+                .checkOut(LocalDate.now().plusDays(12))
+                .guests(2)
+                .build();
+
+        IllegalArgumentException exHost = assertThrows(IllegalArgumentException.class, () ->
+                bookingService.createBooking("host-corp-1", req));
+        assertTrue(exHost.getMessage().contains("perfil corporativo"));
+
+        IllegalArgumentException exAdmin = assertThrows(IllegalArgumentException.class, () ->
+                bookingService.createBooking("admin-corp-1", req));
+        assertTrue(exAdmin.getMessage().contains("perfil corporativo"));
+    }
+
+    @Test
+    @DisplayName("modifyBooking rechaza mover la fecha de check-in al pasado")
+    void testModifyBookingRejectsPastCheckInDate() {
+        Booking existing = victimBooking();
+        when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(existing));
+        co.palaciodelmar.backend.model.Suite suite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-1")
+                .maxGuests(4)
+                .build();
+        when(suiteRepository.findById("suite-1")).thenReturn(Optional.of(suite));
+
+        BookingRequest pastReq = BookingRequest.builder()
+                .suiteId("suite-1")
+                .checkIn(LocalDate.now().minusDays(2))
+                .checkOut(LocalDate.now().plusDays(1))
+                .guests(2)
+                .build();
+
+        assertThrows(IllegalArgumentException.class, () ->
+                bookingService.modifyBooking("b-victim", "user-victim", pastReq));
+    }
+
+    @Test
+    @DisplayName("modifyBooking en reserva confirmada reintenta en slot 2 ante colisión y conserva status confirmed en SuiteNight")
+    void testModifyBookingRetriesNextAvailableSlotAndKeepsConfirmedStatus() {
+        Booking existing = victimBooking();
+        existing.setStatus("confirmed");
+        existing.setPaidAmount(null); // Verifica además protección contra paidAmount nulo
+        when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(existing));
+
+        co.palaciodelmar.backend.model.Suite suite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-1")
+                .branch("branch-1")
+                .basePrice(java.math.BigDecimal.valueOf(500000))
+                .maxGuests(4)
+                .totalUnits(2)
+                .active(true)
+                .available(true)
+                .build();
+        when(suiteRepository.findById("suite-1")).thenReturn(Optional.of(suite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new ArrayList<>());
+        when(promotionRepository.findByBranchAndActiveTrue("branch-1")).thenReturn(List.of());
+        when(pricingService.calculatePrice(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new PricingService.PricingResult(
+                        java.math.BigDecimal.valueOf(500000),
+                        java.math.BigDecimal.ZERO,
+                        java.math.BigDecimal.valueOf(95000),
+                        java.math.BigDecimal.valueOf(595000),
+                        List.of()
+                ));
+        when(bookingRepository.save(org.mockito.ArgumentMatchers.any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        List<co.palaciodelmar.backend.model.SuiteNight> savedNights = new ArrayList<>();
+        when(suiteNightRepository.save(org.mockito.ArgumentMatchers.any(co.palaciodelmar.backend.model.SuiteNight.class)))
+                .thenAnswer(inv -> {
+                    co.palaciodelmar.backend.model.SuiteNight sn = inv.getArgument(0);
+                    if (Integer.valueOf(1).equals(sn.getUnitSlot())) {
+                        throw new org.springframework.dao.DuplicateKeyException("Slot 1 ocupado");
+                    }
+                    savedNights.add(sn);
+                    return sn;
+                });
+
+        BookingRequest modReq = BookingRequest.builder()
+                .suiteId("suite-1")
+                .checkIn(LocalDate.now().plusDays(4))
+                .checkOut(LocalDate.now().plusDays(5))
+                .guests(2)
+                .build();
+
+        co.palaciodelmar.backend.dto.BookingDTO dto = assertDoesNotThrow(() ->
+                bookingService.modifyBooking("b-victim", "user-victim", modReq));
+        assertEquals(2, dto.getUnitSlot());
+        assertEquals(1, savedNights.size());
+        assertEquals("confirmed", savedNights.get(0).getStatus());
     }
 }

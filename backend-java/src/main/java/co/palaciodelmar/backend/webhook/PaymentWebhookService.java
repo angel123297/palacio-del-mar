@@ -31,28 +31,17 @@ public class PaymentWebhookService {
     private final EmailService emailService;
     private final ObjectMapper objectMapper;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private PaymentGateway paymentGateway;
+    private final PaymentGateway paymentGateway;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public PaymentWebhookService(
             PaymentRepository paymentRepository,
             BookingRepository bookingRepository,
             @org.springframework.context.annotation.Lazy BookingService bookingService,
             ProcessedWebhookEventRepository processedWebhookEventRepository,
             EmailService emailService,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper
-    ) {
-        this(paymentRepository, bookingRepository, bookingService, processedWebhookEventRepository, emailService, objectMapper, null);
-    }
-
-    public PaymentWebhookService(
-            PaymentRepository paymentRepository,
-            BookingRepository bookingRepository,
-            @org.springframework.context.annotation.Lazy BookingService bookingService,
-            ProcessedWebhookEventRepository processedWebhookEventRepository,
-            EmailService emailService,
-            ObjectMapper objectMapper,
-            PaymentGateway paymentGateway
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) PaymentGateway paymentGateway
     ) {
         this.paymentRepository = paymentRepository;
         this.bookingRepository = bookingRepository;
@@ -136,7 +125,16 @@ public class PaymentWebhookService {
                 .processedAt(Instant.now())
                 .details("Procesado exitosamente para intentId: " + data.getIntentId())
                 .build();
-        processedWebhookEventRepository.save(record);
+        try {
+            processedWebhookEventRepository.save(record);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            log.info("Evento de webhook registrado concurrentemente (idempotencia): {}", eventId);
+            return Map.of(
+                    "status", "already_processed",
+                    "idempotent", true,
+                    "eventId", eventId
+            );
+        }
 
         return Map.of(
                 "status", "processed",
@@ -221,10 +219,12 @@ public class PaymentWebhookService {
         paymentRepository.save(payment);
 
         BigDecimal currentPaid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
-        BigDecimal newPaid = currentPaid.add(payment.getAmount());
+        BigDecimal paymentAmount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+        BigDecimal newPaid = currentPaid.add(paymentAmount);
         booking.setPaidAmount(newPaid);
 
-        BigDecimal balance = booking.getTotalPrice().subtract(newPaid);
+        BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : newPaid;
+        BigDecimal balance = totalPrice.subtract(newPaid);
         booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
@@ -235,6 +235,11 @@ public class PaymentWebhookService {
                     emailService.sendBookingConfirmation(booking);
                 } catch (Exception e) {
                     log.warn("Error enviando email de confirmación: {}", e.getMessage());
+                }
+                try {
+                    emailService.sendHostBookingNotification(booking);
+                } catch (Exception e) {
+                    log.warn("Error enviando email al anfitrión: {}", e.getMessage());
                 }
             }
         } else {

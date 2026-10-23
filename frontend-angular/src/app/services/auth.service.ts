@@ -21,6 +21,11 @@ export class AuthService {
   }
 
   constructor(private http: HttpClient) {
+    this.loadCachedUser();
+    this.fetchMe();
+  }
+
+  loadCachedUser() {
     const cachedUser = localStorage.getItem('user');
     if (cachedUser) {
       try {
@@ -28,8 +33,9 @@ export class AuthService {
       } catch (e) {
         localStorage.removeItem('user');
       }
+    } else {
+      this.currentUserSignal.set(null);
     }
-    this.fetchMe();
   }
 
   private fetchMe() {
@@ -96,13 +102,30 @@ export class AuthService {
   }
 
   verifyEmail(token: string) {
-    return this.http.post<{success?: boolean, message?: string}>(`${this.apiUrl}/verify-email`, { token }).pipe(
-      timeout(this.TIMEOUT_MS)
+    return this.http.post<AuthResponse>(`${this.apiUrl}/verify-email`, { token }).pipe(
+      timeout(this.TIMEOUT_MS),
+      tap(res => {
+        const tokenVal = (res as any).token || (res as any).data?.token;
+        if (tokenVal) {
+          localStorage.setItem('token', tokenVal);
+        }
+        const user = res.user || (res as any).data?.user;
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+          this.currentUserSignal.set(user);
+        }
+      })
     );
   }
 
   forceVerify(email: string) {
     return this.http.post<{success?: boolean, message?: string}>(`${this.apiUrl}/force-verify`, { email }).pipe(
+      timeout(this.TIMEOUT_MS)
+    );
+  }
+
+  forgotPassword(email: string) {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/forgot-password`, { email }).pipe(
       timeout(this.TIMEOUT_MS)
     );
   }
