@@ -93,10 +93,30 @@
      2. Se persiste el `PaymentIntent` en MongoDB en estado `processing`.
      3. La pasarela simulada firma el payload con `HMAC-SHA256` y dispara el webhook `payment.succeeded`.
      4. El backend verifica la firma, garantiza idempotencia por `eventId`, pasa la reserva a `confirmed` y remueve la expiración de las noches.
-4. Mostrar en **Mailpit (`http://localhost:8025`)** el correo de confirmación recibido por el huésped.
+4. Mostrar en **Mailpit (`http://localhost:8025`)** el correo de confirmación recibido por el huésped con los adjuntos voucher en PDF y evento de calendario `.ics`.
 5. Mostrar en el **Panel del Anfitrión**:
    - La entrega automática del webhook `booking.confirmed` firmada criptográficamente.
    - El botón de **Check-in / Regenerar PIN** (generado con `SecureRandom` de 6 dígitos) y la sección de **Liquidaciones Automáticas (92% Host Payout)**.
+
+---
+
+### Paso 6: Comprobante Imprimible con QR Offline y PIN Inteligente (1 min)
+1. En **Mis Reservas** (`/mis-reservas`) o desde el detalle de la reserva (`/reservas/:id`):
+2. Hacer clic en **"Ver Comprobante / Factura"** (`/reservas/:id/comprobante`).
+3. Destacar ante el jurado:
+   - **Generación Vectorial SVG 100% Offline:** Código QR generado directamente en el cliente con algoritmo matemático nativo (`uqr` embebido en `app/utils/qr.js`), sin consultar librerías pesadas externas ni APIs de terceros en la nube (cero fuga de PII).
+   - **Pase de Acceso Inteligente:** Muestra el PIN de cerradura digital (`smartLockPin`) y los horarios oficiales (Check-in 15:00 / Check-out 13:00).
+   - **Módulo de Reseña Verificada:** Demostrar que el widget de calificación con estrellas y comentario se restringe estrictamente a huéspedes con reserva completada (`checked_out` / `completed`), previniendo reseñas falsas.
+   - **Optimización de Impresión:** Al pulsar "Imprimir / Guardar PDF", la hoja de estilos `@media print` oculta menús, botones y widgets, dejando el voucher comercial formal listo para exportación.
+
+---
+
+### Paso 7: Feeds iCal RFC 5545 para Airbnb / Google Calendar (1 min)
+1. Demostrar la sincronización de calendarios bidireccional mediante los endpoints de iCal:
+   - Feeds de propiedad completa: `GET /api/ical/properties/{id}/feed.ics`
+   - Feeds de suite individual: `GET /api/ical/suites/{id}/feed.ics`
+2. Explicar el blindaje **Anti-IDOR**: si una propiedad está en borrador o rechazada, el feed iCal responde `404` para no filtrar la existencia ni disponibilidad de alojamientos no aprobados.
+3. Mostrar el contenido `.ics` con estructura estándar RFC 5545 (`BEGIN:VCALENDAR`, `BEGIN:VEVENT`, marcas `UID`, `DTSTART`, `DTEND` y `SUMMARY:Reserva Palacio del Mar`).
 
 ---
 
@@ -107,5 +127,7 @@
 | *¿Qué pasa si dos personas hacen clic en "Reservar" al mismo milisegundo para la última habitación?* | Usamos una colección `suite_nights` con un **índice único compuesto en MongoDB `{suite, unitSlot, date}`** más control de concurrencia optimista (`@Version`). Si una suite tiene múltiples unidades físicas (`totalUnits`), `BookingService` itera automáticamente al siguiente `unitSlot` libre; si todas las unidades están tomadas, captura `DuplicateKeyException`, hace rollback de las noches insertadas y responde `409/400` sin posibilidad de overbooking. |
 | *¿Qué pasa si el huésped abre el checkout, bloquea las fechas y cierra la pestaña sin pagar?* | La reserva nace en estado `pending` con un campo `expiresAt = now + 15 min`. El job `BookingExpiryScheduler` corre cada minuto, detecta reservas `pending` vencidas con `paidAmount == 0`, libera todos los documentos `SuiteNight` y transiciona la reserva a `expired`. |
 | *¿Cómo evitan que un atacante falsifique el webhook de pago o reenvíe el mismo pago dos veces?* | 1) Verificamos la firma `HMAC-SHA256` en tiempo constante (`MessageDigest.isEqual`) sobre `timestamp + "." + rawBody`.<br>2) Validamos una ventana de tolerancia de 5 minutos en `X-Palacio-Timestamp` contra ataques de replay.<br>3) Guardamos cada `eventId` en la colección `webhook_events` con índice único para garantizar idempotencia estricta. |
+| *¿Cómo gestionan la revocación de tokens JWT si un usuario cierra sesión o cambia su contraseña?* | Implementamos una lista negra multi-nivel en `TokenBlacklistService`: caché en Redis para validación inmediata a ultra-baja latencia (con fallback en memoria) + persistencia duradera en MongoDB con índice TTL automático `expireAfter = "0s"`. Al hacer logout o cambiar clave, el hash del token se revoca y el `JwtAuthenticationFilter` rechaza cualquier petición subsecuente. |
 | *¿Qué pasa si el servidor del hotel aliado está caído cuando le enviamos un webhook?* | `WebhookDispatcher` registra el intento en `WebhookDelivery` con estado `PENDING` y programa reintentos automáticos con **exponential backoff** (1 min, 5 min y 30 min) mediante `WebhookRetryScheduler`. Tras 3 fallos pasa a `FAILED` y el anfitrión puede reenviarlo manualmente desde su panel. |
 | *¿Cómo evitan que un anfitrión ponga `http://localhost:27017` o `http://169.254.169.254` como URL de webhook para escanear su red interna (SSRF)?* | `HostWebhookService.validateUrlNotInternal()` resuelve el DNS del host y rechaza direcciones loopback, site-local (`10.x`, `172.16.x`, `192.168.x`), link-local (`169.254.x.x` de AWS/GCP metadata) y esquemas distintos a `http/https`. |
+| *¿Cómo garantizan la compatibilidad de calendarios con plataformas como Airbnb o Booking?* | `ICalService` genera feeds bajo el estándar RFC 5545 con saltos de línea CRLF estrictos, cabeceras `text/calendar; charset=UTF-8`, cabeceras anti-caché y cálculo exacto de check-out, soportando suscripción directa desde Google Calendar, Airbnb o Apple Calendar. |

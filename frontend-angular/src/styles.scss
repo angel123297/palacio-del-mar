@@ -20,6 +20,59 @@ body {
   color: var(--cream);
   overflow-x: hidden;
 }
+
+/* ---------- Accesibilidad Universal (WCAG 2.2 AA) ---------- */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  background: var(--gold);
+  color: var(--dark);
+  padding: 12px 20px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  z-index: 999999;
+  text-decoration: none;
+  border-radius: 4px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+  transition: top 0.2s ease-in-out;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 16px;
+  outline: 3px solid #ffffff;
+  outline-offset: 2px;
+}
+
+/* Indicador visual de foco claro y accesible (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--gold) !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--gold) !important;
+  outline-offset: 2px !important;
+}
+
+/* Reducción de movimiento para usuarios sensibles (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 #lang-bar {
   background: #060604;
   padding: 8px 48px;
@@ -88,8 +141,8 @@ body {
   cursor: pointer;
   font-size: 1rem;
   color: var(--dark);
-  width: 24px;
-  height: 24px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -291,7 +344,8 @@ nav {
 .btn-primary {
   background: var(--gold);
   color: var(--dark);
-  padding: 15px 42px;
+  padding: 12px 36px;
+  min-height: 44px;
   font-size: 0.64rem;
   letter-spacing: 0.24em;
   text-transform: uppercase;
@@ -300,7 +354,10 @@ nav {
   transition: all 0.3s;
   font-family: Jost, sans-serif;
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 .btn-primary:hover {
   background: var(--gold-light);
@@ -310,7 +367,8 @@ nav {
   background: transparent;
   color: var(--cream);
   border: 1px solid rgba(245, 240, 232, 0.42);
-  padding: 15px 42px;
+  padding: 12px 36px;
+  min-height: 44px;
   font-size: 0.64rem;
   letter-spacing: 0.24em;
   text-transform: uppercase;
@@ -318,7 +376,10 @@ nav {
   transition: all 0.3s;
   font-family: Jost, sans-serif;
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 .btn-outline:hover {
   border-color: var(--gold);
@@ -756,16 +817,18 @@ section {
   color: #6fcf97;
   font-size: 0.68rem;
 }
-#rooms {
+#rooms,
+#habitaciones {
   background: #0a0a08;
   padding: 96px 48px;
 }
 .rooms-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  max-width: 1200px;
-  margin: 0 auto 16px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 32px;
 }
 .compare-hint {
   font-size: 0.63rem;
@@ -822,8 +885,9 @@ section {
   color: #fff;
 }
 .badge-ok {
-  background: #27ae60d1;
-  color: #fff;
+  background: var(--gold);
+  color: var(--dark);
+  font-weight: 600;
 }
 .room-info {
   position: absolute;
@@ -1849,7 +1913,9 @@ footer {
   }
   section,
   #about,
-  #location {
+  #location,
+  #rooms,
+  #habitaciones {
     padding: 56px 18px;
   }
   #about,
@@ -1946,10 +2012,22 @@ footer {
   color: #f5f0e8b8;
   font-family: Jost, sans-serif;
   transition: color 0.3s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
 }
 .nav-link-btn:hover { color: var(--gold); }
 .nav-user-menu { display: flex; align-items: center; gap: 14px; }
-.nav-user-btn { padding: 8px 16px; font-size: 0.7rem; }
+.nav-user-btn {
+  padding: 8px 16px;
+  font-size: 0.7rem;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
 /* ---------- Ajustes a #booking-bar: el formulario envuelve los .bf ---------- */
 .bf-form { display: flex; align-items: stretch; width: 100%; flex-wrap: wrap; }
@@ -2103,8 +2181,8 @@ input, select, textarea {
   width: 100%;
 }
 input:focus, select:focus, textarea:focus {
-  outline: none;
   border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.4);
 }
 .btn-block { width: 100%; margin-top: 10px; }
 .form-error {
@@ -3042,7 +3120,7 @@ input:focus, select:focus, textarea:focus {
 .crumbs a { color: var(--gold-light); text-decoration: none; }
 .room-name a { color: inherit; text-decoration: none; }
 .room-name a:hover { color: var(--gold-light); }
-.room-detail-link { display: inline-block; margin: 6px 0 10px; color: var(--gold-light); font-size: 0.9rem; }
+.room-detail-link { display: inline-flex; align-items: center; min-height: 28px; min-width: 28px; margin: 4px 0 8px; color: var(--gold-light); font-size: 0.9rem; }
 
 .gallery-main {
   position: relative; display: block; width: 100%; padding: 0; border: 0; cursor: zoom-in;
@@ -3119,9 +3197,23 @@ input:focus, select:focus, textarea:focus {
 .receipt th { text-align: left; width: 38%; padding: 6px 0; color: #555; font-weight: 600; vertical-align: top; }
 .receipt td { padding: 6px 0; text-align: right; }
 .receipt-total th, .receipt-total td { font-size: 1.15rem; font-weight: 700; color: #1a1a1a; border-top: 1px solid #ccc; }
-.receipt-note { font-size: 0.8rem; color: #777; }
+.receipt-note { font-size: 0.8rem; color: #555; }
 @media print {
   .no-print { display: none !important; }
   .receipt-page { background: #fff; padding: 0; }
   .receipt { box-shadow: none; padding: 0; }
 }
+
+/* ===== Accessible Input Placeholders & High Contrast (WCAG 2.2 AA) ===== */
+::placeholder {
+  color: rgba(245, 240, 232, 0.65) !important;
+  opacity: 1;
+}
+
+input::placeholder,
+textarea::placeholder,
+select::placeholder {
+  color: rgba(245, 240, 232, 0.65) !important;
+  opacity: 1;
+}
+

@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Objects;
 
 @Service
-@RequiredArgsConstructor
 public class AdminService {
 
     private final BookingRepository bookingRepository;
@@ -25,6 +24,32 @@ public class AdminService {
     private final PromotionRepository promotionRepository;
     private final SuiteNightRepository suiteNightRepository;
     private final BookingService bookingService;
+    private final PropertyRepository propertyRepository;
+    private final PaymentRepository paymentRepository;
+    private final PaymentGateway paymentGateway;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AdminService(
+            BookingRepository bookingRepository,
+            SuiteRepository suiteRepository,
+            UserRepository userRepository,
+            PromotionRepository promotionRepository,
+            SuiteNightRepository suiteNightRepository,
+            BookingService bookingService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) PropertyRepository propertyRepository,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) PaymentRepository paymentRepository,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) PaymentGateway paymentGateway
+    ) {
+        this.bookingRepository = bookingRepository;
+        this.suiteRepository = suiteRepository;
+        this.userRepository = userRepository;
+        this.promotionRepository = promotionRepository;
+        this.suiteNightRepository = suiteNightRepository;
+        this.bookingService = bookingService;
+        this.propertyRepository = propertyRepository;
+        this.paymentRepository = paymentRepository;
+        this.paymentGateway = paymentGateway;
+    }
 
     @Data
     @Builder
@@ -75,6 +100,7 @@ public class AdminService {
 
     public Booking updateBookingStatus(String bookingId, String newStatus) {
         Booking booking = bookingRepository.findById(bookingId)
+                .or(() -> bookingRepository.findByBookingCode(bookingId))
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
 
         if (newStatus == null || newStatus.isBlank()) {
@@ -135,15 +161,31 @@ public class AdminService {
                 .filter(b -> isActiveStatus(b.getStatus()))
                 .count();
 
-        // Inventario total de unidades vendibles (considerando totalUnits de cada suite activa)
-        long totalRentableUnits = allSuites.stream()
+        // Filtrar solo suites de propiedades aprobadas (o del hotel principal)
+        java.util.Set<String> approvedPropIds = (propertyRepository != null) ? propertyRepository.findAll().stream()
+                .filter(p -> "APPROVED".equalsIgnoreCase(p.getStatus()) && !Boolean.FALSE.equals(p.getActive()))
+                .map(co.palaciodelmar.backend.model.Property::getId)
+                .collect(java.util.stream.Collectors.toSet()) : java.util.Set.of();
+
+        List<co.palaciodelmar.backend.model.Suite> approvedActiveSuites = allSuites.stream()
                 .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+                .filter(s -> s.getPropertyId() == null || approvedPropIds.contains(s.getPropertyId()))
+                .toList();
+
+        // Inventario total de unidades vendibles (considerando totalUnits de cada suite activa aprobada)
+        long totalRentableUnits = approvedActiveSuites.stream()
                 .mapToLong(s -> (s.getTotalUnits() != null && s.getTotalUnits() > 0) ? s.getTotalUnits() : 1)
                 .sum();
 
-        // Unidades ocupadas hoy: conteo de reservas activas alojadas hoy (checkIn <= hoy < checkOut)
+        java.util.Set<String> approvedActiveSuiteIds = approvedActiveSuites.stream()
+                .map(co.palaciodelmar.backend.model.Suite::getId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+
+        // Unidades ocupadas hoy: conteo de reservas activas alojadas hoy para suites aprobadas
         long occupiedUnitsToday = allBookings.stream()
                 .filter(b -> isActiveStatus(b.getStatus()))
+                .filter(b -> b.getSuite() != null && approvedActiveSuiteIds.contains(b.getSuite()))
                 .filter(b -> b.getCheckIn() != null && b.getCheckOut() != null)
                 .filter(b -> !today.isBefore(b.getCheckIn()) && today.isBefore(b.getCheckOut()))
                 .count();
@@ -164,5 +206,47 @@ public class AdminService {
                 .averageOccupancy(averageOccupancy)
                 .totalRevenue(totalRevenue)
                 .build();
+    }
+
+    public List<co.palaciodelmar.backend.model.Payment> getPendingRefunds() {
+        if (paymentRepository == null) return List.of();
+        return paymentRepository.findByStatus("requires_refund");
+    }
+
+    public co.palaciodelmar.backend.model.Payment resolveRefund(String paymentId, String action, String notes) {
+        if (paymentRepository == null) {
+            throw new IllegalStateException("PaymentRepository no configurado");
+        }
+        co.palaciodelmar.backend.model.Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Pago no encontrado: " + paymentId));
+
+        if (!"requires_refund".equalsIgnoreCase(payment.getStatus())) {
+            throw new IllegalStateException("El pago no está pendiente de reembolso (estado: " + payment.getStatus() + ")");
+        }
+
+        if ("mark_refunded".equalsIgnoreCase(action) || "refund".equalsIgnoreCase(action)) {
+            String refundDetails = "";
+            if (paymentGateway != null && payment.getTransactionId() != null) {
+                co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse res =
+                        paymentGateway.refund(payment.getTransactionId(), payment.getAmount());
+                if (res == null || !res.success()) {
+                    String errorMsg = (res != null && res.errorMessage() != null) ? res.errorMessage() : "Transacción rechazada por la pasarela";
+                    throw new IllegalStateException("Fallo en pasarela al procesar reembolso: " + errorMsg);
+                }
+                refundDetails = " (id=" + res.refundId() + ")";
+            }
+            payment.setStatus("refunded");
+            payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
+                    "Reembolso procesado por ADMIN" + refundDetails + ": " + (notes != null && !notes.isBlank() ? notes : "Aprobado manualmente"));
+        } else if ("dismiss".equalsIgnoreCase(action) || "reject".equalsIgnoreCase(action)) {
+            payment.setStatus("failed");
+            payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
+                    "Reembolso descartado por ADMIN: " + (notes != null && !notes.isBlank() ? notes : "No procede reembolso"));
+        } else {
+            throw new IllegalArgumentException("Acción no válida. Opciones permitidas: 'mark_refunded', 'dismiss'");
+        }
+
+        payment.setUpdatedAt(Instant.now());
+        return paymentRepository.save(payment);
     }
 }

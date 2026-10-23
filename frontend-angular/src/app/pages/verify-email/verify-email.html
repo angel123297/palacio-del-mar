@@ -11,13 +11,13 @@
     
     <h1 class="title">
       {{ status() === 'loading' ? 'Verificando...' : 
-         status() === 'success' ? '¡Verificación Exitosa!' : 'Verificación Fallida' }}
+         status() === 'success' ? '¡Bienvenido a Palacio del Mar!' : 'Verificación Fallida' }}
     </h1>
     
     <p class="message">{{ message() }}</p>
     
     <div class="actions" *ngIf="status() !== 'loading'">
-      <a routerLink="/" class="btn-gold">Volver al Inicio</a>
+      <a routerLink="/" class="btn-gold">{{ status() === 'success' ? 'Entrar a Palacio del Mar →' : 'Volver al Inicio' }}</a>
     </div>
   </div>
 </div>

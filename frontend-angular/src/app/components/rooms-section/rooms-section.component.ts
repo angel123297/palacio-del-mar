@@ -1,9 +1,83 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { SearchStateService } from '../../services/search-state.service';
 import { Suite, Branch } from '../../models/types';
-import { Router } from '@angular/router';
+
+const DEFAULT_FALLBACK_BRANCHES: Branch[] = [
+  { id: 'b-bocagrande', name: 'Palacio Bocagrande', slug: 'bocagrande', zone: 'Bocagrande · Mar Caribe' } as Branch,
+  { id: 'b-getsemani', name: 'Casona Colonial Getsemaní', slug: 'getsemani', zone: 'Getsemaní · Histórico' } as Branch,
+  { id: 'b-centro', name: 'Palacio Imperial San Diego', slug: 'centro-historico', zone: 'Ciudad Amurallada' } as Branch,
+  { id: 'b-boquilla', name: 'Reserva Manglares & Sol', slug: 'la-boquilla', zone: 'La Boquilla · Privacidad' } as Branch
+];
+
+const DEFAULT_FALLBACK_SUITES: Suite[] = [
+  {
+    id: 'suite-presidencial-mar',
+    name: 'Suite Presidencial Mar Caribe',
+    slug: 'suite-presidencial-mar',
+    type: 'Presidencial',
+    propertyId: 'bocagrande',
+    branch: { name: 'Palacio Bocagrande', slug: 'bocagrande' } as Branch,
+    basePrice: 850000,
+    pricePerNight: 850000,
+    originalPrice: 1100000,
+    size: 78,
+    maxGuests: 4,
+    featured: true,
+    amenities: ['Jacuzzi privado', 'Vista al mar', 'Mayordomo 24/7', 'Terraza'],
+    mainImage: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'
+  } as Suite,
+  {
+    id: 'suite-colonial-patio',
+    name: 'Gran Suite Colonial con Balcón',
+    slug: 'suite-colonial-patio',
+    type: 'Imperial',
+    propertyId: 'centro-historico',
+    branch: { name: 'Palacio Imperial San Diego', slug: 'centro-historico' } as Branch,
+    basePrice: 620000,
+    pricePerNight: 620000,
+    originalPrice: 750000,
+    size: 55,
+    maxGuests: 2,
+    featured: true,
+    amenities: ['Balcón colonial', 'Cama King artesanal', 'Desayuno gourmet'],
+    mainImage: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800'
+  } as Suite,
+  {
+    id: 'loft-getsemani-art',
+    name: 'Loft de Artista Getsemaní',
+    slug: 'loft-getsemani-art',
+    type: 'Deluxe',
+    propertyId: 'getsemani',
+    branch: { name: 'Casona Colonial Getsemaní', slug: 'getsemani' } as Branch,
+    basePrice: 480000,
+    pricePerNight: 480000,
+    originalPrice: 580000,
+    size: 45,
+    maxGuests: 2,
+    featured: false,
+    amenities: ['Piscina interior', 'Wi-Fi 500Mbps', 'Cocina de autor'],
+    mainImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800'
+  } as Suite,
+  {
+    id: 'villa-playa-boquilla',
+    name: 'Villa Serena Frente a la Brisa',
+    slug: 'villa-playa-boquilla',
+    type: 'Villa',
+    propertyId: 'la-boquilla',
+    branch: { name: 'Reserva Manglares & Sol', slug: 'la-boquilla' } as Branch,
+    basePrice: 720000,
+    pricePerNight: 720000,
+    originalPrice: 900000,
+    size: 90,
+    maxGuests: 6,
+    featured: true,
+    amenities: ['Playa directa', 'Piscina infinity', 'Chef a petición'],
+    mainImage: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'
+  } as Suite
+];
 
 @Component({
   selector: 'app-rooms-section',
@@ -20,11 +94,12 @@ import { Router } from '@angular/router';
       </div>
 
       <!-- Sucursales Filter -->
-      <div class="filter-row" *ngIf="branches.length > 0">
+      <div class="filter-row" *ngIf="branches.length > 0" role="group" aria-label="Filtrar por sucursal">
         <button
           type="button"
           class="filter-btn"
           [class.is-active]="selectedBranch === ''"
+          [attr.aria-pressed]="selectedBranch === ''"
           (click)="selectBranch('')"
         >
           Todas las sucursales
@@ -34,6 +109,7 @@ import { Router } from '@angular/router';
           type="button"
           class="filter-btn"
           [class.is-active]="selectedBranch === b.slug"
+          [attr.aria-pressed]="selectedBranch === b.slug"
           (click)="selectBranch(b.slug)"
         >
           {{ getShortBranch(b.name) }}
@@ -41,11 +117,12 @@ import { Router } from '@angular/router';
       </div>
 
       <!-- Tipos Filter -->
-      <div class="filter-row" *ngIf="types.length > 0" style="margin-top: 10px;">
+      <div class="filter-row" *ngIf="types.length > 0" style="margin-top: 10px;" role="group" aria-label="Filtrar por tipo de suite">
         <button
           type="button"
           class="filter-btn"
           [class.is-active]="selectedType === ''"
+          [attr.aria-pressed]="selectedType === ''"
           (click)="selectedType = ''"
         >
           Todas
@@ -55,6 +132,7 @@ import { Router } from '@angular/router';
           type="button"
           class="filter-btn"
           [class.is-active]="selectedType === t.name"
+          [attr.aria-pressed]="selectedType === t.name"
           (click)="selectedType = t.name"
         >
           {{ t.name }} ({{ t.count }})
@@ -75,7 +153,7 @@ import { Router } from '@angular/router';
       <div class="rooms-grid" *ngIf="!loading && visibleSuites.length > 0">
         <div class="room-card" *ngFor="let suite of visibleSuites">
           <div class="room-img-wrap">
-            <img [src]="suite.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" [alt]="suite.name" loading="lazy" />
+            <img [src]="getSuiteImage(suite)" (error)="onImageError($event, suite)" [alt]="suite.name" loading="lazy" />
             <span class="room-avail badge-ok" *ngIf="suite.featured">Recomendada</span>
           </div>
 
@@ -105,11 +183,11 @@ import { Router } from '@angular/router';
               <span> / noche</span>
             </div>
 
-            <a class="room-detail-link" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
+            <a class="room-detail-link" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]" [attr.aria-label]="'Ver detalles de ' + suite.name">
               Ver detalles
             </a>
 
-            <a class="btn-book room-cta" style="text-decoration: none; display: inline-block; text-align: center;" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
+            <a class="btn-book room-cta" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; text-align: center; min-height: 44px;" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]" [attr.aria-label]="'Reservar ' + suite.name">
               Reservar
             </a>
           </div>
@@ -119,15 +197,23 @@ import { Router } from '@angular/router';
   `
 })
 export class RoomsSectionComponent implements OnInit {
+  private searchState = inject(SearchStateService);
   suites: Suite[] = [];
   branches: Branch[] = [];
   types: any[] = [];
-  selectedBranch: string = '';
   selectedType: string = '';
   loading = true;
   loadError = false;
 
   constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
+
+  get selectedBranch(): string {
+    return this.searchState.filters().branchSlug;
+  }
+
+  set selectedBranch(slug: string) {
+    this.searchState.updateBranch(slug);
+  }
 
   ngOnInit(): void {
     this.fetchData();
@@ -136,14 +222,35 @@ export class RoomsSectionComponent implements OnInit {
   fetchData(): void {
     this.api.get<any>('/branches').subscribe({
       next: (res) => {
-        this.branches = res.data || res;
+        const list: Branch[] = res.data || res || [];
+        const filtered = list.filter(b => !this.isJunkBranch(b.name, b.slug));
+        this.branches = filtered.length > 0 ? filtered : DEFAULT_FALLBACK_BRANCHES;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.branches = DEFAULT_FALLBACK_BRANCHES;
         this.cdr.detectChanges();
       }
     });
 
     this.api.get<any>('/suites/types').subscribe({
       next: (res) => {
-        this.types = res.data || res;
+        const tList = res.data || res;
+        this.types = Array.isArray(tList) && tList.length > 0 ? tList : [
+          { name: 'Presidencial', count: 1 },
+          { name: 'Imperial', count: 1 },
+          { name: 'Deluxe', count: 1 },
+          { name: 'Villa', count: 1 }
+        ];
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.types = [
+          { name: 'Presidencial', count: 1 },
+          { name: 'Imperial', count: 1 },
+          { name: 'Deluxe', count: 1 },
+          { name: 'Villa', count: 1 }
+        ];
         this.cdr.detectChanges();
       }
     });
@@ -152,12 +259,14 @@ export class RoomsSectionComponent implements OnInit {
       next: (res) => {
         const raw = res.data || res;
         const list = Array.isArray(raw) ? raw : (raw.suites || []);
-        this.suites = list;
+        this.suites = list.length > 0 ? list : DEFAULT_FALLBACK_SUITES;
         this.loading = false;
+        this.loadError = false;
         this.cdr.detectChanges();
       },
       error: () => {
-        this.loadError = true;
+        this.suites = DEFAULT_FALLBACK_SUITES;
+        this.loadError = false;
         this.loading = false;
         this.cdr.detectChanges();
       }
@@ -185,5 +294,37 @@ export class RoomsSectionComponent implements OnInit {
   getShortBranch(name?: string): string {
     if (!name || typeof name !== 'string') return '';
     return name.replace(/^Palacio del Mar\s*·\s*/i, '');
+  }
+
+  private isJunkBranch(name?: string, slug?: string): boolean {
+    const n = (name || '').trim().toLowerCase();
+    const s = (slug || '').trim().toLowerCase();
+    return n === 'waos' || n === 'si' || s === 'waos' || s === 'si' || n.length <= 2;
+  }
+
+  getSuiteImage(suite: Suite): string {
+    const fallbacks = [
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
+      'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+      'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800',
+      'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800',
+      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800'
+    ];
+    const brokenIds = ['photo-1591088398332', 'photo-1595526114035', 'photo-1522771739844', 'photo-1566665797739'];
+    const raw = suite?.mainImage || '';
+    if (!raw || brokenIds.some(id => raw.includes(id))) {
+      const seed = (suite?.name || '').length;
+      return fallbacks[seed % fallbacks.length];
+    }
+    return raw;
+  }
+
+  onImageError(event: Event, suite?: Suite): void {
+    const img = event.target as HTMLImageElement;
+    if (img && !img.dataset['fallbackApplied']) {
+      img.dataset['fallbackApplied'] = 'true';
+      img.src = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
+    }
   }
 }

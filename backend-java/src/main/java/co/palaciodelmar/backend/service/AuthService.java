@@ -9,6 +9,7 @@ import co.palaciodelmar.backend.repository.UserRepository;
 import co.palaciodelmar.backend.security.JwtService;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,6 +19,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -184,7 +186,7 @@ public class AuthService {
         return toDTO(userRepository.save(user));
     }
 
-    public void verifyEmail(String token) {
+    public AuthResponse verifyEmail(String token) {
         String hashedToken = hashToken(token);
         User user = userRepository.findByVerificationTokenHash(hashedToken)
                 .orElseThrow(() -> new IllegalArgumentException("Token inválido"));
@@ -197,7 +199,15 @@ public class AuthService {
         user.setVerificationTokenHash(null);
         user.setVerificationTokenExpiresAt(null);
         user.setUpdatedAt(Instant.now());
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        UserPrincipal userPrincipal = new UserPrincipal(savedUser);
+        String jwtToken = jwtService.generateToken(userPrincipal);
+
+        return AuthResponse.builder()
+                .token(jwtToken)
+                .user(toDTO(savedUser))
+                .build();
     }
 
     public void forceVerify(String email) {
@@ -222,8 +232,43 @@ public class AuthService {
             throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
         }
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangedAt(Instant.now());
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
+    }
+
+    public void forgotPassword(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email es requerido");
+        }
+        String normalizedEmail = email.trim().toLowerCase();
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
+        if (user == null) {
+            log.info("Solicitud de forgot-password para correo no registrado: {}", normalizedEmail);
+            return;
+        }
+
+        String tempPassword = generateTemporaryPassword();
+        user.setPassword(passwordEncoder.encode(tempPassword));
+        // Al enviar la contraseña a su bandeja de correo confirmada, se habilita el acceso
+        user.setEmailVerified(true);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        emailService.sendTemporaryPasswordEmail(user.getEmail(), tempPassword);
+        log.info("Contraseña temporal generada y enviada a {}", normalizedEmail);
+    }
+
+    private String generateTemporaryPassword() {
+        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        String lower = "abcdefghijkmnpqrstuvwxyz";
+        String digits = "23456789";
+        SecureRandom sr = new SecureRandom();
+        StringBuilder sb = new StringBuilder("Palacio@");
+        for (int i = 0; i < 2; i++) sb.append(upper.charAt(sr.nextInt(upper.length())));
+        for (int i = 0; i < 2; i++) sb.append(digits.charAt(sr.nextInt(digits.length())));
+        for (int i = 0; i < 2; i++) sb.append(lower.charAt(sr.nextInt(lower.length())));
+        return sb.toString();
     }
 
     public UserDTO toDTO(User user) {

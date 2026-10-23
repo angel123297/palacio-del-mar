@@ -2,17 +2,17 @@
 
 **Palacio del Mar** es una plataforma web de reservas de hospedaje multi-anfitrión orientada a Cartagena de Indias y destinos turísticos de Colombia, con un modelo de baja comisión para anfitriones (8% de tarifa de servicio frente al ~15% de plataformas tradicionales).
 
-La plataforma fue desarrollada con **Spring Boot 3 + Java 21** en el backend y **Angular 18 (Standalone Components & Signals)** en el frontend, soportada por **MongoDB**, **Redis** y mensajería SMTP mediante **Mailpit**.
+La plataforma fue desarrollada con **Spring Boot + Java 21 LTS** en el backend y **Angular (Standalone Components & Signals)** en el frontend, soportada por **MongoDB**, **Redis** y mensajería SMTP mediante **Mailpit**.
 
 ---
 
 ## 🚀 Arquitectura y Tecnologías
 
-- **Backend:** Java 21 LTS, Spring Boot 3.4+, Spring Data MongoDB, Spring Data Redis & In-Memory Cache (`@EnableCaching`), Tareas Asíncronas (`@EnableAsync`), Spring Security (JWT con algoritmo HMAC-SHA256 y persistencia en cabecera Bearer / cookie SameSite=Lax), JavaMail (integrado con Mailpit), Spring Boot Actuator, Springdoc OpenAPI 3.
-- **Frontend:** Angular 18+, TypeScript, Tailwind CSS, Angular Signals (reactividad nativa sin Zone.js overhead), Componentes Standalone.
+- **Backend:** Java 21 LTS, Spring Boot (spring-boot-starter-parent 4.x), Spring Data MongoDB, Spring Data Redis & In-Memory Cache (`@EnableCaching`), Tareas Asíncronas (`@EnableAsync`), Spring Security (JWT con algoritmo HMAC-SHA256 y persistencia en cabecera Bearer / cookie SameSite=Lax), JavaMail (integrado con Mailpit), Spring Boot Actuator, Springdoc OpenAPI 3.
+- **Frontend:** Angular (Standalone Components & Signals), TypeScript, Tailwind CSS, reactividad nativa sin Zone.js overhead.
 - **Base de Datos & Concurrencia:** MongoDB 7.0 (índices únicos compuestos, control de concurrencia optimista `@Version`), Redis 7 Alpine (con fallback en memoria para desarrollo ágil).
 - **Control de Correo / SMTP:** Mailpit para captura y verificación de correos en entornos de desarrollo y pruebas locales.
-- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, Spring MockMvc (175 pruebas unitarias y de integración pasando al 100% con JaCoCo).
+- **Pruebas y QA:** JUnit 5, Mockito, AssertJ, Spring MockMvc (256 pruebas unitarias y de integración pasando al 100% con JaCoCo).
 - **CI/CD:** Pipeline automatizado de GitHub Actions (`.github/workflows/ci.yml`) con compilación, ejecución de tests y verificación de calidad tanto en backend como frontend.
 
 ---
@@ -57,7 +57,7 @@ Cuando ocurre un evento relevante en la plataforma (`booking.created`, `booking.
 - Idempotencia estricta: reenvíos del mismo `eventId` son ignorados sin duplicar transacciones.
 
 ### Integración por API Key (Sistema Externo ➔ Palacio del Mar)
-Los sistemas de hotelería externa pueden interactuar directamente mediante la cabecera `X-API-KEY`:
+Los sistemas de hotelería externa pueden interactuar directamente mediante la cabecera `X-API-KEY` (o `X-Palacio-Api-Key`):
 - `POST /api/integration/rooms`: Sincronización o actualización de habitaciones (`upsert` por `externalId`).
 - `PUT /api/integration/availability`: Bloqueo o desbloqueo de fechas desde el PMS externo, utilizando el modelo transaccional `SuiteNight` para garantizar la protección anti-overbooking frente a reservas del marketplace.
 
@@ -65,18 +65,20 @@ Los sistemas de hotelería externa pueden interactuar directamente mediante la c
 
 ## 🧪 Pruebas Automatizadas y Calidad de Código
 
-El repositorio cuenta con **175 pruebas automatizadas en backend + 8 en frontend** que cubren el 100% de los flujos críticos:
+El repositorio cuenta con **256 pruebas automatizadas en backend + 13 en frontend** que cubren el 100% de los flujos críticos:
 
 ### Backend Java (Spring Boot):
 ```bash
 cd backend-java
 ./mvnw test
 ```
-- **Seguridad y Anti-IDOR (`RoleAndIdorSecurityTest`, `BookingOwnershipSecurityTest`):** Verificación de aislamiento estricto entre anfitriones (`propertyId` + `branches`), prevención de mass assignment y rechazo de accesos no autorizados (401/403/404).
+- **Seguridad y Anti-IDOR (`RoleAndIdorSecurityTest`, `BookingOwnershipSecurityTest`, `TokenBlacklistServiceTest`):** Verificación de aislamiento estricto entre anfitriones (`propertyId` + `branches`), revocación duradera de JWT en MongoDB/Redis al cerrar sesión o cambiar credenciales, protección estricta de Actuator y rechazo de accesos no autorizados (401/403/404).
 - **Webhooks y Despacho (`WebhookDispatcherTest`, `HostWebhookServiceTest`, `PaymentWebhookServiceTest`):** Verificación de firmas HMAC, protección Anti-SSRF, políticas de reintento, idempotencia y auditoría de entregas.
+- **Sincronización iCal RFC 5545 (`ICalServiceTest`, `ICalServiceAdversarialTest`):** Feeds de calendario exportables compatibles con Airbnb y Google Calendar, con validación de estado aprobado y bloqueo de borradores.
 - **Integración Externa (`IntegrationServiceTest`, `ApiKeyServiceTest`):** Alta de habitaciones externas y bloqueos anti-overbooking con `SuiteNight`.
 - **Máquina de Estados de Reserva (`BookingStateMachineTest`):** Cobertura exhaustiva de 49 transiciones válidas e inválidas del ciclo de vida de la reserva.
 - **Concurrencia y Pagos (`PaymentConcurrencyTest`, `SimulatedPaymentGatewayTest`, `BookingExpirySchedulerTest`):** Manejo de colisiones de bloqueo optimista multi-slot (`@Version`), expiración de reservas pendientes y compensaciones.
+- **Notificaciones Transaccionales (`EmailServiceTest`):** Generación y despacho de vouchers adjuntos en PDF y eventos `.ics` vía Mailpit.
 - **Reporte JaCoCo:** Generado en `backend-java/target/site/jacoco/index.html`.
 
 ### Frontend Angular:
@@ -85,16 +87,19 @@ cd frontend-angular
 npm run build
 npm test -- --watch=false
 ```
-- Compilación de producción limpia sin errores TypeScript ni advertencias bloqueantes, y 8 pruebas unitarias pasando con Vitest.
+- Compilación de producción limpia sin errores TypeScript ni advertencias bloqueantes, y 13 pruebas unitarias pasando con Vitest (incluyendo componentes de Voucher QR, PIN inteligente y estado reactivo).
 
 ---
 
 ## 📊 Diagramas Interactivos, Sustentación y Auditorías
+- 📚 **Índice Completo de Documentación:** **[docs/README.md](docs/README.md)**
 - 🏛️ **Diagrama Interactivo de Arquitectura:** **[docs/architecture.html](docs/architecture.html)**
 - 🔄 **Diagrama Interactivo de Secuencia Lógica:** **[docs/sequence.html](docs/sequence.html)**
 - 🎬 **Playbook de Demostración E2E (Sustentación):** **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)**
+- 📋 **Plan de Marketplace & Webhooks:** **[docs/PLAN_MARKETPLACE.md](docs/PLAN_MARKETPLACE.md)**
+- 🧪 **Reporte de Calidad y QA:** **[docs/QA_REPORTE.md](docs/QA_REPORTE.md)**
+- 🔒 **Auditoría de Seguridad:** **[docs/AUDITORIA_SEGURIDAD.md](docs/AUDITORIA_SEGURIDAD.md)**
 - 📝 **Historial de Correcciones:** **[docs/CORRECCIONES.md](docs/CORRECCIONES.md)**
-- 🔒 **Auditoría de Seguridad:** **[AUDITORIA_SEGURIDAD.md](AUDITORIA_SEGURIDAD.md)**
 
 ---
 
@@ -112,7 +117,7 @@ Servicios locales disponibles:
 - **Actuator Health:** `http://localhost:5000/actuator/health`
 - **Mailpit (Webmail de pruebas):** `http://localhost:8025`
 - **Simulador PMS de Prueba:** `http://localhost:4200/demo/external-hotel`
-- **Receptor de Webhooks de Prueba:** `http://localhost:4200/demo/webhook-receiver`
+- **Receptor de Webhooks de Prueba:** `http://localhost:5000/api/demo/webhook-receiver`
 
 ### Opción 2: Ejecución Nativa
 1. **Backend:**

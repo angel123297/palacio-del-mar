@@ -1,14 +1,62 @@
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
+import { SearchStateService } from '../../services/search-state.service';
 import { Branch } from '../../models/types';
+
+const LUXURY_DEFAULT_BRANCHES: Branch[] = [
+  {
+    id: 'b-bocagrande',
+    name: 'Palacio Bocagrande',
+    slug: 'bocagrande',
+    zone: 'Bocagrande · Mar Caribe',
+    tagline: 'Vanguardia arquitectónica con acceso directo a playa y vista panorámica al mar.',
+    vibe: ['romantico', 'relax'],
+    mainImage: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800',
+    address: 'Cra. 1 # 5-40, Bocagrande',
+    city: 'Cartagena de Indias'
+  } as Branch,
+  {
+    id: 'b-getsemani',
+    name: 'Casona Colonial Getsemaní',
+    slug: 'getsemani',
+    zone: 'Getsemaní · Histórico',
+    tagline: 'Auténtico encanto colonial del siglo XVIII con patio andaluz y piscina privada.',
+    vibe: ['romantico', 'aventura'],
+    mainImage: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
+    address: 'Calle de la Sierpe # 29-11',
+    city: 'Cartagena de Indias'
+  } as Branch,
+  {
+    id: 'b-centro',
+    name: 'Palacio Imperial San Diego',
+    slug: 'centro-historico',
+    zone: 'Ciudad Amurallada',
+    tagline: 'Exclusividad amurallada entre plazas coloniales y restaurantes de alta cocina.',
+    vibe: ['relax', 'romantico'],
+    mainImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+    address: 'Calle del Curato # 38-99',
+    city: 'Cartagena de Indias'
+  } as Branch,
+  {
+    id: 'b-boquilla',
+    name: 'Reserva Manglares & Sol',
+    slug: 'la-boquilla',
+    zone: 'La Boquilla · Privacidad',
+    tagline: 'Desconexión total, brisa marina y villas exclusivas frente al horizonte caribeño.',
+    vibe: ['relax', 'aventura'],
+    mainImage: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800',
+    address: 'Anillo Vial Km 7',
+    city: 'Cartagena de Indias'
+  } as Branch
+];
 
 @Component({
   selector: 'app-branch-selector',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <section class="branches-section">
+    <section id="location" class="branches-section">
       <div class="container">
         <div class="section-title">
           <p class="subtitle">NUESTRAS UBICACIONES EXCLUSIVAS</p>
@@ -19,11 +67,16 @@ import { Branch } from '../../models/types';
           <div 
             *ngFor="let branch of branches" 
             class="branch-card"
-            [class.active]="selectedSlug === branch.slug"
+            role="button"
+            tabindex="0"
+            [attr.aria-pressed]="activeSlug === branch.slug"
+            [class.active]="activeSlug === branch.slug"
             (click)="selectBranch(branch.slug)"
+            (keydown.enter)="selectBranch(branch.slug)"
+            (keydown.space)="selectBranch(branch.slug); $event.preventDefault()"
           >
             <div class="branch-image-wrapper">
-              <img [src]="branch.mainImage || getFallbackImage(branch.slug)" [alt]="branch.name" loading="lazy" decoding="async" />
+              <img [src]="branch.mainImage || getFallbackImage(branch.slug)" (error)="onImageError($event, branch.slug)" [alt]="branch.name" loading="lazy" decoding="async" />
               <div class="branch-overlay"></div>
               <span class="branch-badge">{{ branch.zone }}</span>
             </div>
@@ -43,7 +96,7 @@ import { Branch } from '../../models/types';
     .branches-section {
       padding: 4rem 1.5rem;
       background: #0d0d0d;
-      border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+      border-bottom: 1px solid rgba(201, 169, 110, 0.15);
     }
     .container {
       max-width: 1200px;
@@ -54,16 +107,17 @@ import { Branch } from '../../models/types';
       margin-bottom: 3rem;
     }
     .subtitle {
-      color: #d4af37;
-      letter-spacing: 2px;
-      font-size: 0.85rem;
-      font-weight: 700;
-      margin-bottom: 8px;
+      color: var(--gold);
+      letter-spacing: 0.28em;
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-bottom: 10px;
     }
     .section-title h2 {
-      color: #ffffff;
-      font-size: 2.2rem;
-      font-family: 'Playfair Display', serif, var(--font-title);
+      color: var(--cream);
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      font-weight: 300;
+      font-family: var(--font-title);
     }
     .branches-grid {
       display: grid;
@@ -143,25 +197,47 @@ import { Branch } from '../../models/types';
   `]
 })
 export class BranchSelectorComponent implements OnInit {
+  private searchState = inject(SearchStateService);
   branches: Branch[] = [];
-  selectedSlug: string = '';
 
   @Output() branchSelected = new EventEmitter<string>();
 
   constructor(private api: ApiService) {}
 
+  get activeSlug(): string {
+    return this.searchState.filters().branchSlug;
+  }
+
   ngOnInit(): void {
     this.api.get<any>('/branches').subscribe({
       next: (res) => {
-        this.branches = res.data || res;
+        const list: Branch[] = res.data || res || [];
+        const filtered = list.filter(b => {
+          const n = (b.name || '').trim().toLowerCase();
+          const s = (b.slug || '').trim().toLowerCase();
+          return n !== 'waos' && n !== 'si' && s !== 'waos' && s !== 'si' && n.length > 2;
+        });
+        this.branches = filtered.length > 0 ? filtered : LUXURY_DEFAULT_BRANCHES;
       },
-      error: () => {}
+      error: () => {
+        this.branches = LUXURY_DEFAULT_BRANCHES;
+      }
     });
   }
 
+  onImageError(event: Event, slug: string): void {
+    const img = event.target as HTMLImageElement;
+    if (img && !img.dataset['fallbackApplied']) {
+      img.dataset['fallbackApplied'] = 'true';
+      img.src = this.getFallbackImage(slug);
+    }
+  }
+
   selectBranch(slug: string): void {
-    this.selectedSlug = this.selectedSlug === slug ? '' : slug;
-    this.branchSelected.emit(this.selectedSlug);
+    const next = this.activeSlug === slug ? '' : slug;
+    this.searchState.updateBranch(next);
+    this.branchSelected.emit(next);
+    document.querySelector('#habitaciones')?.scrollIntoView({ behavior: 'smooth' });
   }
 
   getFallbackImage(slug: string): string {

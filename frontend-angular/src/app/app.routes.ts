@@ -4,7 +4,9 @@ import { authGuard, adminGuard, hostGuard, authMatchGuard, adminMatchGuard, host
 export const routes: Routes = [
   { path: '', loadComponent: () => import('./pages/home/home.component').then(m => m.HomeComponent) },
   { path: 'buscar', loadComponent: () => import('./pages/search/search.component').then(m => m.SearchComponent) },
+  { path: 'search', redirectTo: 'buscar', pathMatch: 'full' },
   { path: 'habitaciones/:idOrSlug', loadComponent: () => import('./pages/suite-detail/suite-detail.component').then(m => m.SuiteDetailComponent) },
+  { path: 'suites/:idOrSlug', redirectTo: 'habitaciones/:idOrSlug', pathMatch: 'full' },
   { path: 'mis-reservas', loadComponent: () => import('./pages/my-bookings/my-bookings.component').then(m => m.MyBookingsComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },
   { path: 'my-bookings', redirectTo: 'mis-reservas', pathMatch: 'full' },
   { path: 'reservas/:id', loadComponent: () => import('./pages/booking-detail/booking-detail.component').then(m => m.BookingDetailComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },

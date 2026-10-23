@@ -34,6 +34,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     private final ObjectMapper objectMapper;
     private final ScheduledExecutorService scheduler;
     private final HttpClient httpClient;
+    private final java.util.Set<String> inFlightIntents = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     @Value("${palacio.webhooks.payments.secret:whsec_simulated_secret_key_palacio_2026}")
     private String webhookSecret = "whsec_simulated_secret_key_palacio_2026";
@@ -102,24 +103,38 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         if ("succeeded".equalsIgnoreCase(intent.getStatus())) {
             return new PaymentConfirmResponse(true, intent.getTransactionId(), "succeeded", null);
         }
-
-        String safeToken = paymentToken != null ? paymentToken : "";
-        intent.setStatus("processing");
-        intent.setPaymentToken(safeToken);
-        intent.setUpdatedAt(Instant.now());
-        paymentIntentRepository.save(intent);
-
-        log.info("Intento de pago {} marcado en estado 'processing'. Programando resolución asíncrona...", intentId);
-
-        Runnable simulationTask = () -> processIntentSimulation(intentId, safeToken);
-
-        if (simulationDelaySeconds <= 0) {
-            simulationTask.run();
-        } else {
-            scheduler.schedule(simulationTask, simulationDelaySeconds, TimeUnit.SECONDS);
+        if ("processing".equalsIgnoreCase(intent.getStatus()) || !inFlightIntents.add(intentId)) {
+            return new PaymentConfirmResponse(true, intent.getTransactionId(), "processing", null);
         }
 
-        return new PaymentConfirmResponse(true, null, "processing", null);
+        try {
+            String safeToken = paymentToken != null ? paymentToken : "";
+            intent.setStatus("processing");
+            intent.setPaymentToken(safeToken);
+            intent.setUpdatedAt(Instant.now());
+            paymentIntentRepository.save(intent);
+
+            log.info("Intento de pago {} marcado en estado 'processing'. Programando resolución asíncrona...", intentId);
+
+            Runnable simulationTask = () -> {
+                try {
+                    processIntentSimulation(intentId, safeToken);
+                } finally {
+                    inFlightIntents.remove(intentId);
+                }
+            };
+
+            if (simulationDelaySeconds <= 0) {
+                simulationTask.run();
+            } else {
+                scheduler.schedule(simulationTask, simulationDelaySeconds, TimeUnit.SECONDS);
+            }
+
+            return new PaymentConfirmResponse(true, null, "processing", null);
+        } catch (RuntimeException e) {
+            inFlightIntents.remove(intentId);
+            throw e;
+        }
     }
 
     public void processIntentSimulation(String intentId, String paymentToken) {
@@ -230,6 +245,19 @@ public class SimulatedPaymentGateway implements PaymentGateway {
 
         PaymentIntent intent = paymentIntentRepository.findByTransactionId(transactionId)
                 .or(() -> paymentIntentRepository.findById(transactionId))
+                .or(() -> {
+                    String candidateBookingId = transactionId.startsWith("tx_")
+                            ? transactionId.substring(3)
+                            : transactionId;
+                    java.util.List<PaymentIntent> byBooking = paymentIntentRepository.findAllByBookingId(candidateBookingId);
+                    if (byBooking != null && !byBooking.isEmpty()) {
+                        return byBooking.stream()
+                                .filter(pi -> "succeeded".equalsIgnoreCase(pi.getStatus()))
+                                .findFirst()
+                                .or(() -> Optional.of(byBooking.get(0)));
+                    }
+                    return paymentIntentRepository.findByBookingId(candidateBookingId);
+                })
                 .orElse(null);
 
         if (intent == null) {

@@ -47,6 +47,18 @@ public class ReviewService {
             throw new IllegalArgumentException("La calificación debe estar entre 1 y 5 estrellas");
         }
 
+        if (userId != null && !"anonymous".equalsIgnoreCase(userId) && suiteRepository != null && propertyRepository != null) {
+            suiteRepository.findById(suiteId).ifPresent(s -> {
+                if (s.getPropertyId() != null) {
+                    propertyRepository.findById(s.getPropertyId()).ifPresent(p -> {
+                        if (userId.equals(p.getOwnerId())) {
+                            throw new IllegalArgumentException("Un anfitrión no puede calificar su propia propiedad");
+                        }
+                    });
+                }
+            });
+        }
+
         AnalysisResult analysis = analyzeTextSentiment(comment, rating);
 
         Review review = Review.builder()
@@ -141,6 +153,33 @@ public class ReviewService {
         }
 
         return dto;
+    }
+
+    /**
+     * Obtiene la reseña de una reserva verificando permisos (huésped titular, anfitrión de la propiedad o admin).
+     */
+    public ReviewDTO getReviewByBookingId(String bookingId, User user) {
+        if (bookingId == null || bookingId.isBlank()) return null;
+        Booking booking = bookingRepository.findById(bookingId).orElse(null);
+        if (booking == null) return null;
+
+        if (user != null) {
+            boolean isAdmin = "ADMIN".equalsIgnoreCase(user.getRole()) || "ROLE_ADMIN".equalsIgnoreCase(user.getRole());
+            boolean isGuest = user.getId() != null && user.getId().equals(booking.getUser());
+            boolean isHost = false;
+            if (("HOST".equalsIgnoreCase(user.getRole()) || "ROLE_HOST".equalsIgnoreCase(user.getRole())) && booking.getPropertyId() != null && propertyRepository != null) {
+                isHost = propertyRepository.findById(booking.getPropertyId())
+                        .map(p -> user.getId().equals(p.getOwnerId()))
+                        .orElse(false);
+            }
+            if (!isAdmin && !isGuest && !isHost) {
+                return null;
+            }
+        }
+
+        return reviewRepository.findByBookingId(bookingId)
+                .map(this::toDTO)
+                .orElse(null);
     }
 
     public ReviewDTO resolveMaintenanceAlert(String reviewId, String userId) {

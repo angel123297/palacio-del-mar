@@ -95,9 +95,12 @@ public class HostPayoutService {
             List<String> bIds = new ArrayList<>();
 
             for (Booking b : validBookings) {
-                BigDecimal roomPrice = b.getSubtotal() != null ? b.getSubtotal() : b.getTotalPrice();
-                BigDecimal bookingFee = b.getPlatformFee() != null ? b.getPlatformFee() : roomPrice.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
-                BigDecimal bookingNet = b.getHostPayout() != null ? b.getHostPayout() : roomPrice.subtract(bookingFee);
+                BigDecimal fallbackRoom = b.getSubtotal() != null ? b.getSubtotal() : (b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO);
+                BigDecimal bookingFee = b.getPlatformFee() != null ? b.getPlatformFee() : fallbackRoom.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal bookingNet = b.getHostPayout() != null ? b.getHostPayout() : fallbackRoom.subtract(bookingFee);
+                BigDecimal roomPrice = (b.getPlatformFee() != null && b.getHostPayout() != null)
+                        ? bookingFee.add(bookingNet)
+                        : fallbackRoom;
 
                 gross = gross.add(roomPrice);
                 fee = fee.add(bookingFee);
