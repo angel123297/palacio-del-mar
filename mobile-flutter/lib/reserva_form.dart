@@ -6,34 +6,25 @@ class ReservaFormScreen extends StatefulWidget {
 }
 
 class _ReservaFormScreenState extends State<ReservaFormScreen> {
+  bool isLogin = true;
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _guestNameController = TextEditingController();
-  final TextEditingController _hotelDetailsController = TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   final RegExp _emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
 
-  void _submitForm() {
+  void _submitAuth() {
     if (_formKey.currentState!.validate()) {
-      // Normalización automática: quita espacios y convierte a minúsculas
       String cleanEmail = _emailController.text.trim().toLowerCase();
+      String password = _passwordController.text;
 
-      final payload = {
-        "email": cleanEmail,
-        "guestName": _guestNameController.text,
-        "hotelDetails": _hotelDetailsController.text,
-        "amount": _amountController.text,
-      };
-
-      print("Enviando datos limpios desde la app móvil: $payload");
-
-      // Alerta visual de éxito para el usuario
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('¡Reserva Exitosa!'),
-          text: Text('Hemos procesado tu reserva y enviado tu comprobante a $cleanEmail'),
+          title: Text(isLogin ? '¡Bienvenido!' : '¡Registro Exitoso!'),
+          content: Text(isLogin 
+            ? 'Sesión iniciada correctamente para $cleanEmail' 
+            : 'Tu cuenta $cleanEmail ha sido creada y ya puedes usarla en la web y en la app.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -48,48 +39,69 @@ class _ReservaFormScreenState extends State<ReservaFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Reserva - Palacio del Mar')),
+      backgroundColor: Color(0xFF121212),
+      appBar: AppBar(
+        title: Text(isLogin ? 'Palacio del Mar - Iniciar Sesión' : 'Palacio del Mar - Registro'),
+        backgroundColor: Color(0xFF1E1E1E),
+      ),
       body: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _emailController,
-                decoration: InputDecoration(labelText: 'Correo electrónico'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor ingresa un correo';
-                  }
-                  if (!_emailRegex.hasMatch(value)) {
-                    return 'Ingresa un correo electrónico válido';
-                  }
-                  return null;
-                },
+        padding: EdgeInsets.all(24.0),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    isLogin ? 'Acceso a tu cuenta' : 'Crear una cuenta nueva',
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 20),
+                  TextFormField(
+                    controller: _emailController,
+                    style: TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Correo Electrónico',
+                      labelStyle: TextStyle(color: Colors.white70),
+                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFFD4AF37))),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Ingresa un correo';
+                      if (!_emailRegex.hasMatch(value)) return 'Correo inválido';
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 15),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    style: TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Contraseña',
+                      labelStyle: TextStyle(color: Colors.white70),
+                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white54)),
+                      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFFD4AF37))),
+                    ),
+                    validator: (value) => (value == null || value.length < 6) ? 'Mínimo 6 caracteres' : null,
+                  ),
+                  SizedBox(height: 25),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Color(0xFFD4AF37)),
+                    onPressed: _submitAuth,
+                    child: Text(isLogin ? 'INICIAR SESIÓN' : 'REGISTRARSE', style: TextStyle(color: Colors.black)),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() => isLogin = !isLogin),
+                    child: Text(
+                      isLogin ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión',
+                      style: TextStyle(color: Color(0xFFD4AF37)),
+                    ),
+                  ),
+                ],
               ),
-              TextFormField(
-                controller: _guestNameController,
-                decoration: InputDecoration(labelText: 'Nombre del huésped'),
-                validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
-              ),
-              TextFormField(
-                controller: _hotelDetailsController,
-                decoration: InputDecoration(labelText: 'Detalles del hotel'),
-                validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
-              ),
-              TextFormField(
-                controller: _amountController,
-                decoration: InputDecoration(labelText: 'Monto total'),
-                keyboardType: TextInputType.number,
-                validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _submitForm,
-                child: Text('Completar Reserva'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
