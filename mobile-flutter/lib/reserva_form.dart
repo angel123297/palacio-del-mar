@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class ReservaFormScreen extends StatefulWidget {
   @override
@@ -12,27 +14,52 @@ class _ReservaFormScreenState extends State<ReservaFormScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   final RegExp _emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+  
+  final String apiUrl = "https://tu-backend-produccion.com/api/auth";
 
-  void _submitAuth() {
+  Future<void> _submitAuth() async {
     if (_formKey.currentState!.validate()) {
       String cleanEmail = _emailController.text.trim().toLowerCase();
       String password = _passwordController.text;
 
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(isLogin ? '¡Bienvenido!' : '¡Registro Exitoso!'),
-          content: Text(isLogin 
-            ? 'Sesión iniciada correctamente para $cleanEmail' 
-            : 'Tu cuenta $cleanEmail ha sido creada y ya puedes usarla en la web y en la app.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Aceptar'),
+      String endpoint = isLogin ? "$apiUrl/login" : "$apiUrl/register";
+
+      try {
+        final response = await http.post(
+          Uri.parse(endpoint),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({
+            "email": cleanEmail,
+            "password": password,
+          }),
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(isLogin ? '¡Bienvenido!' : '¡Registro Exitoso!'),
+              content: Text(isLogin 
+                ? 'Sesión iniciada correctamente para $cleanEmail' 
+                : 'Tu cuenta ha sido creada y sincronizada para la web y la app.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Aceptar'),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${response.body}'))
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo conectar con el servidor'))
+        );
+      }
     }
   }
 
