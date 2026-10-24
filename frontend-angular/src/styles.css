@@ -1,0 +1,11 @@
+body { border: none !important; outline: none !important; }
+
+* { border-color: transparent !important; }
+
+app-root, div, section { border: none !important; }
+
+/* Regla definitiva para eliminar cualquier borde o línea roja en el mapa */
+app-hotel-map {
+  border: none !important;
+  outline: none !important;
+}

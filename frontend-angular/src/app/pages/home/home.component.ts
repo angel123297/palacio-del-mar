@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+﻿import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -8,6 +8,7 @@ import { BranchSelectorComponent } from '../../components/branch-selector/branch
 import { RoomsSectionComponent } from '../../components/rooms-section/rooms-section.component';
 import { FaqSectionComponent } from '../../components/faq-section/faq-section.component';
 import { ContactSectionComponent } from '../../components/contact-section/contact-section.component';
+import { HotelMapComponent } from '../../components/hotel-map/hotel-map.component';
 
 @Component({
   selector: 'app-home',
@@ -19,13 +20,18 @@ import { ContactSectionComponent } from '../../components/contact-section/contac
     BranchSelectorComponent,
     RoomsSectionComponent,
     FaqSectionComponent,
-    ContactSectionComponent
+    ContactSectionComponent,
+    HotelMapComponent
   ],
   template: `
     <ng-container *ngIf="!isCorporateUser">
       <app-hero></app-hero>
       <app-booking-bar></app-booking-bar>
       <app-branch-selector></app-branch-selector>
+      
+      <!-- Aquí está el mapa con el recuadro rojo temporal para ubicarlo -->
+      <app-hotel-map style="display: block; width: 100%; max-width: 1200px; height: 500px; background-color: #111; border: 2px solid red; margin: 20px auto;"></app-hotel-map>
+
       <app-rooms-section></app-rooms-section>
       <app-faq-section></app-faq-section>
       <app-contact-section></app-contact-section>

@@ -1,0 +1,1 @@
+ C:\\Users\\Samu\\palacio-del-mar\\mobile-flutter\\.dart_tool\\flutter_build\\eae1b388b642ed603726b0af7b8e80ef\\native_assets.json: 
