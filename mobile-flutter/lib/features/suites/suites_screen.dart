@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import '../../screens/filtros_widget.dart';
 
 class SuitesScreen extends StatefulWidget {
   const SuitesScreen({super.key});
@@ -153,7 +154,7 @@ class _SuitesScreenState extends State<SuitesScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                       ),
-                      onPressed: () {},
+                      onPressed: () => showModalBottomSheet(context: context, builder: (ctx) => FiltrosWidget(onFiltrosAplicados: (p, h, pf) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Filtros aplicados'))); })),
                       child: const Text('BUSCAR SUITES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                     ),
                   )

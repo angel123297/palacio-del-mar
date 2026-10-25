@@ -64,13 +64,90 @@ public class AuthController {
         AuthResponse response = authService.login(request);
         addJwtCookie(httpResponse, response.getToken(), httpRequest);
 
+        if (response.getRefreshToken() != null) {
+            boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
+            org.springframework.http.ResponseCookie refreshCookie = org.springframework.http.ResponseCookie.from("refreshToken", response.getRefreshToken())
+                    .httpOnly(true)
+                    .secure(isSecure)
+                    .path("/api/auth")
+                    .maxAge(java.time.Duration.ofDays(7))
+                    .sameSite("Lax")
+                    .build();
+            httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, refreshCookie.toString());
+        }
+
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
         body.put("message", "Inicio de sesión exitoso");
         body.put("token", response.getToken());
+        body.put("refreshToken", response.getRefreshToken());
         body.put("user", response.getUser());
         body.put("data", response);
         return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body != null ? body.get("email") : null;
+        authService.forgotPassword(email);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.");
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> body) {
+        String token = body != null ? body.get("token") : null;
+        String password = body != null ? body.get("password") : (body != null ? body.get("newPassword") : null);
+        authService.resetPassword(token, password);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Contraseña restablecida exitosamente");
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<Map<String, Object>> refreshToken(
+            @RequestBody(required = false) Map<String, String> body,
+            jakarta.servlet.http.HttpServletRequest httpRequest,
+            jakarta.servlet.http.HttpServletResponse httpResponse
+    ) {
+        String token = null;
+        if (body != null && body.containsKey("refreshToken")) {
+            token = body.get("refreshToken");
+        } else if (httpRequest.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : httpRequest.getCookies()) {
+                if ("refreshToken".equals(cookie.getName())) {
+                    token = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        AuthResponse authResp = authService.refreshToken(token);
+        addJwtCookie(httpResponse, authResp.getToken(), httpRequest);
+
+        // Opcional cookie para refresh
+        boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
+        org.springframework.http.ResponseCookie refreshCookie = org.springframework.http.ResponseCookie.from("refreshToken", authResp.getRefreshToken())
+                .httpOnly(true)
+                .secure(isSecure)
+                .path("/api/auth")
+                .maxAge(java.time.Duration.ofDays(7))
+                .sameSite("Lax")
+                .build();
+        httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, refreshCookie.toString());
+
+        Map<String, Object> respMap = new HashMap<>();
+        respMap.put("success", true);
+        respMap.put("token", authResp.getToken());
+        respMap.put("refreshToken", authResp.getRefreshToken());
+        respMap.put("user", authResp.getUser());
+        respMap.put("data", authResp);
+        return ResponseEntity.ok(respMap);
     }
 
     @PostMapping("/verify-email")
@@ -152,15 +229,12 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(
-            jakarta.servlet.http.HttpServletRequest httpRequest,
-            jakarta.servlet.http.HttpServletResponse httpResponse
+            jakarta.servlet.http.HttpServletResponse httpResponse,
+            @AuthenticationPrincipal UserPrincipal principal
     ) {
-        String token = extractToken(httpRequest);
-        if (token != null && !token.isBlank()) {
-            tokenBlacklistService.blacklistToken(token);
+        if (principal != null && principal.getUser() != null) {
+            authService.revokeRefreshToken(principal.getUser().getId());
         }
-
-        boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
         org.springframework.http.ResponseCookie springCookie = org.springframework.http.ResponseCookie.from("jwt", "")
                 .httpOnly(true)
                 .secure(isSecure)
@@ -169,6 +243,15 @@ public class AuthController {
                 .sameSite("Lax")
                 .build();
         httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, springCookie.toString());
+
+        org.springframework.http.ResponseCookie clearRefresh = org.springframework.http.ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/api/auth")
+                .maxAge(java.time.Duration.ZERO)
+                .sameSite("Lax")
+                .build();
+        httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, clearRefresh.toString());
 
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);

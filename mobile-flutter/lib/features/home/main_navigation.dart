@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../suites/suites_screen.dart';
 import '../gastronomy/gastronomy_screen.dart';
 import '../auth/login_screen.dart';
+import '../../screens/mis_reservas_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -17,6 +18,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const SuitesScreen(),
     const GastronomyScreen(),
     const LoginScreen(),
+    const MisReservasScreen(),
   ];
 
   @override
@@ -56,6 +58,7 @@ class _MainNavigationState extends State<MainNavigation> {
           BottomNavigationBarItem(icon: Icon(Icons.hotel_outlined), activeIcon: Icon(Icons.hotel), label: 'Suites'),
           BottomNavigationBarItem(icon: Icon(Icons.restaurant_outlined), activeIcon: Icon(Icons.restaurant), label: 'Gastronomía'),
           BottomNavigationBarItem(icon: Icon(Icons.key_outlined), activeIcon: Icon(Icons.key), label: 'Mi Llave Digital'),
+        BottomNavigationBarItem(icon: Icon(Icons.book_online_outlined), activeIcon: Icon(Icons.book_online), label: 'Reservas'),
         ],
       ),
     );

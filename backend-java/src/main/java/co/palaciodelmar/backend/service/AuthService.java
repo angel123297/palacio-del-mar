@@ -154,8 +154,15 @@ public class AuthService {
         UserPrincipal userPrincipal = new UserPrincipal(user);
         String jwtToken = jwtService.generateToken(userPrincipal);
 
+        String rawRefreshToken = generateSecureToken();
+        user.setRefreshTokenHash(hashToken(rawRefreshToken));
+        user.setRefreshTokenExpiresAt(Instant.now().plus(7, java.time.temporal.ChronoUnit.DAYS));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
         return AuthResponse.builder()
                 .token(jwtToken)
+                .refreshToken(rawRefreshToken)
                 .user(toDTO(user))
                 .build();
     }
@@ -238,37 +245,94 @@ public class AuthService {
     }
 
     public void forgotPassword(String email) {
-        if (email == null || email.trim().isEmpty()) {
-            throw new IllegalArgumentException("Email es requerido");
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("El correo electrónico es requerido");
         }
         String normalizedEmail = email.trim().toLowerCase();
         User user = userRepository.findByEmail(normalizedEmail).orElse(null);
         if (user == null) {
-            log.info("Solicitud de forgot-password para correo no registrado: {}", normalizedEmail);
+            // Mitigación de enumeración de usuarios
             return;
         }
 
-        String tempPassword = generateTemporaryPassword();
-        user.setPassword(passwordEncoder.encode(tempPassword));
-        // Al enviar la contraseña a su bandeja de correo confirmada, se habilita el acceso
-        user.setEmailVerified(true);
+        String rawToken = generateSecureToken();
+        user.setResetPasswordTokenHash(hashToken(rawToken));
+        user.setResetPasswordTokenExpiresAt(Instant.now().plus(1, java.time.temporal.ChronoUnit.HOURS));
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
 
-        emailService.sendTemporaryPasswordEmail(user.getEmail(), tempPassword);
-        log.info("Contraseña temporal generada y enviada a {}", normalizedEmail);
+        try {
+            emailService.sendPasswordResetEmail(user.getEmail(), rawToken);
+        } catch (Exception e) {
+            System.err.println("Failed to send reset password email: " + e.getMessage());
+        }
     }
 
-    private String generateTemporaryPassword() {
-        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-        String lower = "abcdefghijkmnpqrstuvwxyz";
-        String digits = "23456789";
-        SecureRandom sr = new SecureRandom();
-        StringBuilder sb = new StringBuilder("Palacio@");
-        for (int i = 0; i < 2; i++) sb.append(upper.charAt(sr.nextInt(upper.length())));
-        for (int i = 0; i < 2; i++) sb.append(digits.charAt(sr.nextInt(digits.length())));
-        for (int i = 0; i < 2; i++) sb.append(lower.charAt(sr.nextInt(lower.length())));
-        return sb.toString();
+    public void resetPassword(String token, String newPassword) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("Token es requerido");
+        }
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
+        }
+
+        String hashedToken = hashToken(token.trim());
+        User user = userRepository.findByResetPasswordTokenHash(hashedToken)
+                .orElseThrow(() -> new IllegalArgumentException("Token de restablecimiento inválido"));
+
+        if (user.getResetPasswordTokenExpiresAt() == null || user.getResetPasswordTokenExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("El token de restablecimiento ha expirado");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setResetPasswordTokenHash(null);
+        user.setResetPasswordTokenExpiresAt(null);
+        // Invalidar refresh tokens anteriores al cambiar credenciales
+        user.setRefreshTokenHash(null);
+        user.setRefreshTokenExpiresAt(null);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+    }
+
+    public AuthResponse refreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new IllegalArgumentException("Refresh token es requerido");
+        }
+
+        String hashedToken = hashToken(refreshToken.trim());
+        User user = userRepository.findByRefreshTokenHash(hashedToken)
+                .orElseThrow(() -> new IllegalArgumentException("Refresh token inválido"));
+
+        if (user.getRefreshTokenExpiresAt() == null || user.getRefreshTokenExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Refresh token ha expirado. Por favor inicia sesión nuevamente.");
+        }
+
+        UserPrincipal userPrincipal = new UserPrincipal(user);
+        String newAccessToken = jwtService.generateToken(userPrincipal);
+
+        // Rotación de Refresh Token para máxima seguridad
+        String newRawRefreshToken = generateSecureToken();
+        user.setRefreshTokenHash(hashToken(newRawRefreshToken));
+        user.setRefreshTokenExpiresAt(Instant.now().plus(7, java.time.temporal.ChronoUnit.DAYS));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        return AuthResponse.builder()
+                .token(newAccessToken)
+                .refreshToken(newRawRefreshToken)
+                .user(toDTO(user))
+                .build();
+    }
+
+    public void revokeRefreshToken(String userId) {
+        if (userId != null) {
+            userRepository.findById(userId).ifPresent(user -> {
+                user.setRefreshTokenHash(null);
+                user.setRefreshTokenExpiresAt(null);
+                user.setUpdatedAt(Instant.now());
+                userRepository.save(user);
+            });
+        }
     }
 
     public UserDTO toDTO(User user) {

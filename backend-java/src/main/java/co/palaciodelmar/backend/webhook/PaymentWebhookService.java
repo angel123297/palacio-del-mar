@@ -34,8 +34,11 @@ public class PaymentWebhookService {
     private final PaymentGateway paymentGateway;
 
     @org.springframework.beans.factory.annotation.Autowired
+
     public PaymentWebhookService(
+
             PaymentRepository paymentRepository,
+
             BookingRepository bookingRepository,
             @org.springframework.context.annotation.Lazy BookingService bookingService,
             ProcessedWebhookEventRepository processedWebhookEventRepository,

@@ -1,109 +1,183 @@
-﻿import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../config/api_config.dart';
-import 'storage_service.dart';
+import 'dart:convert';
+import '../network/http_client.dart';
+import '../security/secure_storage.dart';
 
 class ApiService {
-  static Future<Map<String, String>> _getHeaders() async {
-    final token = await StorageService.getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  // Registrar nueva reserva en la BD
-  static Future<Map<String, dynamic>> createBooking(Map<String, dynamic> bookingData) async {
-    try {
-      final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/bookings'),
-        headers: headers,
-        body: jsonEncode(bookingData),
-      ).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {'success': true, 'data': jsonDecode(response.body)};
-      }
-      return {'success': false, 'message': 'No se pudo registrar la reserva en la BD.'};
-    } catch (e) {
-      // Simulación de respuesta exitosa si el backend no está respondiendo
-      return {'success': true, 'message': 'Reserva guardada correctamente.'};
-    }
-  }
-
-  // Enviar mensaje de contacto VIP
-  static Future<bool> sendContactMessage(Map<String, String> contactData) async {
-    try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/contact'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(contactData),
-      ).timeout(const Duration(seconds: 5));
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (_) {
-      return true;
-    }
-  }
-
   static Future<Map<String, dynamic>> login(String email, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      ).timeout(const Duration(seconds: 5));
+      final response = await AuthenticatedHttpClient.post('/auth/login', {
+        'email': email.trim().toLowerCase(),
+        'password': password,
+      });
+
+      Map<String, dynamic> responseData = {};
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (_) {}
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final token = data['token'] ?? data['data']?['token'] ?? 'token_jwt_valido';
-        await StorageService.saveToken(token.toString());
-        return {'success': true, 'data': data};
+        final token = responseData['token'] ?? (responseData['data'] != null ? responseData['data']['token'] : null);
+        final refreshToken = responseData['refreshToken'] ?? (responseData['data'] != null ? responseData['data']['refreshToken'] : null);
+        if (token != null) {
+          await SecureStorage.saveToken(token);
+        }
+        if (refreshToken != null) {
+          await SecureStorage.saveRefreshToken(refreshToken);
+        }
+        return {'success': true, 'data': responseData};
+      } else if (response.statusCode == 401) {
+        return {'success': false, 'statusCode': 401, 'message': responseData['message'] ?? 'Credenciales inválidas'};
+      } else {
+        return {'success': false, 'statusCode': response.statusCode, 'message': responseData['message'] ?? 'Error en inicio de sesión (${response.statusCode})'};
       }
-      return {'success': false, 'message': 'Credenciales no válidas.'};
     } catch (e) {
-      if (email.isNotEmpty && password.length >= 4) {
-        await StorageService.saveToken('demo_jwt_token_palacio');
-        return {'success': true};
-      }
-      return {'success': false, 'message': 'Ingresa correo y contraseña válidos.'};
+      return {'success': false, 'error': 'Error de conexión', 'message': 'No se pudo conectar con el servidor'};
     }
   }
 
-  static Future<Map<String, dynamic>> register(String name, String email, String password) async {
+  static Future<Map<String, dynamic>> register(String name, String email, String password, {String? phone}) async {
     try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'nombre': name, 'email': email, 'password': password}),
-      ).timeout(const Duration(seconds: 5));
+      final names = name.trim().split(' ');
+      final firstName = names.isNotEmpty ? names.first : name.trim();
+      final lastName = names.length > 1 ? names.sublist(1).join(' ') : '';
+
+      final response = await AuthenticatedHttpClient.post('/auth/register', {
+        'name': firstName,
+        'lastName': lastName,
+        'email': email.trim().toLowerCase(),
+        'password': password,
+        'phone': phone ?? '',
+      });
+
+      Map<String, dynamic> responseData = {};
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (_) {}
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return {'success': true};
+        final token = responseData['token'] ?? (responseData['data'] != null ? responseData['data']['token'] : null);
+        final refreshToken = responseData['refreshToken'] ?? (responseData['data'] != null ? responseData['data']['refreshToken'] : null);
+        if (token != null) {
+          await SecureStorage.saveToken(token);
+        }
+        if (refreshToken != null) {
+          await SecureStorage.saveRefreshToken(refreshToken);
+        }
+        return {
+          'success': true,
+          'statusCode': response.statusCode,
+          'data': responseData,
+          'message': responseData['message'] ?? 'Registro exitoso'
+        };
+      } else if (response.statusCode == 409) {
+        return {
+          'success': false,
+          'statusCode': 409,
+          'message': responseData['message'] ?? 'El correo electrónico ya se encuentra registrado'
+        };
+      } else {
+        return {
+          'success': false,
+          'statusCode': response.statusCode,
+          'message': responseData['message'] ?? 'Error al procesar el registro (${response.statusCode})'
+        };
       }
-      return {'success': false, 'message': 'Error al registrar.'};
     } catch (e) {
-      return {'success': true};
+      return {'success': false, 'error': 'Error de conexión', 'message': 'No se pudo conectar con el servidor'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    try {
+      final response = await AuthenticatedHttpClient.post('/auth/forgot-password', {
+        'email': email.trim().toLowerCase(),
+      });
+      Map<String, dynamic> responseData = {};
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (_) {}
+      return {
+        'success': response.statusCode == 200,
+        'message': responseData['message'] ?? 'Solicitud de recuperación enviada',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'No se pudo conectar con el servidor'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> resetPassword(String token, String newPassword) async {
+    try {
+      final response = await AuthenticatedHttpClient.post('/auth/reset-password', {
+        'token': token.trim(),
+        'password': newPassword,
+      });
+      Map<String, dynamic> responseData = {};
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (_) {}
+      return {
+        'success': response.statusCode == 200,
+        'message': responseData['message'] ?? 'Contraseña actualizada con éxito',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'No se pudo conectar con el servidor'};
     }
   }
 
   static Future<List<dynamic>> getMyReservations() async {
     try {
-      final headers = await _getHeaders();
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/bookings'),
-        headers: headers,
-      ).timeout(const Duration(seconds: 5));
-
+      final response = await AuthenticatedHttpClient.get('/bookings');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data is List) return data;
-        if (data['data'] is List) return data['data'];
+        if (data is Map && data['data'] is List) return data['data'];
       }
       return [];
     } catch (_) {
       return [];
+    }
+  }
+
+  static Future<bool> createBooking(Map<String, dynamic> bookingData) async {
+    try {
+      final response = await AuthenticatedHttpClient.post('/bookings', bookingData);
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<bool> sendContactMessage(Map<String, dynamic> messageData) async {
+    try {
+      final response = await AuthenticatedHttpClient.post('/contact', messageData);
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<void> sendAuditLog(Map<String, dynamic> auditData) async {
+    try {
+      await AuthenticatedHttpClient.post('/audit/log', auditData);
+    } catch (_) {}
+  }
+
+  static Future<void> logout() async {
+    try {
+      await AuthenticatedHttpClient.post('/auth/logout', {});
+    } catch (_) {}
+    await SecureStorage.clearAuth();
+  }
+
+  static Future<List<dynamic>> getMyBookings() => getMyReservations();
+
+  static Future<void> cancelBooking(String bookingId, {String? reason}) async {
+    final response = await AuthenticatedHttpClient.post(
+      '/bookings/$bookingId/cancel',
+      {'reason': reason ?? ''},
+    );
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Error al cancelar reserva');
     }
   }
 }

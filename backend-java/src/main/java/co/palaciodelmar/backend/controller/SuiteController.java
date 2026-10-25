@@ -31,8 +31,12 @@ public class SuiteController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<SuiteResponseDTO>>> getAllSuites(
-            @RequestParam(required = false) String branch) {
-        List<SuiteResponseDTO> suites = suiteService.getAllActiveSuites(branch);
+            @RequestParam(required = false) String branch,
+            @RequestParam(required = false) java.math.BigDecimal minPrice,
+            @RequestParam(required = false) java.math.BigDecimal maxPrice,
+            @RequestParam(required = false) Integer guests,
+            @RequestParam(required = false) String amenity) {
+        List<SuiteResponseDTO> suites = suiteService.getAllActiveSuites(branch, minPrice, maxPrice, guests, amenity);
         return ResponseEntity.ok(ApiResponse.ok(suites));
     }
 

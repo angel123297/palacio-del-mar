@@ -18,7 +18,22 @@ public class ExperienceService {
     private final ExperienceRepository experienceRepository;
 
     public List<ExperienceDTO> getAllActiveExperiences() {
-        return experienceRepository.findByActiveTrue().stream().map(this::toDTO).toList();
+        return getAllActiveExperiences(null, null, null);
+    }
+
+    public List<ExperienceDTO> getAllActiveExperiences(BigDecimal minPrice, BigDecimal maxPrice, String category) {
+        List<Experience> list = experienceRepository.findByActiveTrue();
+        if (category != null && !category.isBlank()) {
+            String cat = category.trim().toLowerCase();
+            list = list.stream().filter(e -> e.getCategory() != null && e.getCategory().toLowerCase().contains(cat)).toList();
+        }
+        if (minPrice != null) {
+            list = list.stream().filter(e -> e.getPrice() != null && e.getPrice().compareTo(minPrice) >= 0).toList();
+        }
+        if (maxPrice != null) {
+            list = list.stream().filter(e -> e.getPrice() != null && e.getPrice().compareTo(maxPrice) <= 0).toList();
+        }
+        return list.stream().map(this::toDTO).toList();
     }
 
     public List<ExperienceDTO> getExperiencesByBranch(String branchId) {
