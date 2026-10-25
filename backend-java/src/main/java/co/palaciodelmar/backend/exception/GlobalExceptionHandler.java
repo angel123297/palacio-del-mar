@@ -25,6 +25,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(RuntimeException ex) {
         String msg = ex.getMessage();
+        if (msg != null && (msg.toLowerCase().contains("ya está registrado") || msg.toLowerCase().contains("ya esta registrado") || msg.toLowerCase().contains("duplicado"))) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(msg));
+        }
         if (msg != null && (msg.toLowerCase().contains("permiso") || msg.toLowerCase().contains("acceder"))) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(msg));
         }

@@ -15,9 +15,9 @@ public class ReservaController {
     @PostMapping("/completar")
     public ResponseEntity<String> completarReserva(@RequestBody ReservaRequest request) {
         
-        // LÛgica de procesamiento de pago y guardado en base de datos aquÌ...
+        // L√≥gica de procesamiento de pago y guardado en base de datos aqu√≠...
 
-        // Disparador autom·tico del correo con los datos reales de la compra
+        // Disparador autom√°tico del correo con los datos reales de la compra
         emailService.sendReservationReceipt(
             request.getEmail(),
             request.getGuestName(),
@@ -25,7 +25,7 @@ public class ReservaController {
             request.getAmount()
         );
 
-        return ResponseEntity.ok("Reserva procesada con Èxito y correo de comprobante enviado.");
+        return ResponseEntity.ok("Reserva procesada con √©xito y correo de comprobante enviado.");
     }
 }
 class ReservaRequest {

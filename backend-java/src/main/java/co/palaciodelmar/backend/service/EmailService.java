@@ -70,7 +70,17 @@ public class EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom("reservas@palaciodelmar.co");
-            String email = userRepository.findById(booking.getUser()).map(User::getEmail).orElse("cliente@ejemplo.com");
+            String email = null;
+            if (booking.getUser() != null) {
+                email = userRepository.findById(booking.getUser()).map(User::getEmail).orElse(null);
+            }
+            if ((email == null || email.isBlank()) && booking.getGuestDetails() != null) {
+                email = booking.getGuestDetails().getEmail();
+            }
+            if (email == null || email.isBlank()) {
+                log.warn("sendBookingConfirmation omitido: no se encontro email para la reserva {}", booking.getId());
+                return;
+            }
             helper.setTo(email);
             helper.setSubject("Confirmación de tu reserva - Palacio del Mar");
 

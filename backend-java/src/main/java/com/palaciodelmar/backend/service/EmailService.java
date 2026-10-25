@@ -17,7 +17,7 @@ public class EmailService {
         message.setTo(toEmail);
         message.setSubject("Comprobante de Reserva - Palacio del Mar");
         message.setText("Hola " + guestName + ",\n\n" +
-                "¡Gracias por elegir Palacio del Mar!\n\n" +
+                "Â¡Gracias por elegir Palacio del Mar!\n\n" +
                 "Detalles de tu reserva:\n" +
                 hotelDetails + "\n" +
                 "Monto total pagado: $" + amount + "\n\n" +
