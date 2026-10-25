@@ -106,7 +106,7 @@ npm test -- --watch=false
 ## 🛠️ Despliegue y Ejecución Local
 
 ### Opción 1: Docker Compose (Recomendada)
-Para levantar el stack completo (MongoDB, Redis, Mailpit, Backend y Frontend):
+Para levantar el stack completo (MongoDB, Redis, Backend y Frontend):
 ```bash
 docker compose up -d --build
 ```
@@ -115,7 +115,7 @@ Servicios locales disponibles:
 - **Backend Spring Boot:** `http://localhost:5000`
 - **Documentación Swagger / OpenAPI:** `http://localhost:5000/swagger-ui.html`
 - **Actuator Health:** `http://localhost:5000/actuator/health`
-- **Mailpit (Webmail de pruebas):** `http://localhost:8025`
+- **Correo Transaccional Real (SMTP):** Configurable en `.env` (`SPRING_MAIL_*`, por defecto `smtp.gmail.com:587`) + enlaces externos opcionales vía `cloudflared tunnel --url http://localhost:4200` (`APP_BASE_URL`)
 - **Simulador PMS de Prueba:** `http://localhost:4200/demo/external-hotel`
 - **Receptor de Webhooks de Prueba:** `http://localhost:5000/api/demo/webhook-receiver`
 
