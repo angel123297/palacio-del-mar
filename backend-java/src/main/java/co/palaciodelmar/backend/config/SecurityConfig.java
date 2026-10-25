@@ -52,8 +52,6 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/verify-email", "/api/auth/reset-password", "/api/auth/forgot-password", "/api/auth/logout").permitAll()
-                        // Ruta pública a nivel de seguridad; el controlador responde 404 si app.dev.force-verify.enabled=false
-                        .requestMatchers(HttpMethod.POST, "/api/auth/force-verify").permitAll()
                         .requestMatchers("/api/auth/profile", "/api/auth/change-password", "/api/auth/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/branches/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll()

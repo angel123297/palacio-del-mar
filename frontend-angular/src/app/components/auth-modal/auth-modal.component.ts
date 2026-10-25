@@ -80,9 +80,6 @@ import { environment } from '../../../environments/environment';
 
           <p *ngIf="message" [attr.role]="isSuccess ? 'status' : 'alert'" aria-live="polite" [style.color]="isSuccess ? '#2ecc71' : '#ff4d4d'" [style.background]="isSuccess ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="isSuccess ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 8px 12px; border-radius: 6px; border-width: 1px; border-style: solid; display: flex; flex-direction: column; align-items: center; gap: 8px;">
             <span>{{ message }}</span>
-            <button *ngIf="showForceVerifyButton" type="button" (click)="forceVerify()" style="background: var(--gold); color: var(--dark); border: none; padding: 6px 12px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 0.85rem; margin-top: 4px;">
-              Verificar ahora
-            </button>
           </p>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
@@ -327,7 +324,6 @@ export class AuthModalComponent {
   message = '';
   isSuccess = false;
   sentForgot = false;
-  showForceVerifyButton = false;
   showLoginPassword = false;
   showRegPassword = false;
   showConfirmPassword = false;
@@ -358,7 +354,6 @@ export class AuthModalComponent {
     this.confirmPassword = '';
     this.name = '';
     this.phone = '';
-    this.showForceVerifyButton = false;
     this.showLoginPassword = false;
     this.showRegPassword = false;
     this.showConfirmPassword = false;
@@ -370,7 +365,6 @@ export class AuthModalComponent {
     this.busy = true;
     this.message = '';
     this.isSuccess = false;
-    this.showForceVerifyButton = false;
     this.cdr.detectChanges();
 
     const payload = {
@@ -415,32 +409,6 @@ export class AuthModalComponent {
         this.busy = false;
         this.isSuccess = false;
         this.message = err.error?.message || 'Credenciales inválidas.';
-        // Si el usuario no ha verificado su correo, mostrar botón para verificar con 1 clic
-        if (this.message.includes('verificar tu correo electrónico') || this.message.toLowerCase().includes('verificar')) {
-          this.showForceVerifyButton = true;
-        }
-        this.cdr.detectChanges();
-      }
-    });
-  }
-
-  forceVerify(): void {
-    if (!this.email) return;
-    this.busy = true;
-    this.auth.forceVerify(this.email.trim()).subscribe({
-      next: () => {
-        this.busy = false;
-        this.isSuccess = true;
-        this.showForceVerifyButton = false;
-        this.message = '¡Correo verificado! Iniciando sesión...';
-        this.cdr.detectChanges();
-        // Automatically submit login again after verification
-        setTimeout(() => this.submitLogin(), 1000);
-      },
-      error: () => {
-        this.busy = false;
-        this.isSuccess = false;
-        this.message = 'No se pudo verificar. Intenta de nuevo.';
         this.cdr.detectChanges();
       }
     });

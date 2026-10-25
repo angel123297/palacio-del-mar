@@ -119,12 +119,6 @@ export class AuthService {
     );
   }
 
-  forceVerify(email: string) {
-    return this.http.post<{success?: boolean, message?: string}>(`${this.apiUrl}/force-verify`, { email }).pipe(
-      timeout(this.TIMEOUT_MS)
-    );
-  }
-
   forgotPassword(email: string) {
     return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/forgot-password`, { email }).pipe(
       timeout(this.TIMEOUT_MS)
