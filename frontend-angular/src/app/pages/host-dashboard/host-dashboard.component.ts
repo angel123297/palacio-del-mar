@@ -34,36 +34,31 @@ export interface HostPromotionItem {
             <p class="text-[#f5f0e8] opacity-70 text-xs tracking-widest uppercase mt-1">Marketplace de Hospedaje</p>
           </div>
           <!-- Tabs Switcher -->
-          <div class="flex gap-2 bg-[#111] p-1.5 rounded-lg border border-[rgba(201,169,110,0.3)]" role="tablist" aria-label="Secciones del panel">
-            <button (click)="activeTab.set('bookings')" role="tab" [attr.aria-selected]="activeTab() === 'bookings'" tabindex="0" 
-                    [ngClass]="activeTab() === 'bookings' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
-                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
-              Reservas & Recepción
-            </button>
+          <div class="flex flex-wrap gap-2 bg-[#111] p-1.5 rounded-lg border border-[rgba(201,169,110,0.3)]" role="tablist" aria-label="Secciones del panel">
             <button (click)="activeTab.set('properties')" role="tab" [attr.aria-selected]="activeTab() === 'properties'" tabindex="0" 
                     [ngClass]="activeTab() === 'properties' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
-                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
-              Mis Alojamientos
+                    class="px-4 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-1.5">
+              <span>🏨</span> Mis Alojamientos
             </button>
-            <button (click)="activeTab.set('webhooks'); fetchSubscriptions(); fetchDeliveries();" role="tab" [attr.aria-selected]="activeTab() === 'webhooks'" tabindex="0" 
-                    [ngClass]="activeTab() === 'webhooks' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
-                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
-              Notificaciones en Vivo
-            </button>
-            <button (click)="activeTab.set('apikeys'); fetchApiKeys();" role="tab" [attr.aria-selected]="activeTab() === 'apikeys'" tabindex="0" 
-                    [ngClass]="activeTab() === 'apikeys' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
-                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
-              Conexión PMS / Integración
-            </button>
-            <button (click)="activeTab.set('promotions')" role="tab" [attr.aria-selected]="activeTab() === 'promotions'" tabindex="0" 
-                    [ngClass]="activeTab() === 'promotions' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
-                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
-              Promociones
+            <button (click)="activeTab.set('bookings')" role="tab" [attr.aria-selected]="activeTab() === 'bookings'" tabindex="0" 
+                    [ngClass]="activeTab() === 'bookings' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-4 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-1.5">
+              <span>📅</span> Reservas & Calendario
             </button>
             <button (click)="activeTab.set('payouts'); fetchPayouts();" role="tab" [attr.aria-selected]="activeTab() === 'payouts'" tabindex="0" 
                     [ngClass]="activeTab() === 'payouts' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
-                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition">
-              Liquidaciones (92%)
+                    class="px-4 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-1.5">
+              <span>💰</span> Mis Ganancias (92%)
+            </button>
+            <button (click)="activeTab.set('promotions'); fetchPromotions();" role="tab" [attr.aria-selected]="activeTab() === 'promotions'" tabindex="0" 
+                    [ngClass]="activeTab() === 'promotions' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-4 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-1.5">
+              <span>🏷️</span> Ofertas y Descuentos
+            </button>
+            <button (click)="activeTab.set('integrations'); fetchSubscriptions(); fetchDeliveries(); fetchApiKeys();" role="tab" [attr.aria-selected]="isIntegrationsTab()" tabindex="0" 
+                    [ngClass]="isIntegrationsTab() ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-4 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-1.5">
+              <span>🔌</span> Integraciones & Modo Demostración
             </button>
           </div>
         </div>
@@ -313,6 +308,20 @@ export interface HostPromotionItem {
 
         <!-- ==================== TAB 3: MIS ALOJAMIENTOS ==================== -->
         <ng-container *ngIf="activeTab() === 'properties'">
+          <!-- Host guidance card -->
+          <div class="bg-gradient-to-r from-[#141414] via-[#1a1612] to-[#141414] border border-[rgba(201,169,110,0.3)] rounded-xl p-5 shadow-lg mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <span class="text-[10px] font-mono uppercase tracking-widest text-[#c9a96e] bg-[rgba(201,169,110,0.12)] border border-[rgba(201,169,110,0.3)] px-2 py-0.5 rounded">Guía para el Anfitrión</span>
+              <h3 class="font-serif text-xl text-[#f5f0e8] mt-1">¿Cómo funciona la publicación de tus alojamientos?</h3>
+              <p class="text-xs text-[#f5f0e8] opacity-75 mt-0.5 max-w-3xl">
+                1. Registra tu alojamiento en el formulario. 2. Añade tus suites y define tarifas. 3. El Administrador valida la información y lo aprueba para que quede visible en el catálogo de huéspedes.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-[#2ecc71] bg-[rgba(46,204,113,0.1)] border border-[rgba(46,204,113,0.3)] px-3 py-1.5 rounded-lg whitespace-nowrap">
+              <span>🛡️</span> Comisión fija: Solo 8% (Recibes el 92%)
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             <!-- Register / Edit Property Form -->
@@ -554,9 +563,43 @@ export interface HostPromotionItem {
           </div>
         </ng-container>
 
-        <!-- ==================== TAB 4: WEBHOOKS ==================== -->
-        <ng-container *ngIf="activeTab() === 'webhooks'">
-          <!-- Top Grid: Register Subscription + Active Subscriptions -->
+        <!-- ==================== TAB 5: INTEGRACIONES & MODO DEMOSTRACIÓN ==================== -->
+        <ng-container *ngIf="isIntegrationsTab()">
+          <!-- Top presentation banner for academic demonstration -->
+          <div class="bg-gradient-to-r from-[#141414] via-[#1f1910] to-[#141414] border border-[rgba(201,169,110,0.4)] rounded-xl p-6 shadow-xl mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <span class="text-[10px] font-mono uppercase tracking-widest text-[#2ecc71] bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] px-2.5 py-0.5 rounded">Módulo de Sustentación Académica</span>
+                <h2 class="font-serif text-2xl text-[#c9a96e] mt-2">Conectividad Externa & Trazabilidad de Reservas</h2>
+                <p class="text-xs text-[#f5f0e8] opacity-80 mt-1 max-w-3xl">
+                  En esta sección puedes demostrarle a tu profesor cómo Palacio del Mar se comunica con sistemas externos: 
+                  <strong>(1) Avisos salientes (Webhooks con firma HMAC SHA-256)</strong> para notificar cuando un huésped reserve o cancele, y 
+                  <strong>(2) Software hotelero aliado (PMS con API Keys)</strong> para sincronizar habitaciones y calendarios.
+                </p>
+              </div>
+              <button type="button" (click)="activateDemoInOneClick()" [disabled]="submittingWebhook" class="px-5 py-3 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-lg text-xs uppercase tracking-wider transition shadow-lg flex items-center gap-2 whitespace-nowrap cursor-pointer">
+                <span>⚡</span> {{ submittingWebhook ? 'Activando...' : 'Activar Simulador en 1 Clic' }}
+              </button>
+            </div>
+
+            <!-- Subtabs inside Integrations -->
+            <div class="flex flex-wrap gap-2 mt-6 border-t border-[rgba(201,169,110,0.2)] pt-4">
+              <button type="button" (click)="integrationSubTab.set('webhooks'); fetchSubscriptions(); fetchDeliveries();"
+                      [ngClass]="integrationSubTab() === 'webhooks' ? 'bg-[rgba(201,169,110,0.2)] border-[#c9a96e] text-[#c9a96e] font-bold' : 'border-[rgba(255,255,255,0.1)] text-[#f5f0e8] hover:border-[rgba(201,169,110,0.3)]'"
+                      class="px-4 py-2 border rounded-md text-xs uppercase tracking-wider transition flex items-center gap-2 cursor-pointer">
+                <span>📡</span> Avisos en Tiempo Real (Webhooks)
+              </button>
+              <button type="button" (click)="integrationSubTab.set('pms'); fetchApiKeys();"
+                      [ngClass]="integrationSubTab() === 'pms' ? 'bg-[rgba(201,169,110,0.2)] border-[#c9a96e] text-[#c9a96e] font-bold' : 'border-[rgba(255,255,255,0.1)] text-[#f5f0e8] hover:border-[rgba(201,169,110,0.3)]'"
+                      class="px-4 py-2 border rounded-md text-xs uppercase tracking-wider transition flex items-center gap-2 cursor-pointer">
+                <span>🏨</span> Conexión PMS / Channel Manager
+              </button>
+            </div>
+          </div>
+
+          <!-- SUBTAB 1: WEBHOOKS -->
+          <div *ngIf="integrationSubTab() === 'webhooks'" class="space-y-8">
+            <!-- Top Grid: Register Subscription + Active Subscriptions -->
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
             <!-- Left: Register Webhook Form -->
             <div class="bg-[#111] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 shadow-xl">
@@ -753,26 +796,34 @@ export interface HostPromotionItem {
             </div>
 
             <div *ngIf="demoEvents().length === 0" class="p-6 text-center text-[#f5f0e8] opacity-50 text-xs border border-dashed border-[rgba(201,169,110,0.2)] rounded-lg">
-              El simulador está a la espera de avisos. Activa un canal apuntando a este simulador y confirma una reserva para ver el aviso reflejado aquí.
+              El simulador está a la espera de avisos. Haz clic en <strong>"Activar Simulador en 1 Clic"</strong> arriba y confirma una reserva para ver el aviso reflejado aquí.
             </div>
 
             <div class="space-y-3" *ngIf="demoEvents().length > 0">
               <div *ngFor="let ev of demoEvents()" class="bg-[#0a0a0a] border border-[rgba(201,169,110,0.2)] rounded-lg p-4 text-xs font-mono">
-                <div class="flex justify-between items-center mb-2">
+                <div class="flex justify-between items-center mb-1">
                   <span class="text-[#2ecc71] font-bold">{{ ev.eventType }}</span>
                   <span class="text-[#f5f0e8] opacity-50">{{ ev.receivedAt | date:'mediumTime' }}</span>
                 </div>
-                <div class="text-[#f5f0e8] opacity-75 break-all text-[11px] mb-2">
-                  <span class="text-[#c9a96e]">X-Palacio-Signature:</span> {{ ev.signature }}
+
+                <!-- Botón expandible para detalles técnicos (Para el profesor) -->
+                <button type="button" (click)="toggleDeliveryDetails(ev.eventId || ev._id || ev.receivedAt)" class="text-[11px] text-[#c9a96e] hover:underline flex items-center gap-1 my-1 cursor-pointer">
+                  <span>{{ isDeliveryExpanded(ev.eventId || ev._id || ev.receivedAt) ? '▼ Ocultar detalles técnicos' : '▶ Ver carga JSON y firma HMAC (Para el Profesor)' }}</span>
+                </button>
+
+                <div *ngIf="isDeliveryExpanded(ev.eventId || ev._id || ev.receivedAt)" class="mt-2 space-y-2 border-t border-[rgba(201,169,110,0.2)] pt-2">
+                  <div class="text-[#f5f0e8] opacity-75 break-all text-[11px]">
+                    <span class="text-[#c9a96e]">X-Palacio-Signature (HMAC SHA-256):</span> {{ ev.signature }}
+                  </div>
+                  <pre class="bg-[#141414] p-2.5 rounded text-[10px] text-[#f5f0e8] opacity-90 overflow-x-auto">{{ ev.payload }}</pre>
                 </div>
-                <pre class="bg-[#141414] p-2.5 rounded text-[10px] text-[#f5f0e8] opacity-90 overflow-x-auto">{{ ev.payload }}</pre>
               </div>
             </div>
           </div>
-        </ng-container>
+          </div>
 
-        <!-- ==================== TAB 5: CONEXIÓN PMS / CANAL EXTERNO ==================== -->
-        <ng-container *ngIf="activeTab() === 'apikeys'">
+          <!-- SUBTAB 2: PMS / CHANNEL MANAGER -->
+          <div *ngIf="integrationSubTab() === 'pms'" class="space-y-8">
           <!-- Top info banner with demo external hotel link -->
           <div class="bg-gradient-to-r from-[#111] via-[#1c1813] to-[#111] border border-[rgba(201,169,110,0.4)] rounded-xl p-6 shadow-xl mb-8 flex flex-wrap justify-between items-center gap-4">
             <div>
@@ -887,6 +938,7 @@ export interface HostPromotionItem {
                 </div>
               </div>
             </div>
+          </div>
           </div>
         </ng-container>
 
@@ -1045,7 +1097,59 @@ export interface HostPromotionItem {
 export class HostDashboardComponent implements OnInit {
   api = inject(ApiService);
   
-  activeTab = signal<'bookings' | 'promotions' | 'properties' | 'webhooks' | 'apikeys' | 'payouts'>('bookings');
+  activeTab = signal<'properties' | 'bookings' | 'payouts' | 'promotions' | 'integrations' | 'webhooks' | 'apikeys'>('properties');
+  integrationSubTab = signal<'webhooks' | 'pms'>('webhooks');
+  expandedDeliveryIds = signal<Set<string>>(new Set());
+
+  isIntegrationsTab(): boolean {
+    const t = this.activeTab();
+    return t === 'integrations' || t === 'webhooks' || t === 'apikeys';
+  }
+
+  isDeliveryExpanded(id: string): boolean {
+    return this.expandedDeliveryIds().has(id);
+  }
+
+  toggleDeliveryDetails(id: string): void {
+    const set = new Set(this.expandedDeliveryIds());
+    if (set.has(id)) {
+      set.delete(id);
+    } else {
+      set.add(id);
+    }
+    this.expandedDeliveryIds.set(set);
+  }
+
+  activateDemoInOneClick(): void {
+    this.actionMessage.set('');
+    this.actionError.set('');
+    if (this.properties().length === 0) {
+      this.actionError.set('Primero debes registrar un alojamiento en la pestaña "Mis Alojamientos" para vincular el simulador.');
+      return;
+    }
+    this.submittingWebhook = true;
+    const defaultUrl = environment.demoWebhookUrl;
+    const prop = this.properties()[0];
+    const propId = prop.id || (prop as any)._id;
+    const payload = {
+      propertyId: propId,
+      url: defaultUrl,
+      events: ['booking.created', 'booking.confirmed', 'booking.cancelled'],
+      description: 'Receptor Demo Local 1-Clic para sustentación'
+    };
+    this.api.post<ApiResponse<WebhookSubscription>>('/host/webhooks/subscriptions', payload).subscribe({
+      next: () => {
+        this.submittingWebhook = false;
+        this.actionMessage.set('⚡ ¡Simulador de Recepción activado en 1 clic! Ya está listo para recibir avisos en vivo.');
+        this.fetchSubscriptions();
+        this.fetchDeliveries();
+      },
+      error: (err) => {
+        this.submittingWebhook = false;
+        this.actionError.set(err.error?.message || 'Error al activar el simulador.');
+      }
+    });
+  }
 
   metrics = signal<DashboardMetricsDTO | null>(null);
   bookings = signal<Booking[]>([]);

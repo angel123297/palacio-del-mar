@@ -81,6 +81,7 @@ class AuthServiceTest {
         User saved = captor.getValue();
 
         assertNotNull(saved);
+        assertEquals("user", saved.getRole(), "Por defecto el rol debe ser user");
         assertFalse(saved.getEmailVerified(), "El usuario recién registrado debe tener emailVerified en false");
         assertNotNull(saved.getVerificationTokenHash(), "Debe guardarse el hash del token de verificación");
         assertNotNull(saved.getVerificationTokenExpiresAt());
@@ -88,6 +89,32 @@ class AuthServiceTest {
         assertNotNull(response.getUser());
         assertEquals("juan.perez@example.com", response.getUser().getEmail());
         verify(emailService).sendVerificationEmail(eq("juan.perez@example.com"), any());
+    }
+
+    @Test
+    void registerAllowsHostRole() {
+        when(userRepository.existsByEmail("juan.perez@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("hashedPassword");
+
+        registerRequest.setRole("host");
+        authService.register(registerRequest);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        User saved = captor.getValue();
+
+        assertNotNull(saved);
+        assertEquals("host", saved.getRole(), "Debe permitir el registro explícito con rol host");
+    }
+
+    @Test
+    void registerRejectsAdminRole() {
+        when(userRepository.existsByEmail("juan.perez@example.com")).thenReturn(false);
+
+        registerRequest.setRole("admin");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(registerRequest));
+        assertTrue(ex.getMessage().contains("administrador"));
+        verify(userRepository, never()).save(any());
     }
 
     @Test

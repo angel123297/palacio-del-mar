@@ -95,8 +95,30 @@ import { environment } from '../../../environments/environment';
 
         <!-- REGISTER FORM -->
         <form *ngIf="mode === 'register'" (ngSubmit)="submitRegister()" class="auth-form">
-          <p class="modal-eyebrow" style="color: var(--gold); font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">Únete a Palacio del Mar</p>
-          <h2 id="reg-modal-title" class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1.5rem 0; color: #fff;">Crear cuenta</h2>
+          <!-- Role selector in Register -->
+          <div class="auth-role-tabs" style="display: flex; gap: 6px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
+            <button type="button" (click)="registerRole = 'user'"
+                    [style.background]="registerRole === 'user' ? 'var(--gold)' : 'transparent'"
+                    [style.color]="registerRole === 'user' ? '#0d0d0d' : '#f5f0e8'"
+                    [style.font-weight]="registerRole === 'user' ? '700' : '500'"
+                    style="flex: 1; padding: 8px 6px; border: none; border-radius: 6px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              🛎️ Huésped
+            </button>
+            <button type="button" (click)="registerRole = 'host'"
+                    [style.background]="registerRole === 'host' ? 'var(--gold)' : 'transparent'"
+                    [style.color]="registerRole === 'host' ? '#0d0d0d' : '#f5f0e8'"
+                    [style.font-weight]="registerRole === 'host' ? '700' : '500'"
+                    style="flex: 1; padding: 8px 6px; border: none; border-radius: 6px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              🏢 Anfitrión
+            </button>
+          </div>
+
+          <div *ngIf="registerRole === 'host'" style="margin-bottom: 1rem; padding: 8px 12px; background: rgba(201,169,110,0.1); border: 1px solid rgba(201,169,110,0.3); border-radius: 6px; font-size: 0.8rem; color: #e2c99b; line-height: 1.4;">
+            ✨ Publica tus alojamientos, conecta tu recepción y recibe el <strong>92% neto</strong> de cada reserva en tu cuenta bancaria.
+          </div>
+
+          <p class="modal-eyebrow" style="color: var(--gold); font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">{{ registerRole === 'host' ? 'Registro de Anfitrión' : 'Únete a Palacio del Mar' }}</p>
+          <h2 id="reg-modal-title" class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1.5rem 0; color: #fff;">{{ registerRole === 'host' ? 'Crear cuenta de Anfitrión' : 'Crear cuenta de Huésped' }}</h2>
           
           <div style="margin-bottom: 1rem;">
             <label for="auth-reg-name" class="field-label">Nombre completo</label>
@@ -226,9 +248,11 @@ export class AuthModalComponent {
 
   @Input() set initialPortal(p: 'guest' | 'host' | 'admin') {
     this.selectedPortal = p || 'guest';
+    this.registerRole = p === 'host' ? 'host' : 'user';
   }
 
   selectedPortal: 'guest' | 'host' | 'admin' = 'guest';
+  registerRole: 'user' | 'host' = 'user';
 
   get portalEyebrow(): string {
     switch (this.selectedPortal) {
@@ -412,12 +436,14 @@ export class AuthModalComponent {
       email: (this.email || '').trim(),
       password: this.password,
       name: (this.name || '').trim(),
-      phone: (this.phone || '').trim()
+      phone: (this.phone || '').trim(),
+      role: this.registerRole
     };
 
     this.auth.register(payload).subscribe({
       next: () => {
         this.busy = false;
+        this.selectedPortal = this.registerRole === 'host' ? 'host' : 'guest';
         this.mode = 'login';
         this.isSuccess = true;
         this.message = '¡Cuenta creada! Te hemos enviado un enlace a tu correo. Por favor verifícalo para iniciar sesión.';

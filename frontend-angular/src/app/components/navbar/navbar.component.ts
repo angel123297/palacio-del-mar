@@ -57,6 +57,9 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
           </ng-container>
           <ng-template #notLogged>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;">
+              <button class="btn-outline" (click)="openAuth('register', 'host')" aria-label="Pon tu alojamiento" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; cursor: pointer; white-space: nowrap; font-size: 0.82rem; border-color: rgba(226, 201, 155, 0.4); color: #e2c99b;">
+                🏨 Pon tu alojamiento
+              </button>
               <button class="btn-outline" (click)="openAuth('login')" aria-label="Abrir inicio de sesión" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; cursor: pointer; white-space: nowrap; font-size: 0.82rem;">
                 Iniciar sesión
               </button>

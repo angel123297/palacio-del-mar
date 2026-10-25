@@ -99,6 +99,17 @@ public class AuthService {
             throw new IllegalArgumentException("El número de teléfono ya está registrado");
         }
 
+        String assignedRole = "user";
+        if (request.getRole() != null && !request.getRole().trim().isEmpty()) {
+            String requested = request.getRole().trim();
+            if ("admin".equalsIgnoreCase(requested)) {
+                throw new IllegalArgumentException("No se permite el autorregistro con rol de administrador");
+            }
+            if ("host".equalsIgnoreCase(requested)) {
+                assignedRole = "host";
+            }
+        }
+
         String rawToken = generateSecureToken();
         String hashedToken = hashToken(rawToken);
 
@@ -107,7 +118,7 @@ public class AuthService {
                 .lastName(request.getLastName())
                 .email(request.getEmail().toLowerCase())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role("user")
+                .role(assignedRole)
                 .status("active")
                 .emailVerified(false)
                 .verificationTokenHash(hashedToken)
