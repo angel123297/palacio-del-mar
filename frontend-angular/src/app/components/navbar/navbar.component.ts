@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -72,10 +72,12 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
       </nav>
     </header>
 
-    <app-auth-modal [isOpen]="authModalOpen" [initialMode]="authMode" [initialPortal]="authPortal" (closeEvent)="onAuthClose()"></app-auth-modal>
+    <app-auth-modal #authModal [initialPortal]="authPortal" [initialMode]="authMode" [isOpen]="authModalOpen" (closeEvent)="onAuthClose()"></app-auth-modal>
   `
 })
 export class NavbarComponent {
+  @ViewChild('authModal') authModal?: AuthModalComponent;
+
   authModalOpen = false;
   authMode: 'login' | 'register' = 'login';
   authPortal: 'guest' | 'host' | 'admin' = 'guest';
@@ -117,6 +119,9 @@ export class NavbarComponent {
     this.authMode = mode;
     this.authPortal = portal;
     this.authModalOpen = true;
+    if (this.authModal) {
+      this.authModal.open(mode, portal);
+    }
   }
 
   logout(): void {

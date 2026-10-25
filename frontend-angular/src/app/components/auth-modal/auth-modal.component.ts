@@ -230,6 +230,7 @@ export class AuthModalComponent {
       this.showLoginPassword = false;
       this.showRegPassword = false;
       this.showConfirmPassword = false;
+      this.cdr.markForCheck();
     }
   }
   get isOpen(): boolean {
@@ -239,6 +240,7 @@ export class AuthModalComponent {
   @Input() set initialMode(mode: 'login' | 'register' | 'forgot') {
     this._initialMode = mode || 'login';
     this.mode = this._initialMode;
+    this.cdr.markForCheck();
   }
   get initialMode(): 'login' | 'register' | 'forgot' {
     return this._initialMode;
@@ -250,6 +252,7 @@ export class AuthModalComponent {
     this._initialPortal = p || 'guest';
     this.selectedPortal = this._initialPortal;
     this.registerRole = this._initialPortal === 'host' ? 'host' : 'user';
+    this.cdr.markForCheck();
   }
   get initialPortal(): 'guest' | 'host' | 'admin' {
     return this._initialPortal;
@@ -258,28 +261,46 @@ export class AuthModalComponent {
   selectedPortal: 'guest' | 'host' | 'admin' = 'guest';
   registerRole: 'user' | 'host' = 'user';
 
+  open(mode: 'login' | 'register' | 'forgot' = 'login', portal: 'guest' | 'host' | 'admin' = 'guest'): void {
+    this._initialMode = mode;
+    this._initialPortal = portal;
+    this.mode = mode;
+    this.selectedPortal = portal;
+    this.registerRole = portal === 'host' ? 'host' : 'user';
+    this.message = '';
+    this.showLoginPassword = false;
+    this.showRegPassword = false;
+    this.showConfirmPassword = false;
+    this._isOpen = true;
+    this.cdr.detectChanges();
+  }
+
   switchToRegister(): void {
     this.mode = 'register';
     this.registerRole = this.selectedPortal === 'host' ? 'host' : 'user';
     this.message = '';
+    this.cdr.markForCheck();
   }
 
   switchToLogin(): void {
     this.mode = 'login';
     this.selectedPortal = this.registerRole === 'host' ? 'host' : 'guest';
     this.message = '';
+    this.cdr.markForCheck();
   }
 
   selectLoginPortal(portal: 'guest' | 'host' | 'admin'): void {
     this.selectedPortal = portal;
     this.registerRole = portal === 'host' ? 'host' : 'user';
     this.message = '';
+    this.cdr.markForCheck();
   }
 
   selectRegisterRole(role: 'user' | 'host'): void {
     this.registerRole = role;
     this.selectedPortal = role === 'host' ? 'host' : 'guest';
     this.message = '';
+    this.cdr.markForCheck();
   }
 
   get portalEyebrow(): string {
