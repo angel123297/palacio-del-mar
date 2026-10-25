@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'filtros_widget.dart';
+import '../../screens/filtros_widget.dart';
 
 class SuitesScreen extends StatefulWidget {
   const SuitesScreen({super.key});

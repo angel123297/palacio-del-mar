@@ -20,7 +20,7 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
 
   Future<void> _cargarReservas() async {
     try {
-      final data = await _apiService.getMyBookings();
+      final data = await ApiService.getMyBookings();
       setState(() {
         _reservas = data;
         _isLoading = false;
@@ -35,7 +35,7 @@ class _MisReservasScreenState extends State<MisReservasScreen> {
 
   Future<void> _cancelarReserva(String id) async {
     try {
-      await _apiService.cancelBooking(id, reason: 'Cancelación por el usuario');
+      await ApiService.cancelBooking(id, reason: 'Cancelación por el usuario');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Reserva cancelada exitosamente')),
       );

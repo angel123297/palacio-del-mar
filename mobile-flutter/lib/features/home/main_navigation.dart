@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../suites/suites_screen.dart';
 import '../gastronomy/gastronomy_screen.dart';
 import '../auth/login_screen.dart';
-import '../screens/mis_reservas_screen.dart';
+import '../../screens/mis_reservas_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
