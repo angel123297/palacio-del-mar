@@ -131,14 +131,12 @@ export class AuthService {
   }
 
   logout() {
+    this.clearLocalData();
     return this.http.post(`${this.apiUrl}/logout`, {}).pipe(
-      tap(() => {
-        this.clearLocalData();
-      })
+      timeout(this.TIMEOUT_MS)
     ).subscribe({
-      error: () => {
-        this.clearLocalData();
-      }
+      next: () => {},
+      error: () => {}
     });
   }
 }

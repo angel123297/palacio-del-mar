@@ -131,6 +131,21 @@ class AuthServiceTest {
     }
 
     @Test
+    void loginThrowsIllegalStateExceptionIfHostEmailNotVerified() {
+        testUser.setRole("host");
+        testUser.setEmailVerified(false);
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+
+        AuthRequest loginRequest = AuthRequest.builder()
+                .email("juan.perez@example.com")
+                .password("password123")
+                .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> authService.login(loginRequest));
+        assertTrue(ex.getMessage().contains("verificar tu correo electrónico"));
+    }
+
+    @Test
     void loginSucceedsWhenEmailIsVerified() {
         testUser.setEmailVerified(true);
         when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));

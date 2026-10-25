@@ -157,8 +157,8 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Email o contraseña inválidos"));
 
-        // Bloqueo de seguridad: exigir verificación de email (a menos que sea rol admin o host)
-        if (!Boolean.TRUE.equals(user.getEmailVerified()) && !"admin".equalsIgnoreCase(user.getRole()) && !"host".equalsIgnoreCase(user.getRole())) {
+        // Bloqueo de seguridad: exigir verificación de email (a menos que sea rol admin)
+        if (!Boolean.TRUE.equals(user.getEmailVerified()) && !"admin".equalsIgnoreCase(user.getRole())) {
             throw new IllegalStateException("Debes verificar tu correo electrónico antes de iniciar sesión. Por favor revisa tu bandeja de entrada.");
         }
 
