@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import '../network/http_client.dart';
 import '../security/secure_storage.dart';
 
@@ -17,8 +17,12 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final token = responseData['token'] ?? (responseData['data'] != null ? responseData['data']['token'] : null);
+        final refreshToken = responseData['refreshToken'] ?? (responseData['data'] != null ? responseData['data']['refreshToken'] : null);
         if (token != null) {
           await SecureStorage.saveToken(token);
+        }
+        if (refreshToken != null) {
+          await SecureStorage.saveRefreshToken(refreshToken);
         }
         return {'success': true, 'data': responseData};
       } else if (response.statusCode == 401) {
@@ -52,8 +56,12 @@ class ApiService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final token = responseData['token'] ?? (responseData['data'] != null ? responseData['data']['token'] : null);
+        final refreshToken = responseData['refreshToken'] ?? (responseData['data'] != null ? responseData['data']['refreshToken'] : null);
         if (token != null) {
           await SecureStorage.saveToken(token);
+        }
+        if (refreshToken != null) {
+          await SecureStorage.saveRefreshToken(refreshToken);
         }
         return {
           'success': true,
@@ -76,6 +84,43 @@ class ApiService {
       }
     } catch (e) {
       return {'success': false, 'error': 'Error de conexión', 'message': 'No se pudo conectar con el servidor'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    try {
+      final response = await AuthenticatedHttpClient.post('/auth/forgot-password', {
+        'email': email.trim().toLowerCase(),
+      });
+      Map<String, dynamic> responseData = {};
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (_) {}
+      return {
+        'success': response.statusCode == 200,
+        'message': responseData['message'] ?? 'Solicitud de recuperación enviada',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'No se pudo conectar con el servidor'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> resetPassword(String token, String newPassword) async {
+    try {
+      final response = await AuthenticatedHttpClient.post('/auth/reset-password', {
+        'token': token.trim(),
+        'password': newPassword,
+      });
+      Map<String, dynamic> responseData = {};
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (_) {}
+      return {
+        'success': response.statusCode == 200,
+        'message': responseData['message'] ?? 'Contraseña actualizada con éxito',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'No se pudo conectar con el servidor'};
     }
   }
 
@@ -118,6 +163,9 @@ class ApiService {
   }
 
   static Future<void> logout() async {
-    await SecureStorage.deleteToken();
+    try {
+      await AuthenticatedHttpClient.post('/auth/logout', {});
+    } catch (_) {}
+    await SecureStorage.clearAuth();
   }
 }

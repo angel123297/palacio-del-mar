@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../core/services/api_service.dart';
 import '../booking/reservations_screen.dart';
 
@@ -86,6 +86,95 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     }
+  }
+
+  void _showForgotPasswordDialog() {
+    final resetEmailController = TextEditingController(text: _emailController.text.trim());
+    final goldColor = const Color(0xFFC5A059);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        bool isSending = false;
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF161616),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: goldColor.withOpacity(0.3)),
+              ),
+              title: Text(
+                'Recuperar Contraseña',
+                style: TextStyle(fontFamily: 'serif', color: goldColor, fontSize: 18),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Ingresa tu correo para recibir un enlace seguro de restablecimiento.',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: resetEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration('Correo Electrónico', Icons.email_outlined, goldColor),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSending ? null : () => Navigator.pop(dialogCtx),
+                  child: const Text('CANCELAR', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: goldColor,
+                    foregroundColor: Colors.black,
+                  ),
+                  onPressed: isSending
+                      ? null
+                      : () async {
+                          final mail = resetEmailController.text.trim().toLowerCase();
+                          if (!_isValidEmail(mail)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Ingresa un correo electrónico válido'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                            return;
+                          }
+                          setDialogState(() => isSending = true);
+                          final res = await ApiService.forgotPassword(mail);
+                          setDialogState(() => isSending = false);
+                          if (!mounted) return;
+                          Navigator.pop(dialogCtx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(res['message'] ?? 'Enlace de recuperación enviado'),
+                              backgroundColor: goldColor,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                  child: isSending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                        )
+                      : const Text('ENVIAR ENLACE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -185,7 +274,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 32),
+                if (!_isRegister) ...[
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.only(top: 8, bottom: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: _showForgotPasswordDialog,
+                      child: Text(
+                        '¿Olvidaste tu contraseña?',
+                        style: TextStyle(color: goldColor.withOpacity(0.85), fontSize: 11),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
                 _isLoading
                     ? const CircularProgressIndicator(color: goldColor)
                     : ElevatedButton(

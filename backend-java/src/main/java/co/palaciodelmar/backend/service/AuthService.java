@@ -152,8 +152,15 @@ public class AuthService {
         UserPrincipal userPrincipal = new UserPrincipal(user);
         String jwtToken = jwtService.generateToken(userPrincipal);
 
+        String rawRefreshToken = generateSecureToken();
+        user.setRefreshTokenHash(hashToken(rawRefreshToken));
+        user.setRefreshTokenExpiresAt(Instant.now().plus(7, java.time.temporal.ChronoUnit.DAYS));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
         return AuthResponse.builder()
                 .token(jwtToken)
+                .refreshToken(rawRefreshToken)
                 .user(toDTO(user))
                 .build();
     }
@@ -224,6 +231,97 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
+    }
+
+    public void forgotPassword(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("El correo electrónico es requerido");
+        }
+        String normalizedEmail = email.trim().toLowerCase();
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
+        if (user == null) {
+            // Mitigación de enumeración de usuarios
+            return;
+        }
+
+        String rawToken = generateSecureToken();
+        user.setResetPasswordTokenHash(hashToken(rawToken));
+        user.setResetPasswordTokenExpiresAt(Instant.now().plus(1, java.time.temporal.ChronoUnit.HOURS));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        try {
+            emailService.sendPasswordResetEmail(user.getEmail(), rawToken);
+        } catch (Exception e) {
+            System.err.println("Failed to send reset password email: " + e.getMessage());
+        }
+    }
+
+    public void resetPassword(String token, String newPassword) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("Token es requerido");
+        }
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
+        }
+
+        String hashedToken = hashToken(token.trim());
+        User user = userRepository.findByResetPasswordTokenHash(hashedToken)
+                .orElseThrow(() -> new IllegalArgumentException("Token de restablecimiento inválido"));
+
+        if (user.getResetPasswordTokenExpiresAt() == null || user.getResetPasswordTokenExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("El token de restablecimiento ha expirado");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setResetPasswordTokenHash(null);
+        user.setResetPasswordTokenExpiresAt(null);
+        // Invalidar refresh tokens anteriores al cambiar credenciales
+        user.setRefreshTokenHash(null);
+        user.setRefreshTokenExpiresAt(null);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+    }
+
+    public AuthResponse refreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new IllegalArgumentException("Refresh token es requerido");
+        }
+
+        String hashedToken = hashToken(refreshToken.trim());
+        User user = userRepository.findByRefreshTokenHash(hashedToken)
+                .orElseThrow(() -> new IllegalArgumentException("Refresh token inválido"));
+
+        if (user.getRefreshTokenExpiresAt() == null || user.getRefreshTokenExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Refresh token ha expirado. Por favor inicia sesión nuevamente.");
+        }
+
+        UserPrincipal userPrincipal = new UserPrincipal(user);
+        String newAccessToken = jwtService.generateToken(userPrincipal);
+
+        // Rotación de Refresh Token para máxima seguridad
+        String newRawRefreshToken = generateSecureToken();
+        user.setRefreshTokenHash(hashToken(newRawRefreshToken));
+        user.setRefreshTokenExpiresAt(Instant.now().plus(7, java.time.temporal.ChronoUnit.DAYS));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        return AuthResponse.builder()
+                .token(newAccessToken)
+                .refreshToken(newRawRefreshToken)
+                .user(toDTO(user))
+                .build();
+    }
+
+    public void revokeRefreshToken(String userId) {
+        if (userId != null) {
+            userRepository.findById(userId).ifPresent(user -> {
+                user.setRefreshTokenHash(null);
+                user.setRefreshTokenExpiresAt(null);
+                user.setUpdatedAt(Instant.now());
+                userRepository.save(user);
+            });
+        }
     }
 
     public UserDTO toDTO(User user) {

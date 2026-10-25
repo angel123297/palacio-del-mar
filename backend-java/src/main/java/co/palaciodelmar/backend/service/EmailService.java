@@ -64,6 +64,31 @@ public class EmailService {
     }
 
     @Async
+    public void sendPasswordResetEmail(String toEmail, String token) {
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(toEmail);
+            helper.setSubject("Recuperación de contraseña - Palacio del Mar");
+
+            String resetLink = (baseUrl != null ? baseUrl : "http://localhost:4200") + "/restablecer-password?token=" + token;
+            String htmlMsg = "<p>Hola,</p>"
+                    + "<p>Has solicitado restablecer tu contraseña en Palacio del Mar.</p>"
+                    + "<p>Haz clic en el siguiente enlace para definir una nueva contraseña:</p>"
+                    + "<p><a href=\"" + resetLink + "\">Restablecer contraseña</a></p>"
+                    + "<p>Este enlace es válido por 1 hora.</p>"
+                    + "<p>Si no realizaste esta solicitud, puedes ignorar este mensaje.</p>";
+
+            helper.setText(htmlMsg, true);
+
+            javaMailSender.send(message);
+        } catch (Exception e) {
+            log.warn("No se pudo enviar correo de recuperación a {} (servidor SMTP no disponible): {}", toEmail, e.getMessage());
+        }
+    }
+
+    @Async
     public void sendBookingConfirmation(Booking booking) {
         try {
             MimeMessage message = javaMailSender.createMimeMessage();
