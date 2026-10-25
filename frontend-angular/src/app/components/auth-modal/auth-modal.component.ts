@@ -19,21 +19,21 @@ import { environment } from '../../../environments/environment';
         <form *ngIf="mode === 'login'" (ngSubmit)="submitLogin()" class="auth-form">
           <!-- Role Selector Tabs -->
           <div class="auth-role-tabs" style="display: flex; gap: 4px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
-            <button type="button" (click)="selectedPortal = 'guest'; message = '';"
+            <button type="button" (click)="selectLoginPortal('guest')"
                     [style.background]="selectedPortal === 'guest' ? 'var(--gold)' : 'transparent'"
                     [style.color]="selectedPortal === 'guest' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="selectedPortal === 'guest' ? '700' : '500'"
                     style="flex: 1; padding: 8px 4px; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
               🛎️ Huésped
             </button>
-            <button type="button" (click)="selectedPortal = 'host'; message = '';"
+            <button type="button" (click)="selectLoginPortal('host')"
                     [style.background]="selectedPortal === 'host' ? 'var(--gold)' : 'transparent'"
                     [style.color]="selectedPortal === 'host' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="selectedPortal === 'host' ? '700' : '500'"
                     style="flex: 1; padding: 8px 4px; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
               🏢 Anfitrión
             </button>
-            <button type="button" (click)="selectedPortal = 'admin'; message = '';"
+            <button type="button" (click)="selectLoginPortal('admin')"
                     [style.background]="selectedPortal === 'admin' ? 'var(--gold)' : 'transparent'"
                     [style.color]="selectedPortal === 'admin' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="selectedPortal === 'admin' ? '700' : '500'"
@@ -87,7 +87,7 @@ import { environment } from '../../../environments/environment';
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿No tienes cuenta?
-            <button type="button" class="link-btn" (click)="mode = 'register'" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
+            <button type="button" class="link-btn" (click)="switchToRegister()" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
               Regístrate
             </button>
           </p>
@@ -97,14 +97,14 @@ import { environment } from '../../../environments/environment';
         <form *ngIf="mode === 'register'" (ngSubmit)="submitRegister()" class="auth-form">
           <!-- Role selector in Register -->
           <div class="auth-role-tabs" style="display: flex; gap: 6px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
-            <button type="button" (click)="registerRole = 'user'"
+            <button type="button" (click)="selectRegisterRole('user')"
                     [style.background]="registerRole === 'user' ? 'var(--gold)' : 'transparent'"
                     [style.color]="registerRole === 'user' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="registerRole === 'user' ? '700' : '500'"
                     style="flex: 1; padding: 8px 6px; border: none; border-radius: 6px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
               🛎️ Huésped
             </button>
-            <button type="button" (click)="registerRole = 'host'"
+            <button type="button" (click)="selectRegisterRole('host')"
                     [style.background]="registerRole === 'host' ? 'var(--gold)' : 'transparent'"
                     [style.color]="registerRole === 'host' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="registerRole === 'host' ? '700' : '500'"
@@ -179,7 +179,7 @@ import { environment } from '../../../environments/environment';
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿Ya tienes cuenta?
-            <button type="button" class="link-btn" (click)="mode = 'login'" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
+            <button type="button" class="link-btn" (click)="switchToLogin()" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
               Inicia sesión
             </button>
           </p>
@@ -221,11 +221,14 @@ import { environment } from '../../../environments/environment';
 export class AuthModalComponent {
   private _isOpen = false;
   private _initialMode: 'login' | 'register' | 'forgot' = 'login';
+  private _initialPortal: 'guest' | 'host' | 'admin' = 'guest';
 
   @Input() set isOpen(val: boolean) {
     this._isOpen = val;
     if (val) {
       this.mode = this._initialMode || 'login';
+      this.selectedPortal = this._initialPortal || 'guest';
+      this.registerRole = this._initialPortal === 'host' ? 'host' : 'user';
       this.message = '';
       this.showLoginPassword = false;
       this.showRegPassword = false;
@@ -247,12 +250,40 @@ export class AuthModalComponent {
   @Output() closeEvent = new EventEmitter<void>();
 
   @Input() set initialPortal(p: 'guest' | 'host' | 'admin') {
-    this.selectedPortal = p || 'guest';
-    this.registerRole = p === 'host' ? 'host' : 'user';
+    this._initialPortal = p || 'guest';
+    this.selectedPortal = this._initialPortal;
+    this.registerRole = this._initialPortal === 'host' ? 'host' : 'user';
+  }
+  get initialPortal(): 'guest' | 'host' | 'admin' {
+    return this._initialPortal;
   }
 
   selectedPortal: 'guest' | 'host' | 'admin' = 'guest';
   registerRole: 'user' | 'host' = 'user';
+
+  switchToRegister(): void {
+    this.mode = 'register';
+    this.registerRole = this.selectedPortal === 'host' ? 'host' : 'user';
+    this.message = '';
+  }
+
+  switchToLogin(): void {
+    this.mode = 'login';
+    this.selectedPortal = this.registerRole === 'host' ? 'host' : 'guest';
+    this.message = '';
+  }
+
+  selectLoginPortal(portal: 'guest' | 'host' | 'admin'): void {
+    this.selectedPortal = portal;
+    this.registerRole = portal === 'host' ? 'host' : 'user';
+    this.message = '';
+  }
+
+  selectRegisterRole(role: 'user' | 'host'): void {
+    this.registerRole = role;
+    this.selectedPortal = role === 'host' ? 'host' : 'guest';
+    this.message = '';
+  }
 
   get portalEyebrow(): string {
     switch (this.selectedPortal) {

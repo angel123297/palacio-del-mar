@@ -72,7 +72,7 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
       </nav>
     </header>
 
-    <app-auth-modal [isOpen]="authModalOpen" [initialMode]="authMode" [initialPortal]="authPortal" (closeEvent)="authModalOpen = false"></app-auth-modal>
+    <app-auth-modal [isOpen]="authModalOpen" [initialMode]="authMode" [initialPortal]="authPortal" (closeEvent)="onAuthClose()"></app-auth-modal>
   `
 })
 export class NavbarComponent {
@@ -81,6 +81,12 @@ export class NavbarComponent {
   authPortal: 'guest' | 'host' | 'admin' = 'guest';
 
   constructor(public auth: AuthService, private router: Router) {}
+
+  onAuthClose(): void {
+    this.authModalOpen = false;
+    this.authPortal = 'guest';
+    this.authMode = 'login';
+  }
 
   isCorporate(): boolean {
     const role = (this.auth.currentUser()?.role || '').trim().toLowerCase();
