@@ -1,8 +1,9 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property, WebhookSubscription, WebhookDelivery, ApiKeyItem } from '../../models/types';
 import { environment } from '../../../environments/environment';
 
@@ -1096,6 +1097,18 @@ export interface HostPromotionItem {
 })
 export class HostDashboardComponent implements OnInit {
   api = inject(ApiService);
+  auth = inject(AuthService);
+  router = inject(Router);
+
+  constructor() {
+    effect(() => {
+      const user = this.auth.currentUser();
+      const role = (user?.role || '').toLowerCase();
+      if (!user || (role !== 'host' && role !== 'anfitrion')) {
+        this.router.navigate(['/']);
+      }
+    });
+  }
   
   activeTab = signal<'properties' | 'bookings' | 'payouts' | 'promotions' | 'integrations' | 'webhooks' | 'apikeys'>('properties');
   integrationSubTab = signal<'webhooks' | 'pms'>('webhooks');
