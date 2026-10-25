@@ -168,4 +168,28 @@ class ApiService {
     } catch (_) {}
     await SecureStorage.clearAuth();
   }
+
+  Future<List<dynamic>> getMyBookings() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/api/bookings/mis-reservas'),
+      headers: await _getHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      return decoded['data'] ?? [];
+    } else {
+      throw Exception('Error');
+    }
+  }
+
+  Future<void> cancelBooking(String bookingId, {String? reason}) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/api/bookings/cancelar/$bookingId'),
+      headers: await _getHeaders(),
+      body: reason != null ? jsonEncode({'reason': reason}) : null,
+    );
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Error');
+    }
+  }
 }

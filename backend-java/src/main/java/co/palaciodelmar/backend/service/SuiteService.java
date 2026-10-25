@@ -45,8 +45,11 @@ public class SuiteService {
                 .collect(Collectors.toMap(Branch::getId, Function.identity(), (a, b) -> a));
     }
 
-    @Cacheable(value = "suites", key = "#branchFilter != null ? #branchFilter : 'all'")
     public List<SuiteResponseDTO> getAllActiveSuites(String branchFilter) {
+        return getAllActiveSuites(branchFilter, null, null, null, null);
+    }
+
+    public List<SuiteResponseDTO> getAllActiveSuites(String branchFilter, BigDecimal minPrice, BigDecimal maxPrice, Integer guests, String amenity) {
         Map<String, Branch> branchMap = getBranchMap();
         Map<String, Property> propMap = propertyRepository.findAll().stream()
                 .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
@@ -79,6 +82,31 @@ public class SuiteService {
                         }
                         return false;
                     })
+                    .toList();
+        }
+
+        if (guests != null && guests > 0) {
+            suites = suites.stream()
+                    .filter(s -> s.getMaxGuests() != null && s.getMaxGuests() >= guests)
+                    .toList();
+        }
+
+        if (minPrice != null) {
+            suites = suites.stream()
+                    .filter(s -> s.getBasePrice() != null && s.getBasePrice().compareTo(minPrice) >= 0)
+                    .toList();
+        }
+
+        if (maxPrice != null) {
+            suites = suites.stream()
+                    .filter(s -> s.getBasePrice() != null && s.getBasePrice().compareTo(maxPrice) <= 0)
+                    .toList();
+        }
+
+        if (amenity != null && !amenity.isBlank()) {
+            String targetAmenity = amenity.trim().toLowerCase();
+            suites = suites.stream()
+                    .filter(s -> s.getAmenities() != null && s.getAmenities().stream().anyMatch(a -> a.toLowerCase().contains(targetAmenity)))
                     .toList();
         }
 

@@ -173,7 +173,7 @@ public class EmailService {
         }
     }
 
-    private byte[] generateReceiptPdf(Booking booking) {
+    public byte[] generateReceiptPdf(Booking booking) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document document = new Document();
             PdfWriter.getInstance(document, out);
