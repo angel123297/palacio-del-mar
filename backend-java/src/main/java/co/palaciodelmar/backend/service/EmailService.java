@@ -26,7 +26,7 @@ public class EmailService {
         }
     }
 
-    public void sendReservationConfirmation(String to, String userName, String details) {
+    public void sendReservationConfirmation(String to, String userName, String details, String actionUrl) {
         String htmlContent = "<div style=\"background-color: #0f0f0f; color: #f5f5f5; padding: 30px; font-family: Arial, sans-serif; text-align: center;\">" +
             "<h1 style=\"color: #d4af37; letter-spacing: 2px;\">Palacio del Mar</h1>" +
             "<p style=\"font-size: 12px; color: #b3b3b3; text-transform: uppercase;\">Cartagena de Indias · Colombia</p>" +
@@ -34,7 +34,7 @@ public class EmailService {
                 "<h2 style=\"color: #ffffff;\">¡Reserva Confirmada!</h2>" +
                 "<p style=\"color: #cccccc;\">Hola " + userName + ", tu reserva ha sido procesada con éxito.</p>" +
                 "<p style=\"background-color: #262626; padding: 15px; border-radius: 5px; color: #d4af37;\">" + details + "</p>" +
-                "<a href=\"#\" style=\"display: inline-block; background-color: #d4af37; color: #000000; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 4px; margin-top: 20px;\">Ver Detalles</a>" +
+                "<a href=\"" + actionUrl + "\" style=\"display: inline-block; background-color: #d4af37; color: #000000; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 4px; margin-top: 20px;\">Ver Detalles en la App</a>" +
             "</div>" +
         "</div>";
         
