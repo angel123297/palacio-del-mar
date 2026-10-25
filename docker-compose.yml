@@ -38,7 +38,7 @@ services:
       SPRING_MAIL_HOST: smtp.gmail.com
       SPRING_MAIL_PORT: 587
       SPRING_MAIL_USERNAME: reservas.palaciodelmar@gmail.com
-      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:?Define SPRING_MAIL_PASSWORD en el archivo .env}
+      SPRING_MAIL_PASSWORD: "yysd ktxg bnij rceq"
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
     depends_on:
