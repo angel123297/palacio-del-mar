@@ -178,7 +178,7 @@ public class EmailService {
 
             configureSender(helper, "reservas@palaciodelmar.co");
             helper.setTo(ctx.guestEmail().trim());
-            helper.setSubject("Confirmación de Reserva y Comprobante de Pago [" + ctx.bookingCode() + "] - Palacio del Mar");
+            helper.setSubject("¡Tu reserva ha sido registrada y confirmada! [" + ctx.bookingCode() + "] - Palacio del Mar");
 
             String pinCode = getAccessPin(booking);
             String voucherLink = normalizedBaseUrl() + "/reservas/" + booking.getId() + "/comprobante";
@@ -195,7 +195,7 @@ public class EmailService {
                     + "<h1 style=\"color:#c9a96e; font-size:26px; margin:0 0 5px 0; font-family:Georgia,serif;\">Palacio del Mar</h1>"
                     + "<p style=\"color:#e2c99b; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin:0;\">Confirmación Oficial de Reserva y Pago</p>"
                     + "</div>"
-                    + "<h2 style=\"color:#ffffff; font-size:18px; margin-top:0;\">¡Hola, " + escapeHtml(ctx.guestName()) + "! Tu estadía está confirmada</h2>"
+                    + "<h2 style=\"color:#ffffff; font-size:18px; margin-top:0;\">¡Hola, " + escapeHtml(ctx.guestName()) + "! Tu reserva ha sido registrada y confirmada exitosamente</h2>"
                     + "<p style=\"color:#ccc; font-size:14px; line-height:1.6;\">Hemos verificado tu pago exitosamente. Aquí tienes toda la información de tu alojamiento, el desglose de tu transacción y tu llave digital de ingreso:</p>"
                     + "<div style=\"background:#1a1a1a; border:2px solid #c9a96e; padding:18px; border-radius:8px; text-align:center; margin:22px 0;\">"
                     + "<p style=\"color:#c9a96e; text-transform:uppercase; font-size:11px; letter-spacing:2px; margin:0 0 6px 0;\">PIN de Acceso Digital (Smart Lock)</p>"

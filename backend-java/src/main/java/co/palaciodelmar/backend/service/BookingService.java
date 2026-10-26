@@ -311,13 +311,6 @@ public class BookingService {
                     Instant.now()
             ));
         }
-        if (emailService != null) {
-            try {
-                emailService.sendBookingCreatedNotification(savedBooking);
-            } catch (Exception ex) {
-                log.warn("Fallo al despachar notificación de reserva creada {}: {}", savedBooking.getId(), ex.getMessage());
-            }
-        }
         return dto;
     }
 
