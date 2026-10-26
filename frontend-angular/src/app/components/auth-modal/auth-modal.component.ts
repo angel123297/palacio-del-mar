@@ -18,7 +18,7 @@ import { environment } from '../../../environments/environment';
         <!-- LOGIN FORM -->
         <form *ngIf="mode === 'login'" (ngSubmit)="submitLogin()" class="auth-form">
           <!-- Role Selector Tabs -->
-          <div class="auth-role-tabs" style="display: flex; gap: 4px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
+          <div *ngIf="initialPortal !== 'host'" class="auth-role-tabs" style="display: flex; gap: 4px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
             <button type="button" (click)="selectLoginPortal('guest')"
                     [style.background]="selectedPortal === 'guest' ? 'var(--gold)' : 'transparent'"
                     [style.color]="selectedPortal === 'guest' ? '#0d0d0d' : '#f5f0e8'"
@@ -93,7 +93,7 @@ import { environment } from '../../../environments/environment';
         <!-- REGISTER FORM -->
         <form *ngIf="mode === 'register'" (ngSubmit)="submitRegister()" class="auth-form">
           <!-- Role selector in Register -->
-          <div class="auth-role-tabs" style="display: flex; gap: 6px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
+          <div *ngIf="initialPortal !== 'host'" class="auth-role-tabs" style="display: flex; gap: 6px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
             <button type="button" (click)="selectRegisterRole('user')"
                     [style.background]="registerRole === 'user' ? 'var(--gold)' : 'transparent'"
                     [style.color]="registerRole === 'user' ? '#0d0d0d' : '#f5f0e8'"
