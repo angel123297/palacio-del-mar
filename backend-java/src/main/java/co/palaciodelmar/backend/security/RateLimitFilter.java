@@ -110,40 +110,28 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         remoteAddr = remoteAddr.trim();
 
-        // 1. Si la conexión socket directa NO proviene de un proxy confiable (loopback o red privada interna),
-        // ignoramos cualquier encabezado X-Forwarded-For / X-Real-IP para prevenir IP spoofing directo.
+        // 1. Si la conexión socket directa NO proviene de un proxy confiable autorizado (loopback o red interna de contenedores),
+        // ignoramos cualquier encabezado de reenvío para prevenir falsificación directa de IP.
         if (!isTrustedProxy(remoteAddr)) {
             return remoteAddr;
         }
 
-        // 2. Si proviene de un proxy de confianza (Nginx, Docker bridge, localhost),
-        // inspeccionamos la cadena X-Forwarded-For de derecha a izquierda (desde el salto más cercano y confiable).
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            String[] hops = xForwardedFor.split(",");
-            for (int i = hops.length - 1; i >= 0; i--) {
-                String candidate = hops[i].trim();
-                if (isValidIpLiteral(candidate) && !isTrustedProxy(candidate)) {
-                    // Primer IP público / no confiable desde la derecha: el cliente externo legítimo
-                    return candidate;
-                }
-            }
-            // Si todos los saltos fueron proxies internos/locales (entorno de pruebas o LAN),
-            // seleccionamos el último salto válido
-            for (int i = hops.length - 1; i >= 0; i--) {
-                String candidate = hops[i].trim();
-                if (isValidIpLiteral(candidate)) {
-                    return candidate;
-                }
-            }
-        }
-
-        // 3. Alternativa X-Real-IP provista por el proxy confiable
+        // 2. Si proviene de un proxy confiable (ej. Nginx), priorizamos X-Real-IP saneado y sustituido por el proxy
         String xRealIp = request.getHeader("X-Real-IP");
         if (xRealIp != null && !xRealIp.isBlank()) {
             String candidate = xRealIp.trim();
             if (isValidIpLiteral(candidate)) {
                 return candidate;
+            }
+        }
+
+        // 3. Como fallback de proxy confiable, tomamos el salto inmediato (último/derecho) de X-Forwarded-For
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            String[] hops = xForwardedFor.split(",");
+            String rightmost = hops[hops.length - 1].trim();
+            if (isValidIpLiteral(rightmost)) {
+                return rightmost;
             }
         }
 

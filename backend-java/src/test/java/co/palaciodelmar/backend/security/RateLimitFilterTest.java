@@ -60,7 +60,7 @@ class RateLimitFilterTest {
     @DisplayName("Debe retornar HTTP 429 con cabecera Retry-After cuando se excede el rate limit")
     void testPostLoginBlockedWhenExceeded() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
-        request.addHeader("X-Forwarded-For", "203.0.113.195, 10.0.0.1");
+        request.addHeader("X-Real-IP", "203.0.113.195");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         when(rateLimitService.checkLimit(eq("login"), eq("203.0.113.195"), eq(10), eq(60)))
@@ -111,11 +111,12 @@ class RateLimitFilterTest {
     }
 
     @Test
-    @DisplayName("Debe escanear X-Forwarded-For de derecha a izquierda descartando prefijos falsificados desde proxy confiable")
-    void testTrustedProxyTraversesXForwardedForRightToLeftIgnoringSpoofedPrefix() throws ServletException, IOException {
+    @DisplayName("Debe priorizar X-Real-IP saneado por proxy confiable o tomar salto derecho de X-Forwarded-For")
+    void testTrustedProxyUsesRealIpOrRightmostForwardedFor() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
         request.setRemoteAddr("172.18.0.3"); // Proxy Nginx en red Docker privada (confiable)
-        request.addHeader("X-Forwarded-For", "8.8.8.8, 203.0.113.195, 10.0.0.2");
+        request.addHeader("X-Real-IP", "203.0.113.195");
+        request.addHeader("X-Forwarded-For", "203.0.113.195");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         when(rateLimitService.checkLimit(eq("login"), eq("203.0.113.195"), eq(10), eq(60)))
@@ -124,9 +125,7 @@ class RateLimitFilterTest {
         rateLimitFilter.doFilterInternal(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
-        // Debe haber seleccionado el primer salto público desde la derecha (203.0.113.195) ignorando el spoofed (8.8.8.8)
         verify(rateLimitService).checkLimit(eq("login"), eq("203.0.113.195"), eq(10), eq(60));
-        verify(rateLimitService, never()).checkLimit(eq("login"), eq("8.8.8.8"), anyInt(), anyInt());
     }
 
     @Test
