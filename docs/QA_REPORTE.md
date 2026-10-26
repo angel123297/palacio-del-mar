@@ -13,6 +13,39 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-10-26 — Revisión diaria de Vibe: app móvil y auth post-plan, email corporativo; PR draft #23 abierto
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`, 25 oct, todos de S4mu0/agentes):**
+- [chore: actualiza auditoria final y deja el proyecto listo para nuevas fases](https://github.com/angel123297/palacio-del-mar/commit/0307db42676ea7b7e04f79a3f370bca0b21e3290) (00:47 UTC).
+- [feat: implementa recuperacion de contraseña y persistencia con refresh tokens (Fase 1)](https://github.com/angel123297/palacio-del-mar/commit/0d96c2f6600db92feb41ed4d3985acc6771f7376) (01:04 UTC) — recuperación de contraseña + refresh tokens.
+- [feat: Fase 2 completada - historial de reservas, endpoints de cancelación y filtros avanzados en interfaz](https://github.com/angel123297/palacio-del-mar/commit/216dbb1f5fb04b3a99c2a625fc63d9e5d5589e4c) (02:20 UTC).
+- [fix(backend): restaurar BookingService completo (216dbb1 dejó createBooking como stub)](https://github.com/angel123297/palacio-del-mar/commit/93e704f9192a03db4bec82b242b26a8513ce55e4) (03:25 UTC) — ⚠️ revert de un stub introducido horas antes.
+- [fix(mobile): restaurar ApiService y corregir imports y cancelación de reservas](https://github.com/angel123297/palacio-del-mar/commit/9b97f8fba6c75469deb20b5b178fd0a9a0897d92) (03:47 UTC).
+- [fix(backend): permitir arranque de PaymentWebhookService con @Autowired](https://github.com/angel123297/palacio-del-mar/commit/0ae25bba6247aeb55138586614a114e18c44f8b0) (04:36 UTC).
+- [chore(docker): leer secretos de correo y JWT desde .env](https://github.com/angel123297/palacio-del-mar/commit/4c43bd0ca6d81b9150e258ce58db25334dc921eb) (04:36 UTC).
+- [feat(web): mapa de sucursales con Leaflet en la home](https://github.com/angel123297/palacio-del-mar/commit/ec728c0dd80bf7eb0ec28f018de30813de0fdd33) (04:36 UTC).
+- [docs(qa): reporte diario 2026-10-25](https://github.com/angel123297/palacio-del-mar/commit/cec8353782d01c899adefa69d694d7e16955a21d) y [docs(qa): restaurar QA_REPORTE.md completo](https://github.com/angel123297/palacio-del-mar/commit/5257ce47e04fb33b08d281aa2420d0d711c185bf) (14:47/14:48 UTC) — reportes de QA de Vibe.
+- [fix(backend): Actualización de credencial de Gmail y correcciones de compilación](https://github.com/angel123297/palacio-del-mar/commit/4ddecea2898c99d5bf84413f94330b0c5162d96b) (17:23 UTC).
+- [Merge branch 'feature/app-movil-fase4-completa' into plan/marketplace-webhooks](https://github.com/angel123297/palacio-del-mar/commit/1f27fc1615936e77da9777fe21c0a5c450dbf24c) (17:35 UTC) — integración de la app móvil (fase 4).
+- [Fix: Estilo corporativo HTML en correos automáticos](https://github.com/angel123297/palacio-del-mar/commit/c2dffc20c49d80403a27d461f2a68bccad9a1e48) (17:42 UTC).
+- [Fix: Enlace dinámico y funcional en el botón del correo de reserva](https://github.com/angel123297/palacio-del-mar/commit/75cf32c32155511b57f9a2eb85e99cc3d32c6527) (17:44 UTC) — HEAD actual de la rama.
+
+**Pull requests:** **1 PR abierto:** [#23 — Cleanup unused frontend code and dependencies](https://github.com/angel123297/palacio-del-mar/pull/23) (draft, actualizado 26 oct 04:11 UTC, head `cleanup-unused-code-4999260079386501287`). ⚠️ Su base es `proyecto-angular-java` (rama original protegida): revisar y decidir cerrar o cambiar la base antes de cualquier fusión.
+
+**Fase en curso:** plan de 5 fases **entregado** (fusionado el 21 oct). El trabajo nuevo es post-plan: **app móvil** (fases 1–4 móviles con merge `feature/app-movil-fase4-completa`), auth (recuperación de contraseña, refresh tokens), historial/cancelación de reservas, mapa Leaflet y correos HTML corporativos.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — siguen confirmados corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`). Los 10 hallazgos de AUDITORIA_SEGURIDAD.md permanecen cerrados.
+
+**Tests esperados en verde:** ~263+ de backend y ~14+ de frontend (línea base del 22 oct; los commits del día tocan BookingService, PaymentWebhookService y auth, cubiertos por suites existentes, pero **ningún commit reporta corrida de tests**). Pendiente verificación local/CI.
+
+**Riesgos / problemas detectados:**
+- ⚠️ **Commit 4ddecea "Actualización de credencial de Gmail"**: posible credencial/secreto manejado en el repo. Verificar que no haya secretos hardcodeados y que estén en `.env` (no versionado); rotar la credencial si llegó a exponerse.
+- ⚠️ 216dbb1 dejó `createBooking` como stub y fue restaurado en 93e704f 1 hora después: riesgo de regresión en reservas; verificar que `BookingServiceTest` y anti-overbooking (`SuiteNight`) estén en verde.
+- ⚠️ PR #23 con base en `proyecto-angular-java` (rama original): NO fusionar sin decisión explícita del usuario.
+- ⚠️ La app móvil nueva no aparece con tests propios; si se sustenta, agregar suite mínima de smoke.
+- ⚠️ `AGENTS.md` sigue fuera del repositorio (df2c2e0, ignorado vía .gitignore).
+- ℹ️ Persiste el riesgo del conteo de tests (~263) reportado por agentes sin verificación en CI por Vibe.
+
 ### 📅 2026-10-25 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** solo 1 commit, y es el propio reporte diario de QA de ayer — [docs(qa): reporte diario 2026-10-24](https://github.com/angel123297/palacio-del-mar/commit/5ea0c08c2ac6ece9e1e62318eceda4f69139c51c) (24 oct, 14:40 UTC). **Sin cambios de código en el día**: ningún commit de implementación nuevo.
