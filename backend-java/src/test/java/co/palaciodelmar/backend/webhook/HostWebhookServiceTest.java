@@ -14,6 +14,8 @@ import co.palaciodelmar.backend.repository.WebhookSubscriptionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -42,11 +44,21 @@ class HostWebhookServiceTest {
         propertyRepository = mock(PropertyRepository.class);
         webhookDispatcher = mock(WebhookDispatcher.class);
 
+        SsrfProtectionValidator ssrfProtectionValidator = new SsrfProtectionValidator();
+        ssrfProtectionValidator.setDnsResolver(host -> {
+            try {
+                return new InetAddress[]{ InetAddress.getByAddress(new byte[]{93, (byte) 184, (byte) 215, 14}) };
+            } catch (UnknownHostException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
         hostWebhookService = new HostWebhookService(
                 subscriptionRepository,
                 deliveryRepository,
                 propertyRepository,
-                webhookDispatcher
+                webhookDispatcher,
+                ssrfProtectionValidator
         );
 
         hostUser1 = User.builder().id("usr_host_1").email("host1@palacio.co").role("host").build();

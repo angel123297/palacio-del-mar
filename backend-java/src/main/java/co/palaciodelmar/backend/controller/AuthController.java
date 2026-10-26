@@ -118,7 +118,26 @@ public class AuthController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("message", "Si tu correo se encuentra registrado, recibirás una contraseña temporal para acceder.");
+        response.put("message", "Si tu correo se encuentra registrado, recibirás un enlace de restablecimiento de contraseña en breve.");
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> body) {
+        String token = body != null ? body.get("token") : null;
+        String newPassword = body != null ? body.get("newPassword") : null;
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token es requerido");
+        }
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            throw new IllegalArgumentException("Nueva contraseña es requerida");
+        }
+
+        authService.resetPassword(token, newPassword);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.");
         return ResponseEntity.ok(response);
     }
 

@@ -224,16 +224,24 @@ class AuthServiceTest {
     }
 
     @Test
-    void forgotPasswordGeneratesTemporaryPasswordAndSendsEmail() {
+    void forgotPasswordGeneratesSecureTokenAndSendsEmailWithoutModifyingPasswordOrVerification() {
+        testUser.setEmailVerified(false);
+        String originalPassword = testUser.getPassword();
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.encode(anyString())).thenReturn("hashedTempPassword");
 
         authService.forgotPassword("TEST@example.com");
 
-        assertTrue(testUser.getEmailVerified());
-        assertEquals("hashedTempPassword", testUser.getPassword());
+        // NO debe verificar el email automáticamente
+        assertFalse(testUser.getEmailVerified());
+        // NO debe sobreescribir la contraseña actual
+        assertEquals(originalPassword, testUser.getPassword());
+        // Debe generar token y fecha de expiración
+        assertNotNull(testUser.getResetPasswordTokenHash());
+        assertNotNull(testUser.getResetPasswordTokenExpiresAt());
+        assertTrue(testUser.getResetPasswordTokenExpiresAt().isAfter(java.time.Instant.now()));
+
         verify(userRepository).save(testUser);
-        verify(emailService).sendTemporaryPasswordEmail(eq(testUser.getEmail()), anyString());
+        verify(emailService).sendPasswordResetEmail(eq(testUser.getEmail()), anyString());
     }
 
     @Test
@@ -242,7 +250,53 @@ class AuthServiceTest {
 
         assertDoesNotThrow(() -> authService.forgotPassword("unknown@example.com"));
 
-        verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
+        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString());
+    }
+
+    @Test
+    void resetPasswordSuccessUpdatesPasswordAndRevokesTokens() {
+        String rawToken = "my-secure-token-123";
+        testUser.setResetPasswordTokenHash(authService.hashToken(rawToken));
+        testUser.setResetPasswordTokenExpiresAt(java.time.Instant.now().plusSeconds(600));
+
+        when(userRepository.findByResetPasswordTokenHash(anyString())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.encode("newPassword123")).thenReturn("hashedNewPassword");
+
+        authService.resetPassword(rawToken, "newPassword123");
+
+        assertEquals("hashedNewPassword", testUser.getPassword());
+        assertNotNull(testUser.getPasswordChangedAt());
+        assertNull(testUser.getResetPasswordTokenHash());
+        assertNull(testUser.getResetPasswordTokenExpiresAt());
+        verify(userRepository).save(testUser);
+    }
+
+    @Test
+    void resetPasswordFailsWhenTokenExpired() {
+        String rawToken = "expired-token-123";
+        testUser.setResetPasswordTokenHash(authService.hashToken(rawToken));
+        testUser.setResetPasswordTokenExpiresAt(java.time.Instant.now().minusSeconds(10));
+
+        when(userRepository.findByResetPasswordTokenHash(anyString())).thenReturn(Optional.of(testUser));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.resetPassword(rawToken, "newPassword123"));
+        assertTrue(ex.getMessage().contains("expirado"));
+    }
+
+    @Test
+    void resetPasswordFailsWhenTokenInvalid() {
+        when(userRepository.findByResetPasswordTokenHash(anyString())).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.resetPassword("nonexistent-token", "newPassword123"));
+        assertTrue(ex.getMessage().contains("inválido"));
+    }
+
+    @Test
+    void resetPasswordFailsWhenPasswordTooShort() {
+        assertThrows(IllegalArgumentException.class,
+                () -> authService.resetPassword("valid-token", "123"));
     }
 
     @Test

@@ -250,15 +250,43 @@ public class AuthService {
             return;
         }
 
-        String tempPassword = generateTemporaryPassword();
-        user.setPassword(passwordEncoder.encode(tempPassword));
-        // Al enviar la contraseña a su bandeja de correo confirmada, se habilita el acceso
-        user.setEmailVerified(true);
+        // Flujo seguro y no destructivo: NO altera password actual ni emailVerified.
+        // Genera token criptográficamente seguro con validez de 15 minutos almacenado con hash SHA-256.
+        String rawToken = generateSecureToken();
+        String hashedToken = hashToken(rawToken);
+
+        user.setResetPasswordTokenHash(hashedToken);
+        user.setResetPasswordTokenExpiresAt(Instant.now().plus(15, java.time.temporal.ChronoUnit.MINUTES));
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
 
-        emailService.sendTemporaryPasswordEmail(user.getEmail(), tempPassword);
-        log.info("Contraseña temporal generada y enviada a {}", normalizedEmail);
+        emailService.sendPasswordResetEmail(user.getEmail(), rawToken);
+        log.info("Enlace de restablecimiento de contraseña generado y enviado a {}", normalizedEmail);
+    }
+
+    public void resetPassword(String token, String newPassword) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token de restablecimiento es requerido");
+        }
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
+        }
+
+        String hashedToken = hashToken(token.trim());
+        User user = userRepository.findByResetPasswordTokenHash(hashedToken)
+                .orElseThrow(() -> new IllegalArgumentException("Enlace de restablecimiento inválido o ya utilizado"));
+
+        if (user.getResetPasswordTokenExpiresAt() == null || user.getResetPasswordTokenExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("El enlace de restablecimiento ha expirado. Por favor solicita uno nuevo.");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setPasswordChangedAt(Instant.now());
+        user.setResetPasswordTokenHash(null);
+        user.setResetPasswordTokenExpiresAt(null);
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+        log.info("Contraseña restablecida exitosamente para el usuario {}", user.getEmail());
     }
 
     public void resendVerification(String email) {

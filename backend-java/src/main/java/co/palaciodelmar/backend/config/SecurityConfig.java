@@ -28,11 +28,29 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final co.palaciodelmar.backend.security.RateLimitFilter rateLimitFilter;
     private final UserDetailsService userDetailsService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthFilter,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) co.palaciodelmar.backend.security.RateLimitFilter rateLimitFilter,
+            UserDetailsService userDetailsService
+    ) {
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.rateLimitFilter = rateLimitFilter;
+        this.userDetailsService = userDetailsService;
+    }
+
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthFilter,
+            UserDetailsService userDetailsService
+    ) {
+        this(jwtAuthFilter, null, userDetailsService);
+    }
 
     @Value("${app.base-url:http://localhost:4200}")
     private String appBaseUrl = "http://localhost:4200";
@@ -76,8 +94,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/host/**").hasAnyRole("HOST", "ADMIN")
                         .anyRequest().authenticated()
                 )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .authenticationProvider(authenticationProvider());
+
+        if (rateLimitFilter != null) {
+            http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+        }
+        http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -106,8 +128,7 @@ public class SecurityConfig {
                 "http://localhost:4200",
                 "http://localhost:5000",
                 "http://127.0.0.1:4200",
-                "http://127.0.0.1:5000",
-                "https://*.trycloudflare.com"
+                "http://127.0.0.1:5000"
         ));
         if (appBaseUrl != null && !appBaseUrl.isBlank()) {
             String normalizedBaseUrl = appBaseUrl.trim().replaceAll("/+$", "");

@@ -29,6 +29,8 @@ frontend-angular/dist/
 graphify-out/
 scratch/
 .agents/
+.claude/
+skills-lock.json
 AGENTS.md
 *.delivery.json
 docs/*.delivery.json

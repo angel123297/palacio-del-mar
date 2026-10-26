@@ -566,7 +566,7 @@ export class AuthModalComponent {
       next: (res: any) => {
         this.busy = false;
         this.sentForgot = true;
-        this.message = res?.message || 'Si tu correo se encuentra registrado, te hemos enviado una contraseña temporal para ingresar. Revisa tu bandeja de entrada o spam.';
+        this.message = res?.message || 'Si tu correo se encuentra registrado, te hemos enviado un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada o spam.';
         this.cdr.detectChanges();
       },
       error: (err: any) => {

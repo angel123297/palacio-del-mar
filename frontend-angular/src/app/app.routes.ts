@@ -17,6 +17,10 @@ export const routes: Routes = [
   { path: 'perfil', loadComponent: () => import('./pages/profile/profile').then(m => m.ProfileComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },
   { path: 'calendario', loadComponent: () => import('./pages/calendar/calendar').then(m => m.CalendarComponent) },
   { path: 'verificar-email/:token', loadComponent: () => import('./pages/verify-email/verify-email').then(m => m.VerifyEmail) },
+  { path: 'restablecer-contrasena/:token', loadComponent: () => import('./pages/reset-password/reset-password.component').then(m => m.ResetPasswordComponent) },
+  { path: 'reset-password/:token', redirectTo: 'restablecer-contrasena/:token', pathMatch: 'full' },
+  { path: 'restablecer-contrasena', loadComponent: () => import('./pages/reset-password/reset-password.component').then(m => m.ResetPasswordComponent) },
+  { path: 'reset-password', redirectTo: 'restablecer-contrasena', pathMatch: 'full' },
   { path: 'demo/external-hotel', loadComponent: () => import('./pages/external-hotel/external-hotel.component').then(m => m.ExternalHotelComponent) },
   { path: 'simulador-hotel-externo', redirectTo: 'demo/external-hotel', pathMatch: 'full' },
   { path: '**', loadComponent: () => import('./pages/not-found/not-found.component').then(m => m.NotFoundComponent) }

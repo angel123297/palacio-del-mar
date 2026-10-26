@@ -131,6 +131,12 @@ export class AuthService {
     );
   }
 
+  resetPassword(token: string, newPassword: string) {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/reset-password`, { token, newPassword }).pipe(
+      timeout(this.TIMEOUT_MS)
+    );
+  }
+
   logout() {
     const token = localStorage.getItem('token');
     this.clearLocalData();

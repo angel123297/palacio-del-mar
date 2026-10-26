@@ -30,6 +30,7 @@ public class WebhookDispatcher {
     private final WebhookDeliveryRepository deliveryRepository;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final SsrfProtectionValidator ssrfProtectionValidator;
 
     @Autowired(required = false)
     private EmailService emailService;
@@ -51,9 +52,10 @@ public class WebhookDispatcher {
     public WebhookDispatcher(
             WebhookSubscriptionRepository subscriptionRepository,
             WebhookDeliveryRepository deliveryRepository,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper
+            @org.springframework.beans.factory.annotation.Autowired(required = false) ObjectMapper objectMapper,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) SsrfProtectionValidator ssrfProtectionValidator
     ) {
-        this(subscriptionRepository, deliveryRepository, objectMapper, null);
+        this(subscriptionRepository, deliveryRepository, objectMapper, null, ssrfProtectionValidator);
     }
 
     public WebhookDispatcher(
@@ -62,12 +64,23 @@ public class WebhookDispatcher {
             ObjectMapper objectMapper,
             HttpClient httpClient
     ) {
+        this(subscriptionRepository, deliveryRepository, objectMapper, httpClient, new SsrfProtectionValidator());
+    }
+
+    public WebhookDispatcher(
+            WebhookSubscriptionRepository subscriptionRepository,
+            WebhookDeliveryRepository deliveryRepository,
+            ObjectMapper objectMapper,
+            HttpClient httpClient,
+            SsrfProtectionValidator ssrfProtectionValidator
+    ) {
         this.subscriptionRepository = subscriptionRepository;
         this.deliveryRepository = deliveryRepository;
         this.objectMapper = objectMapper != null ? objectMapper.copy().findAndRegisterModules() : new ObjectMapper().findAndRegisterModules();
         this.httpClient = httpClient != null ? httpClient : HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(4))
                 .build();
+        this.ssrfProtectionValidator = ssrfProtectionValidator != null ? ssrfProtectionValidator : new SsrfProtectionValidator();
     }
 
     @EventListener
@@ -119,6 +132,16 @@ public class WebhookDispatcher {
 
     public void executeDelivery(WebhookDelivery delivery, String secret) {
         delivery.setAttempts(delivery.getAttempts() + 1);
+
+        // Segunda barrera estricta: re-validar URL y resolución DNS al despachar
+        if (ssrfProtectionValidator != null && !ssrfProtectionValidator.isSafeUrl(delivery.getTargetUrl())) {
+            log.error("Entrega de webhook {} bloqueada por política SSRF en destino {}", delivery.getEventId(), delivery.getTargetUrl());
+            delivery.setStatus("FAILED");
+            delivery.setErrorMessage("Destino bloqueado por política de seguridad SSRF o host inalcanzable");
+            delivery.setNextRetryAt(null);
+            deliveryRepository.save(delivery);
+            return;
+        }
 
         String signature = WebhookSigner.sign(delivery.getPayload(), secret != null ? secret : "secret");
         String timestamp = String.valueOf(Instant.now().getEpochSecond());

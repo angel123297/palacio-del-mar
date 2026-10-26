@@ -193,6 +193,32 @@ class WebhookDispatcherTest {
     }
 
     @Test
+    void testDeliveryBlockedBySsrfAtDispatchTime() throws IOException, InterruptedException {
+        WebhookDelivery delivery = WebhookDelivery.builder()
+                .id("del_ssrf")
+                .eventId("evt_ssrf_1")
+                .eventType("test.ssrf")
+                .subscriptionId("sub_ssrf")
+                .propertyId("prop_01")
+                .ownerId("host_01")
+                .targetUrl("http://169.254.169.254/latest/meta-data")
+                .payload("{\"test\":true}")
+                .attempts(0)
+                .maxAttempts(3)
+                .status("PENDING")
+                .build();
+
+        dispatcher.executeDelivery(delivery, "mysecret");
+
+        assertEquals(1, delivery.getAttempts());
+        assertEquals("FAILED", delivery.getStatus());
+        assertNull(delivery.getNextRetryAt());
+        assertTrue(delivery.getErrorMessage().contains("SSRF"));
+        // El cliente HTTP jamás debió ser llamado
+        verify(httpClient, never()).send(any(HttpRequest.class), any());
+    }
+
+    @Test
     void testBackoffIntervalsCalculation() {
         assertEquals(60, dispatcher.getBackoffSeconds(1));
         assertEquals(300, dispatcher.getBackoffSeconds(2));

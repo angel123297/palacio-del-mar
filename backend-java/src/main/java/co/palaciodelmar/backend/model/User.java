@@ -51,6 +51,9 @@ public class User {
     private String verificationTokenHash;
     private Instant verificationTokenExpiresAt;
 
+    private String resetPasswordTokenHash;
+    private Instant resetPasswordTokenExpiresAt;
+
     private Profile profile;
 
     @Builder.Default

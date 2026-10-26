@@ -516,6 +516,42 @@ public class EmailService {
     }
 
     @Async
+    public void sendPasswordResetEmail(String toEmail, String token) {
+        if (isBlank(toEmail)) return;
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            configureSender(helper, "seguridad@palaciodelmar.co");
+            helper.setTo(toEmail.trim());
+            helper.setSubject("Restablece tu Contraseña - Palacio del Mar");
+
+            String resetLink = normalizedBaseUrl() + "/restablecer-contrasena/" + token;
+            String htmlMsg = "<div style=\"background:#0d0d0d; color:#fff; font-family:'Segoe UI',Roboto,Helvetica,sans-serif; padding:30px; border-radius:10px; max-width:600px; margin:auto; border:1px solid #c9a96e;\">"
+                    + "<div style=\"text-align:center; margin-bottom:20px;\">"
+                    + "<h1 style=\"color:#c9a96e; font-size:24px; margin:0 0 6px 0; font-family:Georgia,serif;\">Palacio del Mar</h1>"
+                    + "<p style=\"color:#e2c99b; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin:0;\">Seguridad y Acceso</p>"
+                    + "</div>"
+                    + "<h2 style=\"color:#ffffff; font-size:19px; margin-top:0;\">Restablecimiento de Contraseña</h2>"
+                    + "<p style=\"color:#ccc; font-size:14px; line-height:1.6;\">Has solicitado restablecer la contraseña de tu cuenta en Palacio del Mar. Haz clic en el siguiente botón para definir tu nueva clave:</p>"
+                    + "<div style=\"text-align:center; margin:28px 0;\">"
+                    + "<a href=\"" + resetLink + "\" style=\"background:#c9a96e; color:#0d0d0d; padding:13px 28px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:15px; display:inline-block;\">Restablecer mi Contraseña</a>"
+                    + "</div>"
+                    + "<p style=\"color:#999; font-size:12px; line-height:1.5; word-break:break-all;\">Si el botón no abre directamente, copia y pega este enlace en tu navegador:<br>"
+                    + "<a href=\"" + resetLink + "\" style=\"color:#c9a96e;\">" + resetLink + "</a></p>"
+                    + "<p style=\"color:#e6c887; font-size:12px; margin-top:16px;\">⏱️ Este enlace es válido por <strong>15 minutos</strong> y expira automáticamente tras su uso.</p>"
+                    + "<p style=\"color:#777; font-size:11px; margin-top:20px; border-top:1px solid #222; padding-top:12px;\">Si no solicitaste este cambio, puedes ignorar este correo; tu contraseña actual continúa siendo segura y nadie puede acceder sin este enlace.</p>"
+                    + "</div>";
+
+            helper.setText(htmlMsg, true);
+            javaMailSender.send(message);
+            log.info("Correo con enlace de restablecimiento de contraseña enviado exitosamente a {}", toEmail);
+        } catch (Exception e) {
+            log.warn("No se pudo enviar correo con enlace de restablecimiento a {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    @Async
     public void sendTemporaryPasswordEmail(String toEmail, String temporaryPassword) {
         if (isBlank(toEmail)) return;
         try {

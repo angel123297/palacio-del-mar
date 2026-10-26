@@ -374,6 +374,18 @@ class EmailServiceTest {
     }
 
     @Test
+    @DisplayName("sendPasswordResetEmail envía enlace seguro de restablecimiento de contraseña")
+    void testSendPasswordResetEmail_Success() {
+        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
+
+        assertDoesNotThrow(() -> emailService.sendPasswordResetEmail("usuario@ejemplo.com", "secure-token-abc"));
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender, times(1)).send(captor.capture());
+        assertNotNull(captor.getValue());
+    }
+
+    @Test
     @DisplayName("sendTemporaryPasswordEmail envía correo con contraseña temporal al usuario")
     void testSendTemporaryPasswordEmail_Success() {
         when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
