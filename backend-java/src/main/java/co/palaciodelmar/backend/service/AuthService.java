@@ -10,6 +10,12 @@ import co.palaciodelmar.backend.security.JwtService;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,7 +27,6 @@ import java.util.Base64;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -29,6 +34,24 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
+    private MongoTemplate mongoTemplate;
+
+    @Autowired
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       JwtService jwtService, AuthenticationManager authenticationManager,
+                       EmailService emailService,
+                       @Autowired(required = false) MongoTemplate mongoTemplate) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.authenticationManager = authenticationManager;
+        this.emailService = emailService;
+        this.mongoTemplate = mongoTemplate;
+    }
+
+    public void setMongoTemplate(MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
+    }
 
     private String generateSecureToken() {
         SecureRandom secureRandom = new SecureRandom();
@@ -273,18 +296,53 @@ public class AuthService {
         }
 
         String hashedToken = hashToken(token.trim());
+        Instant now = Instant.now();
+
+        // Operación atómica en MongoDB para eliminar cualquier condición de carrera (Race Condition)
+        if (mongoTemplate != null) {
+            Query query = new Query(Criteria.where("resetPasswordTokenHash").is(hashedToken)
+                    .and("resetPasswordTokenExpiresAt").gt(now));
+
+            Update update = new Update()
+                    .set("password", passwordEncoder.encode(newPassword))
+                    .set("passwordChangedAt", now)
+                    .set("updatedAt", now)
+                    .unset("resetPasswordTokenHash")
+                    .unset("resetPasswordTokenExpiresAt");
+
+            User updatedUser = mongoTemplate.findAndModify(
+                    query,
+                    update,
+                    FindAndModifyOptions.options().returnNew(true),
+                    User.class
+            );
+
+            if (updatedUser == null) {
+                // Si la actualización atómica no encontró coincidencia, verificamos si el token existía pero ya expiró
+                java.util.Optional<User> expiredUser = userRepository.findByResetPasswordTokenHash(hashedToken);
+                if (expiredUser.isPresent()) {
+                    throw new IllegalArgumentException("El enlace de restablecimiento ha expirado. Por favor solicita uno nuevo.");
+                }
+                throw new IllegalArgumentException("Enlace de restablecimiento inválido o ya utilizado");
+            }
+
+            log.info("Contraseña restablecida exitosamente de forma atómica para el usuario {}", updatedUser.getEmail());
+            return;
+        }
+
+        // Fallback defensivo si mongoTemplate no está disponible (ej. ciertos tests unitarios aislados)
         User user = userRepository.findByResetPasswordTokenHash(hashedToken)
                 .orElseThrow(() -> new IllegalArgumentException("Enlace de restablecimiento inválido o ya utilizado"));
 
-        if (user.getResetPasswordTokenExpiresAt() == null || user.getResetPasswordTokenExpiresAt().isBefore(Instant.now())) {
+        if (user.getResetPasswordTokenExpiresAt() == null || user.getResetPasswordTokenExpiresAt().isBefore(now)) {
             throw new IllegalArgumentException("El enlace de restablecimiento ha expirado. Por favor solicita uno nuevo.");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
-        user.setPasswordChangedAt(Instant.now());
+        user.setPasswordChangedAt(now);
         user.setResetPasswordTokenHash(null);
         user.setResetPasswordTokenExpiresAt(null);
-        user.setUpdatedAt(Instant.now());
+        user.setUpdatedAt(now);
         userRepository.save(user);
         log.info("Contraseña restablecida exitosamente para el usuario {}", user.getEmail());
     }

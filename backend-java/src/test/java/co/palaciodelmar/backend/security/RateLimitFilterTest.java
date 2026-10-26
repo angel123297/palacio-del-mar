@@ -90,4 +90,59 @@ class RateLimitFilterTest {
         assertEquals(429, response.getStatus());
         assertEquals("600", response.getHeader("Retry-After"));
     }
+
+    @Test
+    @DisplayName("Debe ignorar X-Forwarded-For falsificado si la conexión socket directa no proviene de un proxy confiable")
+    void testDirectUntrustedSocketConnectionIgnoresSpoofedXForwardedFor() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
+        request.setRemoteAddr("198.51.100.77"); // IP pública directa
+        request.addHeader("X-Forwarded-For", "1.2.3.4, 5.6.7.8");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(rateLimitService.checkLimit(eq("login"), eq("198.51.100.77"), eq(10), eq(60)))
+                .thenReturn(new RateLimitService.RateLimitResult(true, 0));
+
+        rateLimitFilter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        // Debe haberse evaluado con la IP del socket, nunca con el header spoofed
+        verify(rateLimitService).checkLimit(eq("login"), eq("198.51.100.77"), eq(10), eq(60));
+        verify(rateLimitService, never()).checkLimit(eq("login"), eq("1.2.3.4"), anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("Debe escanear X-Forwarded-For de derecha a izquierda descartando prefijos falsificados desde proxy confiable")
+    void testTrustedProxyTraversesXForwardedForRightToLeftIgnoringSpoofedPrefix() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
+        request.setRemoteAddr("172.18.0.3"); // Proxy Nginx en red Docker privada (confiable)
+        request.addHeader("X-Forwarded-For", "8.8.8.8, 203.0.113.195, 10.0.0.2");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(rateLimitService.checkLimit(eq("login"), eq("203.0.113.195"), eq(10), eq(60)))
+                .thenReturn(new RateLimitService.RateLimitResult(true, 0));
+
+        rateLimitFilter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        // Debe haber seleccionado el primer salto público desde la derecha (203.0.113.195) ignorando el spoofed (8.8.8.8)
+        verify(rateLimitService).checkLimit(eq("login"), eq("203.0.113.195"), eq(10), eq(60));
+        verify(rateLimitService, never()).checkLimit(eq("login"), eq("8.8.8.8"), anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("Debe manejar cabeceras IP malformadas sin fallar y respaldarse en remoteAddr")
+    void testMalformedIpHeaderFallsBackToRemoteAddr() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader("X-Forwarded-For", "attacker-domain.com; inject, not-an-ip");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(rateLimitService.checkLimit(eq("login"), eq("127.0.0.1"), eq(10), eq(60)))
+                .thenReturn(new RateLimitService.RateLimitResult(true, 0));
+
+        rateLimitFilter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verify(rateLimitService).checkLimit(eq("login"), eq("127.0.0.1"), eq(10), eq(60));
+    }
 }

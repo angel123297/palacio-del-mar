@@ -15,6 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -41,6 +45,9 @@ class AuthServiceTest {
 
     @Mock
     private EmailService emailService;
+
+    @Mock
+    private MongoTemplate mongoTemplate;
 
     @InjectMocks
     private AuthService authService;
@@ -254,8 +261,52 @@ class AuthServiceTest {
     }
 
     @Test
-    void resetPasswordSuccessUpdatesPasswordAndRevokesTokens() {
+    void resetPasswordAtomicSuccessUpdatesPasswordAndRevokesTokens() {
         String rawToken = "my-secure-token-123";
+        testUser.setResetPasswordTokenHash(authService.hashToken(rawToken));
+        testUser.setResetPasswordTokenExpiresAt(java.time.Instant.now().plusSeconds(600));
+
+        when(passwordEncoder.encode("newPassword123")).thenReturn("hashedNewPassword");
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(User.class)))
+                .thenReturn(testUser);
+
+        assertDoesNotThrow(() -> authService.resetPassword(rawToken, "newPassword123"));
+
+        verify(mongoTemplate).findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(User.class));
+    }
+
+    @Test
+    void resetPasswordAtomicPreventsConcurrentRaceCondition() {
+        String rawToken = "race-token-123";
+        // Simula que una solicitud concurrente ya consumió el token en MongoDB
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(User.class)))
+                .thenReturn(null);
+        when(userRepository.findByResetPasswordTokenHash(anyString())).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.resetPassword(rawToken, "newPassword123"));
+        assertTrue(ex.getMessage().contains("inválido o ya utilizado"));
+    }
+
+    @Test
+    void resetPasswordAtomicFailsWhenTokenExpired() {
+        String rawToken = "expired-token-123";
+        testUser.setResetPasswordTokenHash(authService.hashToken(rawToken));
+        testUser.setResetPasswordTokenExpiresAt(java.time.Instant.now().minusSeconds(10));
+
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(User.class)))
+                .thenReturn(null);
+        when(userRepository.findByResetPasswordTokenHash(anyString())).thenReturn(Optional.of(testUser));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> authService.resetPassword(rawToken, "newPassword123"));
+        assertTrue(ex.getMessage().contains("expirado"));
+    }
+
+    @Test
+    void resetPasswordFallbackSuccessWhenMongoTemplateNull() {
+        authService.setMongoTemplate(null);
+        String rawToken = "fallback-token-123";
         testUser.setResetPasswordTokenHash(authService.hashToken(rawToken));
         testUser.setResetPasswordTokenExpiresAt(java.time.Instant.now().plusSeconds(600));
 
@@ -272,20 +323,9 @@ class AuthServiceTest {
     }
 
     @Test
-    void resetPasswordFailsWhenTokenExpired() {
-        String rawToken = "expired-token-123";
-        testUser.setResetPasswordTokenHash(authService.hashToken(rawToken));
-        testUser.setResetPasswordTokenExpiresAt(java.time.Instant.now().minusSeconds(10));
-
-        when(userRepository.findByResetPasswordTokenHash(anyString())).thenReturn(Optional.of(testUser));
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> authService.resetPassword(rawToken, "newPassword123"));
-        assertTrue(ex.getMessage().contains("expirado"));
-    }
-
-    @Test
     void resetPasswordFailsWhenTokenInvalid() {
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(User.class)))
+                .thenReturn(null);
         when(userRepository.findByResetPasswordTokenHash(anyString())).thenReturn(Optional.empty());
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,

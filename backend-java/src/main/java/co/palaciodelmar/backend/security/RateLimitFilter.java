@@ -13,7 +13,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Filtro de seguridad para aplicar límites de tasa (Rate Limiting) en endpoints críticos de autenticación.
@@ -75,15 +78,75 @@ public class RateLimitFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String resolveClientIp(HttpServletRequest request) {
+    private static final Pattern IPV4_PATTERN =
+            Pattern.compile("^((25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(25[0-5]|2[0-4]\\d|[01]?\\d\\d?)$");
+    private static final Pattern IPV6_PATTERN =
+            Pattern.compile("^[0-9a-fA-F:]+$");
+
+    public static boolean isValidIpLiteral(String ip) {
+        if (ip == null || ip.isBlank()) return false;
+        String trimmed = ip.trim();
+        return IPV4_PATTERN.matcher(trimmed).matches() || (trimmed.contains(":") && IPV6_PATTERN.matcher(trimmed).matches());
+    }
+
+    public static boolean isTrustedProxy(String ip) {
+        if (!isValidIpLiteral(ip)) {
+            return false;
+        }
+        try {
+            InetAddress address = InetAddress.getByName(ip.trim());
+            return address.isLoopbackAddress()
+                    || address.isSiteLocalAddress()
+                    || address.isLinkLocalAddress();
+        } catch (UnknownHostException e) {
+            return false;
+        }
+    }
+
+    public String resolveClientIp(HttpServletRequest request) {
+        String remoteAddr = request.getRemoteAddr();
+        if (remoteAddr == null || remoteAddr.isBlank()) {
+            return "unknown";
+        }
+        remoteAddr = remoteAddr.trim();
+
+        // 1. Si la conexión socket directa NO proviene de un proxy confiable (loopback o red privada interna),
+        // ignoramos cualquier encabezado X-Forwarded-For / X-Real-IP para prevenir IP spoofing directo.
+        if (!isTrustedProxy(remoteAddr)) {
+            return remoteAddr;
+        }
+
+        // 2. Si proviene de un proxy de confianza (Nginx, Docker bridge, localhost),
+        // inspeccionamos la cadena X-Forwarded-For de derecha a izquierda (desde el salto más cercano y confiable).
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
+            String[] hops = xForwardedFor.split(",");
+            for (int i = hops.length - 1; i >= 0; i--) {
+                String candidate = hops[i].trim();
+                if (isValidIpLiteral(candidate) && !isTrustedProxy(candidate)) {
+                    // Primer IP público / no confiable desde la derecha: el cliente externo legítimo
+                    return candidate;
+                }
+            }
+            // Si todos los saltos fueron proxies internos/locales (entorno de pruebas o LAN),
+            // seleccionamos el último salto válido
+            for (int i = hops.length - 1; i >= 0; i--) {
+                String candidate = hops[i].trim();
+                if (isValidIpLiteral(candidate)) {
+                    return candidate;
+                }
+            }
         }
+
+        // 3. Alternativa X-Real-IP provista por el proxy confiable
         String xRealIp = request.getHeader("X-Real-IP");
         if (xRealIp != null && !xRealIp.isBlank()) {
-            return xRealIp.trim();
+            String candidate = xRealIp.trim();
+            if (isValidIpLiteral(candidate)) {
+                return candidate;
+            }
         }
-        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
+
+        return remoteAddr;
     }
 }
