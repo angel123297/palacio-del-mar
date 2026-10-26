@@ -464,6 +464,17 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     }
     if (this.paymentForm.invalid || !this.booking) {
       this.paymentForm.markAllAsTouched();
+      this.errorMsg = 'Por favor completa todos los campos requeridos de la tarjeta.';
+      this.cdr.detectChanges();
+      if (this.paymentForm.get('cardName')?.invalid) {
+        document.getElementById('checkout-card-name')?.focus();
+      } else if (this.paymentForm.get('cardNumber')?.invalid) {
+        document.getElementById('checkout-card-number')?.focus();
+      } else if (this.paymentForm.get('expiry')?.invalid) {
+        document.getElementById('checkout-card-expiry')?.focus();
+      } else if (this.paymentForm.get('cvv')?.invalid) {
+        document.getElementById('checkout-card-cvv')?.focus();
+      }
       return;
     }
 
