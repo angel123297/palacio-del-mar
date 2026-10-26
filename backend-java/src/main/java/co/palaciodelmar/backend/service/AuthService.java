@@ -63,12 +63,14 @@ public class AuthService {
         String normalizedEmail = request.getEmail().toLowerCase();
         if (userRepository.existsByEmail(normalizedEmail)) {
             User existing = userRepository.findByEmail(normalizedEmail).orElse(null);
-            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank())) {
+            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank() || !Boolean.TRUE.equals(existing.getEmailVerified()))) {
                 String rawToken = generateSecureToken();
                 String hashedToken = hashToken(rawToken);
 
                 existing.setName(request.getName());
-                existing.setLastName(request.getLastName());
+                if (request.getLastName() != null) {
+                    existing.setLastName(request.getLastName());
+                }
                 existing.setPassword(passwordEncoder.encode(request.getPassword()));
                 existing.setEmailVerified(false);
                 existing.setVerificationTokenHash(hashedToken);
@@ -257,6 +259,33 @@ public class AuthService {
 
         emailService.sendTemporaryPasswordEmail(user.getEmail(), tempPassword);
         log.info("Contraseña temporal generada y enviada a {}", normalizedEmail);
+    }
+
+    public void resendVerification(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email es requerido");
+        }
+        String normalizedEmail = email.trim().toLowerCase();
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
+        if (user == null) {
+            log.info("Solicitud de reenvío de verificación para correo no registrado: {}", normalizedEmail);
+            return;
+        }
+
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new IllegalStateException("Tu cuenta ya se encuentra verificada. Puedes iniciar sesión directamente.");
+        }
+
+        String rawToken = generateSecureToken();
+        String hashedToken = hashToken(rawToken);
+
+        user.setVerificationTokenHash(hashedToken);
+        user.setVerificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        emailService.sendVerificationEmail(user.getEmail(), rawToken);
+        log.info("Nuevo correo de verificación reenviado exitosamente a {}", normalizedEmail);
     }
 
     private String generateTemporaryPassword() {

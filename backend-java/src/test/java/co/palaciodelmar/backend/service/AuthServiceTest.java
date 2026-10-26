@@ -244,4 +244,60 @@ class AuthServiceTest {
 
         verify(emailService, never()).sendTemporaryPasswordEmail(anyString(), anyString());
     }
+
+    @Test
+    void resendVerificationRegeneratesTokenAndSendsEmailWhenUserUnverified() {
+        testUser.setEmailVerified(false);
+        String oldHash = "old-hash-12345";
+        testUser.setVerificationTokenHash(oldHash);
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenReturn(testUser);
+
+        authService.resendVerification("juan.perez@example.com");
+
+        assertNotNull(testUser.getVerificationTokenHash());
+        assertNotEquals(oldHash, testUser.getVerificationTokenHash(), "El hash del token anterior debe ser invalidado y reemplazado");
+        assertNotNull(testUser.getVerificationTokenExpiresAt());
+        verify(userRepository).save(testUser);
+        verify(emailService).sendVerificationEmail(eq("juan.perez@example.com"), anyString());
+    }
+
+    @Test
+    void resendVerificationThrowsIllegalStateExceptionIfUserAlreadyVerified() {
+        testUser.setEmailVerified(true);
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> authService.resendVerification("juan.perez@example.com"));
+        assertTrue(ex.getMessage().contains("ya se encuentra verificada"));
+        verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
+    }
+
+    @Test
+    void resendVerificationHandlesUnknownEmailGracefully() {
+        when(userRepository.findByEmail("desconocido@example.com")).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> authService.resendVerification("desconocido@example.com"));
+        verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
+    }
+
+    @Test
+    void registerOverwritesAndResendsWhenUserExistsAndUnverified() {
+        testUser.setEmailVerified(false);
+        String oldHash = "old-hash-99999";
+        testUser.setVerificationTokenHash(oldHash);
+
+        when(userRepository.existsByEmail("juan.perez@example.com")).thenReturn(true);
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.encode(anyString())).thenReturn("newHashedPassword");
+        when(userRepository.save(any(User.class))).thenReturn(testUser);
+
+        registerRequest.setPassword("newSecretPassword123");
+        AuthResponse res = authService.register(registerRequest);
+
+        assertNotNull(res);
+        assertNull(res.getToken());
+        assertNotEquals(oldHash, testUser.getVerificationTokenHash());
+        verify(emailService).sendVerificationEmail(eq("juan.perez@example.com"), anyString());
+        verify(userRepository).save(testUser);
+    }
 }

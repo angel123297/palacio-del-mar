@@ -119,6 +119,12 @@ export class AuthService {
     );
   }
 
+  resendVerification(email: string) {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/resend-verification`, { email }).pipe(
+      timeout(this.TIMEOUT_MS)
+    );
+  }
+
   forgotPassword(email: string) {
     return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/forgot-password`, { email }).pipe(
       timeout(this.TIMEOUT_MS)

@@ -78,9 +78,12 @@ import { environment } from '../../../environments/environment';
             {{ busy ? 'Entrando…' : 'Iniciar sesión' }}
           </button>
 
-          <p *ngIf="message" [attr.role]="isSuccess ? 'status' : 'alert'" aria-live="polite" [style.color]="isSuccess ? '#2ecc71' : '#ff4d4d'" [style.background]="isSuccess ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="isSuccess ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 8px 12px; border-radius: 6px; border-width: 1px; border-style: solid; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <div *ngIf="message" [attr.role]="isSuccess ? 'status' : 'alert'" aria-live="polite" [style.color]="isSuccess ? '#2ecc71' : '#ff4d4d'" [style.background]="isSuccess ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="isSuccess ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 10px 14px; border-radius: 6px; border-width: 1px; border-style: solid; display: flex; flex-direction: column; align-items: center; gap: 8px;">
             <span>{{ message }}</span>
-          </p>
+            <button *ngIf="showResendVerification" type="button" (click)="resendVerificationEmail()" [disabled]="busyResend" style="background: var(--gold); color: #0d0d0d; border: none; border-radius: 4px; padding: 6px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;">
+              {{ busyResend ? 'Reenviando…' : '✉️ Reenviar enlace de verificación' }}
+            </button>
+          </div>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿No tienes cuenta?
@@ -170,9 +173,12 @@ import { environment } from '../../../environments/environment';
             {{ busy ? 'Creando cuenta…' : 'Crear cuenta' }}
           </button>
 
-          <p *ngIf="message" role="alert" aria-live="assertive" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.9rem; font-weight: 500; background: rgba(255, 77, 77, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 77, 77, 0.3);">
-            {{ message }}
-          </p>
+          <div *ngIf="message" role="alert" aria-live="assertive" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.9rem; font-weight: 500; background: rgba(255, 77, 77, 0.1); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255, 77, 77, 0.3); display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <span>{{ message }}</span>
+            <button *ngIf="showResendVerification" type="button" (click)="resendVerificationEmail()" [disabled]="busyResend" style="background: var(--gold); color: #0d0d0d; border: none; border-radius: 4px; padding: 6px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;">
+              {{ busyResend ? 'Reenviando…' : '✉️ Reenviar enlace de verificación' }}
+            </button>
+          </div>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿Ya tienes cuenta?
@@ -272,6 +278,9 @@ export class AuthModalComponent {
     this.showRegPassword = false;
     this.showConfirmPassword = false;
     this._isOpen = true;
+    this.showResendVerification = false;
+    this.busyResend = false;
+    this.targetVerificationEmail = '';
     this.cdr.detectChanges();
   }
 
@@ -279,6 +288,8 @@ export class AuthModalComponent {
     this.mode = 'register';
     this.registerRole = this.selectedPortal === 'host' ? 'host' : 'user';
     this.message = '';
+    this.showResendVerification = false;
+    this.busyResend = false;
     this.cdr.markForCheck();
   }
 
@@ -286,6 +297,8 @@ export class AuthModalComponent {
     this.mode = 'login';
     this.selectedPortal = this.registerRole === 'host' ? 'host' : 'guest';
     this.message = '';
+    this.showResendVerification = false;
+    this.busyResend = false;
     this.cdr.markForCheck();
   }
 
@@ -348,6 +361,9 @@ export class AuthModalComponent {
   showLoginPassword = false;
   showRegPassword = false;
   showConfirmPassword = false;
+  showResendVerification = false;
+  busyResend = false;
+  targetVerificationEmail = '';
 
   constructor(
     private auth: AuthService,
@@ -378,14 +394,46 @@ export class AuthModalComponent {
     this.showLoginPassword = false;
     this.showRegPassword = false;
     this.showConfirmPassword = false;
+    this.showResendVerification = false;
+    this.busyResend = false;
+    this.targetVerificationEmail = '';
     this.closeEvent.emit();
     this.cdr.detectChanges();
+  }
+
+  resendVerificationEmail(): void {
+    const emailToUse = (this.targetVerificationEmail || this.email || '').trim();
+    if (!emailToUse) {
+      this.message = 'Por favor escribe tu correo electrónico para reenviar la verificación.';
+      this.isSuccess = false;
+      return;
+    }
+
+    this.busyResend = true;
+    this.cdr.detectChanges();
+
+    this.auth.resendVerification(emailToUse).subscribe({
+      next: (res: any) => {
+        this.busyResend = false;
+        this.showResendVerification = false;
+        this.isSuccess = true;
+        this.message = res?.message || 'Hemos enviado un nuevo enlace de verificación a tu correo. El enlace anterior ha quedado invalidado; revisa tu bandeja de entrada.';
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.busyResend = false;
+        this.isSuccess = false;
+        this.message = err.error?.message || 'No se pudo reenviar el enlace. Por favor intenta nuevamente.';
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   submitLogin(): void {
     this.busy = true;
     this.message = '';
     this.isSuccess = false;
+    this.showResendVerification = false;
     this.cdr.detectChanges();
 
     const payload = {
@@ -429,7 +477,14 @@ export class AuthModalComponent {
       error: (err) => {
         this.busy = false;
         this.isSuccess = false;
-        this.message = err.error?.message || 'Credenciales inválidas.';
+        const msg = err.error?.message || 'Credenciales inválidas.';
+        this.message = msg;
+        if (msg.toLowerCase().includes('verificar tu correo') || msg.toLowerCase().includes('verific') || msg.toLowerCase().includes('bandeja')) {
+          this.showResendVerification = true;
+          this.targetVerificationEmail = (this.email || '').trim();
+        } else {
+          this.showResendVerification = false;
+        }
         this.cdr.detectChanges();
       }
     });
@@ -450,6 +505,7 @@ export class AuthModalComponent {
     this.busy = true;
     this.message = '';
     this.isSuccess = false;
+    this.showResendVerification = false;
     this.cdr.detectChanges();
 
     const payload = {
@@ -466,9 +522,11 @@ export class AuthModalComponent {
         this.selectedPortal = this.registerRole === 'host' ? 'host' : 'guest';
         this.mode = 'login';
         this.isSuccess = true;
-        this.message = '¡Cuenta creada! Te hemos enviado un enlace a tu correo. Por favor verifícalo para iniciar sesión.';
+        this.message = '¡Cuenta registrada! Te hemos enviado un enlace a tu correo. Por favor verifícalo para iniciar sesión.';
         this.password = '';
         this.confirmPassword = '';
+        this.showResendVerification = true;
+        this.targetVerificationEmail = payload.email;
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -478,10 +536,14 @@ export class AuthModalComponent {
         const lowerMsg = rawMsg.toLowerCase();
         if (lowerMsg.includes('teléfono') || lowerMsg.includes('telefono') || lowerMsg.includes('phone')) {
           this.message = rawMsg || 'El número de teléfono ya está registrado con otra cuenta.';
+          this.showResendVerification = false;
         } else if (lowerMsg.includes('email') || lowerMsg.includes('correo')) {
-          this.message = `El correo ${payload.email} ya está registrado. Por favor haz clic en "Inicia sesión".`;
+          this.message = `El correo ${payload.email} ya está registrado. ¿Aún no has verificado tu cuenta o deseas ingresar?`;
+          this.showResendVerification = true;
+          this.targetVerificationEmail = payload.email;
         } else {
           this.message = rawMsg || 'No se pudo crear la cuenta. Intenta de nuevo.';
+          this.showResendVerification = false;
         }
         this.cdr.detectChanges();
       }
