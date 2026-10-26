@@ -122,6 +122,7 @@ export interface RegisterDTO {
   email: string;
   password?: string;
   phone?: string;
+  role?: string;
 }
 
 export interface Booking {

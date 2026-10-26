@@ -63,12 +63,14 @@ public class AuthService {
         String normalizedEmail = request.getEmail().toLowerCase();
         if (userRepository.existsByEmail(normalizedEmail)) {
             User existing = userRepository.findByEmail(normalizedEmail).orElse(null);
-            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank())) {
+            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank() || !Boolean.TRUE.equals(existing.getEmailVerified()))) {
                 String rawToken = generateSecureToken();
                 String hashedToken = hashToken(rawToken);
 
                 existing.setName(request.getName());
-                existing.setLastName(request.getLastName());
+                if (request.getLastName() != null) {
+                    existing.setLastName(request.getLastName());
+                }
                 existing.setPassword(passwordEncoder.encode(request.getPassword()));
                 existing.setEmailVerified(false);
                 existing.setVerificationTokenHash(hashedToken);
@@ -99,6 +101,17 @@ public class AuthService {
             throw new IllegalArgumentException("El número de teléfono ya está registrado");
         }
 
+        String assignedRole = "user";
+        if (request.getRole() != null && !request.getRole().trim().isEmpty()) {
+            String requested = request.getRole().trim();
+            if ("admin".equalsIgnoreCase(requested)) {
+                throw new IllegalArgumentException("No se permite el autorregistro con rol de administrador");
+            }
+            if ("host".equalsIgnoreCase(requested)) {
+                assignedRole = "host";
+            }
+        }
+
         String rawToken = generateSecureToken();
         String hashedToken = hashToken(rawToken);
 
@@ -107,7 +120,7 @@ public class AuthService {
                 .lastName(request.getLastName())
                 .email(request.getEmail().toLowerCase())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role("user")
+                .role(assignedRole)
                 .status("active")
                 .emailVerified(false)
                 .verificationTokenHash(hashedToken)
@@ -146,8 +159,8 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Email o contraseña inválidos"));
 
-        // Bloqueo de seguridad: exigir verificación de email (a menos que sea rol admin o host)
-        if (!Boolean.TRUE.equals(user.getEmailVerified()) && !"admin".equalsIgnoreCase(user.getRole()) && !"host".equalsIgnoreCase(user.getRole())) {
+        // Bloqueo de seguridad: exigir verificación de email (a menos que sea rol admin)
+        if (!Boolean.TRUE.equals(user.getEmailVerified()) && !"admin".equalsIgnoreCase(user.getRole())) {
             throw new IllegalStateException("Debes verificar tu correo electrónico antes de iniciar sesión. Por favor revisa tu bandeja de entrada.");
         }
 
@@ -210,17 +223,6 @@ public class AuthService {
                 .build();
     }
 
-    public void forceVerify(String email) {
-        User user = userRepository.findByEmail(email.toLowerCase())
-                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
-
-        user.setEmailVerified(true);
-        user.setVerificationTokenHash(null);
-        user.setVerificationTokenExpiresAt(null);
-        user.setUpdatedAt(Instant.now());
-        userRepository.save(user);
-    }
-
     public void changePassword(String userId, String currentPassword, String newPassword) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
@@ -257,6 +259,33 @@ public class AuthService {
 
         emailService.sendTemporaryPasswordEmail(user.getEmail(), tempPassword);
         log.info("Contraseña temporal generada y enviada a {}", normalizedEmail);
+    }
+
+    public void resendVerification(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email es requerido");
+        }
+        String normalizedEmail = email.trim().toLowerCase();
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
+        if (user == null) {
+            log.info("Solicitud de reenvío de verificación para correo no registrado: {}", normalizedEmail);
+            return;
+        }
+
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new IllegalStateException("Tu cuenta ya se encuentra verificada. Puedes iniciar sesión directamente.");
+        }
+
+        String rawToken = generateSecureToken();
+        String hashedToken = hashToken(rawToken);
+
+        user.setVerificationTokenHash(hashedToken);
+        user.setVerificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS));
+        user.setUpdatedAt(Instant.now());
+        userRepository.save(user);
+
+        emailService.sendVerificationEmail(user.getEmail(), rawToken);
+        log.info("Nuevo correo de verificación reenviado exitosamente a {}", normalizedEmail);
     }
 
     private String generateTemporaryPassword() {

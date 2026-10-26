@@ -2,6 +2,7 @@ package co.palaciodelmar.backend.config;
 
 import co.palaciodelmar.backend.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,6 +23,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -31,6 +33,9 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
+
+    @Value("${app.base-url:http://localhost:4200}")
+    private String appBaseUrl = "http://localhost:4200";
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -46,9 +51,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new org.springframework.security.web.authentication.HttpStatusEntryPoint(org.springframework.http.HttpStatus.UNAUTHORIZED))
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/verify-email", "/api/auth/reset-password", "/api/auth/forgot-password", "/api/auth/logout").permitAll()
-                        // Ruta pública a nivel de seguridad; el controlador responde 404 si app.dev.force-verify.enabled=false
-                        .requestMatchers(HttpMethod.POST, "/api/auth/force-verify").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/verify-email", "/api/auth/resend-verification", "/api/auth/reset-password", "/api/auth/forgot-password", "/api/auth/logout").permitAll()
                         .requestMatchers("/api/auth/profile", "/api/auth/change-password", "/api/auth/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/branches/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll()
@@ -99,7 +102,20 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:4200", "http://localhost:5000", "http://127.0.0.1:4200", "http://127.0.0.1:5000"));
+        List<String> originPatterns = new ArrayList<>(List.of(
+                "http://localhost:4200",
+                "http://localhost:5000",
+                "http://127.0.0.1:4200",
+                "http://127.0.0.1:5000",
+                "https://*.trycloudflare.com"
+        ));
+        if (appBaseUrl != null && !appBaseUrl.isBlank()) {
+            String normalizedBaseUrl = appBaseUrl.trim().replaceAll("/+$", "");
+            if (!normalizedBaseUrl.isEmpty() && !originPatterns.contains(normalizedBaseUrl)) {
+                originPatterns.add(normalizedBaseUrl);
+            }
+        }
+        configuration.setAllowedOriginPatterns(originPatterns);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

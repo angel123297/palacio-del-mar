@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { tap, timeout } from 'rxjs';
 import { User, AuthResponse, LoginDTO, RegisterDTO } from '../models/types';
 import { environment } from '../../environments/environment';
@@ -20,7 +21,7 @@ export class AuthService {
     return !!user && user.emailVerified !== false;
   }
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private router: Router) {
     this.loadCachedUser();
     this.fetchMe();
   }
@@ -118,8 +119,8 @@ export class AuthService {
     );
   }
 
-  forceVerify(email: string) {
-    return this.http.post<{success?: boolean, message?: string}>(`${this.apiUrl}/force-verify`, { email }).pipe(
+  resendVerification(email: string) {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/resend-verification`, { email }).pipe(
       timeout(this.TIMEOUT_MS)
     );
   }
@@ -131,14 +132,15 @@ export class AuthService {
   }
 
   logout() {
-    return this.http.post(`${this.apiUrl}/logout`, {}).pipe(
-      tap(() => {
-        this.clearLocalData();
-      })
+    const token = localStorage.getItem('token');
+    this.clearLocalData();
+    this.router.navigate(['/']);
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    return this.http.post(`${this.apiUrl}/logout`, {}, { headers }).pipe(
+      timeout(this.TIMEOUT_MS)
     ).subscribe({
-      error: () => {
-        this.clearLocalData();
-      }
+      next: () => {},
+      error: () => {}
     });
   }
 }

@@ -1,4 +1,3 @@
-successfully downloaded text file (SHA: f85828abc2922def7fd842577b2bad56179689a1)
 # 🧪 QA Report — Palacio del Mar
 
 Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (Colombia) con la tarea programada de Vibe. Aquí se registran los resultados de Jules y de Vibe.
@@ -13,6 +12,46 @@ Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (C
 - Todos los bloqueantes y hallazgos reportados han sido completamente solucionados.
 
 ## 🗓️ Reporte diario (bitácora)
+
+### 📅 2026-10-24 — Revisión diaria de Vibe: sin cambios en el día
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** solo 1 commit, y es el propio reporte diario de QA de ayer — [docs(qa): reporte diario 2026-10-23](https://github.com/angel123297/palacio-del-mar/commit/fa1dd3383d6ad00caef665cf21ea1c434b9a9be1) (23 oct, 14:20 UTC). **Sin cambios de código en el día**: ningún commit de implementación nuevo.
+
+**Pull requests:** **0 PRs abiertos** (verificado vía GitHub API). Backlog de PRs sigue limpio desde el 21 oct (#20 fue el último, ya fusionado).
+
+**Fase en curso:** plan de 5 fases **entregado** (fusionado a `proyecto-angular-java` el 21 oct). Sin avance post-plan en el día (la última actividad funcional fue el 22 oct: auth/UX, calendario con turnover checkout, email real y builds Docker).
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — siguen confirmados corregidos y activados desde el 16 oct (`PriceIntegritySecurityTest` sin `@Disabled`). Los 10 hallazgos de AUDITORIA_SEGURIDAD.md permanecen cerrados.
+
+**Tests esperados en verde:** ~263+ de backend y ~14+ de frontend (cifras heredadas del 22–23 oct; al no haber commits de código, la línea base del 22 oct se mantiene). No se detectan fallos; riesgo menor: sin commits no hay evidencia fresca de CI del día, se recomienda verificar Actions en el próximo commit.
+
+
+### 📅 2026-10-23 — Revisión diaria de Vibe: fixes de auth/UX, calendario con días de rotación y builds Docker; sin PRs abiertos
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`, todos del usuario/agentes, 22 oct 20:01–22:43 UTC):**
+- [fix(docker): agregar reintentos de red y timeouts extendidos para npm y maven en builds](https://github.com/angel123297/palacio-del-mar/commit/d5e6590bab238de844fe775d711b8fe80005ddeb) (20:01 UTC).
+- [feat(calendar): soportar dias de rotacion hotelera (turnover checkout) y filtrar reservas canceladas en motor de inventario](https://github.com/angel123297/palacio-del-mar/commit/02dacc9788285c4fa9de351a56843e913f0d83c2) (20:46 UTC) — turnover checkout en calendario; reservas canceladas ya no consumen inventario.
+- [feat(auth,email,roles): separar portales corporativos, notificaciones por email real y restricciones de reservas para anfitrion/admin](https://github.com/angel123297/palacio-del-mar/commit/bb98b176684e362597536a15fabf8eadb2535fc3) (22:02 UTC) — email real (deja Mailpit como entorno de prueba), restricciones de rol para reservas.
+- [fix(navbar): unificar acceso en botón iniciar sesión y remover portal corporativo redundante](https://github.com/angel123297/palacio-del-mar/commit/a93940f8ab1407dbfa1b1f9bdb458eb55e26e851) (22:15 UTC).
+- [fix(auth): corregir mapeo de error de teléfono duplicado que mostraba erróneamente correo ya registrado](https://github.com/angel123297/palacio-del-mar/commit/feff000b77d91c12c6dd348c0c7a6cb45e4dcc4c) (22:27 UTC).
+- [fix(docker): agregar valor por defecto de desarrollo para JWT_SECRET cuando falta archivo .env](https://github.com/angel123297/palacio-del-mar/commit/bd6587004506b41e16f5cfe7a373dae6c2e1ddbc) (22:27 UTC).
+- [feat(auth): habilitar boton verificar ahora directamente en modal de inicio de sesion](https://github.com/angel123297/palacio-del-mar/commit/7ab6c75b4a860178c3b4fcd57089026d79375daf) (22:43 UTC) — HEAD actual de la rama.
+
+**Pull requests:** **0 PRs abiertos.** Sin cambios de estado: todos los PRs previos siguen cerrados (backlog limpio desde el 21 oct).
+
+**Fase en curso:** plan de 5 fases **entregado** (fusionado a `proyecto-angular-java` vía #20 y merge f5302db del 21 oct). Actividad post-plan: UX de autenticación, portales por rol, email transaccional real y robustez de builds Docker.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — confirmados corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`). Los 10 hallazgos de AUDITORIA_SEGURIDAD.md permanecen cerrados.
+
+**Tests esperados en verde:** ~263+ de backend y ~14+ de frontend (cifras heredadas del 21–22 oct; los commits de hoy tocan auth, calendario e email, cubiertos por suites existentes, pero **ningún commit reporta corrida de tests**). **Pendiente verificación local/CI** (el conector no expone corridas de Actions).
+
+**Riesgos / problemas detectados:**
+- ⚠️ El fix de JWT_SECRET por defecto para desarrollo (bd65870) debe quedar restringido a perfil dev: un valor por defecto en producción invalidaría el hallazgo PDM relacionado con el secret JWT. Verificar `application.yml`/perfiles.
+- ⚠️ La validación de error de teléfono duplicado (feff000) sugiere que la BD ya no usa constraint única de teléfono o que el manejo era incompleto: revisar que exista validación a nivel de servicio y no solo mapeo del error.
+- ⚠️ Email "real" (bb98b17): confirmar que las credenciales SMTP no estén hardcodeadas y que Mailpit siga disponible para entornos de prueba/sustentación.
+- ⚠️ Cambios de calendario (02dacc9) tocan el motor de inventario: verificar que los tests de disponibilidad/anti-overbooking (`SuiteNight`) sigan en verde.
+- ⚠️ Persiste la 2ª fusión sobre `proyecto-angular-java` (f5302db, 21 oct): si la regla es no modificar la rama original, confirmar si fue intencional.
+- ⚠️ `AGENTS.md` sigue fuera del repositorio (df2c2e0, ignorado vía .gitignore).
 
 ### 📅 2026-10-22 — Revisión diaria de Vibe: migración TS/SCSS, plan de carga JMeter y fixes de calendario; sin PRs abiertos
 
