@@ -382,4 +382,121 @@ class BookingOwnershipSecurityTest {
         assertEquals(1, savedNights.size());
         assertEquals("confirmed", savedNights.get(0).getStatus());
     }
+
+    @Test
+    @DisplayName("A-4: modifyBooking re-verifica estado dentro del lock y rechaza reserva expirada concurrentemente")
+    void testModifyBookingRejectsConcurrentlyExpiredBookingInsideLock() {
+        Booking outerPending = victimBooking();
+        outerPending.setStatus("pending");
+
+        Booking innerExpired = victimBooking();
+        innerExpired.setStatus("expired");
+
+        when(bookingRepository.findById("b-victim"))
+                .thenReturn(Optional.of(outerPending))
+                .thenReturn(Optional.of(innerExpired));
+
+        co.palaciodelmar.backend.model.Suite suite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-1")
+                .branch("branch-1")
+                .basePrice(java.math.BigDecimal.valueOf(500000))
+                .maxGuests(4)
+                .totalUnits(1)
+                .active(true)
+                .available(true)
+                .build();
+        when(suiteRepository.findById("suite-1")).thenReturn(Optional.of(suite));
+
+        BookingRequest modReq = BookingRequest.builder()
+                .suiteId("suite-1")
+                .checkIn(LocalDate.now().plusDays(6))
+                .checkOut(LocalDate.now().plusDays(8))
+                .guests(2)
+                .build();
+
+        assertThrows(IllegalArgumentException.class, () ->
+                bookingService.modifyBooking("b-victim", "user-victim", modReq));
+        org.mockito.Mockito.verify(suiteNightRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(bookingRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("A-4: modifyBooking revierte noches nuevas y restaura originales si falla bookingRepository.save")
+    void testModifyBookingRestoresOriginalNightsWhenSaveFails() {
+        Booking existing = victimBooking();
+        existing.setStatus("confirmed");
+        when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(existing));
+
+        co.palaciodelmar.backend.model.Suite suite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-1")
+                .branch("branch-1")
+                .basePrice(java.math.BigDecimal.valueOf(500000))
+                .maxGuests(4)
+                .totalUnits(1)
+                .active(true)
+                .available(true)
+                .build();
+        when(suiteRepository.findById("suite-1")).thenReturn(Optional.of(suite));
+        co.palaciodelmar.backend.model.SuiteNight origNight = co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("orig-sn-1")
+                .suite("suite-1")
+                .unitSlot(1)
+                .booking("b-victim")
+                .status("confirmed")
+                .build();
+        when(suiteNightRepository.findByBooking("b-victim")).thenReturn(List.of(origNight));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new ArrayList<>());
+        when(promotionRepository.findByBranchAndActiveTrue("branch-1")).thenReturn(List.of());
+        when(pricingService.calculatePrice(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new PricingService.PricingResult(
+                        java.math.BigDecimal.valueOf(500000),
+                        java.math.BigDecimal.ZERO,
+                        java.math.BigDecimal.valueOf(95000),
+                        java.math.BigDecimal.valueOf(595000),
+                        List.of()
+                ));
+        when(suiteNightRepository.save(org.mockito.ArgumentMatchers.any(co.palaciodelmar.backend.model.SuiteNight.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(org.mockito.ArgumentMatchers.any(Booking.class)))
+                .thenThrow(new org.springframework.dao.OptimisticLockingFailureException("Concurrent @Version conflict"));
+
+        BookingRequest modReq = BookingRequest.builder()
+                .suiteId("suite-1")
+                .checkIn(LocalDate.now().plusDays(6))
+                .checkOut(LocalDate.now().plusDays(7))
+                .guests(2)
+                .build();
+
+        assertThrows(org.springframework.dao.OptimisticLockingFailureException.class, () ->
+                bookingService.modifyBooking("b-victim", "user-victim", modReq));
+
+        org.mockito.Mockito.verify(suiteNightRepository, org.mockito.Mockito.atLeastOnce()).deleteAll(org.mockito.ArgumentMatchers.anyList());
+        org.mockito.Mockito.verify(suiteNightRepository, org.mockito.Mockito.times(1)).saveAll(org.mockito.ArgumentMatchers.anyList());
+    }
+
+    @Test
+    @DisplayName("Bajo: performPreCheckIn rechaza userId nulo y lectura anónima por código enmascara PII")
+    void testPreCheckInRequiresUserIdAndAnonymousCodeLookupMasksPii() {
+        Booking booking = victimBooking();
+        booking.setGuestDetails(Booking.GuestDetails.builder()
+                .fullName("Ana Pérez")
+                .email("anaperez@example.com")
+                .phone("+573001234567")
+                .specialRequests("Piso alto")
+                .build());
+        when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByBookingCode("PDM-PII1")).thenReturn(Optional.of(booking));
+        User guest = User.builder().id("user-victim").email("anaperez@example.com").build();
+        when(userRepository.findById("user-victim")).thenReturn(Optional.of(guest));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                bookingService.performPreCheckIn("b-victim", null, "123456789", ""));
+
+        co.palaciodelmar.backend.dto.BookingDTO anonDto = bookingService.getBookingByCodeSecure("PDM-PII1", null);
+        org.junit.jupiter.api.Assertions.assertNull(anonDto.getSmartLockPin());
+        org.junit.jupiter.api.Assertions.assertNull(anonDto.getSpecialRequests());
+        assertTrue(anonDto.getGuestEmail().contains("***"), "El email debe enmascararse en consultas sin sesión");
+        assertTrue(anonDto.getGuestPhone().contains("***"), "El teléfono debe enmascararse en consultas sin sesión");
+    }
 }

@@ -6,6 +6,7 @@ import { ReceiptComponent } from './receipt.component';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, ActivatedRoute, convertToParamMap } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 import { of, Subject, throwError } from 'rxjs';
 
 describe('ReceiptComponent', () => {
@@ -37,6 +38,10 @@ describe('ReceiptComponent', () => {
         provideHttpClient(),
         provideRouter([]),
         { provide: ApiService, useValue: apiServiceMock },
+        {
+          provide: AuthService,
+          useValue: { currentUserValue: { id: 'guest-1', name: 'Juan Perez', email: 'juan@example.com', role: 'user' } }
+        },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -133,5 +138,11 @@ describe('ReceiptComponent', () => {
   it('debe mostrar "Pendiente de asignación" cuando smartLockPin no está asignado', () => {
     component.booking = { ...mockBooking, smartLockPin: undefined as any };
     expect(component.smartLockPinDisplay).toBe('Pendiente de asignación');
+  });
+
+  it('debe mostrar aviso para iniciar sesión si el usuario no está autenticado', () => {
+    (component as any).auth = { currentUserValue: null };
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Inicia sesión con tu cuenta de huésped');
   });
 });

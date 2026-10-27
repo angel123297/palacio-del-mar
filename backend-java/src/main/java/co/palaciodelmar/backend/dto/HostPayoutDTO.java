@@ -28,6 +28,10 @@ public class HostPayoutDTO {
     private String status;
     private LocalDate periodStart;
     private LocalDate periodEnd;
+    private String destinationBank;
+    private String destinationAccountType;
+    private String destinationAccountMasked;
+    private String destinationHolder;
     private Instant processedAt;
     private Instant createdAt;
 }

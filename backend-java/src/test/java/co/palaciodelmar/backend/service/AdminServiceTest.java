@@ -279,4 +279,50 @@ class AdminServiceTest {
         org.junit.jupiter.api.Assertions.assertTrue(result.getNotes().contains("Reembolso descartado por ADMIN"));
         verify(paymentGateway, never()).refund(any(), any());
     }
+
+    @Test
+    @DisplayName("updateBookingStatus con código PDM-... libera inventario usando el ID interno de MongoDB")
+    void testUpdateBookingStatusByBookingCodeDeletesSuiteNightsWithInternalId() {
+        Booking booking = Booking.builder()
+                .id("mongo-booking-id-99")
+                .bookingCode("PDM-20261026-Z999")
+                .suite("suite-1")
+                .unitSlot(1)
+                .status("confirmed")
+                .checkIn(LocalDate.now().plusDays(5))
+                .checkOut(LocalDate.now().plusDays(8))
+                .build();
+
+        when(bookingRepository.findById("PDM-20261026-Z999")).thenReturn(java.util.Optional.empty());
+        when(bookingRepository.findByBookingCode("PDM-20261026-Z999")).thenReturn(java.util.Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        adminService.updateBookingStatus("PDM-20261026-Z999", "CANCELLED");
+
+        verify(suiteNightRepository).deleteByBooking("mongo-booking-id-99");
+        verify(suiteNightRepository, never()).deleteByBooking("PDM-20261026-Z999");
+    }
+
+    @Test
+    @DisplayName("updateBookingStatus si bookingRepository.save falla por bloqueo optimista, no borra suite_nights ni libera lock prematuramente")
+    void testUpdateBookingStatusWhenSaveFailsDoesNotDeleteSuiteNights() {
+        Booking booking = Booking.builder()
+                .id("b-opt-lock")
+                .suite("suite-lock-1")
+                .unitSlot(1)
+                .status("confirmed")
+                .checkIn(LocalDate.now().plusDays(2))
+                .checkOut(LocalDate.now().plusDays(4))
+                .build();
+
+        when(bookingRepository.findById("b-opt-lock")).thenReturn(java.util.Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenThrow(new org.springframework.dao.OptimisticLockingFailureException("Version conflict"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.dao.OptimisticLockingFailureException.class,
+                () -> adminService.updateBookingStatus("b-opt-lock", "CANCELLED")
+        );
+
+        verify(suiteNightRepository, never()).deleteByBooking(anyString());
+    }
 }

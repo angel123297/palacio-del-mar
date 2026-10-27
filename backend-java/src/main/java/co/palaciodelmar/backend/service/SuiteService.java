@@ -45,11 +45,8 @@ public class SuiteService {
                 .collect(Collectors.toMap(Branch::getId, Function.identity(), (a, b) -> a));
     }
 
+    @Cacheable(value = "suites", key = "#branchFilter != null ? #branchFilter : 'all'")
     public List<SuiteResponseDTO> getAllActiveSuites(String branchFilter) {
-        return getAllActiveSuites(branchFilter, null, null, null, null);
-    }
-
-    public List<SuiteResponseDTO> getAllActiveSuites(String branchFilter, BigDecimal minPrice, BigDecimal maxPrice, Integer guests, String amenity) {
         Map<String, Branch> branchMap = getBranchMap();
         Map<String, Property> propMap = propertyRepository.findAll().stream()
                 .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
@@ -82,31 +79,6 @@ public class SuiteService {
                         }
                         return false;
                     })
-                    .toList();
-        }
-
-        if (guests != null && guests > 0) {
-            suites = suites.stream()
-                    .filter(s -> s.getMaxGuests() != null && s.getMaxGuests() >= guests)
-                    .toList();
-        }
-
-        if (minPrice != null) {
-            suites = suites.stream()
-                    .filter(s -> s.getBasePrice() != null && s.getBasePrice().compareTo(minPrice) >= 0)
-                    .toList();
-        }
-
-        if (maxPrice != null) {
-            suites = suites.stream()
-                    .filter(s -> s.getBasePrice() != null && s.getBasePrice().compareTo(maxPrice) <= 0)
-                    .toList();
-        }
-
-        if (amenity != null && !amenity.isBlank()) {
-            String targetAmenity = amenity.trim().toLowerCase();
-            suites = suites.stream()
-                    .filter(s -> s.getAmenities() != null && s.getAmenities().stream().anyMatch(a -> a.toLowerCase().contains(targetAmenity)))
                     .toList();
         }
 
@@ -271,7 +243,16 @@ public class SuiteService {
             }
         }
 
-        BigDecimal total = result.total().add(experiencesTotal);
+        BigDecimal extraGuestsFee = BigDecimal.ZERO;
+        if (request.getGuests() != null && request.getGuests() > 2) {
+            extraGuestsFee = new BigDecimal("120000")
+                    .multiply(BigDecimal.valueOf(request.getGuests() - 2))
+                    .multiply(BigDecimal.valueOf(nights));
+        }
+
+        BigDecimal roomTotal = result.total();
+        BigDecimal guaranteeDeposit = new BigDecimal("100000");
+        BigDecimal total = roomTotal.add(experiencesTotal).add(extraGuestsFee);
 
         CalculatePriceResponseDTO.DatesInfo datesInfo = CalculatePriceResponseDTO.DatesInfo.builder()
                 .checkIn(request.getCheckIn())
@@ -291,6 +272,9 @@ public class SuiteService {
                 .dates(datesInfo)
                 .nightlyPrice(suite.getBasePrice())
                 .subtotal(subtotal)
+                .roomTotal(roomTotal)
+                .extraGuestsFee(extraGuestsFee)
+                .guaranteeDeposit(guaranteeDeposit)
                 .experiencesTotal(experiencesTotal)
                 .discount(result.discount())
                 .discountReason(result.discount().compareTo(BigDecimal.ZERO) > 0 ? "Promoción / Larga estadía" : null)

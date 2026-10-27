@@ -5,54 +5,6 @@ import { ApiService } from '../../services/api.service';
 import { SearchStateService } from '../../services/search-state.service';
 import { Suite, ApiResponse } from '../../models/types';
 
-const DEFAULT_SEARCH_SUITES: Suite[] = [
-  {
-    id: 'suite-presidencial-mar',
-    name: 'Suite Presidencial Mar Caribe',
-    slug: 'suite-presidencial-mar',
-    type: 'Presidencial',
-    description: 'Vistas panorámicas a la bahía de Bocagrande, jacuzzi privado y mayordomo personal 24/7.',
-    propertyId: 'bocagrande',
-    branch: { name: 'Palacio Bocagrande', slug: 'bocagrande' } as any,
-    basePrice: 850000,
-    pricePerNight: 850000,
-    totalPrice: 1700000,
-    size: 78,
-    maxGuests: 4,
-    mainImage: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'
-  } as Suite,
-  {
-    id: 'suite-colonial-patio',
-    name: 'Gran Suite Colonial con Balcón',
-    slug: 'suite-colonial-patio',
-    type: 'Imperial',
-    description: 'Balcón colonial sobre las murallas, cama King artesanal y desayuno de autor.',
-    propertyId: 'centro-historico',
-    branch: { name: 'Palacio Imperial San Diego', slug: 'centro-historico' } as any,
-    basePrice: 620000,
-    pricePerNight: 620000,
-    totalPrice: 1240000,
-    size: 55,
-    maxGuests: 2,
-    mainImage: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800'
-  } as Suite,
-  {
-    id: 'loft-getsemani-art',
-    name: 'Loft de Artista Getsemaní',
-    slug: 'loft-getsemani-art',
-    type: 'Deluxe',
-    description: 'Espacio contemporáneo con piscina privada, patio andaluz y cocina gourmet.',
-    propertyId: 'getsemani',
-    branch: { name: 'Casona Colonial Getsemaní', slug: 'getsemani' } as any,
-    basePrice: 480000,
-    pricePerNight: 480000,
-    totalPrice: 960000,
-    size: 45,
-    maxGuests: 2,
-    mainImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800'
-  } as Suite
-];
-
 @Component({
   selector: 'app-search',
   standalone: true,
@@ -64,17 +16,6 @@ const DEFAULT_SEARCH_SUITES: Suite[] = [
         <p class="text-[#f5f0e8] opacity-70 mb-8 text-sm tracking-widest uppercase">
           Mostrando disponibilidad para {{ searchState.nights() }} noche(s)
         </p>
-
-        <!-- Banner de sugerencias si aplica -->
-        <div *ngIf="isFallbackResults()" class="mb-8 p-4 bg-[rgba(201,169,110,0.08)] border border-[#c9a96e] rounded-xl flex items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <span class="text-2xl" aria-hidden="true">✨</span>
-            <p class="text-xs md:text-sm text-[#f5f0e8]">
-              Mostrando nuestras suites más exclusivas con disponibilidad garantizada y tarifa calculada para tu estancia.
-            </p>
-          </div>
-          <button (click)="fetchResults()" class="min-h-[32px] px-2 inline-flex items-center text-xs text-[#c9a96e] underline hover:text-white uppercase tracking-wider whitespace-nowrap cursor-pointer">Actualizar</button>
-        </div>
 
         <!-- Filtro de ambiente -->
         <div *ngIf="searchState.filters().vibe" class="mb-10 p-6 bg-[rgba(201,169,110,0.05)] border border-[rgba(201,169,110,0.4)] rounded-xl flex items-center gap-6">
@@ -92,7 +33,17 @@ const DEFAULT_SEARCH_SUITES: Suite[] = [
           <div class="w-full max-w-[800px] h-48 bg-[#1a1a1a] animate-pulse rounded-lg border border-[rgba(201,169,110,0.1)]"></div>
         </div>
 
-        <div *ngIf="!loading() && suites().length === 0" class="text-center py-20 border border-[rgba(201,169,110,0.2)] rounded-lg bg-[rgba(255,255,255,0.02)]">
+        <!-- Estado de error -->
+        <div *ngIf="!loading() && loadError()" class="text-center py-20 border border-[rgba(231,76,60,0.4)] rounded-lg bg-[rgba(231,76,60,0.06)] px-4">
+          <p class="text-xl text-[#f5f0e8] mb-2">No pudimos consultar la disponibilidad en este momento.</p>
+          <p class="text-sm text-[#f5f0e8] opacity-60 mb-6">Ocurrió un error al conectar con el servidor.</p>
+          <button (click)="fetchResults()" class="px-6 py-2.5 bg-[#c9a96e] hover:bg-[#e2c99b] text-[#0d0d0d] font-bold transition duration-300 uppercase tracking-widest text-xs rounded cursor-pointer">
+            Reintentar
+          </button>
+        </div>
+
+        <!-- Estado vacío -->
+        <div *ngIf="!loading() && !loadError() && suites().length === 0" class="text-center py-20 border border-[rgba(201,169,110,0.2)] rounded-lg bg-[rgba(255,255,255,0.02)]">
           <p class="text-xl text-[#f5f0e8] opacity-60">No encontramos suites disponibles para estas fechas.</p>
           <button routerLink="/" class="mt-6 px-6 py-2 bg-transparent border border-[#c9a96e] text-[#c9a96e] hover:bg-[#c9a96e] hover:text-[#0d0d0d] transition duration-300 uppercase tracking-widest text-xs">
             Cambiar Fechas
@@ -142,7 +93,6 @@ export class SearchComponent implements OnInit {
   suites = signal<Suite[]>([]);
   loading = signal(true);
   loadError = signal(false);
-  isFallbackResults = signal(false);
 
   loadFailed(): boolean { return this.loadError(); }
 
@@ -189,7 +139,6 @@ export class SearchComponent implements OnInit {
   fetchResults() {
     this.loading.set(true);
     this.loadError.set(false);
-    this.isFallbackResults.set(false);
     const params = this.searchState.getApiParams();
     this.api.get<ApiResponse<any> | any>('/availability', params).subscribe({
       next: (res) => {
@@ -202,27 +151,12 @@ export class SearchComponent implements OnInit {
           return s;
         });
 
-        if (mappedSuites.length > 0) {
-          this.suites.set(mappedSuites);
-        } else {
-          const nights = this.searchState.nights() || 2;
-          const fallback = DEFAULT_SEARCH_SUITES.map(s => ({
-            ...s,
-            totalPrice: (s.basePrice || 500000) * nights
-          }));
-          this.suites.set(fallback);
-          this.isFallbackResults.set(true);
-        }
+        this.suites.set(mappedSuites);
         this.loading.set(false);
       },
       error: () => {
-        const nights = this.searchState.nights() || 2;
-        const fallback = DEFAULT_SEARCH_SUITES.map(s => ({
-          ...s,
-          totalPrice: (s.basePrice || 500000) * nights
-        }));
-        this.suites.set(fallback);
-        this.isFallbackResults.set(true);
+        this.suites.set([]);
+        this.loadError.set(true);
         this.loading.set(false);
       }
     });

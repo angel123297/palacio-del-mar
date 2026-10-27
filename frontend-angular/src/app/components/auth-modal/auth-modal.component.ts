@@ -18,22 +18,22 @@ import { environment } from '../../../environments/environment';
         <!-- LOGIN FORM -->
         <form *ngIf="mode === 'login'" (ngSubmit)="submitLogin()" class="auth-form">
           <!-- Role Selector Tabs -->
-          <div class="auth-role-tabs" style="display: flex; gap: 4px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
-            <button type="button" (click)="selectedPortal = 'guest'; message = '';"
+          <div *ngIf="initialPortal !== 'host'" class="auth-role-tabs" style="display: flex; gap: 4px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
+            <button type="button" (click)="selectLoginPortal('guest')"
                     [style.background]="selectedPortal === 'guest' ? 'var(--gold)' : 'transparent'"
                     [style.color]="selectedPortal === 'guest' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="selectedPortal === 'guest' ? '700' : '500'"
                     style="flex: 1; padding: 8px 4px; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
               🛎️ Huésped
             </button>
-            <button type="button" (click)="selectedPortal = 'host'; message = '';"
+            <button type="button" (click)="selectLoginPortal('host')"
                     [style.background]="selectedPortal === 'host' ? 'var(--gold)' : 'transparent'"
                     [style.color]="selectedPortal === 'host' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="selectedPortal === 'host' ? '700' : '500'"
                     style="flex: 1; padding: 8px 4px; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
               🏢 Anfitrión
             </button>
-            <button type="button" (click)="selectedPortal = 'admin'; message = '';"
+            <button type="button" (click)="selectLoginPortal('admin')"
                     [style.background]="selectedPortal === 'admin' ? 'var(--gold)' : 'transparent'"
                     [style.color]="selectedPortal === 'admin' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="selectedPortal === 'admin' ? '700' : '500'"
@@ -78,16 +78,16 @@ import { environment } from '../../../environments/environment';
             {{ busy ? 'Entrando…' : 'Iniciar sesión' }}
           </button>
 
-          <p *ngIf="message" [attr.role]="isSuccess ? 'status' : 'alert'" aria-live="polite" [style.color]="isSuccess ? '#2ecc71' : '#ff4d4d'" [style.background]="isSuccess ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="isSuccess ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 8px 12px; border-radius: 6px; border-width: 1px; border-style: solid; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <div *ngIf="message" [attr.role]="isSuccess ? 'status' : 'alert'" aria-live="polite" [style.color]="isSuccess ? '#2ecc71' : '#ff4d4d'" [style.background]="isSuccess ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="isSuccess ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 10px 14px; border-radius: 6px; border-width: 1px; border-style: solid; display: flex; flex-direction: column; align-items: center; gap: 8px;">
             <span>{{ message }}</span>
-            <button *ngIf="showForceVerifyButton" type="button" (click)="forceVerify()" style="background: var(--gold); color: var(--dark); border: none; padding: 6px 12px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 0.85rem; margin-top: 4px;">
-              Verificar ahora
+            <button *ngIf="showResendVerification" type="button" (click)="resendVerificationEmail()" [disabled]="busyResend" style="background: var(--gold); color: #0d0d0d; border: none; border-radius: 4px; padding: 6px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;">
+              {{ busyResend ? 'Reenviando…' : '✉️ Reenviar enlace de verificación' }}
             </button>
-          </p>
+          </div>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿No tienes cuenta?
-            <button type="button" class="link-btn" (click)="mode = 'register'" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
+            <button type="button" class="link-btn" (click)="switchToRegister()" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
               Regístrate
             </button>
           </p>
@@ -95,8 +95,30 @@ import { environment } from '../../../environments/environment';
 
         <!-- REGISTER FORM -->
         <form *ngIf="mode === 'register'" (ngSubmit)="submitRegister()" class="auth-form">
-          <p class="modal-eyebrow" style="color: var(--gold); font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">Únete a Palacio del Mar</p>
-          <h2 id="reg-modal-title" class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1.5rem 0; color: #fff;">Crear cuenta</h2>
+          <!-- Role selector in Register -->
+          <div *ngIf="initialPortal !== 'host'" class="auth-role-tabs" style="display: flex; gap: 6px; margin-bottom: 1.25rem; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; border: 1px solid rgba(201,169,110,0.25);">
+            <button type="button" (click)="selectRegisterRole('user')"
+                    [style.background]="registerRole === 'user' ? 'var(--gold)' : 'transparent'"
+                    [style.color]="registerRole === 'user' ? '#0d0d0d' : '#f5f0e8'"
+                    [style.font-weight]="registerRole === 'user' ? '700' : '500'"
+                    style="flex: 1; padding: 8px 6px; border: none; border-radius: 6px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              🛎️ Huésped
+            </button>
+            <button type="button" (click)="selectRegisterRole('host')"
+                    [style.background]="registerRole === 'host' ? 'var(--gold)' : 'transparent'"
+                    [style.color]="registerRole === 'host' ? '#0d0d0d' : '#f5f0e8'"
+                    [style.font-weight]="registerRole === 'host' ? '700' : '500'"
+                    style="flex: 1; padding: 8px 6px; border: none; border-radius: 6px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              🏢 Anfitrión
+            </button>
+          </div>
+
+          <div *ngIf="registerRole === 'host'" style="margin-bottom: 1rem; padding: 8px 12px; background: rgba(201,169,110,0.1); border: 1px solid rgba(201,169,110,0.3); border-radius: 6px; font-size: 0.8rem; color: #e2c99b; line-height: 1.4;">
+            ✨ Publica tus alojamientos, conecta tu recepción y recibe el <strong>92% neto</strong> de cada reserva en tu cuenta bancaria.
+          </div>
+
+          <p class="modal-eyebrow" style="color: var(--gold); font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">{{ registerRole === 'host' ? 'Registro de Anfitrión' : 'Únete a Palacio del Mar' }}</p>
+          <h2 id="reg-modal-title" class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1.5rem 0; color: #fff;">{{ registerRole === 'host' ? 'Crear cuenta de Anfitrión' : 'Crear cuenta de Huésped' }}</h2>
           
           <div style="margin-bottom: 1rem;">
             <label for="auth-reg-name" class="field-label">Nombre completo</label>
@@ -151,13 +173,16 @@ import { environment } from '../../../environments/environment';
             {{ busy ? 'Creando cuenta…' : 'Crear cuenta' }}
           </button>
 
-          <p *ngIf="message" role="alert" aria-live="assertive" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.9rem; font-weight: 500; background: rgba(255, 77, 77, 0.1); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 77, 77, 0.3);">
-            {{ message }}
-          </p>
+          <div *ngIf="message" role="alert" aria-live="assertive" style="margin-top: 1rem; text-align: center; color: #ff4d4d; font-size: 0.9rem; font-weight: 500; background: rgba(255, 77, 77, 0.1); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255, 77, 77, 0.3); display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <span>{{ message }}</span>
+            <button *ngIf="showResendVerification" type="button" (click)="resendVerificationEmail()" [disabled]="busyResend" style="background: var(--gold); color: #0d0d0d; border: none; border-radius: 4px; padding: 6px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px;">
+              {{ busyResend ? 'Reenviando…' : '✉️ Reenviar enlace de verificación' }}
+            </button>
+          </div>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem; color: #aaa;">
             ¿Ya tienes cuenta?
-            <button type="button" class="link-btn" (click)="mode = 'login'" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
+            <button type="button" class="link-btn" (click)="switchToLogin()" style="background: none; border: none; color: var(--gold); font-weight: 600; cursor: pointer; margin-left: 6px; min-height: 44px; display: inline-flex; align-items: center;">
               Inicia sesión
             </button>
           </p>
@@ -199,15 +224,19 @@ import { environment } from '../../../environments/environment';
 export class AuthModalComponent {
   private _isOpen = false;
   private _initialMode: 'login' | 'register' | 'forgot' = 'login';
+  private _initialPortal: 'guest' | 'host' | 'admin' = 'guest';
 
   @Input() set isOpen(val: boolean) {
     this._isOpen = val;
     if (val) {
       this.mode = this._initialMode || 'login';
+      this.selectedPortal = this._initialPortal || 'guest';
+      this.registerRole = this._initialPortal === 'host' ? 'host' : 'user';
       this.message = '';
       this.showLoginPassword = false;
       this.showRegPassword = false;
       this.showConfirmPassword = false;
+      this.cdr.markForCheck();
     }
   }
   get isOpen(): boolean {
@@ -217,6 +246,7 @@ export class AuthModalComponent {
   @Input() set initialMode(mode: 'login' | 'register' | 'forgot') {
     this._initialMode = mode || 'login';
     this.mode = this._initialMode;
+    this.cdr.markForCheck();
   }
   get initialMode(): 'login' | 'register' | 'forgot' {
     return this._initialMode;
@@ -225,10 +255,66 @@ export class AuthModalComponent {
   @Output() closeEvent = new EventEmitter<void>();
 
   @Input() set initialPortal(p: 'guest' | 'host' | 'admin') {
-    this.selectedPortal = p || 'guest';
+    this._initialPortal = p || 'guest';
+    this.selectedPortal = this._initialPortal;
+    this.registerRole = this._initialPortal === 'host' ? 'host' : 'user';
+    this.cdr.markForCheck();
+  }
+  get initialPortal(): 'guest' | 'host' | 'admin' {
+    return this._initialPortal;
   }
 
   selectedPortal: 'guest' | 'host' | 'admin' = 'guest';
+  registerRole: 'user' | 'host' = 'user';
+
+  open(mode: 'login' | 'register' | 'forgot' = 'login', portal: 'guest' | 'host' | 'admin' = 'guest'): void {
+    this._initialMode = mode;
+    this._initialPortal = portal;
+    this.mode = mode;
+    this.selectedPortal = portal;
+    this.registerRole = portal === 'host' ? 'host' : 'user';
+    this.message = '';
+    this.showLoginPassword = false;
+    this.showRegPassword = false;
+    this.showConfirmPassword = false;
+    this._isOpen = true;
+    this.showResendVerification = false;
+    this.busyResend = false;
+    this.targetVerificationEmail = '';
+    this.cdr.detectChanges();
+  }
+
+  switchToRegister(): void {
+    this.mode = 'register';
+    this.registerRole = this.selectedPortal === 'host' ? 'host' : 'user';
+    this.message = '';
+    this.showResendVerification = false;
+    this.busyResend = false;
+    this.cdr.markForCheck();
+  }
+
+  switchToLogin(): void {
+    this.mode = 'login';
+    this.selectedPortal = this.registerRole === 'host' ? 'host' : 'guest';
+    this.message = '';
+    this.showResendVerification = false;
+    this.busyResend = false;
+    this.cdr.markForCheck();
+  }
+
+  selectLoginPortal(portal: 'guest' | 'host' | 'admin'): void {
+    this.selectedPortal = portal;
+    this.registerRole = portal === 'host' ? 'host' : 'user';
+    this.message = '';
+    this.cdr.markForCheck();
+  }
+
+  selectRegisterRole(role: 'user' | 'host'): void {
+    this.registerRole = role;
+    this.selectedPortal = role === 'host' ? 'host' : 'guest';
+    this.message = '';
+    this.cdr.markForCheck();
+  }
 
   get portalEyebrow(): string {
     switch (this.selectedPortal) {
@@ -272,10 +358,12 @@ export class AuthModalComponent {
   message = '';
   isSuccess = false;
   sentForgot = false;
-  showForceVerifyButton = false;
   showLoginPassword = false;
   showRegPassword = false;
   showConfirmPassword = false;
+  showResendVerification = false;
+  busyResend = false;
+  targetVerificationEmail = '';
 
   constructor(
     private auth: AuthService,
@@ -303,19 +391,49 @@ export class AuthModalComponent {
     this.confirmPassword = '';
     this.name = '';
     this.phone = '';
-    this.showForceVerifyButton = false;
     this.showLoginPassword = false;
     this.showRegPassword = false;
     this.showConfirmPassword = false;
+    this.showResendVerification = false;
+    this.busyResend = false;
+    this.targetVerificationEmail = '';
     this.closeEvent.emit();
     this.cdr.detectChanges();
+  }
+
+  resendVerificationEmail(): void {
+    const emailToUse = (this.targetVerificationEmail || this.email || '').trim();
+    if (!emailToUse) {
+      this.message = 'Por favor escribe tu correo electrónico para reenviar la verificación.';
+      this.isSuccess = false;
+      return;
+    }
+
+    this.busyResend = true;
+    this.cdr.detectChanges();
+
+    this.auth.resendVerification(emailToUse).subscribe({
+      next: (res: any) => {
+        this.busyResend = false;
+        this.showResendVerification = false;
+        this.isSuccess = true;
+        this.message = res?.message || 'Hemos enviado un nuevo enlace de verificación a tu correo. El enlace anterior ha quedado invalidado; revisa tu bandeja de entrada.';
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.busyResend = false;
+        this.isSuccess = false;
+        this.message = err.error?.message || 'No se pudo reenviar el enlace. Por favor intenta nuevamente.';
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   submitLogin(): void {
     this.busy = true;
     this.message = '';
     this.isSuccess = false;
-    this.showForceVerifyButton = false;
+    this.showResendVerification = false;
     this.cdr.detectChanges();
 
     const payload = {
@@ -359,33 +477,14 @@ export class AuthModalComponent {
       error: (err) => {
         this.busy = false;
         this.isSuccess = false;
-        this.message = err.error?.message || 'Credenciales inválidas.';
-        // Si el usuario no ha verificado su correo, mostrar botón para verificar con 1 clic
-        if (this.message.includes('verificar tu correo electrónico') || this.message.toLowerCase().includes('verificar')) {
-          this.showForceVerifyButton = true;
+        const msg = err.error?.message || 'Credenciales inválidas.';
+        this.message = msg;
+        if (msg.toLowerCase().includes('verificar tu correo') || msg.toLowerCase().includes('verific') || msg.toLowerCase().includes('bandeja')) {
+          this.showResendVerification = true;
+          this.targetVerificationEmail = (this.email || '').trim();
+        } else {
+          this.showResendVerification = false;
         }
-        this.cdr.detectChanges();
-      }
-    });
-  }
-
-  forceVerify(): void {
-    if (!this.email) return;
-    this.busy = true;
-    this.auth.forceVerify(this.email.trim()).subscribe({
-      next: () => {
-        this.busy = false;
-        this.isSuccess = true;
-        this.showForceVerifyButton = false;
-        this.message = '¡Correo verificado! Iniciando sesión...';
-        this.cdr.detectChanges();
-        // Automatically submit login again after verification
-        setTimeout(() => this.submitLogin(), 1000);
-      },
-      error: () => {
-        this.busy = false;
-        this.isSuccess = false;
-        this.message = 'No se pudo verificar. Intenta de nuevo.';
         this.cdr.detectChanges();
       }
     });
@@ -406,23 +505,28 @@ export class AuthModalComponent {
     this.busy = true;
     this.message = '';
     this.isSuccess = false;
+    this.showResendVerification = false;
     this.cdr.detectChanges();
 
     const payload = {
       email: (this.email || '').trim(),
       password: this.password,
       name: (this.name || '').trim(),
-      phone: (this.phone || '').trim()
+      phone: (this.phone || '').trim(),
+      role: this.registerRole
     };
 
     this.auth.register(payload).subscribe({
       next: () => {
         this.busy = false;
+        this.selectedPortal = this.registerRole === 'host' ? 'host' : 'guest';
         this.mode = 'login';
         this.isSuccess = true;
-        this.message = '¡Cuenta creada! Te hemos enviado un enlace a tu correo. Por favor verifícalo para iniciar sesión.';
+        this.message = '¡Cuenta registrada! Te hemos enviado un enlace a tu correo. Por favor verifícalo para iniciar sesión.';
         this.password = '';
         this.confirmPassword = '';
+        this.showResendVerification = true;
+        this.targetVerificationEmail = payload.email;
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -432,10 +536,14 @@ export class AuthModalComponent {
         const lowerMsg = rawMsg.toLowerCase();
         if (lowerMsg.includes('teléfono') || lowerMsg.includes('telefono') || lowerMsg.includes('phone')) {
           this.message = rawMsg || 'El número de teléfono ya está registrado con otra cuenta.';
+          this.showResendVerification = false;
         } else if (lowerMsg.includes('email') || lowerMsg.includes('correo')) {
-          this.message = `El correo ${payload.email} ya está registrado. Por favor haz clic en "Inicia sesión".`;
+          this.message = `El correo ${payload.email} ya está registrado. ¿Aún no has verificado tu cuenta o deseas ingresar?`;
+          this.showResendVerification = true;
+          this.targetVerificationEmail = payload.email;
         } else {
           this.message = rawMsg || 'No se pudo crear la cuenta. Intenta de nuevo.';
+          this.showResendVerification = false;
         }
         this.cdr.detectChanges();
       }
@@ -458,7 +566,7 @@ export class AuthModalComponent {
       next: (res: any) => {
         this.busy = false;
         this.sentForgot = true;
-        this.message = res?.message || 'Si tu correo se encuentra registrado, te hemos enviado una contraseña temporal para ingresar. Revisa tu bandeja de entrada o spam.';
+        this.message = res?.message || 'Si tu correo se encuentra registrado, te hemos enviado un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada o spam.';
         this.cdr.detectChanges();
       },
       error: (err: any) => {

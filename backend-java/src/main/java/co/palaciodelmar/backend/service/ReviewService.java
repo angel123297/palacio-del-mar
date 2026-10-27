@@ -140,15 +140,15 @@ public class ReviewService {
         if (analysis.maintenanceAlert() != null && webhookDispatcher != null) {
             String propId = booking.getPropertyId() != null ? booking.getPropertyId() : booking.getBranch();
             if (propId != null) {
-                webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", Map.of(
-                        "reviewId", saved.getId(),
-                        "bookingId", booking.getId(),
-                        "suiteId", saved.getSuite(),
-                        "alert", analysis.maintenanceAlert(),
-                        "comment", saved.getComment(),
-                        "rating", saved.getRating(),
-                        "createdAt", saved.getCreatedAt().toString()
-                ));
+                Map<String, Object> alertPayload = new java.util.LinkedHashMap<>();
+                alertPayload.put("reviewId", saved.getId() != null ? saved.getId() : "");
+                alertPayload.put("bookingId", booking.getId() != null ? booking.getId() : bookingId);
+                alertPayload.put("suiteId", saved.getSuite() != null ? saved.getSuite() : "");
+                alertPayload.put("alert", analysis.maintenanceAlert());
+                alertPayload.put("comment", saved.getComment() != null ? saved.getComment() : "");
+                alertPayload.put("rating", saved.getRating());
+                alertPayload.put("createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : Instant.now().toString());
+                webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", alertPayload);
             }
         }
 

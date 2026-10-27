@@ -213,9 +213,9 @@ export class BranchSelectorComponent implements OnInit {
       next: (res) => {
         const list: Branch[] = res.data || res || [];
         const filtered = list.filter(b => {
-          const n = (b.name || '').trim().toLowerCase();
-          const s = (b.slug || '').trim().toLowerCase();
-          return n !== 'waos' && n !== 'si' && s !== 'waos' && s !== 'si' && n.length > 2;
+          const n = (b?.name || '').trim();
+          const s = (b?.slug || '').trim();
+          return n.length > 2 && s.length > 2;
         });
         this.branches = filtered.length > 0 ? filtered : LUXURY_DEFAULT_BRANCHES;
       },

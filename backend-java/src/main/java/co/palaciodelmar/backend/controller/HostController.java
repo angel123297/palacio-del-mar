@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.controller;
 
 import co.palaciodelmar.backend.dto.ApiResponse;
+import co.palaciodelmar.backend.dto.BankAccountDTO;
 import co.palaciodelmar.backend.dto.BookingDTO;
 import co.palaciodelmar.backend.dto.PromotionDTO;
 import co.palaciodelmar.backend.dto.PromotionRequest;
@@ -13,6 +14,7 @@ import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.repository.PromotionRepository;
 import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
+import co.palaciodelmar.backend.repository.UserRepository;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.BookingService;
 import jakarta.validation.Valid;
@@ -52,6 +54,9 @@ public class HostController {
 
     @Autowired(required = false)
     private PropertyRepository propertyRepository;
+
+    @Autowired(required = false)
+    private UserRepository userRepository;
 
     @Autowired
     public HostController(
@@ -469,5 +474,109 @@ public class HostController {
         bookingRepository.save(booking);
 
         return ResponseEntity.ok(ApiResponse.ok(Map.of("smartLockPin", newPin)));
+    }
+
+    @GetMapping("/bank-account")
+    public ResponseEntity<ApiResponse<BankAccountDTO>> getBankAccount(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        if (user == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("No autenticado"));
+        }
+        User freshUser = userRepository != null && user.getId() != null
+                ? userRepository.findById(user.getId()).orElse(user)
+                : user;
+        User.BankAccount acc = freshUser.getBankAccount();
+        if (acc == null) {
+            return ResponseEntity.ok(ApiResponse.ok(BankAccountDTO.builder()
+                    .bankName("Bancolombia")
+                    .accountType("Ahorros")
+                    .accountNumber("")
+                    .accountNumberMasked("")
+                    .holderName("")
+                    .build()));
+        }
+        String masked = acc.getAccountNumberMasked();
+        if (masked == null || masked.isBlank()) {
+            masked = maskAccountNumber(acc.getAccountNumber());
+        }
+        return ResponseEntity.ok(ApiResponse.ok(BankAccountDTO.builder()
+                .bankName(acc.getBankName())
+                .accountType(acc.getAccountType())
+                .accountNumber(masked)
+                .accountNumberMasked(masked)
+                .holderName(acc.getHolderName())
+                .documentId(acc.getDocumentId())
+                .documentType(acc.getDocumentType())
+                .updatedAt(acc.getUpdatedAt())
+                .build()));
+    }
+
+    @PutMapping("/bank-account")
+    public ResponseEntity<ApiResponse<BankAccountDTO>> updateBankAccount(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestBody BankAccountDTO request) {
+        User user = userPrincipal != null ? userPrincipal.getUser() : null;
+        if (user == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("No autenticado"));
+        }
+        User freshUser = userRepository != null && user.getId() != null
+                ? userRepository.findById(user.getId()).orElse(user)
+                : user;
+        User.BankAccount existing = freshUser.getBankAccount();
+
+        String rawAccount = request.getAccountNumber();
+        final String effectiveAccountNumber;
+        final String effectiveMasked;
+
+        if (rawAccount != null && rawAccount.startsWith("***") && existing != null && existing.getAccountNumber() != null) {
+            // Se reenvió el valor ya enmascarado; preservar el número real original
+            effectiveAccountNumber = existing.getAccountNumber();
+            effectiveMasked = existing.getAccountNumberMasked() != null ? existing.getAccountNumberMasked() : maskAccountNumber(effectiveAccountNumber);
+        } else {
+            effectiveAccountNumber = rawAccount != null ? rawAccount.trim() : "";
+            effectiveMasked = maskAccountNumber(effectiveAccountNumber);
+        }
+
+        User.BankAccount updated = User.BankAccount.builder()
+                .bankName(request.getBankName() != null ? request.getBankName().trim() : "Bancolombia")
+                .accountType(request.getAccountType() != null ? request.getAccountType().trim() : "Ahorros")
+                .accountNumber(effectiveAccountNumber)
+                .accountNumberMasked(effectiveMasked)
+                .holderName(request.getHolderName() != null ? request.getHolderName().trim() : "")
+                .documentId(request.getDocumentId())
+                .documentType(request.getDocumentType())
+                .updatedAt(java.time.Instant.now())
+                .build();
+
+        freshUser.setBankAccount(updated);
+        freshUser.setUpdatedAt(java.time.Instant.now());
+        if (userRepository != null) {
+            userRepository.save(freshUser);
+        }
+
+        BankAccountDTO responseDTO = BankAccountDTO.builder()
+                .bankName(updated.getBankName())
+                .accountType(updated.getAccountType())
+                .accountNumber(effectiveMasked)
+                .accountNumberMasked(effectiveMasked)
+                .holderName(updated.getHolderName())
+                .documentId(updated.getDocumentId())
+                .documentType(updated.getDocumentType())
+                .updatedAt(updated.getUpdatedAt())
+                .build();
+
+        return ResponseEntity.ok(ApiResponse.ok("Datos bancarios actualizados correctamente", responseDTO));
+    }
+
+    private static String maskAccountNumber(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        String clean = raw.trim();
+        if (clean.length() <= 4) {
+            return "***" + clean;
+        }
+        return "***" + clean.substring(clean.length() - 4);
     }
 }

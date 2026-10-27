@@ -38,14 +38,58 @@
           </div>
           <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{ suite.name }}</h1>
           <p style="color: var(--gold);">{{ suite.type }} · {{ suite.size || 45 }} m² · Máx {{ suite.maxGuests || 2 }} huéspedes</p>
+
+          <!-- Redis Real-Time Social Proof & Urgency Banner -->
+          <div *ngIf="socialProof && (socialProof.activeViewers > 0 || socialProof.bookingsLast24h > 0 || socialProof.lastBookedMinutesAgo != null)"
+               class="social-proof-banner"
+               role="status"
+               aria-live="polite">
+            <div class="social-proof-live">
+              <span class="pulse-dot" aria-hidden="true"></span>
+              <span>
+                {{ socialProof.activeViewers === 1
+                    ? '1 viajero está explorando esta suite ahora mismo'
+                    : socialProof.activeViewers + ' viajeros están viendo esta suite en tiempo real' }}
+              </span>
+              <span *ngIf="socialProof.highDemand" class="high-demand-pill">Alta demanda</span>
+            </div>
+            <div *ngIf="socialProof.bookingsLast24h > 0 || socialProof.lastBookedMinutesAgo != null" class="social-proof-meta">
+              <span *ngIf="socialProof.bookingsLast24h > 0">
+                🔥 {{ socialProof.bookingsLast24h === 1 ? '1 reserva confirmada en las últimas 24 h' : socialProof.bookingsLast24h + ' reservas en las últimas 24 h' }}
+              </span>
+              <span *ngIf="socialProof.lastBookedMinutesAgo != null">
+                · {{ formatLastBooked(socialProof.lastBookedMinutesAgo) }}
+              </span>
+            </div>
+          </div>
+
           <p style="color: #ccc; margin-top: 1rem;">{{ suite.description }}</p>
 
-          <div *ngIf="suite.branch?.highlights?.length" style="margin-top: 2rem;">
-            <h3 style="color: var(--gold);">Lugares Cercanos</h3>
-            <ul>
-              <li *ngFor="let h of suite.branch.highlights" style="margin-bottom: 0.5rem;">{{h.name}} ({{h.walkMinutes}} min)</li>
-            </ul>
+          <!-- Redis Geo Nearby Cartagena Landmarks -->
+          <div *ngIf="nearbyPlaces.length > 0; else fallbackHighlights" class="geo-nearby-section">
+            <h3 style="color: var(--gold); margin: 0 0 0.85rem 0; font-size: 1.05rem;">📍 Entorno & Distancias Reales en Cartagena</h3>
+            <div class="geo-places-grid">
+              <div *ngFor="let place of nearbyPlaces" class="geo-place-card">
+                <div class="geo-place-header">
+                  <strong class="geo-place-name">{{ place.name }}</strong>
+                  <span *ngIf="place.distanceKm != null" class="geo-distance-badge">{{ place.distanceKm | number:'1.1-2' }} km</span>
+                </div>
+                <div class="geo-place-sub">
+                  <span *ngIf="place.zone">{{ place.zone }}</span>
+                  <span *ngIf="place.walkMinutes != null"> · 🚶 {{ place.walkMinutes }} min a pie</span>
+                  <span *ngIf="place.walkMinutes == null && place.driveMinutes != null"> · 🚗 {{ place.driveMinutes }} min</span>
+                </div>
+              </div>
+            </div>
           </div>
+          <ng-template #fallbackHighlights>
+            <div *ngIf="suite.branch?.highlights?.length" style="margin-top: 2rem;">
+              <h3 style="color: var(--gold);">Lugares Cercanos</h3>
+              <ul>
+                <li *ngFor="let h of suite.branch?.highlights" style="margin-bottom: 0.5rem;">{{h.name}} ({{h.walkMinutes}} min)</li>
+              </ul>
+            </div>
+          </ng-template>
         </div>
         <div class="card">
           <h3 style="color: var(--gold); margin-top: 0;">Reserva</h3>

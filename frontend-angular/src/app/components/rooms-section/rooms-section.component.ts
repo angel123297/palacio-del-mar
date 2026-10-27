@@ -12,73 +12,6 @@ const DEFAULT_FALLBACK_BRANCHES: Branch[] = [
   { id: 'b-boquilla', name: 'Reserva Manglares & Sol', slug: 'la-boquilla', zone: 'La Boquilla · Privacidad' } as Branch
 ];
 
-const DEFAULT_FALLBACK_SUITES: Suite[] = [
-  {
-    id: 'suite-presidencial-mar',
-    name: 'Suite Presidencial Mar Caribe',
-    slug: 'suite-presidencial-mar',
-    type: 'Presidencial',
-    propertyId: 'bocagrande',
-    branch: { name: 'Palacio Bocagrande', slug: 'bocagrande' } as Branch,
-    basePrice: 850000,
-    pricePerNight: 850000,
-    originalPrice: 1100000,
-    size: 78,
-    maxGuests: 4,
-    featured: true,
-    amenities: ['Jacuzzi privado', 'Vista al mar', 'Mayordomo 24/7', 'Terraza'],
-    mainImage: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'
-  } as Suite,
-  {
-    id: 'suite-colonial-patio',
-    name: 'Gran Suite Colonial con Balcón',
-    slug: 'suite-colonial-patio',
-    type: 'Imperial',
-    propertyId: 'centro-historico',
-    branch: { name: 'Palacio Imperial San Diego', slug: 'centro-historico' } as Branch,
-    basePrice: 620000,
-    pricePerNight: 620000,
-    originalPrice: 750000,
-    size: 55,
-    maxGuests: 2,
-    featured: true,
-    amenities: ['Balcón colonial', 'Cama King artesanal', 'Desayuno gourmet'],
-    mainImage: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800'
-  } as Suite,
-  {
-    id: 'loft-getsemani-art',
-    name: 'Loft de Artista Getsemaní',
-    slug: 'loft-getsemani-art',
-    type: 'Deluxe',
-    propertyId: 'getsemani',
-    branch: { name: 'Casona Colonial Getsemaní', slug: 'getsemani' } as Branch,
-    basePrice: 480000,
-    pricePerNight: 480000,
-    originalPrice: 580000,
-    size: 45,
-    maxGuests: 2,
-    featured: false,
-    amenities: ['Piscina interior', 'Wi-Fi 500Mbps', 'Cocina de autor'],
-    mainImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800'
-  } as Suite,
-  {
-    id: 'villa-playa-boquilla',
-    name: 'Villa Serena Frente a la Brisa',
-    slug: 'villa-playa-boquilla',
-    type: 'Villa',
-    propertyId: 'la-boquilla',
-    branch: { name: 'Reserva Manglares & Sol', slug: 'la-boquilla' } as Branch,
-    basePrice: 720000,
-    pricePerNight: 720000,
-    originalPrice: 900000,
-    size: 90,
-    maxGuests: 6,
-    featured: true,
-    amenities: ['Playa directa', 'Piscina infinity', 'Chef a petición'],
-    mainImage: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'
-  } as Suite
-];
-
 @Component({
   selector: 'app-rooms-section',
   standalone: true,
@@ -259,14 +192,14 @@ export class RoomsSectionComponent implements OnInit {
       next: (res) => {
         const raw = res.data || res;
         const list = Array.isArray(raw) ? raw : (raw.suites || []);
-        this.suites = list.length > 0 ? list : DEFAULT_FALLBACK_SUITES;
+        this.suites = list;
         this.loading = false;
         this.loadError = false;
         this.cdr.detectChanges();
       },
       error: () => {
-        this.suites = DEFAULT_FALLBACK_SUITES;
-        this.loadError = false;
+        this.suites = [];
+        this.loadError = true;
         this.loading = false;
         this.cdr.detectChanges();
       }
@@ -297,9 +230,9 @@ export class RoomsSectionComponent implements OnInit {
   }
 
   private isJunkBranch(name?: string, slug?: string): boolean {
-    const n = (name || '').trim().toLowerCase();
-    const s = (slug || '').trim().toLowerCase();
-    return n === 'waos' || n === 'si' || s === 'waos' || s === 'si' || n.length <= 2;
+    const n = (name || '').trim();
+    const s = (slug || '').trim();
+    return n.length <= 2 || s.length <= 2;
   }
 
   getSuiteImage(suite: Suite): string {

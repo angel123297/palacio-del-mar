@@ -36,8 +36,25 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     private final HttpClient httpClient;
     private final java.util.Set<String> inFlightIntents = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    @Value("${palacio.webhooks.payments.secret:whsec_simulated_secret_key_palacio_2026}")
-    private String webhookSecret = "whsec_simulated_secret_key_palacio_2026";
+    private static final java.util.Set<String> FORBIDDEN_SECRETS = java.util.Set.of(
+            "whsec_simulated_secret_key_palacio_2026",
+            "super_secret_jwt_key_palacio_del_mar_2026_dev_min32chars",
+            "pdm_internal_trusted_proxy_token_2026"
+    );
+
+    @Value("${palacio.webhooks.payments.secret}")
+    private String webhookSecret;
+
+    @jakarta.annotation.PostConstruct
+    public void validateSecret() {
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            throw new IllegalStateException("PAYMENTS_WEBHOOK_SECRET es obligatorio en SimulatedPaymentGateway");
+        }
+        String trimmed = webhookSecret.trim();
+        if (trimmed.length() < 32 || FORBIDDEN_SECRETS.contains(trimmed)) {
+            throw new IllegalStateException("PAYMENTS_WEBHOOK_SECRET inseguro en SimulatedPaymentGateway: debe tener >= 32 caracteres y no usar el valor público");
+        }
+    }
 
     @Value("${server.port:5000}")
     private int serverPort = 5000;

@@ -27,10 +27,6 @@ public class AuthController {
     @org.springframework.beans.factory.annotation.Value("${security.cookie.secure:false}")
     private boolean cookieSecure;
 
-    // SOLO DESARROLLO: permite verificar un correo sin el enlace. Apagado por defecto.
-    @org.springframework.beans.factory.annotation.Value("${app.dev.force-verify.enabled:false}")
-    private boolean forceVerifyEnabled;
-
     private void addJwtCookie(jakarta.servlet.http.HttpServletResponse response, String token, jakarta.servlet.http.HttpServletRequest request) {
         boolean isSecure = cookieSecure || (request != null && (request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"))));
         org.springframework.http.ResponseCookie springCookie = org.springframework.http.ResponseCookie.from("jwt", token)
@@ -46,7 +42,9 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> register(@RequestBody RegisterRequest request, jakarta.servlet.http.HttpServletResponse httpResponse, jakarta.servlet.http.HttpServletRequest httpRequest) {
         AuthResponse response = authService.register(request);
-        addJwtCookie(httpResponse, response.getToken(), httpRequest);
+        if (response.getToken() != null && !response.getToken().isBlank()) {
+            addJwtCookie(httpResponse, response.getToken(), httpRequest);
+        }
 
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
@@ -64,90 +62,13 @@ public class AuthController {
         AuthResponse response = authService.login(request);
         addJwtCookie(httpResponse, response.getToken(), httpRequest);
 
-        if (response.getRefreshToken() != null) {
-            boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
-            org.springframework.http.ResponseCookie refreshCookie = org.springframework.http.ResponseCookie.from("refreshToken", response.getRefreshToken())
-                    .httpOnly(true)
-                    .secure(isSecure)
-                    .path("/api/auth")
-                    .maxAge(java.time.Duration.ofDays(7))
-                    .sameSite("Lax")
-                    .build();
-            httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, refreshCookie.toString());
-        }
-
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
         body.put("message", "Inicio de sesión exitoso");
         body.put("token", response.getToken());
-        body.put("refreshToken", response.getRefreshToken());
         body.put("user", response.getUser());
         body.put("data", response);
         return ResponseEntity.ok(body);
-    }
-
-    @PostMapping("/forgot-password")
-    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody Map<String, String> body) {
-        String email = body != null ? body.get("email") : null;
-        authService.forgotPassword(email);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.");
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/reset-password")
-    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> body) {
-        String token = body != null ? body.get("token") : null;
-        String password = body != null ? body.get("password") : (body != null ? body.get("newPassword") : null);
-        authService.resetPassword(token, password);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "Contraseña restablecida exitosamente");
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/refresh-token")
-    public ResponseEntity<Map<String, Object>> refreshToken(
-            @RequestBody(required = false) Map<String, String> body,
-            jakarta.servlet.http.HttpServletRequest httpRequest,
-            jakarta.servlet.http.HttpServletResponse httpResponse
-    ) {
-        String token = null;
-        if (body != null && body.containsKey("refreshToken")) {
-            token = body.get("refreshToken");
-        } else if (httpRequest.getCookies() != null) {
-            for (jakarta.servlet.http.Cookie cookie : httpRequest.getCookies()) {
-                if ("refreshToken".equals(cookie.getName())) {
-                    token = cookie.getValue();
-                    break;
-                }
-            }
-        }
-
-        AuthResponse authResp = authService.refreshToken(token);
-        addJwtCookie(httpResponse, authResp.getToken(), httpRequest);
-
-        // Opcional cookie para refresh
-        boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
-        org.springframework.http.ResponseCookie refreshCookie = org.springframework.http.ResponseCookie.from("refreshToken", authResp.getRefreshToken())
-                .httpOnly(true)
-                .secure(isSecure)
-                .path("/api/auth")
-                .maxAge(java.time.Duration.ofDays(7))
-                .sameSite("Lax")
-                .build();
-        httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, refreshCookie.toString());
-
-        Map<String, Object> respMap = new HashMap<>();
-        respMap.put("success", true);
-        respMap.put("token", authResp.getToken());
-        respMap.put("refreshToken", authResp.getRefreshToken());
-        respMap.put("user", authResp.getUser());
-        respMap.put("data", authResp);
-        return ResponseEntity.ok(respMap);
     }
 
     @PostMapping("/verify-email")
@@ -173,6 +94,21 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Map<String, Object>> resendVerification(@RequestBody Map<String, String> body) {
+        String email = body != null ? body.get("email") : null;
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email es requerido");
+        }
+
+        authService.resendVerification(email);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Hemos enviado un nuevo enlace de verificación a tu correo. El enlace anterior ha quedado invalidado.");
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody Map<String, String> body) {
         String email = body != null ? body.get("email") : null;
@@ -184,28 +120,26 @@ public class AuthController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("message", "Si tu correo se encuentra registrado, recibirás una contraseña temporal para acceder.");
+        response.put("message", "Si tu correo se encuentra registrado, recibirás un enlace de restablecimiento de contraseña en breve.");
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/force-verify")
-    public ResponseEntity<Map<String, Object>> forceVerify(@RequestBody Map<String, String> body) {
-        if (!forceVerifyEnabled) {
-            Map<String, Object> notFound = new HashMap<>();
-            notFound.put("success", false);
-            notFound.put("message", "No encontrado");
-            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND).body(notFound);
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> body) {
+        String token = body != null ? body.get("token") : null;
+        String newPassword = body != null ? body.get("newPassword") : null;
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token es requerido");
         }
-        String email = body != null ? body.get("email") : null;
-        if (email == null || email.trim().isEmpty()) {
-            throw new IllegalArgumentException("Email es requerido");
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            throw new IllegalArgumentException("Nueva contraseña es requerida");
         }
 
-        authService.forceVerify(email);
+        authService.resetPassword(token, newPassword);
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("message", "Correo verificado manualmente");
+        response.put("message", "Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.");
         return ResponseEntity.ok(response);
     }
 
@@ -229,12 +163,15 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(
-            jakarta.servlet.http.HttpServletResponse httpResponse,
-            @AuthenticationPrincipal UserPrincipal principal
+            jakarta.servlet.http.HttpServletRequest httpRequest,
+            jakarta.servlet.http.HttpServletResponse httpResponse
     ) {
-        if (principal != null && principal.getUser() != null) {
-            authService.revokeRefreshToken(principal.getUser().getId());
+        String token = extractToken(httpRequest);
+        if (token != null && !token.isBlank()) {
+            tokenBlacklistService.blacklistToken(token);
         }
+
+        boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
         org.springframework.http.ResponseCookie springCookie = org.springframework.http.ResponseCookie.from("jwt", "")
                 .httpOnly(true)
                 .secure(isSecure)
@@ -244,19 +181,40 @@ public class AuthController {
                 .build();
         httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, springCookie.toString());
 
-        org.springframework.http.ResponseCookie clearRefresh = org.springframework.http.ResponseCookie.from("refreshToken", "")
-                .httpOnly(true)
-                .secure(false)
-                .path("/api/auth")
-                .maxAge(java.time.Duration.ZERO)
-                .sameSite("Lax")
-                .build();
-        httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, clearRefresh.toString());
-
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
         body.put("message", "Sesión cerrada exitosamente");
         return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/logout-all")
+    public ResponseEntity<ApiResponse<Void>> logoutAllDevices(
+            @AuthenticationPrincipal UserPrincipal principal,
+            jakarta.servlet.http.HttpServletRequest httpRequest,
+            jakarta.servlet.http.HttpServletResponse httpResponse
+    ) {
+        if (principal == null || principal.getUser() == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("No autenticado"));
+        }
+
+        authService.logoutAllDevices(principal.getUser().getId());
+
+        String token = extractToken(httpRequest);
+        if (token != null && !token.isBlank()) {
+            tokenBlacklistService.blacklistToken(token);
+        }
+
+        boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
+        org.springframework.http.ResponseCookie springCookie = org.springframework.http.ResponseCookie.from("jwt", "")
+                .httpOnly(true)
+                .secure(isSecure)
+                .path("/")
+                .maxAge(java.time.Duration.ZERO)
+                .sameSite("Lax")
+                .build();
+        httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, springCookie.toString());
+
+        return ResponseEntity.ok(ApiResponse.ok("Se han cerrado todas tus sesiones activas en todos los dispositivos", null));
     }
 
     private String extractToken(jakarta.servlet.http.HttpServletRequest request) {
@@ -280,6 +238,9 @@ public class AuthController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody User request
     ) {
+        if (principal == null || principal.getUser() == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("No autenticado"));
+        }
         UserDTO updated = authService.updateProfile(principal.getUser().getId(), request);
         return ResponseEntity.ok(ApiResponse.ok("Perfil actualizado exitosamente", updated));
     }
@@ -291,6 +252,9 @@ public class AuthController {
             jakarta.servlet.http.HttpServletRequest httpRequest,
             jakarta.servlet.http.HttpServletResponse httpResponse
     ) {
+        if (principal == null || principal.getUser() == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("No autenticado"));
+        }
         String currentPassword = body != null ? body.get("currentPassword") : null;
         String newPassword = body != null ? body.get("newPassword") : null;
         authService.changePassword(principal.getUser().getId(), currentPassword, newPassword);

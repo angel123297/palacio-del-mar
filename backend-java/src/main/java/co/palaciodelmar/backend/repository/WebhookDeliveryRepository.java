@@ -13,4 +13,5 @@ public interface WebhookDeliveryRepository extends MongoRepository<WebhookDelive
     List<WebhookDelivery> findBySubscriptionIdOrderByCreatedAtDesc(String subscriptionId);
     List<WebhookDelivery> findByOwnerIdOrderByCreatedAtDesc(String ownerId);
     List<WebhookDelivery> findByStatusAndNextRetryAtBefore(String status, Instant beforeTime);
+    List<WebhookDelivery> findByStatusAndNextRetryAtIsNullAndCreatedAtBefore(String status, Instant beforeTime);
 }

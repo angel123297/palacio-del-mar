@@ -13,5 +13,4 @@ public interface UserRepository extends MongoRepository<User, String> {
     Boolean existsByProfilePhone(String phone);
     Optional<User> findByVerificationTokenHash(String verificationTokenHash);
     Optional<User> findByResetPasswordTokenHash(String resetPasswordTokenHash);
-    Optional<User> findByRefreshTokenHash(String refreshTokenHash);
 }

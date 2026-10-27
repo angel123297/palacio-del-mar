@@ -9,12 +9,16 @@ import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.repository.PaymentRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +30,18 @@ public class PaymentService {
     private final PaymentGateway paymentGateway;
     private final EmailService emailService;
     private final UserRepository userRepository;
+
+    @Setter
+    @Autowired(required = false)
+    private RedisLockService redisLockService;
+
+    @Setter
+    @Autowired(required = false)
+    private SocialProofService socialProofService;
+
+    @Setter
+    @Autowired(required = false)
+    private AvailabilityCacheEvictor availabilityCacheEvictor;
 
     public Map<String, Object> getPaymentConfig() {
         return Map.of(
@@ -40,12 +56,29 @@ public class PaymentService {
     }
 
     public PaymentGateway.PaymentIntentResponse createPaymentIntent(String userId, String bookingId, String method, String idempotencyKey) {
-        if (idempotencyKey != null) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             Payment existingPayment = paymentRepository.findByIdempotencyKey(idempotencyKey).orElse(null);
             if (existingPayment != null && existingPayment.getIntentId() != null) {
-                if (userId != null && !existingPayment.getUser().equals(userId)) throw new IllegalArgumentException("Idempotency key mismatch");
-                if (!existingPayment.getBooking().equals(bookingId)) throw new IllegalArgumentException("Idempotency key mismatch");
-                return new PaymentGateway.PaymentIntentResponse(existingPayment.getIntentId(), "secret_" + existingPayment.getIntentId(), existingPayment.getAmount(), existingPayment.getCurrency(), existingPayment.getStatus());
+                if (!Objects.equals(existingPayment.getBooking(), bookingId)) {
+                    throw new IllegalArgumentException("Idempotency key mismatch");
+                }
+                if (userId != null && !Objects.equals(existingPayment.getUser(), userId)) {
+                    throw new IllegalArgumentException("Idempotency key mismatch");
+                }
+                if (userId == null && existingPayment.getUser() != null) {
+                    userRepository.findById(existingPayment.getUser()).ifPresent(u -> {
+                        if (u.getPassword() != null && !u.getPassword().isBlank()) {
+                            throw new IllegalArgumentException("Idempotency key mismatch");
+                        }
+                    });
+                }
+                return new PaymentGateway.PaymentIntentResponse(
+                        existingPayment.getIntentId(),
+                        "secret_" + existingPayment.getIntentId(),
+                        existingPayment.getAmount(),
+                        existingPayment.getCurrency(),
+                        existingPayment.getStatus()
+                );
             }
         }
 
@@ -95,9 +128,36 @@ public class PaymentService {
     }
 
     public Map<String, Object> confirmPayment(String userId, String intentId, String paymentToken) {
+        if (intentId == null || intentId.isBlank()) {
+            throw new IllegalArgumentException("Intención de pago no especificada");
+        }
+        if (redisLockService != null) {
+            return redisLockService.executeWithLock(
+                    "payment:" + intentId.trim(),
+                    Duration.ofSeconds(15),
+                    Duration.ofSeconds(5),
+                    () -> doConfirmPayment(userId, intentId.trim(), paymentToken)
+            );
+        }
+        return doConfirmPayment(userId, intentId.trim(), paymentToken);
+    }
+
+    private Map<String, Object> doConfirmPayment(String userId, String intentId, String paymentToken) {
         Payment payment = paymentRepository.findByIntentId(intentId)
                 .orElseThrow(() -> new IllegalArgumentException("Intención de pago no encontrada"));
 
+        if (redisLockService != null && payment.getBooking() != null && !payment.getBooking().isBlank()) {
+            return redisLockService.executeWithLock(
+                    "booking:" + payment.getBooking().trim(),
+                    Duration.ofSeconds(15),
+                    Duration.ofSeconds(5),
+                    () -> doConfirmPaymentUnderLocks(userId, intentId, paymentToken, payment)
+            );
+        }
+        return doConfirmPaymentUnderLocks(userId, intentId, paymentToken, payment);
+    }
+
+    private Map<String, Object> doConfirmPaymentUnderLocks(String userId, String intentId, String paymentToken, Payment payment) {
         Booking booking = bookingRepository.findById(payment.getBooking())
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
 
@@ -114,8 +174,18 @@ public class PaymentService {
             }
         }
 
+        // Reproducción idempotente si esta intención específica ya fue completada previamente
+        if ("completed".equalsIgnoreCase(payment.getStatus())) {
+            java.util.Map<String, Object> replayMap = new java.util.HashMap<>();
+            replayMap.put("payment", toDTO(payment));
+            replayMap.put("booking", bookingService.toDTO(booking));
+            replayMap.put("status", payment.getStatus());
+            replayMap.put("transactionId", payment.getTransactionId());
+            return replayMap;
+        }
 
-        if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0 && "paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+        if (booking.getBalanceDue() != null && booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0
+                && "paid".equalsIgnoreCase(booking.getPaymentStatus())) {
             throw new IllegalStateException("La reserva ya ha sido pagada en su totalidad.");
         }
 
@@ -124,10 +194,6 @@ public class PaymentService {
         }
         if ("pending".equalsIgnoreCase(booking.getStatus()) && booking.getExpiresAt() != null && booking.getExpiresAt().isBefore(java.time.Instant.now())) {
             throw new IllegalStateException("El tiempo para pagar esta reserva ha expirado");
-        }
-
-        if ("completed".equals(payment.getStatus())) {
-            return Map.of("payment", toDTO(payment), "booking", bookingService.toDTO(booking));
         }
 
         PaymentGateway.PaymentConfirmResponse confirmResponse = paymentGateway.confirmIntent(intentId, paymentToken);
@@ -168,8 +234,21 @@ public class PaymentService {
         try {
             updatedBooking = bookingRepository.save(booking);
         } catch (org.springframework.dao.OptimisticLockingFailureException e) {
-            payment.setStatus("failed");
-            payment.setNotes("Conflicto por concurrencia. La reserva fue modificada simultáneamente.");
+            // El cargo síncrono ya fue emitido: registrar transactionId e intentar reversión inmediata en pasarela
+            payment.setTransactionId(confirmResponse.transactionId());
+            boolean refunded = false;
+            if (confirmResponse.transactionId() != null && !confirmResponse.transactionId().isBlank() && payment.getAmount() != null) {
+                try {
+                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(confirmResponse.transactionId(), payment.getAmount());
+                    refunded = (refundResp != null && refundResp.success());
+                } catch (Exception ignored) {
+                }
+            }
+            payment.setStatus(refunded ? "refunded" : "requires_refund");
+            payment.setUpdatedAt(Instant.now());
+            payment.setNotes(refunded
+                    ? "Conflicto por concurrencia tras cobro síncrono. Reembolso automático emitido."
+                    : "Conflicto por concurrencia tras cobro síncrono. Requiere reembolso manual.");
             paymentRepository.save(payment);
             throw new IllegalStateException("Conflicto al procesar el pago. La reserva fue modificada o cancelada simultáneamente.");
         }
@@ -181,6 +260,21 @@ public class PaymentService {
         Payment savedPayment = paymentRepository.save(payment);
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
+             if (redisLockService != null) {
+                 redisLockService.releaseSuiteHold(
+                         updatedBooking.getSuite(),
+                         updatedBooking.getUnitSlot(),
+                         updatedBooking.getCheckIn(),
+                         updatedBooking.getCheckOut(),
+                         updatedBooking.getId()
+                 );
+             }
+             if (socialProofService != null) {
+                 socialProofService.recordBookingActivity(updatedBooking.getSuite(), null, "paid:" + updatedBooking.getId());
+             }
+             if (availabilityCacheEvictor != null) {
+                 availabilityCacheEvictor.evictAvailability();
+             }
              emailService.sendBookingConfirmation(updatedBooking);
              emailService.sendHostBookingNotification(updatedBooking);
         }
@@ -188,6 +282,8 @@ public class PaymentService {
         java.util.Map<String, Object> returnMap = new java.util.HashMap<>();
         returnMap.put("payment", toDTO(savedPayment));
         returnMap.put("booking", bookingService.toDTO(updatedBooking));
+        returnMap.put("status", savedPayment.getStatus());
+        returnMap.put("transactionId", savedPayment.getTransactionId());
         return returnMap;
     }
 
@@ -198,8 +294,17 @@ public class PaymentService {
         Booking booking = bookingRepository.findById(payment.getBooking())
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
 
-        if (booking.getUser() != null && userId != null && !booking.getUser().equals(userId)) {
-            throw new IllegalArgumentException("No tienes permiso para consultar este pago");
+        if (booking.getUser() != null) {
+            if (userId != null && !booking.getUser().equals(userId)) {
+                throw new IllegalArgumentException("No tienes permiso para consultar este pago");
+            }
+            if (userId == null) {
+                userRepository.findById(booking.getUser()).ifPresent(u -> {
+                    if (u.getPassword() != null && !u.getPassword().isBlank()) {
+                        throw new IllegalArgumentException("No tienes permiso para consultar este pago. Inicia sesión.");
+                    }
+                });
+            }
         }
 
         java.util.Map<String, Object> result = new java.util.HashMap<>();

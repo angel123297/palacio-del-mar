@@ -4,8 +4,11 @@ import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.BookingStatus;
 import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.service.BookingService;
+import co.palaciodelmar.backend.service.RedisLockService;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,10 +16,12 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Tarea programada que automatiza el ciclo de vida hotelero (Self Check-in y Auto Check-out):
@@ -31,9 +36,14 @@ public class AutoStayLifecycleScheduler {
 
     private static final ZoneId BOGOTA = ZoneId.of("America/Bogota");
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final BigDecimal PLATFORM_FEE_RATE = new BigDecimal("0.08");
 
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
+
+    @Setter
+    @Autowired(required = false)
+    private RedisLockService redisLockService;
 
     @Value("${palacio.lifecycle.autocheckin.hour:15}")
     private int autoCheckInHour = 15;
@@ -54,30 +64,43 @@ public class AutoStayLifecycleScheduler {
         // Reservas confirmadas con fecha de check-in hoy o anterior
         List<Booking> confirmedBookings = bookingRepository.findByStatusIn(List.of("confirmed"));
 
-        for (Booking booking : confirmedBookings) {
-            if (booking.getCheckIn() == null) continue;
+        for (Booking candidate : confirmedBookings) {
+            if (candidate == null || candidate.getId() == null || candidate.getCheckIn() == null) continue;
 
-            boolean isPastCheckInDate = today.isAfter(booking.getCheckIn());
-            boolean isCheckInDayReady = today.isEqual(booking.getCheckIn()) && nowTime.getHour() >= autoCheckInHour;
+            boolean isPastCheckInDate = today.isAfter(candidate.getCheckIn());
+            boolean isCheckInDayReady = today.isEqual(candidate.getCheckIn()) && nowTime.getHour() >= autoCheckInHour;
 
             if (isPastCheckInDate || isCheckInDayReady) {
                 try {
-                    if (booking.getSmartLockPin() == null || booking.getSmartLockPin().isBlank()) {
-                        booking.setSmartLockPin(String.format("%06d", SECURE_RANDOM.nextInt(100000, 1000000)));
-                    }
+                    executeWithBookingLock(candidate.getId(), () -> {
+                        Booking booking = bookingRepository.findById(candidate.getId()).orElse(null);
+                        if (booking == null || !"confirmed".equalsIgnoreCase(booking.getStatus()) || booking.getCheckIn() == null) {
+                            return null;
+                        }
+                        boolean freshPast = today.isAfter(booking.getCheckIn());
+                        boolean freshReady = today.isEqual(booking.getCheckIn()) && nowTime.getHour() >= autoCheckInHour;
+                        if (!freshPast && !freshReady) {
+                            return null;
+                        }
 
-                    bookingService.changeBookingStatus(
-                            booking,
-                            BookingStatus.CHECKED_IN,
-                            "System-AutoStayLifecycle",
-                            "Self Check-in automático ejecutado a la hora oficial de ingreso (" + autoCheckInHour + ":00)"
-                    );
-                    bookingRepository.save(booking);
+                        if (booking.getSmartLockPin() == null || booking.getSmartLockPin().isBlank()) {
+                            booking.setSmartLockPin(String.format("%06d", SECURE_RANDOM.nextInt(100000, 1000000)));
+                        }
 
-                    log.info("Self Check-in automático procesado para reserva {} (Huésped: {}, PIN activado: {})",
-                            booking.getId(), booking.getUser(), booking.getSmartLockPin());
+                        bookingService.changeBookingStatus(
+                                booking,
+                                BookingStatus.CHECKED_IN,
+                                "System-AutoStayLifecycle",
+                                "Self Check-in automático ejecutado a la hora oficial de ingreso (" + autoCheckInHour + ":00)"
+                        );
+                        bookingRepository.save(booking);
+
+                        log.info("Self Check-in automático procesado para reserva {} (Huésped: {}, PIN activado)",
+                                booking.getId(), booking.getUser());
+                        return null;
+                    });
                 } catch (Exception e) {
-                    log.error("Error al procesar auto check-in para reserva {}: {}", booking.getId(), e.getMessage());
+                    log.error("Error al procesar auto check-in para reserva {}: {}", candidate.getId(), e.getMessage());
                 }
             }
         }
@@ -87,55 +110,101 @@ public class AutoStayLifecycleScheduler {
         // Reservas en estancia activa (checked_in)
         List<Booking> activeBookings = bookingRepository.findByStatusIn(List.of("checked_in"));
 
-        for (Booking booking : activeBookings) {
-            if (booking.getCheckOut() == null) continue;
+        for (Booking candidate : activeBookings) {
+            if (candidate == null || candidate.getId() == null || candidate.getCheckOut() == null) continue;
 
-            boolean isPastCheckOutDate = today.isAfter(booking.getCheckOut());
-            boolean isCheckOutDayReady = today.isEqual(booking.getCheckOut()) && nowTime.getHour() >= autoCheckOutHour;
+            boolean isPastCheckOutDate = today.isAfter(candidate.getCheckOut());
+            boolean isCheckOutDayReady = today.isEqual(candidate.getCheckOut()) && nowTime.getHour() >= autoCheckOutHour;
 
             if (isPastCheckOutDate || isCheckOutDayReady) {
                 try {
-                    // Late check-out automático: aplica si el PIN sigue activo pasadas las 13:00 ANTES de cerrar
-                    boolean isPast13 = isPastCheckOutDate || (today.isEqual(booking.getCheckOut()) && (nowTime.getHour() >= 13 || nowTime.isAfter(LocalTime.of(13, 0))));
-                    boolean pinStillActive = booking.getSmartLockPin() != null && !booking.getSmartLockPin().isBlank();
+                    executeWithBookingLock(candidate.getId(), () -> {
+                        Booking booking = bookingRepository.findById(candidate.getId()).orElse(null);
+                        if (booking == null || !"checked_in".equalsIgnoreCase(booking.getStatus()) || booking.getCheckOut() == null) {
+                            return null;
+                        }
+                        boolean freshPast = today.isAfter(booking.getCheckOut());
+                        boolean freshReady = today.isEqual(booking.getCheckOut()) && nowTime.getHour() >= autoCheckOutHour;
+                        if (!freshPast && !freshReady) {
+                            return null;
+                        }
 
-                    if (isPast13 && pinStillActive && booking.getPricePerNight() != null) {
-                        BigDecimal currentTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
-                        BigDecimal currentBalance = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
-                        BigDecimal recargo = booking.getPricePerNight().multiply(new BigDecimal("0.50")).setScale(2, RoundingMode.HALF_UP);
-                        booking.setTotalPrice(currentTotal.add(recargo));
-                        booking.setBalanceDue(currentBalance.add(recargo));
-                        booking.setPaymentStatus("partial");
-                        booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Recargo automático Late Check-out aplicado: $" + recargo);
-                    }
+                        // Late check-out automático: aplica si el PIN sigue activo pasadas las 13:00 ANTES de cerrar
+                        boolean isPast13 = freshPast || (today.isEqual(booking.getCheckOut()) && (nowTime.getHour() >= 13 || nowTime.isAfter(LocalTime.of(13, 0))));
+                        boolean pinStillActive = booking.getSmartLockPin() != null && !booking.getSmartLockPin().isBlank();
 
-                    // Desactivar el PIN de la cerradura inteligente al cerrar
-                    booking.setSmartLockPin(null);
+                        if (isPast13 && pinStillActive && booking.getPricePerNight() != null) {
+                            BigDecimal currentTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
+                            BigDecimal currentBalance = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
+                            BigDecimal recargo = booking.getPricePerNight().multiply(new BigDecimal("0.50")).setScale(2, RoundingMode.HALF_UP);
+                            booking.setTotalPrice(currentTotal.add(recargo));
+                            booking.setBalanceDue(currentBalance.add(recargo));
+                            booking.setPaymentStatus("partial");
 
-                    // Devolución automática del depósito de garantía
-                    BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
-                    if (deposit.signum() > 0 && !Boolean.TRUE.equals(booking.getGuaranteeRefunded())) {
-                        BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
-                        BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
-                        BigDecimal refundable = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
-                        booking.setRefundedAmount(refunded.add(refundable));
-                        booking.setGuaranteeRefunded(true);
-                        booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto automáticamente: $" + refundable);
-                    }
+                            // Recalcular comisión de plataforma (8%) y liquidación del anfitrión (92%) incluyendo el recargo
+                            BigDecimal currentFee = booking.getPlatformFee() != null ? booking.getPlatformFee() : BigDecimal.ZERO;
+                            BigDecimal currentHostPayout = booking.getHostPayout() != null ? booking.getHostPayout() : BigDecimal.ZERO;
+                            if (currentFee.signum() > 0 || currentHostPayout.signum() > 0) {
+                                BigDecimal recargoFee = recargo.multiply(PLATFORM_FEE_RATE).setScale(2, RoundingMode.HALF_UP);
+                                BigDecimal recargoHost = recargo.subtract(recargoFee);
+                                booking.setPlatformFee(currentFee.add(recargoFee));
+                                booking.setHostPayout(currentHostPayout.add(recargoHost));
+                            } else {
+                                BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
+                                BigDecimal baseRoom = booking.getSubtotal() != null
+                                        ? booking.getSubtotal()
+                                        : currentTotal.subtract(deposit).max(BigDecimal.ZERO);
+                                BigDecimal newRoomBase = baseRoom.add(recargo);
+                                BigDecimal totalFee = newRoomBase.multiply(PLATFORM_FEE_RATE).setScale(2, RoundingMode.HALF_UP);
+                                booking.setPlatformFee(totalFee);
+                                booking.setHostPayout(newRoomBase.subtract(totalFee));
+                            }
 
-                    bookingService.changeBookingStatus(
-                            booking,
-                            BookingStatus.CHECKED_OUT,
-                            "System-AutoStayLifecycle",
-                            "Auto Check-out programado ejecutado a la hora límite (" + autoCheckOutHour + ":00)"
-                    );
-                    bookingRepository.save(booking);
+                            booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Recargo automático Late Check-out aplicado: $" + recargo);
+                        }
 
-                    log.info("Auto Check-out procesado para reserva {} (Garantía reembolsada, suite liberada)", booking.getId());
+                        // Desactivar el PIN de la cerradura inteligente al cerrar
+                        booking.setSmartLockPin(null);
+
+                        // Devolución automática del depósito de garantía
+                        BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
+                        if (deposit.signum() > 0 && !Boolean.TRUE.equals(booking.getGuaranteeRefunded())) {
+                            BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+                            BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+                            BigDecimal refundable = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
+                            booking.setRefundedAmount(refunded.add(refundable));
+                            booking.setGuaranteeRefunded(true);
+                            booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto automáticamente: $" + refundable);
+                        }
+
+                        bookingService.changeBookingStatus(
+                                booking,
+                                BookingStatus.CHECKED_OUT,
+                                "System-AutoStayLifecycle",
+                                "Auto Check-out programado ejecutado a la hora límite (" + autoCheckOutHour + ":00)"
+                        );
+                        bookingRepository.save(booking);
+
+                        log.info("Auto Check-out procesado para reserva {} (Garantía reembolsada, suite liberada)", booking.getId());
+                        return null;
+                    });
                 } catch (Exception e) {
-                    log.error("Error al procesar auto check-out para reserva {}: {}", booking.getId(), e.getMessage());
+                    log.error("Error al procesar auto check-out para reserva {}: {}", candidate.getId(), e.getMessage());
                 }
             }
         }
+    }
+
+    private <T> T executeWithBookingLock(String bookingId, Supplier<T> action) {
+        if (redisLockService == null) {
+            return action.get();
+        }
+        String lockKey = "booking:" + bookingId;
+        if (redisLockService.isDistributedConfigured()) {
+            return redisLockService.executeWithStrictDistributedLock(
+                    lockKey, Duration.ofSeconds(10), Duration.ofSeconds(2), action);
+        }
+        return redisLockService.executeWithLock(
+                lockKey, Duration.ofSeconds(10), Duration.ofSeconds(2), action);
     }
 }

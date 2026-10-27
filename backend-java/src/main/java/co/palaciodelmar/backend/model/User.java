@@ -54,10 +54,8 @@ public class User {
     private String resetPasswordTokenHash;
     private Instant resetPasswordTokenExpiresAt;
 
-    private String refreshTokenHash;
-    private Instant refreshTokenExpiresAt;
-
     private Profile profile;
+    private BankAccount bankAccount;
 
     @Builder.Default
     private Instant createdAt = Instant.now();
@@ -67,6 +65,7 @@ public class User {
 
     private Instant deletedAt;
     private Instant passwordChangedAt;
+    private Instant sessionsRevokedAt;
 
     @Data
     @Builder
@@ -90,5 +89,20 @@ public class User {
         private String state;
         private String country;
         private String postalCode;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BankAccount {
+        private String bankName;
+        private String accountType; // "Ahorros", "Corriente"
+        private String accountNumber;
+        private String accountNumberMasked;
+        private String holderName;
+        private String documentId;
+        private String documentType;
+        private Instant updatedAt;
     }
 }

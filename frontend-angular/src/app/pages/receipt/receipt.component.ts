@@ -134,7 +134,14 @@ import { renderSVG } from '../../utils/qr';
 
         <!-- Módulo de Reseña Verificada (post-check-out, no imprimible) -->
         <div *ngIf="canLeaveReview" class="no-print" style="margin-top: 2.5rem; background: #fdfbf7; border: 1px solid #e8dfc8; border-radius: 8px; padding: 1.5rem;">
-          <div *ngIf="!reviewSubmitted">
+          <div *ngIf="!isLoggedIn" style="text-align: center; padding: 10px;">
+            <p style="margin: 0 0 10px 0; font-size: 0.9rem; color: #555;">Inicia sesión con tu cuenta de huésped para calificar tu experiencia de estadía.</p>
+            <a routerLink="/login" style="display: inline-block; background: #0d0d0d; color: #d4af37; border: 1px solid #d4af37; padding: 6px 16px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; text-decoration: none;">
+              Iniciar Sesión
+            </a>
+          </div>
+
+          <div *ngIf="isLoggedIn && !reviewSubmitted">
             <h4 style="margin: 0 0 6px 0; color: #8c7329; font-size: 1.1rem;">Califica tu experiencia de estadía</h4>
             <p style="margin: 0 0 12px 0; font-size: 0.85rem; color: #666;">Tu calificación como huésped verificado ayuda a mantener la calidad del marketplace.</p>
             
@@ -167,7 +174,7 @@ import { renderSVG } from '../../utils/qr';
             </div>
           </div>
 
-          <div *ngIf="reviewSubmitted" style="text-align: center; color: #2ecc71; padding: 10px;">
+          <div *ngIf="isLoggedIn && reviewSubmitted" style="text-align: center; color: #2ecc71; padding: 10px;">
             <strong>✓ ¡Gracias por tu reseña verificada! Ha sido registrada exitosamente.</strong>
           </div>
         </div>
@@ -262,6 +269,10 @@ export class ReceiptComponent implements OnInit {
 
   print(): void {
     window.print();
+  }
+
+  get isLoggedIn(): boolean {
+    return !this.auth || !!this.auth.currentUserValue;
   }
 
   get isPaid(): boolean {

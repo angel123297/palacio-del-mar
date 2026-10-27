@@ -273,6 +273,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   timerSeconds: number = 900;
   timerInterval: any = null;
 
+  private paymentAttemptFingerprint = '';
+  private checkoutIdempotencyKey = '';
+  private confirmIdempotencyKey = '';
+
   paymentForm: FormGroup;
 
   get balanceDue(): number {
@@ -464,6 +468,17 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     }
     if (this.paymentForm.invalid || !this.booking) {
       this.paymentForm.markAllAsTouched();
+      this.errorMsg = 'Por favor completa todos los campos requeridos de la tarjeta.';
+      this.cdr.detectChanges();
+      if (this.paymentForm.get('cardName')?.invalid) {
+        document.getElementById('checkout-card-name')?.focus();
+      } else if (this.paymentForm.get('cardNumber')?.invalid) {
+        document.getElementById('checkout-card-number')?.focus();
+      } else if (this.paymentForm.get('expiry')?.invalid) {
+        document.getElementById('checkout-card-expiry')?.focus();
+      } else if (this.paymentForm.get('cvv')?.invalid) {
+        document.getElementById('checkout-card-cvv')?.focus();
+      }
       return;
     }
 
@@ -526,9 +541,17 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       method: (methodPayload.method === 'CREDIT_CARD' || !methodPayload.method) ? 'card' : methodPayload.method.toLowerCase()
     };
 
+    const attemptFp = `${targetBookingId}|${checkoutPayload.method}|${paymentToken}`;
+    if (this.paymentAttemptFingerprint !== attemptFp || !this.checkoutIdempotencyKey || !this.confirmIdempotencyKey) {
+      this.paymentAttemptFingerprint = attemptFp;
+      const seed = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      this.checkoutIdempotencyKey = `chk_${seed}`;
+      this.confirmIdempotencyKey = `cfm_${seed}`;
+    }
+
     let createdIntentId = '';
 
-    this.api.post<any>('/payments/checkout', checkoutPayload).pipe(
+    this.api.post<any>('/payments/checkout', checkoutPayload, { 'Idempotency-Key': this.checkoutIdempotencyKey }).pipe(
       switchMap((intentRes: any) => {
         const intentData = intentRes.data || intentRes;
         createdIntentId = intentData.intentId || intentData.id;
@@ -537,7 +560,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         return this.api.post<any>('/payments/confirm', {
           intentId: createdIntentId,
           paymentToken
-        });
+        }, { 'Idempotency-Key': this.confirmIdempotencyKey });
       })
     ).subscribe({
       next: (confirmRes: any) => {
@@ -557,6 +580,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.processing = false;
+        // Si fue rechazado por negocio (400/422, p. ej. tarjeta declinada), rotar clave para permitir nuevo intento limpio
+        if (err?.status && err.status >= 400 && err.status < 500 && err.status !== 409) {
+          this.checkoutIdempotencyKey = '';
+          this.confirmIdempotencyKey = '';
+        }
         this.errorMsg = err?.error?.message || err?.message || 'Transacción declinada por el banco simulado. Por favor intenta de nuevo.';
         this.cdr.detectChanges();
       }

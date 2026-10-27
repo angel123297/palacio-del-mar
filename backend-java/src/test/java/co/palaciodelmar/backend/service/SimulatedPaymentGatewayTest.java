@@ -272,4 +272,16 @@ class SimulatedPaymentGatewayTest {
         assertEquals("refunded", res.status());
         assertEquals("refunded", succeededAttempt.getStatus());
     }
+
+    @Test
+    void testValidateSecretRejectsPublicDefaultSecret() {
+        ReflectionTestUtils.setField(gateway, "webhookSecret", "whsec_simulated_secret_key_palacio_2026");
+        assertThrows(IllegalStateException.class, () -> gateway.validateSecret());
+
+        ReflectionTestUtils.setField(gateway, "webhookSecret", "");
+        assertThrows(IllegalStateException.class, () -> gateway.validateSecret());
+
+        ReflectionTestUtils.setField(gateway, "webhookSecret", "f0e1d2c3b4a5968778695a4b3c2d1e0ff0e1d2c3b4a5968778695a4b3c2d1e0f");
+        assertDoesNotThrow(() -> gateway.validateSecret());
+    }
 }

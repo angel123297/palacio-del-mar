@@ -9,7 +9,7 @@ import { CommonModule } from '@angular/common';
     <section id="hero">
       <div
         class="hero-bg"
-        style="background-size:cover;background-position:center;background-repeat:no-repeat;background-image: url('https://images.unsplash.com/photo-1540541338287-41700207dee6?w=1200&auto=format&fit=crop&q=70')"
+        style="background-image: linear-gradient(to bottom, rgba(13, 13, 11, 0.72) 0%, rgba(13, 13, 11, 0.52) 45%, rgba(13, 13, 11, 0.92) 100%), url('https://images.unsplash.com/photo-1540541338287-41700207dee6?w=1600&auto=format&fit=crop&q=80'); background-size: cover; background-position: center; background-repeat: no-repeat;"
       ></div>
       <div class="hero-content">
         <p class="hero-eyebrow" style="text-shadow: 0 2px 8px rgba(0,0,0,0.8);">Cartagena de Indias · Marketplace de hospedaje</p>

@@ -18,11 +18,8 @@ public class ExperienceController {
     private final ExperienceService experienceService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ExperienceDTO>>> getAllExperiences(
-            @RequestParam(required = false) java.math.BigDecimal minPrice,
-            @RequestParam(required = false) java.math.BigDecimal maxPrice,
-            @RequestParam(required = false) String category) {
-        List<ExperienceDTO> experiences = experienceService.getAllActiveExperiences(minPrice, maxPrice, category);
+    public ResponseEntity<ApiResponse<List<ExperienceDTO>>> getAllExperiences() {
+        List<ExperienceDTO> experiences = experienceService.getAllActiveExperiences();
         return ResponseEntity.ok(ApiResponse.ok(experiences));
     }
 

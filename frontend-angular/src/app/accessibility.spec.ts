@@ -191,6 +191,47 @@ describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
 
       localStorage.removeItem('user');
     });
+
+    it('al presionar Pon tu alojamiento debe abrir el modal en modo registro y rol host, incluso tras cerrar y reabrir', () => {
+      localStorage.removeItem('user');
+      authService.loadCachedUser();
+      fixture.detectChanges();
+      compiled = fixture.nativeElement as HTMLElement;
+
+      const hostBtn = compiled.querySelector('button[aria-label="Pon tu alojamiento"]') as HTMLButtonElement;
+      expect(hostBtn).toBeTruthy();
+      hostBtn.click();
+      fixture.detectChanges();
+
+      const modalComp = fixture.debugElement.children.find(c => c.componentInstance instanceof AuthModalComponent)?.componentInstance as AuthModalComponent;
+      expect(modalComp).toBeTruthy();
+      expect(modalComp.mode).toBe('register');
+      expect(modalComp.registerRole).toBe('host');
+
+      // Cerrar modal
+      modalComp.close();
+      fixture.detectChanges();
+      expect(modalComp.isOpen).toBe(false);
+
+      // Reabrir con "Pon tu alojamiento"
+      hostBtn.click();
+      fixture.detectChanges();
+      expect(modalComp.isOpen).toBe(true);
+      expect(modalComp.mode).toBe('register');
+      expect(modalComp.registerRole).toBe('host');
+
+      // Cambiar a iniciar sesión dentro del modal debe preservar el portal anfitrión
+      modalComp.switchToLogin();
+      fixture.detectChanges();
+      expect(modalComp.mode).toBe('login');
+      expect(modalComp.selectedPortal).toBe('host');
+
+      // Cambiar de vuelta a registro debe preservar el rol anfitrión
+      modalComp.switchToRegister();
+      fixture.detectChanges();
+      expect(modalComp.mode).toBe('register');
+      expect(modalComp.registerRole).toBe('host');
+    });
   });
 
   describe('Profile Accessibility (WCAG 4.1.2 & 1.3.1)', () => {

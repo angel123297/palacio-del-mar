@@ -1,8 +1,9 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property } from '../../models/types';
 
 export interface PromotionItem {
@@ -712,6 +713,18 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
 })
 export class AdminDashboardComponent implements OnInit {
   api = inject(ApiService);
+  auth = inject(AuthService);
+  router = inject(Router);
+
+  constructor() {
+    effect(() => {
+      const user = this.auth.currentUser();
+      const role = (user?.role || '').toLowerCase();
+      if (!user || role !== 'admin') {
+        this.router.navigate(['/']);
+      }
+    });
+  }
   
   activeTab = signal<'bookings' | 'promotions' | 'properties' | 'refunds'>('bookings');
 

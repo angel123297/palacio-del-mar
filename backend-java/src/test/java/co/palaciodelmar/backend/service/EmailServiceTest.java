@@ -1,12 +1,16 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.model.*;
+import co.palaciodelmar.backend.repository.BranchRepository;
+import co.palaciodelmar.backend.repository.PaymentRepository;
 import co.palaciodelmar.backend.repository.PropertyRepository;
+import co.palaciodelmar.backend.repository.SuiteRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
 import com.lowagie.text.pdf.PdfReader;
 import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import jakarta.mail.BodyPart;
 import jakarta.mail.Multipart;
+import jakarta.mail.Part;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -42,13 +47,44 @@ class EmailServiceTest {
     @Mock
     private PropertyRepository propertyRepository;
 
+    @Mock
+    private SuiteRepository suiteRepository;
+
+    @Mock
+    private BranchRepository branchRepository;
+
+    @Mock
+    private PaymentRepository paymentRepository;
+
     private EmailService emailService;
 
     @BeforeEach
     void setUp() {
         emailService = new EmailService(javaMailSender, userRepository);
         ReflectionTestUtils.setField(emailService, "propertyRepository", propertyRepository);
+        ReflectionTestUtils.setField(emailService, "suiteRepository", suiteRepository);
+        ReflectionTestUtils.setField(emailService, "branchRepository", branchRepository);
+        ReflectionTestUtils.setField(emailService, "paymentRepository", paymentRepository);
         ReflectionTestUtils.setField(emailService, "baseUrl", "http://localhost:4200");
+    }
+
+    private String extractHtmlContent(Part part) throws Exception {
+        Object content = part.getContent();
+        if (content instanceof String str) {
+            return str;
+        }
+        if (content instanceof Multipart multipart) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < multipart.getCount(); i++) {
+                BodyPart bp = multipart.getBodyPart(i);
+                if (Part.ATTACHMENT.equalsIgnoreCase(bp.getDisposition())) {
+                    continue;
+                }
+                sb.append(extractHtmlContent(bp));
+            }
+            return sb.toString();
+        }
+        return "";
     }
 
     private MimeMessage createMockMimeMessage() {
@@ -338,6 +374,18 @@ class EmailServiceTest {
     }
 
     @Test
+    @DisplayName("sendPasswordResetEmail envía enlace seguro de restablecimiento de contraseña")
+    void testSendPasswordResetEmail_Success() {
+        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
+
+        assertDoesNotThrow(() -> emailService.sendPasswordResetEmail("usuario@ejemplo.com", "secure-token-abc"));
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender, times(1)).send(captor.capture());
+        assertNotNull(captor.getValue());
+    }
+
+    @Test
     @DisplayName("sendTemporaryPasswordEmail envía correo con contraseña temporal al usuario")
     void testSendTemporaryPasswordEmail_Success() {
         when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
@@ -367,5 +415,229 @@ class EmailServiceTest {
         assertDoesNotThrow(() -> emailService.sendPropertyStatusNotification(null, "APPROVED"));
         assertDoesNotThrow(() -> emailService.sendWebhookFailureAlert(null));
         assertDoesNotThrow(() -> emailService.sendReviewInvitation(null));
+    }
+
+    @Test
+    @DisplayName("Normaliza APP_BASE_URL eliminando barras finales para evitar enlaces rotos con doble //")
+    void testNormalizeBaseUrl_StripsTrailingSlashAcrossLinks() throws Exception {
+        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
+        ReflectionTestUtils.setField(emailService, "baseUrl", "https://palacio-tunel.trycloudflare.com/");
+
+        emailService.sendVerificationEmail("ana@gmail.com", "tok-777");
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender).send(captor.capture());
+        String html = extractHtmlContent(captor.getValue());
+        assertTrue(html.contains("https://palacio-tunel.trycloudflare.com/verificar-email/tok-777"));
+        assertFalse(html.contains("trycloudflare.com//"));
+    }
+
+    @Test
+    @DisplayName("sendBookingConfirmation omite envío si no hay correo de destinatario (sin fallback falso cliente@ejemplo.com)")
+    void testSendBookingConfirmation_SkipsSendingWhenNoRecipientEmail() {
+        Booking booking = Booking.builder()
+                .id("BK-NO-EMAIL")
+                .user(null)
+                .guestDetails(null)
+                .checkIn(LocalDate.of(2026, 12, 1))
+                .checkOut(LocalDate.of(2026, 12, 3))
+                .build();
+
+        emailService.sendBookingConfirmation(booking);
+
+        verify(javaMailSender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    @DisplayName("validateMailConfiguration limpia espacios en App Password de Gmail y tolera credenciales vacías")
+    void testValidateMailConfiguration_SanitizesGmailAppPasswordSpacesAndHandlesMissingCreds() {
+        JavaMailSenderImpl senderImpl = new JavaMailSenderImpl();
+        senderImpl.setHost("smtp.gmail.com");
+        senderImpl.setUsername("palaciodelmar39@gmail.com");
+        senderImpl.setPassword("abcd efgh ijkl mnop");
+
+        EmailService serviceWithRealSender = new EmailService(senderImpl, userRepository);
+        ReflectionTestUtils.setField(serviceWithRealSender, "mailUsername", "palaciodelmar39@gmail.com");
+        ReflectionTestUtils.setField(serviceWithRealSender, "mailAuth", true);
+
+        assertDoesNotThrow(serviceWithRealSender::validateMailConfiguration);
+        assertEquals("abcdefghijklmnop", senderImpl.getPassword());
+
+        EmailService unconfiguredService = new EmailService(new JavaMailSenderImpl(), userRepository);
+        ReflectionTestUtils.setField(unconfiguredService, "mailUsername", "");
+        ReflectionTestUtils.setField(unconfiguredService, "mailAuth", true);
+        assertDoesNotThrow(unconfiguredService::validateMailConfiguration);
+    }
+
+    @Test
+    @DisplayName("sendBookingCreatedNotification incluye nombre real de suite, sede, dirección, noches, huéspedes y desglose en COP")
+    void testSendBookingCreatedNotification_IncludesRichSuitePropertyItineraryAndPricing() throws Exception {
+        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
+
+        User guest = User.builder()
+                .id("guest-user-1")
+                .name("Angel Kaleth")
+                .email("angelkaleth633@gmail.com")
+                .build();
+        when(userRepository.findById("guest-user-1")).thenReturn(Optional.of(guest));
+
+        String rawSuiteObjectId = "671a00000000000000000099";
+        Suite suite = Suite.builder()
+                .id(rawSuiteObjectId)
+                .name("Superior Patio Colonial")
+                .type("Suite Colonial")
+                .branch("branch-centro")
+                .build();
+        when(suiteRepository.findById(rawSuiteObjectId)).thenReturn(Optional.of(suite));
+
+        Branch branch = Branch.builder()
+                .id("branch-centro")
+                .name("Palacio del Mar · Centro Histórico")
+                .zone("Centro Histórico")
+                .address("Calle de la Factoría, Centro Histórico, Cartagena")
+                .build();
+        when(branchRepository.findById("branch-centro")).thenReturn(Optional.of(branch));
+
+        Booking booking = Booking.builder()
+                .id("671b00000000000000000123")
+                .bookingCode("PDM-CARTAGENA01")
+                .user("guest-user-1")
+                .suite(rawSuiteObjectId)
+                .branch("branch-centro")
+                .checkIn(LocalDate.of(2026, 11, 10))
+                .checkOut(LocalDate.of(2026, 11, 15))
+                .nights(5)
+                .guests(2)
+                .subtotal(new BigDecimal("2000000"))
+                .taxes(new BigDecimal("380000"))
+                .guaranteeDeposit(new BigDecimal("200000"))
+                .totalPrice(new BigDecimal("2580000"))
+                .status("pending")
+                .build();
+
+        emailService.sendBookingCreatedNotification(booking);
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender).send(captor.capture());
+        String html = extractHtmlContent(captor.getValue());
+
+        assertTrue(html.contains("PDM-CARTAGENA01"), "Debe incluir el código legible de reserva");
+        assertTrue(html.contains("Superior Patio Colonial"), "Debe incluir el nombre real de la suite");
+        assertTrue(html.contains("Suite Colonial"), "Debe incluir el tipo de suite");
+        assertFalse(html.contains(rawSuiteObjectId), "Nunca debe mostrar el ObjectId hexadecimal de la suite");
+        assertTrue(html.contains("Palacio del Mar · Centro Histórico"), "Debe incluir el nombre de la sede/propiedad");
+        assertTrue(html.contains("Calle de la Factoría, Centro Histórico, Cartagena"), "Debe incluir la dirección física");
+        assertTrue(html.contains("5 noches"), "Debe mostrar la cantidad de noches");
+        assertTrue(html.contains("2"), "Debe mostrar la cantidad de huéspedes");
+        assertTrue(html.contains("2.580.000"), "Debe formatear el total en pesos colombianos");
+        assertTrue(html.contains("http://localhost:4200/checkout/671b00000000000000000123"));
+    }
+
+    @Test
+    @DisplayName("sendBookingConfirmation incluye detalles completos de alojamiento y pago en HTML, PDF e ICS")
+    void testSendBookingConfirmation_IncludesRichAccommodationAndPaymentDetailsInHtmlPdfAndIcs() throws Exception {
+        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
+
+        User guest = User.builder()
+                .id("guest-user-55")
+                .name("Valentina Torres")
+                .email("valentina@gmail.com")
+                .build();
+        when(userRepository.findById("guest-user-55")).thenReturn(Optional.of(guest));
+
+        Suite suite = Suite.builder()
+                .id("suite-id-01")
+                .name("Penthouse Vista Mar")
+                .type("Penthouse Deluxe")
+                .propertyId("prop-bocagrande")
+                .build();
+        when(suiteRepository.findById("suite-id-01")).thenReturn(Optional.of(suite));
+
+        Property property = Property.builder()
+                .id("prop-bocagrande")
+                .name("Torre Marina Bocagrande")
+                .address("Av. San Martín #8-45, Bocagrande")
+                .city("Cartagena")
+                .build();
+        when(propertyRepository.findById("prop-bocagrande")).thenReturn(Optional.of(property));
+
+        Payment completedPayment = Payment.builder()
+                .id("pay-01")
+                .booking("bk-id-555")
+                .status("completed")
+                .paymentMethod("pse")
+                .provider("simulated")
+                .transactionId("TXN-PSE-998877")
+                .amount(new BigDecimal("3200000"))
+                .currency("COP")
+                .build();
+        when(paymentRepository.findByBooking("bk-id-555")).thenReturn(List.of(completedPayment));
+
+        Booking booking = Booking.builder()
+                .id("bk-id-555")
+                .bookingCode("PDM-998877665544")
+                .user("guest-user-55")
+                .suite("suite-id-01")
+                .propertyId("prop-bocagrande")
+                .smartLockPin("482910")
+                .checkIn(LocalDate.of(2026, 12, 20))
+                .checkOut(LocalDate.of(2026, 12, 24))
+                .nights(4)
+                .guests(3)
+                .totalPrice(new BigDecimal("3200000"))
+                .paidAmount(new BigDecimal("3200000"))
+                .balanceDue(BigDecimal.ZERO)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .build();
+
+        emailService.sendBookingConfirmation(booking);
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender).send(captor.capture());
+
+        String html = extractHtmlContent(captor.getValue());
+        assertTrue(html.contains("Valentina Torres"));
+        assertTrue(html.contains("PDM-998877665544"));
+        assertTrue(html.contains("482910"));
+        assertTrue(html.contains("Penthouse Vista Mar"));
+        assertTrue(html.contains("Penthouse Deluxe"));
+        assertTrue(html.contains("Torre Marina Bocagrande"));
+        assertTrue(html.contains("Av. San Martín #8-45, Bocagrande"));
+        assertTrue(html.contains("4 noches"));
+        assertTrue(html.contains("PSE"));
+        assertTrue(html.contains("TXN-PSE-998877"));
+        assertTrue(html.contains("3.200.000"));
+
+        Multipart content = (Multipart) captor.getValue().getContent();
+        byte[] pdfBytes = null;
+        String icsContent = null;
+        for (int i = 0; i < content.getCount(); i++) {
+            BodyPart part = content.getBodyPart(i);
+            if (part.getFileName() != null && part.getFileName().endsWith(".pdf")) {
+                pdfBytes = part.getInputStream().readAllBytes();
+            } else if (part.getFileName() != null && part.getFileName().endsWith(".ics")) {
+                icsContent = new String(part.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            }
+        }
+
+        assertNotNull(pdfBytes);
+        PdfReader pdfReader = new PdfReader(pdfBytes);
+        String pdfText;
+        try {
+            pdfText = new PdfTextExtractor(pdfReader).getTextFromPage(1);
+        } finally {
+            pdfReader.close();
+        }
+        assertTrue(pdfText.contains("PDM-998877665544"));
+        assertTrue(pdfText.contains("Penthouse Vista Mar"));
+        assertTrue(pdfText.contains("Torre Marina Bocagrande"));
+        assertTrue(pdfText.contains("PSE"));
+        assertTrue(pdfText.contains("TXN-PSE-998877"));
+
+        assertNotNull(icsContent);
+        assertTrue(icsContent.contains("Penthouse Vista Mar"));
+        assertTrue(icsContent.contains("PDM-998877665544"));
+        assertTrue(icsContent.contains("LOCATION:"));
     }
 }

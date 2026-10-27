@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -57,6 +57,9 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
           </ng-container>
           <ng-template #notLogged>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;">
+              <button class="btn-outline" (click)="openAuth('register', 'host')" aria-label="Pon tu alojamiento" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; cursor: pointer; white-space: nowrap; font-size: 0.82rem; border-color: rgba(226, 201, 155, 0.4); color: #e2c99b;">
+                🏨 Pon tu alojamiento
+              </button>
               <button class="btn-outline" (click)="openAuth('login')" aria-label="Abrir inicio de sesión" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; cursor: pointer; white-space: nowrap; font-size: 0.82rem;">
                 Iniciar sesión
               </button>
@@ -69,15 +72,23 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
       </nav>
     </header>
 
-    <app-auth-modal [isOpen]="authModalOpen" [initialMode]="authMode" [initialPortal]="authPortal" (closeEvent)="authModalOpen = false"></app-auth-modal>
+    <app-auth-modal #authModal [initialPortal]="authPortal" [initialMode]="authMode" [isOpen]="authModalOpen" (closeEvent)="onAuthClose()"></app-auth-modal>
   `
 })
 export class NavbarComponent {
+  @ViewChild('authModal') authModal?: AuthModalComponent;
+
   authModalOpen = false;
   authMode: 'login' | 'register' = 'login';
   authPortal: 'guest' | 'host' | 'admin' = 'guest';
 
   constructor(public auth: AuthService, private router: Router) {}
+
+  onAuthClose(): void {
+    this.authModalOpen = false;
+    this.authPortal = 'guest';
+    this.authMode = 'login';
+  }
 
   isCorporate(): boolean {
     const role = (this.auth.currentUser()?.role || '').trim().toLowerCase();
@@ -108,6 +119,9 @@ export class NavbarComponent {
     this.authMode = mode;
     this.authPortal = portal;
     this.authModalOpen = true;
+    if (this.authModal) {
+      this.authModal.open(mode, portal);
+    }
   }
 
   logout(): void {
