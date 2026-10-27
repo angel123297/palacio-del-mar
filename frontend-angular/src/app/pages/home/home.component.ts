@@ -1,3 +1,4 @@
+import { HotelMapComponent } from '../../components/hotel-map/hotel-map.component';
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -20,12 +21,13 @@ import { ContactSectionComponent } from '../../components/contact-section/contac
     RoomsSectionComponent,
     FaqSectionComponent,
     ContactSectionComponent
-  ],
+  , HotelMapComponent],
   template: `
     <ng-container *ngIf="!isCorporateUser">
       <app-hero></app-hero>
       <app-booking-bar></app-booking-bar>
       <app-branch-selector></app-branch-selector>
+      <app-hotel-map></app-hotel-map>
       <app-rooms-section></app-rooms-section>
       <app-faq-section></app-faq-section>
       <app-contact-section></app-contact-section>
