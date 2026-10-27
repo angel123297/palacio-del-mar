@@ -1,17 +1,23 @@
-# 🧪 QA Report — Palacio del Mar
-
-Reporte único de QA del proyecto. Se actualiza **cada día a las 9:00 a.m.** (Colombia) con la tarea programada de Vibe. Aquí se registran los resultados de Jules y de Vibe.
-
-## 📊 Estado actual (verificación local, 18 oct 2026 — 9ª verificación)
-
-- Backend: **256/256 tests** en verde (37 archivos de pruebas, 0 fallos, 0 errores y 0 omitidos).
-- Frontend: **13/13 tests** en verde (5 archivos de pruebas en Vitest) y compilación de producción exitosa (`dist/palacio-del-mar-web`).
-- CI: `.github/workflows/ci.yml` en verde en GitHub Actions (`plan/marketplace-webhooks`).
-- Protocolo `non-breaking-delivery`: estrictamente aplicado y verificado.
-- **Inconsistencias Resueltas:** Endpoint `GET /api/host/promotions` agregado e integrado en frontend, soporte dual para cabeceras de API key (`X-API-KEY` y `X-Palacio-Api-Key`), unificación de conteo de tests (256 pruebas en 37 archivos) y normalización de enlaces a `docs/CORRECCIONES.md`.
-- Todos los bloqueantes y hallazgos reportados han sido completamente solucionados.
-
 ## 🗓️ Reporte diario (bitácora)
+
+### 📅 2026-10-27 — Revisión diaria de Vibe: sin cambios en el día
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`, 26–27 oct):** solo el propio reporte de QA — [docs(qa): reporte diario 2026-10-26](https://github.com/angel123297/palacio-del-mar/commit/e6c9992db8d2ec153fbf83bd83262b70ccd73233) (26 oct 14:13 UTC, Vibe). **Sin cambios de código nuevos en el día.**
+
+**Pull requests:** sigue abierto **1 PR**: [#23 — Cleanup unused frontend code and dependencies](https://github.com/angel123297/palacio-del-mar/pull/23) (draft, creado 26 oct 04:11 UTC, sin actualizaciones desde entonces). ⚠️ Su base es `proyecto-angular-java` (rama original protegida): NO fusionar sin decisión explícita del usuario; revisar y decidir cerrar o cambiar la base.
+
+**Fase en curso:** plan de 5 fases **entregado** (fusionado el 21 oct). El trabajo reciente es post-plan: app móvil (fases 1–4 móviles), auth (recuperación de contraseña, refresh tokens), historial/cancelación, mapa Leaflet y correos HTML. Hoy no hubo avance en ninguno de esos frentes.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — siguen confirmados corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`). Los 10 hallazgos de AUDITORIA_SEGURIDAD.md permanecen cerrados.
+
+**Tests esperados en verde:** ~263+ de backend y ~14+ de frontend (línea base del 22 oct; sin commits nuevos de código, no hay riesgo de regresión nueva, pero el conteo sigue sin verificación local/CI por Vibe en esta ventana).
+
+**Riesgos / problemas detectados (sin cambios, siguen abiertos):**
+- ⚠️ Commit 4ddecea ("Actualización de credencial de Gmail"): verificar que no haya secretos hardcodeados en el historial; rotar la credencial si llegó a exponerse.
+- ⚠️ PR #23 con base en `proyecto-angular-java`: NO fusionar sin decisión explícita.
+- ⚠️ La app móvil sigue sin suite de tests propia; agregar smoke mínimo antes de sustentarla.
+- ⚠️ `AGENTS.md` sigue fuera del repositorio (ignorado vía .gitignore).
+- ℹ️ Verificar corrida de CI (GitHub Actions) sobre el HEAD actual (75cf32c) para confirmar los ~263 tests en verde.
 
 ### 📅 2026-10-26 — Revisión diaria de Vibe: app móvil y auth post-plan, email corporativo; PR draft #23 abierto
 
