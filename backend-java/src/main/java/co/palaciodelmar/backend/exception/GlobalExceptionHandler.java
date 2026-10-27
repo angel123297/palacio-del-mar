@@ -5,8 +5,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import java.util.stream.Collectors;
@@ -20,6 +22,11 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
         return ResponseEntity.badRequest().body(ApiResponse.error(errors));
+    }
+
+    @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ApiResponse<Void>> handleInvalidRequestParameters(Exception ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.error("Parámetro de solicitud inválido o faltante"));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
