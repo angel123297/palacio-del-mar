@@ -355,61 +355,20 @@ public class PaymentWebhookService {
                     java.time.Duration.ofSeconds(15),
                     java.time.Duration.ofSeconds(5),
                     () -> {
-                        doHandleRefundProcessed(data);
+                        doHandleRefundProcessed(data, eventId);
                         return null;
                     }
             );
             return;
         }
-        doHandleRefundProcessed(data);
+        doHandleRefundProcessed(data, eventId);
     }
 
-    private void doHandleRefundProcessed(PaymentWebhookPayload.PaymentWebhookData data) {
+    private void doHandleRefundProcessed(PaymentWebhookPayload.PaymentWebhookData data, String eventId) {
         Payment payment = paymentRepository.findByIntentId(data.getIntentId()).orElse(null);
         if (payment == null) {
             return;
         }
-        if ("refunded".equalsIgnoreCase(payment.getStatus())) {
-            log.info("Payment {} ya se encontraba en estado refunded; omitiendo doble abono contable", payment.getId());
-            return;
-        }
-
-        payment.setStatus("refunded");
-        payment.setUpdatedAt(Instant.now());
-        paymentRepository.save(payment);
-
-        Runnable applyRefundToBooking = () -> {
-            Booking booking = bookingRepository.findById(payment.getBooking()).orElse(null);
-            if (booking == null) {
-                return;
-            }
-            BigDecimal paidCap = booking.getPaidAmount() != null
-                    ? booking.getPaidAmount().max(BigDecimal.ZERO)
-                    : (payment.getAmount() != null ? payment.getAmount().max(BigDecimal.ZERO) : BigDecimal.ZERO);
-            BigDecimal currentRefunded = booking.getRefundedAmount() != null
-                    ? booking.getRefundedAmount().max(BigDecimal.ZERO)
-                    : BigDecimal.ZERO;
-            BigDecimal rawRefund = data.getAmount() != null
-                    ? data.getAmount()
-                    : (payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO);
-            BigDecimal eventRefund = rawRefund.max(BigDecimal.ZERO);
-
-            BigDecimal newRefunded;
-            if ("cancelled".equalsIgnoreCase(booking.getStatus()) && currentRefunded.compareTo(BigDecimal.ZERO) > 0) {
-                // cancelBooking ya contabilizó el reembolso al cancelar; reconciliar sin sumar dos veces
-                newRefunded = currentRefunded.max(eventRefund).min(paidCap);
-            } else {
-                newRefunded = currentRefunded.add(eventRefund).min(paidCap);
-            }
-
-            booking.setRefundedAmount(newRefunded);
-            if (paidCap.compareTo(BigDecimal.ZERO) > 0 && newRefunded.compareTo(paidCap) >= 0) {
-                booking.setPaymentStatus("refunded");
-            } else if (newRefunded.compareTo(BigDecimal.ZERO) > 0) {
-                booking.setPaymentStatus("partial");
-            }
-            bookingRepository.save(booking);
-        };
 
         if (redisLockService != null && payment.getBooking() != null && !payment.getBooking().isBlank()) {
             redisLockService.executeWithLock(
@@ -417,12 +376,89 @@ public class PaymentWebhookService {
                     java.time.Duration.ofSeconds(15),
                     java.time.Duration.ofSeconds(5),
                     () -> {
-                        applyRefundToBooking.run();
+                        applyRefundToBooking(payment, data, eventId);
                         return null;
                     }
             );
-        } else {
-            applyRefundToBooking.run();
+            return;
+        }
+        applyRefundToBooking(payment, data, eventId);
+    }
+
+    private void applyRefundToBooking(Payment initialPayment, PaymentWebhookPayload.PaymentWebhookData data, String eventId) {
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            Payment payment = paymentRepository.findByIntentId(data.getIntentId()).orElse(initialPayment);
+            if (payment == null) {
+                return;
+            }
+
+            Booking booking = (payment.getBooking() != null && !payment.getBooking().isBlank())
+                    ? bookingRepository.findById(payment.getBooking()).orElse(null)
+                    : null;
+
+            BigDecimal paidCap = (booking != null && booking.getPaidAmount() != null)
+                    ? booking.getPaidAmount().max(BigDecimal.ZERO)
+                    : (payment.getAmount() != null ? payment.getAmount().max(BigDecimal.ZERO) : BigDecimal.ZERO);
+            BigDecimal currentRefunded = (booking != null && booking.getRefundedAmount() != null)
+                    ? booking.getRefundedAmount().max(BigDecimal.ZERO)
+                    : BigDecimal.ZERO;
+            BigDecimal rawRefund = data.getAmount() != null
+                    ? data.getAmount()
+                    : (payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO);
+            BigDecimal eventRefund = rawRefund.max(BigDecimal.ZERO);
+
+            // Si payment ya está en estado refunded, verificar si el booking ya refleja el reembolso
+            if ("refunded".equalsIgnoreCase(payment.getStatus())) {
+                boolean bookingReflectsRefund = (booking == null)
+                        || (paidCap.compareTo(BigDecimal.ZERO) == 0)
+                        || ("refunded".equalsIgnoreCase(booking.getPaymentStatus()))
+                        || (currentRefunded.compareTo(BigDecimal.ZERO) > 0 && currentRefunded.compareTo(eventRefund) >= 0);
+
+                if (bookingReflectsRefund) {
+                    log.info("Payment {} ya se encontraba en estado refunded y Booking {} ya refleja el reembolso; omitiendo doble abono contable",
+                            payment.getId(), booking != null ? booking.getId() : "null");
+                    return;
+                }
+                log.warn("Payment {} está marcado como refunded pero Booking {} no refleja el reembolso (status: {}, refundedAmount: {}). Procediendo a actualizar booking.",
+                        payment.getId(), booking.getId(), booking.getPaymentStatus(), currentRefunded);
+            }
+
+            if (booking != null) {
+                BigDecimal newRefunded;
+                if ("cancelled".equalsIgnoreCase(booking.getStatus()) && currentRefunded.compareTo(BigDecimal.ZERO) > 0) {
+                    // cancelBooking ya contabilizó el reembolso al cancelar; reconciliar sin sumar dos veces
+                    newRefunded = currentRefunded.max(eventRefund).min(paidCap);
+                } else {
+                    newRefunded = currentRefunded.add(eventRefund).min(paidCap);
+                }
+
+                booking.setRefundedAmount(newRefunded);
+                if (paidCap.compareTo(BigDecimal.ZERO) > 0 && newRefunded.compareTo(paidCap) >= 0) {
+                    booking.setPaymentStatus("refunded");
+                } else if (newRefunded.compareTo(BigDecimal.ZERO) > 0) {
+                    booking.setPaymentStatus("partial");
+                }
+
+                try {
+                    bookingRepository.save(booking);
+                } catch (org.springframework.dao.OptimisticLockingFailureException ole) {
+                    if (attempt < 3) {
+                        log.warn("Conflicto @Version reembolsando Booking {} en webhook {} (intento {}/3), reintentando...",
+                                booking.getId(), eventId, attempt);
+                        continue;
+                    }
+                    throw ole;
+                }
+            }
+
+            // Persistir estado refunded del payment ÚNICAMENTE DESPUÉS del save exitoso del booking
+            payment.setStatus("refunded");
+            payment.setUpdatedAt(Instant.now());
+            payment.setNotes("Reembolso procesado exitosamente via webhook (" + eventId + ")");
+            paymentRepository.save(payment);
+            log.info("Payment {} y Booking {} actualizados exitosamente tras reembolso via webhook ({})",
+                    payment.getId(), booking != null ? booking.getId() : "null", eventId);
+            return;
         }
     }
 

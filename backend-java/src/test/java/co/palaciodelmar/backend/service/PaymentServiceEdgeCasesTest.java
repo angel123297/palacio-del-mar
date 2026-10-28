@@ -264,4 +264,105 @@ class PaymentServiceEdgeCasesTest {
                 paymentService.createPaymentIntent(null, "book-idem", "card", "idem-key-secret")
         );
     }
+
+    @Test
+    void testConfirmPayment_WhenOptimisticLockingFailure_AndWebhookAlreadyCompletedPayment_ReturnsReplayWithoutRefunding() {
+        String intentId = "pi_concurrent_opt_lock";
+        String bookingId = "book_concurrent_123";
+
+        Payment initialPayment = Payment.builder()
+                .id("pay-opt-1")
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .status("pending")
+                .intentId(intentId)
+                .build();
+
+        Booking initialBooking = Booking.builder()
+                .id(bookingId)
+                .status("pending")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("500000"))
+                .build();
+
+        Payment completedByWebhookPayment = Payment.builder()
+                .id("pay-opt-1")
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .status("completed")
+                .transactionId("tx_webhook_456")
+                .intentId(intentId)
+                .build();
+
+        Booking confirmedBooking = Booking.builder()
+                .id(bookingId)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .balanceDue(BigDecimal.ZERO)
+                .build();
+
+        co.palaciodelmar.backend.repository.SuiteNightRepository mockSuiteNightRepo = mock(co.palaciodelmar.backend.repository.SuiteNightRepository.class);
+        paymentService.setSuiteNightRepository(mockSuiteNightRepo);
+
+        when(paymentRepository.findByIntentId(intentId))
+                .thenReturn(Optional.of(initialPayment))
+                .thenReturn(Optional.of(completedByWebhookPayment));
+
+        when(bookingRepository.findById(bookingId))
+                .thenReturn(Optional.of(initialBooking))
+                .thenReturn(Optional.of(confirmedBooking));
+
+        when(paymentGateway.confirmIntent(eq(intentId), any()))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_sync_123", "succeeded", null));
+
+        when(bookingRepository.save(any(Booking.class)))
+                .thenThrow(new org.springframework.dao.OptimisticLockingFailureException("Version conflict"));
+
+        when(bookingService.toDTO(any())).thenReturn(co.palaciodelmar.backend.dto.BookingDTO.builder().id(bookingId).status("confirmed").build());
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment(null, intentId, "tok_test");
+
+        assertEquals("completed", result.get("status"));
+        assertEquals("tx_webhook_456", result.get("transactionId"));
+
+        verify(paymentGateway, never()).refund(any(), any());
+        verify(mockSuiteNightRepo, never()).deleteByBooking(any());
+    }
+
+    @Test
+    void testConfirmPayment_WithNullTotalPrice_HandlesGracefullyWithoutNPE() {
+        String intentId = "pi_null_total";
+        String bookingId = "book_null_total";
+
+        Payment payment = Payment.builder()
+                .id("pay-null-1")
+                .booking(bookingId)
+                .amount(new BigDecimal("100000"))
+                .status("pending")
+                .intentId(intentId)
+                .build();
+
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .status("pending")
+                .totalPrice(null)
+                .paidAmount(null)
+                .build();
+
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent(eq(intentId), any()))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_null_1", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(bookingService.toDTO(any())).thenReturn(co.palaciodelmar.backend.dto.BookingDTO.builder().id(bookingId).build());
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment(null, intentId, "tok_test");
+
+        assertEquals("completed", result.get("status"));
+        assertEquals(BigDecimal.ZERO, booking.getBalanceDue());
+    }
 }

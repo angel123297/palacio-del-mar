@@ -564,4 +564,118 @@ class PaymentWebhookServiceTest {
         assertEquals(new BigDecimal("300000"), activePaidBooking.getRefundedAmount(),
                 "refundedAmount jamás debe superar paidAmount");
     }
+
+    @Test
+    void testRefundProcessed_RetriesOnOptimisticLockingFailureAndPersistsRefundedAfterBooking() {
+        String eventId = "evt_refund_retry_1";
+        String intentId = "pi_refund_retry";
+        String bookingId = "book_refund_retry";
+
+        Payment payment = Payment.builder()
+                .id("pay_retry_1")
+                .intentId(intentId)
+                .booking(bookingId)
+                .amount(new BigDecimal("250000"))
+                .status("completed")
+                .build();
+
+        Booking staleBooking = Booking.builder()
+                .id(bookingId)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("250000"))
+                .paidAmount(new BigDecimal("250000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .build();
+
+        Booking freshBooking = Booking.builder()
+                .id(bookingId)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("250000"))
+                .paidAmount(new BigDecimal("250000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .build();
+
+        when(processedWebhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById(bookingId))
+                .thenReturn(Optional.of(staleBooking))
+                .thenReturn(Optional.of(freshBooking));
+
+        // Primer intento lanza OptimisticLockingFailureException, segundo intento guarda exitosamente
+        when(bookingRepository.save(any(Booking.class)))
+                .thenThrow(new org.springframework.dao.OptimisticLockingFailureException("Version conflict on attempt 1"))
+                .thenAnswer(i -> i.getArguments()[0]);
+
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+        String body = """
+                {
+                  "eventId": "%s",
+                  "eventType": "refund.processed",
+                  "data": { "intentId": "%s", "bookingId": "%s", "amount": 250000 }
+                }
+                """.formatted(eventId, intentId, bookingId);
+
+        Map<String, Object> result = webhookService.processWebhook(body, WebhookSigner.sign(body, secret), eventId, ts);
+
+        assertEquals("processed", result.get("status"));
+        assertEquals("refunded", payment.getStatus());
+        assertEquals(new BigDecimal("250000"), freshBooking.getRefundedAmount());
+        assertEquals("refunded", freshBooking.getPaymentStatus());
+        verify(bookingRepository, times(2)).save(any(Booking.class));
+        verify(paymentRepository, times(1)).save(payment);
+    }
+
+    @Test
+    void testRefundProcessed_EarlyReturnHealsBookingWhenPaymentWasRefundedButBookingNotYetUpdated() {
+        String eventId = "evt_refund_heal_1";
+        String intentId = "pi_refund_heal";
+        String bookingId = "book_refund_heal";
+
+        // Payment ya quedó marcado como refunded (intento previo fallido al persistir booking)
+        Payment refundedPayment = Payment.builder()
+                .id("pay_heal_1")
+                .intentId(intentId)
+                .booking(bookingId)
+                .amount(new BigDecimal("180000"))
+                .status("refunded")
+                .build();
+
+        // Pero la reserva quedó desactualizada (paymentStatus still 'paid', refundedAmount 0)
+        Booking unhealedBooking = Booking.builder()
+                .id(bookingId)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("180000"))
+                .paidAmount(new BigDecimal("180000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .build();
+
+        when(processedWebhookEventRepository.existsByEventId(eventId)).thenReturn(false);
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(refundedPayment));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(unhealedBooking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+        String body = """
+                {
+                  "eventId": "%s",
+                  "eventType": "refund.processed",
+                  "data": { "intentId": "%s", "bookingId": "%s", "amount": 180000 }
+                }
+                """.formatted(eventId, intentId, bookingId);
+
+        Map<String, Object> result = webhookService.processWebhook(body, WebhookSigner.sign(body, secret), eventId, ts);
+
+        assertEquals("processed", result.get("status"));
+        assertEquals("refunded", refundedPayment.getStatus());
+        assertEquals(new BigDecimal("180000"), unhealedBooking.getRefundedAmount(),
+                "Debe subsanar la reserva y no saltarla con early return si el booking aún no refleja el reembolso");
+        assertEquals("refunded", unhealedBooking.getPaymentStatus());
+        verify(bookingRepository, times(1)).save(unhealedBooking);
+    }
 }
