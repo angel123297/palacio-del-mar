@@ -26,6 +26,9 @@ public class AdminController {
     private final BookingService bookingService;
     private final co.palaciodelmar.backend.service.PropertyService propertyService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.service.HostPayoutService hostPayoutService;
+
     @GetMapping("/properties")
     public ResponseEntity<ApiResponse<List<co.palaciodelmar.backend.dto.PropertyDTO>>> getAdminProperties(
             @RequestParam(required = false) String status) {
@@ -117,6 +120,14 @@ public class AdminController {
         String notes = body.get("notes");
         co.palaciodelmar.backend.model.Payment p = adminService.resolveRefund(id, action, notes);
         return ResponseEntity.ok(ApiResponse.ok("Reembolso resuelto exitosamente", toPaymentDTO(p)));
+    }
+
+    @PostMapping("/payouts/process")
+    public ResponseEntity<ApiResponse<List<co.palaciodelmar.backend.dto.HostPayoutDTO>>> triggerPayoutProcess() {
+        List<co.palaciodelmar.backend.dto.HostPayoutDTO> payouts = hostPayoutService != null
+                ? hostPayoutService.processAutomatedPayouts()
+                : List.of();
+        return ResponseEntity.ok(ApiResponse.ok("Proceso de liquidación ejecutado exitosamente", payouts));
     }
 
     private co.palaciodelmar.backend.dto.PaymentDTO toPaymentDTO(co.palaciodelmar.backend.model.Payment p) {

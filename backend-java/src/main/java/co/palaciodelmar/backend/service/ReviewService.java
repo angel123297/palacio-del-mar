@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.ReviewDTO;
+import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Review;
 import co.palaciodelmar.backend.model.User;
@@ -52,7 +53,7 @@ public class ReviewService {
                 if (s.getPropertyId() != null) {
                     propertyRepository.findById(s.getPropertyId()).ifPresent(p -> {
                         if (userId.equals(p.getOwnerId())) {
-                            throw new IllegalArgumentException("Un anfitrión no puede calificar su propia propiedad");
+                            throw new ForbiddenAccessException("Un anfitrión no puede calificar su propia propiedad");
                         }
                     });
                 }
@@ -95,11 +96,15 @@ public class ReviewService {
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
 
         if (userId != null && !userId.equals(booking.getUser())) {
-            throw new IllegalArgumentException("Solo el huésped titular puede calificar esta reserva");
+            throw new ForbiddenAccessException("Solo el huésped titular puede calificar esta reserva");
         }
 
-        if (booking.getStatus() != null && "cancelled".equalsIgnoreCase(booking.getStatus())) {
+        String st = booking.getStatus() != null ? booking.getStatus().toLowerCase() : "";
+        if ("cancelled".equals(st)) {
             throw new IllegalStateException("No se pueden enviar reseñas para reservas canceladas");
+        }
+        if (!"checked_out".equals(st) && !"completed".equals(st)) {
+            throw new IllegalStateException("Solo puedes calificar tu estadía después del check-out");
         }
 
         if (reviewRepository.existsByBookingId(bookingId)) {

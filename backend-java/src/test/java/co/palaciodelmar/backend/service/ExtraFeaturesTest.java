@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.ReviewDTO;
+import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Review;
 import co.palaciodelmar.backend.repository.BookingRepository;
@@ -34,6 +35,7 @@ class ExtraFeaturesTest {
                 .id(bookingId)
                 .user(userId)
                 .suite("SUITE-001")
+                .status("checked_out")
                 .guestDetails(Booking.GuestDetails.builder().fullName("Mariana Gomez").build())
                 .build();
 
@@ -67,11 +69,57 @@ class ExtraFeaturesTest {
 
         ReviewService reviewService = new ReviewService(reviewRepository, bookingRepository, userRepository);
 
-        when(bookingRepository.findById("BOOK-DUP")).thenReturn(Optional.of(Booking.builder().id("BOOK-DUP").user("U1").build()));
+        when(bookingRepository.findById("BOOK-DUP")).thenReturn(Optional.of(Booking.builder().id("BOOK-DUP").user("U1").status("checked_out").build()));
         when(reviewRepository.existsByBookingId("BOOK-DUP")).thenReturn(true);
 
         assertThrows(IllegalStateException.class, () ->
                 reviewService.addVerifiedReview("BOOK-DUP", "U1", 5, "Excelente")
         );
+    }
+
+    @Test
+    @DisplayName("ReviewService rechaza reseña si la reserva no ha completado el check-out (pending, confirmed, expired)")
+    void blocksReviewBeforeStayCompleted() {
+        ReviewRepository reviewRepository = Mockito.mock(ReviewRepository.class);
+        BookingRepository bookingRepository = Mockito.mock(BookingRepository.class);
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+
+        ReviewService reviewService = new ReviewService(reviewRepository, bookingRepository, userRepository);
+
+        when(bookingRepository.findById("BK-PENDING")).thenReturn(Optional.of(
+                Booking.builder().id("BK-PENDING").user("U1").status("pending").build()
+        ));
+        when(bookingRepository.findById("BK-EXPIRED")).thenReturn(Optional.of(
+                Booking.builder().id("BK-EXPIRED").user("U1").status("expired").build()
+        ));
+
+        IllegalStateException exPending = assertThrows(IllegalStateException.class, () ->
+                reviewService.addVerifiedReview("BK-PENDING", "U1", 5, "Excelente")
+        );
+        assertTrue(exPending.getMessage().contains("después del check-out"));
+
+        IllegalStateException exExpired = assertThrows(IllegalStateException.class, () ->
+                reviewService.addVerifiedReview("BK-EXPIRED", "U1", 5, "Excelente")
+        );
+        assertTrue(exExpired.getMessage().contains("después del check-out"));
+    }
+
+    @Test
+    @DisplayName("ReviewService lanza ForbiddenAccessException si el usuario no es el titular de la reserva")
+    void blocksReviewWhenUserIsNotOwner() {
+        ReviewRepository reviewRepository = Mockito.mock(ReviewRepository.class);
+        BookingRepository bookingRepository = Mockito.mock(BookingRepository.class);
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+
+        ReviewService reviewService = new ReviewService(reviewRepository, bookingRepository, userRepository);
+
+        when(bookingRepository.findById("BK-LEGIT")).thenReturn(Optional.of(
+                Booking.builder().id("BK-LEGIT").user("U1").status("checked_out").build()
+        ));
+
+        ForbiddenAccessException ex = assertThrows(ForbiddenAccessException.class, () ->
+                reviewService.addVerifiedReview("BK-LEGIT", "U2_ATTACKER", 5, "Excelente")
+        );
+        assertEquals("Solo el huésped titular puede calificar esta reserva", ex.getMessage());
     }
 }
