@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/services/api_service.dart';
 
 class DigitalKeyView extends StatefulWidget {
   const DigitalKeyView({super.key});
@@ -19,6 +20,8 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
 
   bool _isRegister = false;
   bool _obscurePassword = true;
+  List<dynamic> _userBookings = [];
+  bool _isLoadingBookings = false;
 
   static final RegExp _emailRegExp = RegExp(
     r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
@@ -26,6 +29,24 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
 
   bool _isValidEmail(String email) {
     return _emailRegExp.hasMatch(email.trim().toLowerCase());
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBookings());
+  }
+
+  Future<void> _loadBookings() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) return;
+    setState(() => _isLoadingBookings = true);
+    final data = await ApiService.getMyReservations();
+    if (!mounted) return;
+    setState(() {
+      _userBookings = data;
+      _isLoadingBookings = false;
+    });
   }
 
   @override
@@ -52,7 +73,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
       if (res['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(res['message'] ?? 'Registro exitoso. Revisa tu correo de verificación.'),
+            content: Text(res['message'] ?? 'Revisa tu correo para verificar tu cuenta antes de iniciar sesión'),
             backgroundColor: AppTheme.gold,
             behavior: SnackBarBehavior.floating,
           ),
@@ -77,7 +98,9 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
       final res = await authProvider.login(email, password);
       if (!mounted) return;
 
-      if (res['success'] != true) {
+      if (res['success'] == true) {
+        _loadBookings();
+      } else {
         final errorMsg = res['message'] ?? 'Credenciales incorrectas o error de conexión';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -95,6 +118,20 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
     final authProvider = context.watch<AuthProvider>();
 
     if (authProvider.isAuthenticated) {
+      if (_userBookings.isEmpty && !_isLoadingBookings) {
+        _loadBookings();
+      }
+      final latest = _userBookings.isNotEmpty ? _userBookings.first : null;
+      final suite = latest is Map ? latest['suite'] : null;
+      final suiteName = (suite is Map ? suite['name'] : null) ?? (latest is Map ? latest['guestName'] : null) ?? 'Palacio del Mar';
+      final branch = latest is Map ? latest['branch'] : null;
+      final location = (branch is Map ? branch['name'] : null) ?? authProvider.currentUserEmail ?? 'Centro Histórico · Cartagena';
+      final qrCode = (latest is Map ? (latest['bookingCode'] ?? latest['id']) : null)?.toString() ?? 'PALACIO-KEY';
+      final smartPin = latest is Map ? latest['smartLockPin']?.toString() : null;
+      final checkIn = latest is Map ? latest['checkIn']?.toString() : null;
+      final checkOut = latest is Map ? latest['checkOut']?.toString() : null;
+      final dateRange = (checkIn != null && checkOut != null) ? '$checkIn - $checkOut' : null;
+
       return Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -111,13 +148,15 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Gran Suite Presidencial',
-                      style: TextStyle(
-                        fontFamily: 'serif',
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        suiteName.toString(),
+                        style: const TextStyle(
+                          fontFamily: 'serif',
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -127,9 +166,16 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                   ],
                 ),
                 Text(
-                  authProvider.currentUserEmail ?? 'Centro Histórico · Cartagena',
+                  location.toString(),
                   style: const TextStyle(color: AppTheme.gold, fontSize: 12),
                 ),
+                if (dateRange != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    dateRange,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ],
                 const Divider(height: 30, color: Colors.white10),
                 const Text(
                   'LLAVE DIGITAL DE ACCESO',
@@ -153,7 +199,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: QrImageView(
-                    data: 'RES-8921-PALACIO',
+                    data: qrCode,
                     version: QrVersions.auto,
                     size: 160,
                   ),
@@ -167,9 +213,9 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: AppTheme.gold.withOpacity(0.3)),
                   ),
-                  child: const Column(
+                  child: Column(
                     children: [
-                      Text(
+                      const Text(
                         'PIN DE HABITACIÓN',
                         style: TextStyle(
                           color: AppTheme.gold,
@@ -178,14 +224,15 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                           letterSpacing: 2,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        '8492',
+                        smartPin ?? 'El PIN estará disponible al confirmar tu reserva',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 6,
+                          fontSize: smartPin != null ? 32 : 12,
+                          fontWeight: smartPin != null ? FontWeight.bold : FontWeight.normal,
+                          letterSpacing: smartPin != null ? 6 : 1,
                         ),
                       ),
                     ],
@@ -290,8 +337,8 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                     if (v == null || v.trim().isEmpty) {
                       return 'Ingresa tu contraseña';
                     }
-                    if (v.trim().length < 4) {
-                      return 'Mínimo 4 caracteres';
+                    if (_isRegister && v.trim().length < 6) {
+                      return 'Mínimo 6 caracteres';
                     }
                     return null;
                   },

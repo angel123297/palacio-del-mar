@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/services/api_service.dart';
@@ -91,20 +91,46 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
               : RefreshIndicator(
                   color: goldColor,
                   onRefresh: _fetchData,
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      _buildReservationCard(
-                        hotelName: 'Gran Suite Presidencial',
-                        location: 'Centro Histórico · Cartagena',
-                        code: 'RES-8921-PALACIO',
-                        dates: '18 Oct - 20 Oct 2026',
-                        pinCode: '8492',
-                        status: 'CONFIRMADA',
-                        goldColor: goldColor,
-                      ),
-                    ],
-                  ),
+                  child: _reservations.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: const [
+                            SizedBox(height: 60),
+                            Center(
+                              child: Text(
+                                'No tienes reservas registradas',
+                                style: TextStyle(color: Colors.white54, fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: _reservations.length,
+                          itemBuilder: (context, index) {
+                            final res = _reservations[index];
+                            final suite = res['suite'];
+                            final hotelName = (suite is Map ? suite['name'] : null) ?? res['guestName'] ?? 'Suite Palacio del Mar';
+                            final branch = res['branch'];
+                            final location = (branch is Map ? branch['name'] : null) ?? 'Centro Histórico · Cartagena';
+                            final code = res['bookingCode'] ?? res['id'] ?? 'RESERVA';
+                            final checkIn = res['checkIn']?.toString() ?? '';
+                            final checkOut = res['checkOut']?.toString() ?? '';
+                            final dates = (checkIn.isNotEmpty && checkOut.isNotEmpty) ? '$checkIn - $checkOut' : 'Fechas por confirmar';
+                            final pin = res['smartLockPin'];
+                            final status = (res['status']?.toString() ?? 'PENDIENTE').toUpperCase();
+
+                            return _buildReservationCard(
+                              hotelName: hotelName.toString(),
+                              location: location.toString(),
+                              code: code.toString(),
+                              dates: dates,
+                              pinCode: pin?.toString(),
+                              status: status,
+                              goldColor: goldColor,
+                            );
+                          },
+                        ),
                 ),
         ),
       ),
@@ -116,7 +142,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
     required String location,
     required String code,
     required String dates,
-    required String pinCode,
+    required String? pinCode,
     required String status,
     required Color goldColor,
   }) {
@@ -212,7 +238,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
           ),
           const SizedBox(height: 24),
           InkWell(
-            onTap: () => _copyPin(pinCode),
+            onTap: pinCode != null ? () => _copyPin(pinCode) : null,
             borderRadius: BorderRadius.circular(6),
             child: Container(
               width: double.infinity,
@@ -241,13 +267,14 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    '8492',
+                  Text(
+                    pinCode ?? 'El PIN estará disponible al confirmar tu reserva',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 8,
-                      color: Colors.white,
+                      fontSize: pinCode != null ? 34 : 12,
+                      fontWeight: pinCode != null ? FontWeight.bold : FontWeight.normal,
+                      letterSpacing: pinCode != null ? 8 : 1,
+                      color: pinCode != null ? Colors.white : Colors.white70,
                     ),
                   ),
                 ],

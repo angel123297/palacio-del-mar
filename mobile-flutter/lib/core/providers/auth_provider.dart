@@ -37,9 +37,13 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final res = await ApiService.register(name, email, password, phone: phone);
-    if (res['success'] == true && res['data']?['token'] != null) {
-      _isAuthenticated = true;
-      _currentUserEmail = email.trim().toLowerCase();
+    if (res['success'] == true) {
+      if (res['data']?['token'] != null) {
+        _isAuthenticated = true;
+        _currentUserEmail = email.trim().toLowerCase();
+      } else {
+        _isAuthenticated = false;
+      }
     }
 
     _isLoading = false;

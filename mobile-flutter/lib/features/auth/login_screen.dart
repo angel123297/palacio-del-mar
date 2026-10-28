@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../core/services/api_service.dart';
 import '../booking/reservations_screen.dart';
 
@@ -44,11 +46,12 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text.trim();
     final name = _nameController.text.trim();
 
+    final authProvider = context.read<AuthProvider>();
     Map<String, dynamic> result;
     if (_isRegister) {
-      result = await ApiService.register(name, email, password);
+      result = await authProvider.register(name, email, password);
     } else {
-      result = await ApiService.login(email, password);
+      result = await authProvider.login(email, password);
     }
 
     setState(() => _isLoading = false);
@@ -59,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (_isRegister) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? 'Cuenta creada exitosamente. Revisa tu correo de verificación.'),
+            content: Text(result['message'] ?? 'Revisa tu correo para verificar tu cuenta antes de iniciar sesión'),
             backgroundColor: const Color(0xFFC5A059),
             behavior: SnackBarBehavior.floating,
           ),
@@ -270,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'Ingresa tu contraseña';
-                    if (v.trim().length < 4) return 'Mínimo 4 caracteres';
+                    if (_isRegister && v.trim().length < 6) return 'Mínimo 6 caracteres';
                     return null;
                   },
                 ),

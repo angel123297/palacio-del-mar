@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/booking_provider.dart';
+import '../../core/services/api_service.dart';
 
 class SuitesCatalogView extends StatefulWidget {
   const SuitesCatalogView({super.key});
@@ -12,8 +13,53 @@ class SuitesCatalogView extends StatefulWidget {
 
 class _SuitesCatalogViewState extends State<SuitesCatalogView> {
   String _selectedZone = 'Todas';
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _suites = [];
 
-  final List<Map<String, dynamic>> _suites = [
+  @override
+  void initState() {
+    super.initState();
+    _fetchSuites();
+  }
+
+  Future<void> _fetchSuites() async {
+    setState(() => _isLoading = true);
+    final data = await ApiService.getSuites();
+    if (!mounted) return;
+    if (data != null && data.isNotEmpty) {
+      final mapped = data.map<Map<String, dynamic>>((s) {
+        if (s is! Map) return {};
+        final branch = s['branch'];
+        final branchName = (branch is Map ? branch['name'] : null)?.toString() ?? 'Centro Histórico';
+        final price = s['basePrice'] ?? s['price'] ?? 0;
+        final rawAmenities = s['amenities'];
+        final amenitiesList = (rawAmenities is List)
+            ? rawAmenities.map((a) => a.toString().toUpperCase()).toList()
+            : <String>['AIRE ACONDICIONADO', 'WIFI'];
+
+        return {
+          'id': s['id'] ?? s['_id'],
+          'title': (s['name'] ?? 'Suite Palacio del Mar').toString(),
+          'zone': branchName,
+          'category': (s['type'] ?? 'HABITACIÓN').toString().toUpperCase(),
+          'price': '\$ $price',
+          'image': (s['mainImage'] ?? 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800').toString(),
+          'amenities': amenitiesList,
+        };
+      }).where((m) => m.isNotEmpty).toList();
+      setState(() {
+        _suites = mapped;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _suites = _fallbackSuites;
+        _isLoading = false;
+      });
+    }
+  }
+
+  static final List<Map<String, dynamic>> _fallbackSuites = [
     {
       'title': 'Superior Patio Colonial',
       'zone': 'Centro Histórico',
@@ -104,6 +150,14 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: CircularProgressIndicator(color: AppTheme.gold),
+        ),
+      );
+    }
     final filtered = _selectedZone == 'Todas'
         ? _suites
         : _suites.where((s) => s['zone'] == _selectedZone).toList();

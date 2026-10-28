@@ -180,4 +180,18 @@ class ApiService {
       throw Exception('Error al cancelar reserva');
     }
   }
+
+  static Future<List<dynamic>?> getSuites() async {
+    try {
+      final response = await AuthenticatedHttpClient.get('/suites');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['data'] is List) return data['data'];
+        if (data is List) return data;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }
