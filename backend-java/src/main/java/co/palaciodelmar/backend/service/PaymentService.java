@@ -3,6 +3,7 @@ package co.palaciodelmar.backend.service;
 import co.palaciodelmar.backend.dto.BookingDTO;
 import co.palaciodelmar.backend.dto.PaymentDTO;
 import co.palaciodelmar.backend.dto.PaymentRequest;
+import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Payment;
 import co.palaciodelmar.backend.repository.BookingRepository;
@@ -42,6 +43,10 @@ public class PaymentService {
     @Setter
     @Autowired(required = false)
     private AvailabilityCacheEvictor availabilityCacheEvictor;
+
+    @Setter
+    @Autowired(required = false)
+    private co.palaciodelmar.backend.repository.SuiteNightRepository suiteNightRepository;
 
     public Map<String, Object> getPaymentConfig() {
         return Map.of(
@@ -91,7 +96,7 @@ public class PaymentService {
 
         if (booking.getUser() != null) {
             if (userId != null && !booking.getUser().equals(userId)) {
-                throw new IllegalArgumentException("No tienes permiso para pagar esta reserva");
+                throw new ForbiddenAccessException("No tienes permiso para pagar esta reserva");
             }
             if (userId == null) {
                 userRepository.findById(booking.getUser()).ifPresent(u -> {
@@ -163,7 +168,7 @@ public class PaymentService {
 
         if (booking.getUser() != null) {
             if (userId != null && !booking.getUser().equals(userId)) {
-                throw new IllegalArgumentException("No tienes permiso para confirmar este pago");
+                throw new ForbiddenAccessException("No tienes permiso para confirmar este pago");
             }
             if (userId == null) {
                 userRepository.findById(booking.getUser()).ifPresent(u -> {
@@ -250,6 +255,18 @@ public class PaymentService {
                     ? "Conflicto por concurrencia tras cobro síncrono. Reembolso automático emitido."
                     : "Conflicto por concurrencia tras cobro síncrono. Requiere reembolso manual.");
             paymentRepository.save(payment);
+
+            if (suiteNightRepository != null && booking.getId() != null) {
+                try {
+                    suiteNightRepository.deleteByBooking(booking.getId());
+                    if (availabilityCacheEvictor != null) {
+                        availabilityCacheEvictor.evictAvailability();
+                    }
+                } catch (Exception ex) {
+                    // Log y continuar propagando la excepción
+                }
+            }
+
             throw new IllegalStateException("Conflicto al procesar el pago. La reserva fue modificada o cancelada simultáneamente.");
         }
 
@@ -296,12 +313,12 @@ public class PaymentService {
 
         if (booking.getUser() != null) {
             if (userId != null && !booking.getUser().equals(userId)) {
-                throw new IllegalArgumentException("No tienes permiso para consultar este pago");
+                throw new ForbiddenAccessException("No tienes permiso para consultar este pago");
             }
             if (userId == null) {
                 userRepository.findById(booking.getUser()).ifPresent(u -> {
                     if (u.getPassword() != null && !u.getPassword().isBlank()) {
-                        throw new IllegalArgumentException("No tienes permiso para consultar este pago. Inicia sesión.");
+                        throw new ForbiddenAccessException("No tienes permiso para consultar este pago. Inicia sesión.");
                     }
                 });
             }

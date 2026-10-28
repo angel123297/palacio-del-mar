@@ -61,8 +61,8 @@ public class AutoStayLifecycleScheduler {
     }
 
     void processAutoCheckIns(LocalDate today, LocalTime nowTime) {
-        // Reservas confirmadas con fecha de check-in hoy o anterior
-        List<Booking> confirmedBookings = bookingRepository.findByStatusIn(List.of("confirmed"));
+        // Reservas confirmadas con fecha de check-in hoy o anterior (filtrado en MongoDB, evita OOM/N+1)
+        List<Booking> confirmedBookings = bookingRepository.findByStatusInAndCheckInLessThanEqual(List.of("confirmed"), today);
 
         for (Booking candidate : confirmedBookings) {
             if (candidate == null || candidate.getId() == null || candidate.getCheckIn() == null) continue;
@@ -107,8 +107,8 @@ public class AutoStayLifecycleScheduler {
     }
 
     void processAutoCheckOuts(LocalDate today, LocalTime nowTime) {
-        // Reservas en estancia activa (checked_in)
-        List<Booking> activeBookings = bookingRepository.findByStatusIn(List.of("checked_in"));
+        // Reservas en estancia activa (checked_in) con fecha de check-out hoy o anterior
+        List<Booking> activeBookings = bookingRepository.findByStatusInAndCheckOutLessThanEqual(List.of("checked_in"), today);
 
         for (Booking candidate : activeBookings) {
             if (candidate == null || candidate.getId() == null || candidate.getCheckOut() == null) continue;

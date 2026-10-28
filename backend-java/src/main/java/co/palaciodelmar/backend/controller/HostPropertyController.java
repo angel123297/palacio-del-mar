@@ -147,6 +147,30 @@ public class HostPropertyController {
         return ResponseEntity.ok(ApiResponse.ok("Proceso de liquidación ejecutado exitosamente", payouts));
     }
 
+    @GetMapping("/reviews")
+    public ResponseEntity<ApiResponse<List<ReviewDTO>>> getHostReviews(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        String userId = principal.getUser().getId();
+        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        List<PropertyDTO> properties = isAdmin ? propertyService.getAllPropertiesForAdmin(null) : propertyService.getPropertiesByOwner(userId);
+        List<ReviewDTO> hostReviews = new java.util.ArrayList<>();
+        if (reviewService != null && properties != null) {
+            for (PropertyDTO prop : properties) {
+                String pId = prop.getId() != null ? prop.getId() : prop.get_id();
+                List<Suite> suites = propertyService.getPropertySuitesForHost(pId, userId, isAdmin);
+                if (suites != null) {
+                    for (Suite suite : suites) {
+                        List<ReviewDTO> suiteReviews = reviewService.getSuiteReviews(suite.getId());
+                        if (suiteReviews != null) {
+                            hostReviews.addAll(suiteReviews);
+                        }
+                    }
+                }
+            }
+        }
+        return ResponseEntity.ok(ApiResponse.ok(hostReviews));
+    }
+
     @PutMapping("/reviews/{reviewId}/resolve-maintenance")
     public ResponseEntity<ApiResponse<ReviewDTO>> resolveMaintenance(
             @AuthenticationPrincipal UserPrincipal principal,

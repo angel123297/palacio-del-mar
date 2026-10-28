@@ -188,19 +188,24 @@ public class AvailabilityService {
                     .toList();
             int totalCapacity = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
 
-            int maxOccupiedOnAnyDate = 0;
-            java.util.Map<java.time.LocalDate, Long> occupancyPerDate = occupiedNights.stream()
-                .flatMap(sn -> sn.getDates().stream())
-                .filter(d -> !d.isBefore(checkIn) && d.isBefore(checkOut))
-                .collect(java.util.stream.Collectors.groupingBy(d -> d, java.util.stream.Collectors.counting()));
-
-            for (int i = 0; i < nights; i++) {
-                long occ = occupancyPerDate.getOrDefault(checkIn.plusDays(i), 0L);
-                if (occ > maxOccupiedOnAnyDate) {
-                    maxOccupiedOnAnyDate = (int) occ;
+            List<Integer> availableSlots = new ArrayList<>();
+            for (int slot = 1; slot <= totalCapacity; slot++) {
+                int finalSlot = slot;
+                boolean isSlotAvailable = true;
+                for (int i = 0; i < nights; i++) {
+                    LocalDate d = checkIn.plusDays(i);
+                    boolean slotOccupiedOnDate = occupiedNights.stream()
+                            .anyMatch(sn -> sn.getUnitSlot() != null && sn.getUnitSlot() == finalSlot && sn.getDates() != null && sn.getDates().contains(d));
+                    if (slotOccupiedOnDate) {
+                        isSlotAvailable = false;
+                        break;
+                    }
+                }
+                if (isSlotAvailable) {
+                    availableSlots.add(slot);
                 }
             }
-            int free = Math.max(0, totalCapacity - maxOccupiedOnAnyDate);
+            int free = availableSlots.size();
 
             co.palaciodelmar.backend.service.PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), checkIn, checkOut, java.math.BigDecimal.ZERO);
             java.math.BigDecimal totalPrice = pricingResult.total();
