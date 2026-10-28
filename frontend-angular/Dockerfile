@@ -10,7 +10,7 @@ RUN npm config set fetch-retries 5 \
     && npm config set fetch-timeout 300000
 
 COPY package*.json ./
-RUN npm install --legacy-peer-deps --no-audit --no-fund
+RUN npm ci --legacy-peer-deps --no-audit --no-fund
 COPY . .
 RUN npm run build
 

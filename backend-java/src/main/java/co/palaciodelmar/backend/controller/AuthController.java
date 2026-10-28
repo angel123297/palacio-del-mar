@@ -40,7 +40,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@RequestBody RegisterRequest request, jakarta.servlet.http.HttpServletResponse httpResponse, jakarta.servlet.http.HttpServletRequest httpRequest) {
+    public ResponseEntity<Map<String, Object>> register(@jakarta.validation.Valid @RequestBody RegisterRequest request, jakarta.servlet.http.HttpServletResponse httpResponse, jakarta.servlet.http.HttpServletRequest httpRequest) {
         AuthResponse response = authService.register(request);
         if (response.getToken() != null && !response.getToken().isBlank()) {
             addJwtCookie(httpResponse, response.getToken(), httpRequest);

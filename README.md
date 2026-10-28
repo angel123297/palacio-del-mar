@@ -65,7 +65,7 @@ Los sistemas de hotelería externa pueden interactuar directamente mediante la c
 
 ## 🧪 Pruebas Automatizadas y Calidad de Código
 
-El repositorio cuenta con **256 pruebas automatizadas en backend + 13 en frontend** que cubren el 100% de los flujos críticos:
+El repositorio cuenta con **446 pruebas automatizadas en backend + 43 en frontend** que cubren el 100% de los flujos críticos:
 
 ### Backend Java (Spring Boot):
 ```bash
@@ -79,7 +79,7 @@ cd backend-java
 - **Máquina de Estados de Reserva (`BookingStateMachineTest`):** Cobertura exhaustiva de 49 transiciones válidas e inválidas del ciclo de vida de la reserva.
 - **Concurrencia y Pagos (`PaymentConcurrencyTest`, `SimulatedPaymentGatewayTest`, `BookingExpirySchedulerTest`):** Manejo de colisiones de bloqueo optimista multi-slot (`@Version`), expiración de reservas pendientes y compensaciones.
 - **Notificaciones Transaccionales (`EmailServiceTest`):** Generación y despacho de vouchers adjuntos en PDF y eventos `.ics` vía Mailpit.
-- **Reporte JaCoCo:** Generado en `backend-java/target/site/jacoco/index.html`.
+- **Reporte JaCoCo:** Generado en `backend-java/target/site/jacoco/index.html` (104 clases cubiertas).
 
 ### Frontend Angular:
 ```bash
@@ -87,7 +87,7 @@ cd frontend-angular
 npm run build
 npm test -- --watch=false
 ```
-- Compilación de producción limpia sin errores TypeScript ni advertencias bloqueantes, y 13 pruebas unitarias pasando con Vitest (incluyendo componentes de Voucher QR, PIN inteligente y estado reactivo).
+- Compilación de producción limpia sin errores TypeScript ni advertencias bloqueantes (presupuesto inicial < 700KB), y 43 pruebas unitarias pasando con Vitest en 9 archivos (incluyendo suite de accesibilidad WCAG 2.2 AA, componentes de Voucher QR, PIN inteligente y estado reactivo con Signals).
 
 ---
 
@@ -134,13 +134,16 @@ Servicios locales disponibles:
 
 ---
 
-## 🔑 Credenciales de Prueba Preconfiguradas
+## 🔑 Credenciales de Prueba Preconfiguradas (Modo Demo / Desarrollo)
 
-| Rol | Correo Electrónico | Contraseña | Descripción |
+> [!WARNING]
+> Las credenciales a continuación solo se siembran si `SEED_DEMO_DATA=true`. En entornos de producción (`SEED_DEMO_DATA=false`), el sembrado de cuentas demo está deshabilitado por seguridad y la cuenta de administrador requiere configurar una contraseña fuerte en `ADMIN_DEFAULT_PASSWORD`.
+
+| Rol | Correo Electrónico | Contraseña Demo | Descripción |
 | :--- | :--- | :--- | :--- |
-| **Administrador** | `admin@palaciodelmar.co` | `Admin123456!` | Acceso completo y moderación de alojamientos |
-| **Anfitrión Fundador** | `anfitrion@palaciodelmar.co` | `Host123456!` | Gestión de sedes iniciales (Centro Histórico y Getsemaní) |
-| **Huésped (Verificado)** | `huesped@palaciodelmar.co` | `User123456!` | Usuario con email pre-verificado para reservas |
+| **Administrador** | `admin@palaciodelmar.co` | `Admin123456!` (solo demo) | Acceso completo y moderación de alojamientos |
+| **Anfitrión Fundador** | `anfitrion@palaciodelmar.co` | `Host123456!` (solo demo) | Gestión de sedes iniciales (Centro Histórico y Getsemaní) |
+| **Huésped (Verificado)** | `huesped@palaciodelmar.co` | `User123456!` (solo demo) | Usuario con email pre-verificado para reservas |
 
 ---
 

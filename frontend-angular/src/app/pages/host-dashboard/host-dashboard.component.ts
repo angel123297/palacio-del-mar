@@ -72,11 +72,11 @@ export interface HostPromotionItem {
         <!-- Toast Feedback Banner -->
         <div *ngIf="actionMessage()" role="status" aria-live="polite" class="mb-6 p-4 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded-lg text-sm flex items-center justify-between">
           <span>✔ {{ actionMessage() }}</span>
-          <button (click)="actionMessage.set('')" class="text-xs opacity-70 hover:opacity-100">✕</button>
+          <button (click)="actionMessage.set('')" aria-label="Cerrar notificación" class="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded hover:bg-white/10 text-xs opacity-70 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-current">✕</button>
         </div>
         <div *ngIf="actionError()" role="alert" aria-live="assertive" class="mb-6 p-4 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded-lg text-sm flex items-center justify-between">
           <span>✖ {{ actionError() }}</span>
-          <button (click)="actionError.set('')" class="text-xs opacity-70 hover:opacity-100">✕</button>
+          <button (click)="actionError.set('')" aria-label="Cerrar alerta" class="min-w-[28px] min-h-[28px] flex items-center justify-center p-1 rounded hover:bg-white/10 text-xs opacity-70 hover:opacity-100 focus:outline-none focus:ring-1 focus:ring-current">✕</button>
         </div>
 
         <!-- ==================== TAB 1: RESERVAS & RECEPCIÓN ==================== -->

@@ -3,6 +3,7 @@ package co.palaciodelmar.backend.config;
 import co.palaciodelmar.backend.model.*;
 import co.palaciodelmar.backend.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
@@ -27,6 +29,9 @@ public class DataInitializer implements CommandLineRunner {
 
     @org.springframework.beans.factory.annotation.Value("${admin.default.password:Admin123456!}")
     private String adminPassword;
+
+    @org.springframework.beans.factory.annotation.Value("${app.seed-demo-data:false}")
+    private boolean seedDemoData;
 
     @Override
     public void run(String... args) {
@@ -579,50 +584,60 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         if (userRepository.findByEmail("admin@palaciodelmar.co").isEmpty()) {
-            User admin = User.builder()
-                    .name("Admin")
-                    .lastName("Palacio")
-                    .email("admin@palaciodelmar.co")
-                    .password(passwordEncoder.encode(adminPassword))
-                    .role("admin")
-                    .status("active")
-                    .emailVerified(true)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
-            userRepository.save(admin);
+            boolean isDefaultInsecurePassword = "Admin123456!".equals(adminPassword);
+            if (seedDemoData || (!isDefaultInsecurePassword && adminPassword != null && !adminPassword.isBlank())) {
+                User admin = User.builder()
+                        .name("Admin")
+                        .lastName("Palacio")
+                        .email("admin@palaciodelmar.co")
+                        .password(passwordEncoder.encode(adminPassword))
+                        .role("admin")
+                        .status("active")
+                        .emailVerified(true)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                userRepository.save(admin);
+                log.info("Usuario administrador inicializado exitosamente: admin@palaciodelmar.co");
+            } else {
+                log.warn("Omitiendo creación de admin semilla: app.seed-demo-data=false y admin.default.password no fue configurado con una contraseña personalizada segura.");
+            }
         }
 
-        if (userRepository.findByEmail("anfitrion@palaciodelmar.co").isEmpty()) {
-            List<String> branchIds = branchRepository.findAll().stream().map(Branch::getId).toList();
-            User host = User.builder()
-                    .name("Anfitrión")
-                    .lastName("Palacio")
-                    .email("anfitrion@palaciodelmar.co")
-                    .password(passwordEncoder.encode("Host123456!"))
-                    .role("host")
-                    .status("active")
-                    .branches(branchIds)
-                    .emailVerified(true)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
-            userRepository.save(host);
-        }
+        if (seedDemoData) {
+            if (userRepository.findByEmail("anfitrion@palaciodelmar.co").isEmpty()) {
+                List<String> branchIds = branchRepository.findAll().stream().map(Branch::getId).toList();
+                User host = User.builder()
+                        .name("Anfitrión")
+                        .lastName("Palacio")
+                        .email("anfitrion@palaciodelmar.co")
+                        .password(passwordEncoder.encode("Host123456!"))
+                        .role("host")
+                        .status("active")
+                        .branches(branchIds)
+                        .emailVerified(true)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                userRepository.save(host);
+                log.info("Usuario anfitrión semilla inicializado: anfitrion@palaciodelmar.co");
+            }
 
-        if (userRepository.findByEmail("huesped@palaciodelmar.co").isEmpty()) {
-            User guest = User.builder()
-                    .name("Huésped")
-                    .lastName("Verificado")
-                    .email("huesped@palaciodelmar.co")
-                    .password(passwordEncoder.encode("User123456!"))
-                    .role("user")
-                    .status("active")
-                    .emailVerified(true)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
-            userRepository.save(guest);
+            if (userRepository.findByEmail("huesped@palaciodelmar.co").isEmpty()) {
+                User guest = User.builder()
+                        .name("Huésped")
+                        .lastName("Verificado")
+                        .email("huesped@palaciodelmar.co")
+                        .password(passwordEncoder.encode("User123456!"))
+                        .role("user")
+                        .status("active")
+                        .emailVerified(true)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                userRepository.save(guest);
+                log.info("Usuario huésped semilla inicializado: huesped@palaciodelmar.co");
+            }
         }
 
         // Migración/Seed de Sedes a Propiedades en el Marketplace

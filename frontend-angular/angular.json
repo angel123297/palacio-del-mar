@@ -43,7 +43,10 @@
               "fonts": {
                 "inline": false
               }
-            }
+            },
+            "allowedCommonJsDependencies": [
+              "leaflet"
+            ]
           },
           "configurations": {
             "production": {

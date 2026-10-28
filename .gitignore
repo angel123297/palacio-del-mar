@@ -32,6 +32,7 @@ scratch/
 .claude/
 skills-lock.json
 AGENTS.md
+README-AUDITORIA-LOCAL.md
 *.delivery.json
 docs/*.delivery.json
 docs/*.md

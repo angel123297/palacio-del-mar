@@ -72,11 +72,21 @@ class AuthControllerTest {
 
         var result = mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"guest@example.com\",\"password\":\"secret\",\"name\":\"Guest\"}"))
+                        .content("{\"email\":\"guest@example.com\",\"password\":\"secret123\",\"name\":\"Guest\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
 
         assertTrue(result.getResponse().getHeader("Set-Cookie").contains("jwt=registered-token"));
+    }
+
+    @Test
+    void registerRejectsShortPasswordWithBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"guest@example.com\",\"password\":\"short\",\"name\":\"Guest\"}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(authService);
     }
 
     @Test

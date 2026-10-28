@@ -115,6 +115,14 @@ class AuthServiceTest {
     }
 
     @Test
+    void registerRejectsShortPassword() {
+        registerRequest.setPassword("short");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(registerRequest));
+        assertTrue(ex.getMessage().contains("al menos 8 caracteres"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     void registerRejectsAdminRole() {
         when(userRepository.existsByEmail("juan.perez@example.com")).thenReturn(false);
 

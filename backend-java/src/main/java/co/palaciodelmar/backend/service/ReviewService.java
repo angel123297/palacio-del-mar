@@ -73,7 +73,7 @@ public class ReviewService {
                 .keyHighlights(analysis.highlights())
                 .maintenanceAlert(analysis.maintenanceAlert())
                 .verifiedStay(false)
-                .approved(true)
+                .approved(false)
                 .createdAt(Instant.now())
                 .build();
 

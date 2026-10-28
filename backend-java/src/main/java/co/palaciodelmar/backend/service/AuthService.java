@@ -86,7 +86,10 @@ public class AuthService {
     }
 
     public AuthResponse register(RegisterRequest request) {
-        String normalizedEmail = request.getEmail().toLowerCase();
+        if (request.getPassword() == null || request.getPassword().length() < 8) {
+            throw new IllegalArgumentException("La contraseña debe tener al menos 8 caracteres");
+        }
+        String normalizedEmail = request.getEmail() != null ? request.getEmail().toLowerCase() : "";
         if (userRepository.existsByEmail(normalizedEmail)) {
             User existing = userRepository.findByEmail(normalizedEmail).orElse(null);
             if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank())) {
@@ -274,8 +277,8 @@ public class AuthService {
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw new IllegalArgumentException("La contraseña actual no es correcta");
         }
-        if (newPassword == null || newPassword.length() < 6) {
-            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 8 caracteres");
         }
         Instant changedAt = Instant.now();
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -334,8 +337,8 @@ public class AuthService {
         if (token == null || token.trim().isEmpty()) {
             throw new IllegalArgumentException("Token de restablecimiento es requerido");
         }
-        if (newPassword == null || newPassword.length() < 6) {
-            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 8 caracteres");
         }
 
         String hashedToken = hashToken(token.trim());
