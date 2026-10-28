@@ -89,7 +89,7 @@ public class AuthService {
         String normalizedEmail = request.getEmail().toLowerCase();
         if (userRepository.existsByEmail(normalizedEmail)) {
             User existing = userRepository.findByEmail(normalizedEmail).orElse(null);
-            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank() || !Boolean.TRUE.equals(existing.getEmailVerified()))) {
+            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank())) {
                 String rawToken = generateSecureToken();
                 String hashedToken = hashToken(rawToken);
 
@@ -113,9 +113,13 @@ public class AuthService {
                 }
 
                 try {
-                    emailService.sendVerificationEmail(existing.getEmail(), rawToken);
+                    if (request.getReturnUrl() != null && !request.getReturnUrl().isBlank()) {
+                        emailService.sendVerificationEmail(existing.getEmail(), rawToken, request.getReturnUrl());
+                    } else {
+                        emailService.sendVerificationEmail(existing.getEmail(), rawToken);
+                    }
                 } catch (Exception e) {
-                    System.err.println("Failed to send verification email: " + e.getMessage());
+                    log.error("Failed to send verification email: {}", e.getMessage(), e);
                 }
 
                 return AuthResponse.builder()
@@ -164,10 +168,14 @@ public class AuthService {
         userRepository.save(user);
 
         try {
-            emailService.sendVerificationEmail(user.getEmail(), rawToken);
+            if (request.getReturnUrl() != null && !request.getReturnUrl().isBlank()) {
+                emailService.sendVerificationEmail(user.getEmail(), rawToken, request.getReturnUrl());
+            } else {
+                emailService.sendVerificationEmail(user.getEmail(), rawToken);
+            }
         } catch (Exception e) {
             // Log error, but don't fail registration
-            System.err.println("Failed to send verification email: " + e.getMessage());
+            log.error("Failed to send verification email: {}", e.getMessage(), e);
         }
 
         // No se entrega token hasta verificar el correo
@@ -395,17 +403,6 @@ public class AuthService {
         log.info("Nuevo correo de verificación reenviado exitosamente a {}", normalizedEmail);
     }
 
-    private String generateTemporaryPassword() {
-        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-        String lower = "abcdefghijkmnpqrstuvwxyz";
-        String digits = "23456789";
-        SecureRandom sr = new SecureRandom();
-        StringBuilder sb = new StringBuilder("Palacio@");
-        for (int i = 0; i < 2; i++) sb.append(upper.charAt(sr.nextInt(upper.length())));
-        for (int i = 0; i < 2; i++) sb.append(digits.charAt(sr.nextInt(digits.length())));
-        for (int i = 0; i < 2; i++) sb.append(lower.charAt(sr.nextInt(lower.length())));
-        return sb.toString();
-    }
 
     public UserDTO toDTO(User user) {
         if (user == null) return null;

@@ -48,6 +48,18 @@ public class SsrfProtectionValidator {
             22, 23, 25, 110, 143, 1025, 3306, 5000, 5432, 6379, 8025, 27017
     );
 
+    public static boolean isDemoReceiverEndpoint(URI uri) {
+        if (uri == null) return false;
+        String path = uri.getPath();
+        if (path == null || !"/api/demo/webhook-receiver".equals(path)) {
+            return false;
+        }
+        String host = uri.getHost() != null ? uri.getHost().toLowerCase(Locale.ROOT) : "";
+        int port = uri.getPort() > 0 ? uri.getPort() : ("https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80);
+        return (("localhost".equals(host) || "127.0.0.1".equals(host) || "backend-java".equals(host) || "palacio-backend-java".equals(host))
+                && (port == 5000 || port == 80));
+    }
+
     /**
      * Valida una URL contra SSRF. Lanza {@link IllegalArgumentException} si la URL viola las políticas de seguridad.
      *
@@ -84,6 +96,22 @@ public class SsrfProtectionValidator {
             throw new IllegalArgumentException("La URL del webhook debe incluir un host válido");
         }
 
+        boolean https = "https".equals(scheme);
+        int port = uri.getPort() > 0 ? uri.getPort() : (https ? 443 : 80);
+
+        // Excepción controlada: receptor demo oficial de Palacio del Mar para simulaciones en 1 clic
+        if (isDemoReceiverEndpoint(uri)) {
+            try {
+                InetAddress[] addresses = dnsResolver.resolve(host);
+                if (addresses == null || addresses.length == 0) {
+                    throw new IllegalArgumentException("No se pudo resolver el host del receptor demo: " + host);
+                }
+                return new ValidatedTarget(uri, host, port, https, addresses[0]);
+            } catch (UnknownHostException e) {
+                throw new IllegalArgumentException("Host del receptor demo no reconocible o inalcanzable por DNS: " + host);
+            }
+        }
+
         // 1. Verificación de lista negra de hosts y sufijos locales
         if (FORBIDDEN_HOSTS.contains(host)
                 || host.endsWith(".local")
@@ -93,8 +121,6 @@ public class SsrfProtectionValidator {
         }
 
         // 2. Verificación de puertos prohibidos
-        boolean https = "https".equals(scheme);
-        int port = uri.getPort() > 0 ? uri.getPort() : (https ? 443 : 80);
         if (FORBIDDEN_PORTS.contains(port)) {
             throw new IllegalArgumentException("Puerto de destino no permitido para webhooks: " + port);
         }

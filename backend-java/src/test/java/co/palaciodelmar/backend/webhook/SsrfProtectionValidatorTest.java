@@ -84,6 +84,23 @@ class SsrfProtectionValidatorTest {
     }
 
     @Test
+    @DisplayName("Debe permitir el receptor demo local oficial en 1 clic")
+    void testDemoReceiverAllowed() {
+        validator.setDnsResolver(host -> {
+            try {
+                return new InetAddress[]{ InetAddress.getByName("127.0.0.1") };
+            } catch (UnknownHostException e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        assertTrue(validator.isSafeUrl("http://localhost:5000/api/demo/webhook-receiver"));
+        assertTrue(validator.isSafeUrl("http://backend-java:5000/api/demo/webhook-receiver"));
+        assertEquals("http://backend-java:5000/api/demo/webhook-receiver",
+                validator.validateUrl("http://backend-java:5000/api/demo/webhook-receiver"));
+    }
+
+    @Test
     @DisplayName("Debe bloquear dominios que resuelven a rango 10.0.0.0/8")
     void testDnsResolvingToClassA() {
         validator.setDnsResolver(host -> {

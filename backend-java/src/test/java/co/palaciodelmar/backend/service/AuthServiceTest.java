@@ -356,7 +356,8 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerOverwritesAndResendsWhenUserExistsAndUnverified() {
+    void registerAllowsClaimingStubUserWithoutPassword() {
+        testUser.setPassword(null);
         testUser.setEmailVerified(false);
         String oldHash = "old-hash-99999";
         testUser.setVerificationTokenHash(oldHash);
@@ -374,5 +375,17 @@ class AuthServiceTest {
         assertNotEquals(oldHash, testUser.getVerificationTokenHash());
         verify(emailService).sendVerificationEmail(eq("juan.perez@example.com"), anyString());
         verify(userRepository).save(testUser);
+    }
+
+    @Test
+    void registerRejectsWhenUserExistsWithPasswordEvenIfUnverified() {
+        testUser.setEmailVerified(false);
+        testUser.setPassword("existingHashedPassword");
+        when(userRepository.existsByEmail("juan.perez@example.com")).thenReturn(true);
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(registerRequest));
+        assertEquals("El email ya está registrado", ex.getMessage());
+        verify(userRepository, never()).save(any());
     }
 }

@@ -31,16 +31,20 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(RuntimeException ex) {
-        String msg = ex.getMessage();
-        if (msg != null && (msg.toLowerCase().contains("permiso") || msg.toLowerCase().contains("acceder"))) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(msg));
-        }
-        return ResponseEntity.badRequest().body(ApiResponse.error(msg));
+        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ForbiddenAccessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbiddenAccess(ForbiddenAccessException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Acceso denegado: no posees los permisos necesarios"));
+        String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "Acceso denegado: no posees los permisos necesarios";
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(msg));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

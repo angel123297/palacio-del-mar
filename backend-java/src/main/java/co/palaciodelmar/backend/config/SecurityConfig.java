@@ -67,8 +67,15 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new org.springframework.security.web.authentication.HttpStatusEntryPoint(org.springframework.http.HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding(java.nio.charset.StandardCharsets.UTF_8.name());
+                            response.getWriter().write("{\"success\":false,\"message\":\"Acceso denegado: no posees los permisos necesarios\",\"data\":null}");
+                        })
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/verify-email", "/api/auth/resend-verification", "/api/auth/reset-password", "/api/auth/forgot-password", "/api/auth/logout").permitAll()
                         .requestMatchers("/api/auth/profile", "/api/auth/change-password", "/api/auth/me", "/api/auth/logout-all").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/branches/**").permitAll()
