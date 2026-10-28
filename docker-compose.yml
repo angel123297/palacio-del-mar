@@ -6,6 +6,11 @@ services:
     image: mongo:7
     container_name: palacio-mongo
     restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - mongo
+          - palacio-mongo
     ports:
       - "127.0.0.1:27017:27017"
     volumes:
@@ -22,6 +27,11 @@ services:
     build: ./backend-java
     container_name: palacio-backend-java
     restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - backend-java
+          - palacio-backend-java
     ports:
       - "127.0.0.1:5000:5000"
     environment:
@@ -56,6 +66,11 @@ services:
     image: redis:alpine
     container_name: palacio-redis
     restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - redis
+          - palacio-redis
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
@@ -71,6 +86,11 @@ services:
     build: ./frontend-angular
     container_name: palacio-web-angular
     restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - web-angular
+          - palacio-web-angular
     ports:
       - "127.0.0.1:4200:80"
     environment:
