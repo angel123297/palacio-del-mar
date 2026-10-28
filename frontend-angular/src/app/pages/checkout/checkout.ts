@@ -36,9 +36,16 @@ import { finalize, switchMap } from 'rxjs';
           <div *ngIf="!loading && booking" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 2rem;">
             
             <!-- Reservation TTL Countdown -->
-            <div style="background: rgba(201,169,110,0.1); border: 1px solid rgba(201,169,110,0.4); border-radius: 8px; padding: 12px 18px; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div *ngIf="timerSeconds > 0" style="background: rgba(201,169,110,0.1); border: 1px solid rgba(201,169,110,0.4); border-radius: 8px; padding: 12px 18px; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
               <span style="font-size: 0.9rem; color: #f5f0e8;"><strong>Tiempo restante para pagar tu reserva:</strong></span>
               <span style="font-family: monospace; font-size: 1.2rem; font-weight: bold; color: var(--gold); letter-spacing: 2px;">{{ timerText }}</span>
+            </div>
+
+            <!-- Reservation Expired Banner -->
+            <div *ngIf="timerSeconds <= 0" role="alert" aria-live="assertive" style="background: rgba(255,77,77,0.15); border: 1px solid rgba(255,77,77,0.5); border-radius: 8px; padding: 16px; margin-bottom: 1.5rem; text-align: center;">
+              <p style="color: #ff6b6b; font-weight: bold; font-size: 1.05rem; margin-bottom: 10px;">El tiempo de retención de 15 minutos ha expirado</p>
+              <p style="color: #ccc; font-size: 0.9rem; margin-bottom: 14px;">Las fechas retenidas han sido liberadas para otros huéspedes.</p>
+              <a routerLink="/buscar" class="btn-primary" style="display: inline-block; text-decoration: none; padding: 10px 22px; font-weight: bold; font-size: 0.9rem;">Volver a buscar suites</a>
             </div>
 
             <h3 style="color: #fff; margin-bottom: 1.5rem; font-size: 1.3rem; border-bottom: 1px solid rgba(212,175,55,0.2); padding-bottom: 0.5rem;">Elige tu método de pago</h3>
@@ -49,7 +56,7 @@ import { finalize, switchMap } from 'rxjs';
                 [style.border-color]="selectedMethod === 'CARD' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
                 [style.background]="selectedMethod === 'CARD' ? 'rgba(212,175,55,0.1)' : 'transparent'"
                 style="flex: 1; min-width: 140px; min-height: 80px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
-                <span style="font-size: 2rem;" aria-hidden="true">💳</span>
+                <svg style="width: 28px; height: 28px; fill: currentColor;" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
                 <span style="font-weight: 600;">Tarjeta de Crédito</span>
               </button>
 
@@ -57,16 +64,16 @@ import { finalize, switchMap } from 'rxjs';
                 [style.border-color]="selectedMethod === 'PSE' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
                 [style.background]="selectedMethod === 'PSE' ? 'rgba(212,175,55,0.1)' : 'transparent'"
                 style="flex: 1; min-width: 140px; min-height: 80px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
-                <span style="font-size: 2rem;" aria-hidden="true">🏦</span>
+                <svg style="width: 28px; height: 28px; fill: currentColor;" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v7h3v-7H4zm6 0v7h3v-7h-3zM2 22h19v-3H2v3zm14-12v7h3v-7h-3zm-4.5-9L2 6v2h19V6l-9.5-5z"/></svg>
                 <span style="font-weight: 600;">PSE / Bancos</span>
               </button>
 
-              <button type="button" role="radio" [attr.aria-checked]="selectedMethod === 'PAYPAL'" aria-label="Pagar internacionalmente con PayPal" (click)="selectedMethod = 'PAYPAL'"
-                [style.border-color]="selectedMethod === 'PAYPAL' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
-                [style.background]="selectedMethod === 'PAYPAL' ? 'rgba(212,175,55,0.1)' : 'transparent'"
+              <button type="button" role="radio" [attr.aria-checked]="selectedMethod === 'NEQUI'" aria-label="Pagar con cuenta Nequi" (click)="selectedMethod = 'NEQUI'"
+                [style.border-color]="selectedMethod === 'NEQUI' ? 'var(--gold)' : 'rgba(255,255,255,0.2)'"
+                [style.background]="selectedMethod === 'NEQUI' ? 'rgba(212,175,55,0.1)' : 'transparent'"
                 style="flex: 1; min-width: 140px; min-height: 80px; padding: 1.5rem 1rem; border-width: 2px; border-style: solid; border-radius: 12px; color: #fff; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
-                <span style="font-size: 2rem;" aria-hidden="true">🅿️</span>
-                <span style="font-weight: 600;">PayPal</span>
+                <svg style="width: 28px; height: 28px; fill: currentColor;" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14zm-5-2c.83 0 1.5-.67 1.5-1.5S12.83 14 12 14s-1.5.67-1.5 1.5.67 1.5 1.5 1.5z"/></svg>
+                <span style="font-weight: 600;">Nequi</span>
               </button>
             </div>
 
@@ -83,31 +90,31 @@ import { finalize, switchMap } from 'rxjs';
 
                 <div style="margin-bottom: 1.2rem;">
                   <label for="checkout-card-name" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Titular de la tarjeta</label>
-                  <input id="checkout-card-name" type="text" formControlName="cardName" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;" [style.border-color]="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="Como aparece en la tarjeta">
+                  <input id="checkout-card-name" type="text" formControlName="cardName" autocomplete="cc-name" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;" [style.border-color]="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="Como aparece en la tarjeta">
                   <div *ngIf="paymentForm.get('cardName')?.invalid && paymentForm.get('cardName')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Campo requerido</div>
                 </div>
 
                 <div style="margin-bottom: 1.2rem;">
                   <label for="checkout-card-number" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Número de Tarjeta</label>
-                  <input id="checkout-card-number" type="text" formControlName="cardNumber" maxlength="19" (input)="formatCardNumber($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; letter-spacing: 2px;" [style.border-color]="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="0000 0000 0000 0000">
+                  <input id="checkout-card-number" type="text" formControlName="cardNumber" maxlength="19" autocomplete="cc-number" inputmode="numeric" (input)="formatCardNumber($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; letter-spacing: 2px;" [style.border-color]="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="0000 0000 0000 0000">
                   <div *ngIf="paymentForm.get('cardNumber')?.invalid && paymentForm.get('cardNumber')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Número inválido</div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem;">
                   <div>
                     <label for="checkout-card-expiry" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Expiración</label>
-                    <input id="checkout-card-expiry" type="text" formControlName="expiry" maxlength="5" (input)="formatExpiry($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center;" [style.border-color]="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="MM/AA">
+                    <input id="checkout-card-expiry" type="text" formControlName="expiry" maxlength="5" autocomplete="cc-exp" inputmode="numeric" (input)="formatExpiry($event)" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center;" [style.border-color]="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="MM/AA">
                     <div *ngIf="paymentForm.get('expiry')?.invalid && paymentForm.get('expiry')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">Formato MM/AA</div>
                   </div>
                   <div>
                     <label for="checkout-card-cvv" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">CVV / CVC</label>
-                    <input id="checkout-card-cvv" type="password" formControlName="cvv" maxlength="4" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center; letter-spacing: 3px;" [style.border-color]="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="•••">
+                    <input id="checkout-card-cvv" type="password" formControlName="cvv" maxlength="4" autocomplete="cc-csc" inputmode="numeric" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem; text-align: center; letter-spacing: 3px;" [style.border-color]="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched ? '#ff4d4d' : 'rgba(255,255,255,0.1)'" placeholder="•••">
                     <div *ngIf="paymentForm.get('cvv')?.invalid && paymentForm.get('cvv')?.touched" style="color: #ff4d4d; font-size: 0.8rem; margin-top: 5px;">CVV inválido</div>
                   </div>
                 </div>
               </div>
 
-              <button type="submit" [disabled]="processing" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+              <button type="submit" [disabled]="processing || timerSeconds <= 0" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                 <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
@@ -129,14 +136,14 @@ import { finalize, switchMap } from 'rxjs';
                     <option value="bogota">Banco de Bogotá</option>
                     <option value="bbva">BBVA Colombia</option>
                     <option value="occidente">Banco de Occidente</option>
-                    <option value="nequi">Nequi</option>
                     <option value="daviplata">DaviPlata</option>
+                    <option value="colpatria">Scotiabank Colpatria</option>
                   </select>
                 </div>
                 <p style="font-size: 0.85rem; color: #888;">Al continuar, serás redirigido a la pasarela segura de tu banco para confirmar la transacción.</p>
               </div>
 
-              <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+              <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing || timerSeconds <= 0" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                 <span *ngIf="!processing">Ir al Banco a pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
@@ -144,15 +151,22 @@ import { finalize, switchMap } from 'rxjs';
               </button>
             </div>
 
-            <!-- PAYPAL FORM -->
-            <div *ngIf="selectedMethod === 'PAYPAL'">
-              <div style="background: rgba(0,0,0,0.3); padding: 3rem 2rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 2rem; text-align: center;">
-                <div style="font-size: 3rem; color: #0070ba; font-weight: 800; font-style: italic; letter-spacing: -2px; margin-bottom: 1rem;">PayPal</div>
-                <p style="color: #ccc; margin-bottom: 2rem;">Paga de forma rápida y segura con tu cuenta de PayPal.</p>
+            <!-- NEQUI FORM -->
+            <div *ngIf="selectedMethod === 'NEQUI'">
+              <div style="background: rgba(0,0,0,0.3); padding: 2.5rem 2rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 2rem; text-align: center;">
+                <div style="font-size: 2.2rem; color: #ff007f; font-weight: 800; letter-spacing: -1px; margin-bottom: 0.5rem;">Nequi</div>
+                <p style="color: #ccc; margin-bottom: 1.5rem; font-size: 0.95rem;">Ingresa tu número celular registrado en Nequi para recibir la notificación de pago en tu app.</p>
                 
-                <button type="button" (click)="processPayPal()" [disabled]="processing" style="background: #ffc439; color: #000; border: none; border-radius: 24px; min-height: 48px; padding: 12px 30px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 250px;">
-                  <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }} con PayPal</span>
-                  <span *ngIf="processing">Abriendo PayPal...</span>
+                <div style="max-width: 320px; margin: 0 auto 1.5rem auto; text-align: left;">
+                  <label for="checkout-nequi-phone" style="display: block; color: #aaa; margin-bottom: 0.5rem; font-size: 0.9rem;">Número Celular Nequi</label>
+                  <input id="checkout-nequi-phone" type="tel" inputmode="tel" autocomplete="tel" [(ngModel)]="nequiPhone" placeholder="Ej: 300 123 4567" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 12px; border-radius: 6px; font-size: 1.1rem; text-align: center; letter-spacing: 2px;" />
+                </div>
+
+                <button type="button" (click)="processNequi()" [disabled]="!nequiPhone || processing || timerSeconds <= 0" class="btn-primary" style="background: #ff007f; color: #fff; border: none; border-radius: 24px; min-height: 48px; padding: 12px 30px; font-size: 1.05rem; font-weight: 700; cursor: pointer; transition: all 0.2s; min-width: 250px;">
+                  <span *ngIf="!processing">Enviar notificación a mi Nequi</span>
+                  <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    {{ processingMessage }} <div class="luxury-spinner" style="width: 18px; height: 18px; border-width: 2px;"></div>
+                  </span>
                 </button>
               </div>
             </div>
@@ -265,8 +279,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   pollingInterval: any = null;
   errorMsg = '';
 
-  selectedMethod: 'CARD' | 'PSE' | 'PAYPAL' = 'CARD';
+  selectedMethod: 'CARD' | 'PSE' | 'NEQUI' = 'CARD';
   pseBank: string = '';
+  nequiPhone: string = '';
   alreadyPaid = false;
 
   timerText: string = '15:00';
@@ -418,22 +433,27 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     }, 900);
   }
 
-  processPayPal() {
+  processNequi() {
     if (this.timerSeconds <= 0) {
       this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
       this.cdr.detectChanges();
       return;
     }
+    if (!this.nequiPhone || this.nequiPhone.trim().length < 10) {
+      this.errorMsg = 'Por favor ingresa un número de celular válido para Nequi (10 dígitos).';
+      this.cdr.detectChanges();
+      return;
+    }
     this.processing = true;
-    this.processingMessage = 'Conectando con ventana segura de PayPal...';
+    this.processingMessage = 'Enviando solicitud de cobro push a tu Nequi...';
     this.errorMsg = '';
     this.cdr.detectChanges();
     
     setTimeout(() => {
-      this.processingMessage = 'Verificando autorización de cuenta PayPal...';
+      this.processingMessage = 'Esperando confirmación en tu aplicación Nequi...';
       this.cdr.detectChanges();
       setTimeout(() => {
-        this.executePaymentPayload({ method: 'PAYPAL' });
+        this.executePaymentPayload({ method: 'NEQUI', phone: this.nequiPhone.trim() });
       }, 900);
     }, 900);
   }

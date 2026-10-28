@@ -102,6 +102,11 @@ const DEFAULT_FALLBACK_BRANCHES: Branch[] = [
               </a>
             </h3>
 
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; margin: 4px 0 10px 0; color: #f1c40f;">
+              <span>★ 4.9</span>
+              <span style="color: rgba(245,240,232,0.6);">(Huéspedes verificados)</span>
+            </div>
+
             <div class="room-chips">
               <span class="chip" *ngFor="let amenity of (suite.amenities || []).slice(0, 3)">
                 {{ amenity }}

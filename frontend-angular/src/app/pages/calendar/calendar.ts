@@ -21,6 +21,13 @@ const bogotaTodayIso = (): string => {
   selector: 'app-calendar',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
+  styles: [`
+    #calendar-suite-select:focus-visible {
+      outline: 2px solid var(--gold) !important;
+      outline-offset: 2px;
+      border-color: var(--gold) !important;
+    }
+  `],
   template: `
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 4rem 1.5rem;">
       <div style="max-width: 1000px; margin: 0 auto;">
@@ -33,7 +40,7 @@ const bogotaTodayIso = (): string => {
         <div style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; background: rgba(255,255,255,0.03); padding: 1rem 1.25rem; border-radius: 8px; border: 1px solid rgba(212,175,55,0.25);">
           <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 260px;">
             <label for="calendar-suite-select" style="color: var(--gold); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; white-space: nowrap;">Filtrar Suite:</label>
-            <select id="calendar-suite-select" [(ngModel)]="selectedSuiteId" (ngModelChange)="loadData()" style="flex: 1; background: #141414; color: #f5f0e8; border: 1px solid rgba(212,175,55,0.35); border-radius: 6px; padding: 8px 12px; font-size: 0.9rem; outline: none;">
+            <select id="calendar-suite-select" [(ngModel)]="selectedSuiteId" (ngModelChange)="loadData()" style="flex: 1; background: #141414; color: #f5f0e8; border: 1px solid rgba(212,175,55,0.35); border-radius: 6px; padding: 8px 12px; font-size: 0.9rem;">
               <option value="">Todas las Suites ({{ suites.length }} alojamientos)</option>
               <option *ngFor="let s of suites" [value]="s.id || s._id">{{ s.name }} — $ {{ (s.basePrice || 450000) | number:'1.0-0' }} / noche</option>
             </select>

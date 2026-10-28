@@ -53,6 +53,10 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   experiences: Experience[] = [];
   selectedExperiences: { exp: Experience; qty: number }[] = [];
 
+  // Reviews
+  reviews: any[] = [];
+  averageRating = 5.0;
+
   // Step 3: VIP Services
   airportPickup = false;
   petFriendly = false;
@@ -183,6 +187,8 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
           this.fetchLiveQuote();
           this.initSocialProofPing(idOrSlug);
           this.fetchNearbyGeoPlaces(idOrSlug);
+          const sId = this.suite ? (this.suite.id || this.suite._id) : idOrSlug;
+          this.loadReviews(sId || idOrSlug);
           this.cdr.detectChanges();
         },
         error: () => {
@@ -311,6 +317,10 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     return base + taxes;
   }
 
+  get totalSuitePrice(): number {
+    return this.totalRoomPrice;
+  }
+
   get totalExperiencesPrice(): number {
     return this.selectedExperiences.reduce((sum, item) => sum + (item.exp.price * item.qty), 0);
   }
@@ -367,6 +377,62 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     return (exp.id || exp._id || '') as string;
   }
 
+  loadReviews(suiteId: string): void {
+    this.api.get<any>(`/suites/${suiteId}/reviews`).subscribe({
+      next: (res) => {
+        const list = res.data || res || [];
+        this.reviews = Array.isArray(list) ? list : [];
+        if (this.reviews.length > 0) {
+          const sum = this.reviews.reduce((acc, r) => acc + (r.rating || 5), 0);
+          this.averageRating = Number((sum / this.reviews.length).toFixed(1));
+        } else {
+          this.averageRating = 5.0;
+        }
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.reviews = [];
+        this.averageRating = 5.0;
+      }
+    });
+  }
+
+  updateExperienceQty(exp: Experience, delta: number, event?: Event): void {
+    if (event) event.stopPropagation();
+    const expKey = this.expId(exp) || exp.name;
+    const item = this.selectedExperiences.find(e => (this.expId(e.exp) || e.exp.name) === expKey);
+    if (item) {
+      const newQty = item.qty + delta;
+      if (newQty <= 0) {
+        this.selectedExperiences = this.selectedExperiences.filter(e => (this.expId(e.exp) || e.exp.name) !== expKey);
+      } else {
+        item.qty = newQty;
+      }
+    } else if (delta > 0) {
+      this.selectedExperiences.push({ exp, qty: 1 });
+    }
+    this.fetchLiveQuote();
+  }
+
+  getExperienceQty(exp: Experience): number {
+    const expKey = this.expId(exp) || exp.name;
+    const item = this.selectedExperiences.find(e => (this.expId(e.exp) || e.exp.name) === expKey);
+    return item ? item.qty : 0;
+  }
+
+  skipStep(currentStep: number): void {
+    if (currentStep === 2) {
+      this.selectedExperiences = [];
+    } else if (currentStep === 3) {
+      this.airportPickup = false;
+      this.petFriendly = false;
+      this.wantFood = false;
+      this.foodType = '';
+      this.customFood = '';
+    }
+    this.nextStep();
+  }
+
   toggleExperience(exp: Experience) {
     const expKey = this.expId(exp) || exp.name;
     const idx = this.selectedExperiences.findIndex(e => (this.expId(e.exp) || e.exp.name) === expKey);
@@ -375,6 +441,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     } else {
       this.selectedExperiences.push({ exp, qty: 1 });
     }
+    this.fetchLiveQuote();
   }
 
   isExperienceSelected(exp: Experience): boolean {
@@ -512,7 +579,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
       petFriendly: this.petFriendly,
       needsCrib: this.needsCrib,
       foodOrders: foodOrders,
-      experiences: this.selectedExperiences.map(e => this.expId(e.exp)),
+      experiences: this.selectedExperiences.map(e => ({ experienceId: this.expId(e.exp), quantity: e.qty })),
       guestName: this.guestName,
       guestEmail: this.guestEmail,
       guestPhone: this.guestPhone

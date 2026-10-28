@@ -40,12 +40,50 @@ import { Booking } from '../../models/types';
           <div class="bd-section digital-key-box" style="margin-top: 1.5rem;" *ngIf="booking.status === 'confirmed' || booking.status === 'checked_in'">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.8rem;">
               <h3 class="bd-section-title" style="margin: 0; border: none; padding: 0; display: flex; align-items: center; gap: 0.5rem;">
-                <span>🔑</span> {{ isGuestOwner ? 'Llave Digital & Self Check-in' : 'Control de Acceso Digital' }}
+                <svg style="width: 20px; height: 20px; color: var(--gold);" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                {{ isGuestOwner ? 'Llave Digital & Self Check-in' : 'Control de Acceso Digital' }}
               </h3>
               <span class="status-badge" [ngClass]="booking.status === 'checked_in' ? 'checked_in' : 'confirmed'">
-                {{ booking.status === 'checked_in' ? '🟢 EN ESTANCIA ACTIVA' : '⏰ PROGRAMADO 15:00 HRS' }}
+                {{ booking.status === 'checked_in' ? 'EN ESTANCIA ACTIVA' : 'PROGRAMADO 15:00 HRS' }}
               </span>
             </div>
+
+            <!-- Estado de Pre-check-in -->
+            <div *ngIf="booking.preCheckInCompleted" style="background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); border-radius: 6px; padding: 8px 12px; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; color: #2ecc71; font-size: 0.88rem;">
+              <svg style="width: 18px; height: 18px; flex-shrink: 0;" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              <span><strong>Pre-check-in completado:</strong> Documento {{ booking.documentNumber || 'registrado' }}. Tu cerradura inteligente está vinculada.</span>
+            </div>
+
+            <!-- Formulario de Pre-check-in si no ha sido completado -->
+            <div *ngIf="!booking.preCheckInCompleted && isGuestOwner" style="background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.35); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem;">
+              <h4 style="color: var(--gold); margin: 0 0 6px 0; font-size: 1.05rem; display: flex; align-items: center; gap: 6px;">
+                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+                Registro Turístico Obligatorio (Pre-Check-in)
+              </h4>
+              <p style="color: #ccc; font-size: 0.88rem; margin: 0 0 1rem 0; line-height: 1.4;">
+                Por disposición legal hotelera en Colombia, ingresa tu número de documento para formalizar tu registro de llegada y activar tu llave digital inteligente.
+              </p>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 1rem;">
+                <div>
+                  <label for="precheckin-doc" style="display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 4px;">Cédula de Ciudadanía o Pasaporte *</label>
+                  <input id="precheckin-doc" type="text" [(ngModel)]="preCheckInDoc" placeholder="Ej: CC 1020304050 o Pasaporte" style="width: 100%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 10px; color: #fff; font-size: 0.95rem; box-sizing: border-box;" />
+                </div>
+                <div>
+                  <label for="precheckin-comp" style="display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 4px;">Huéspedes acompañantes (opcional)</label>
+                  <input id="precheckin-comp" type="text" [(ngModel)]="preCheckInCompanions" placeholder="Nombres de acompañantes" style="width: 100%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 10px; color: #fff; font-size: 0.95rem; box-sizing: border-box;" />
+                </div>
+              </div>
+
+              <div *ngIf="preCheckInError" role="alert" style="color: #ff6b6b; font-size: 0.85rem; margin-bottom: 10px;">
+                {{ preCheckInError }}
+              </div>
+
+              <button type="button" (click)="submitPreCheckIn()" [disabled]="preCheckInLoading || !preCheckInDoc.trim()" class="btn-primary" style="padding: 10px 22px; font-weight: 600; cursor: pointer; min-height: 44px;">
+                {{ preCheckInLoading ? 'Registrando...' : 'Confirmar Pre-check-in y Activar Llave' }}
+              </button>
+            </div>
+
             <p style="font-size: 0.95rem; color: #ddd; margin: 0.4rem 0;">
               {{ isGuestOwner ? 'Tu estancia cuenta con ingreso 100% automatizado mediante cerradura inteligente.' : 'Acceso automatizado asignado a la estancia del huésped.' }}
             </p>
@@ -53,9 +91,9 @@ import { Booking } from '../../models/types';
             <div class="pin-display">
               <div>
                 <div style="font-size: 0.75rem; letter-spacing: 1.5px; color: #aaa; margin-bottom: 2px;">PIN DE ACCESO INTELIGENTE:</div>
-                <div class="pin-code">{{ booking.smartLockPin || 'GENERANDO...' }}</div>
+                <div class="pin-code">{{ booking.smartLockPin || 'PENDIENTE DE ACTIVACIÓN' }}</div>
               </div>
-              <button *ngIf="booking.smartLockPin" class="btn-copy" (click)="copyPin(booking.smartLockPin)" [attr.aria-label]="'Copiar PIN ' + booking.smartLockPin">{{ pinCopied ? 'PIN copiado' : '📋 Copiar PIN' }}</button>
+              <button *ngIf="booking.smartLockPin" class="btn-copy" (click)="copyPin(booking.smartLockPin)" [attr.aria-label]="'Copiar PIN ' + booking.smartLockPin">{{ pinCopied ? 'PIN copiado' : 'Copiar PIN' }}</button>
             </div>
 
             <div style="margin-top: 1rem; font-size: 0.85rem; color: #bbb; background: rgba(0,0,0,0.3); padding: 0.9rem; border-radius: 6px; display: flex; flex-direction: column; gap: 0.4rem;">
@@ -179,7 +217,16 @@ import { Booking } from '../../models/types';
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
             <!-- Info de la estancia -->
             <div class="bd-section">
-              <h3 class="bd-section-title">Estancia</h3>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 8px;">
+                <h3 class="bd-section-title" style="margin: 0; padding: 0; border: none;">Estancia</h3>
+                <button *ngIf="booking.isModifiable && (isGuestOwner || isHostOrAdmin)"
+                        type="button"
+                        (click)="openModifyModal()"
+                        style="background: transparent; border: 1px solid var(--gold); color: var(--gold); padding: 5px 12px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
+                  <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  Cambiar fechas
+                </button>
+              </div>
               <p><strong>Suite:</strong>&nbsp;{{ suiteName }}</p>
               <p *ngIf="booking.propertyId || booking.branch"><strong>Alojamiento:</strong>&nbsp;{{ booking.branch?.name || 'Sede Principal' }}</p>
               <p><strong>Llegada:</strong>&nbsp;{{ booking.checkIn | date:'dd/MM/yyyy' }}</p>
@@ -257,6 +304,50 @@ import { Booking } from '../../models/types';
             
             <div style="border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; overflow: hidden; height: 300px;">
               <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-75.56846141815187%2C10.420601934399738%2C-75.53816318511964%2C10.434417758994511&amp;layer=mapnik" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+            </div>
+          </div>
+
+          <!-- Modal para Cambiar Fechas -->
+          <div *ngIf="showModifyModal" 
+               style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1.5rem;"
+               role="dialog" 
+               aria-modal="true" 
+               aria-labelledby="modify-dates-title">
+            <div style="background: #141414; border: 1px solid var(--gold); border-radius: 10px; max-width: 480px; width: 100%; padding: 2rem; box-shadow: 0 10px 40px rgba(0,0,0,0.8); box-sizing: border-box;">
+              <h3 id="modify-dates-title" style="color: var(--gold); margin: 0 0 0.5rem 0; font-family: var(--font-title); font-size: 1.5rem;">
+                Cambiar Fechas de Reserva
+              </h3>
+              <p style="color: #aaa; font-size: 0.88rem; margin: 0 0 1.5rem 0; line-height: 1.4;">
+                Ajusta las fechas de tu estancia en <strong>{{ suiteName }}</strong>. El valor total y balance pendiente se actualizarán automáticamente.
+              </p>
+
+              <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
+                <div>
+                  <label for="modify-checkin" style="display: block; font-size: 0.8rem; color: #ccc; margin-bottom: 4px;">Nueva Fecha de Llegada (Check-in)</label>
+                  <input id="modify-checkin" type="date" [(ngModel)]="modifyCheckIn" [min]="minDate" class="luxury-input" style="width: 100%; box-sizing: border-box;" />
+                </div>
+                <div>
+                  <label for="modify-checkout" style="display: block; font-size: 0.8rem; color: #ccc; margin-bottom: 4px;">Nueva Fecha de Salida (Check-out)</label>
+                  <input id="modify-checkout" type="date" [(ngModel)]="modifyCheckOut" [min]="modifyCheckIn || minDate" class="luxury-input" style="width: 100%; box-sizing: border-box;" />
+                </div>
+              </div>
+
+              <div *ngIf="modifyError" role="alert" style="background: rgba(231,76,60,0.15); border: 1px solid #e74c3c; border-radius: 6px; padding: 8px 12px; color: #ff6b6b; font-size: 0.85rem; margin-bottom: 1rem;">
+                {{ modifyError }}
+              </div>
+
+              <div *ngIf="modifySuccess" role="status" style="background: rgba(46,204,113,0.15); border: 1px solid #2ecc71; border-radius: 6px; padding: 8px 12px; color: #2ecc71; font-size: 0.85rem; margin-bottom: 1rem;">
+                {{ modifySuccess }}
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" (click)="closeModifyModal()" [disabled]="modifyLoading" class="btn-secondary" style="padding: 10px 18px; font-size: 0.85rem; border: 1px solid #555; color: #ccc; background: transparent; border-radius: 6px; cursor: pointer;">
+                  Cancelar
+                </button>
+                <button type="button" (click)="submitModifyDates()" [disabled]="modifyLoading || !modifyCheckIn || !modifyCheckOut" class="btn-primary" style="padding: 10px 20px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                  {{ modifyLoading ? 'Guardando...' : 'Confirmar Cambio' }}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -344,6 +435,21 @@ export class BookingDetailComponent implements OnInit {
   reviewSuccess = false;
   reviewError = '';
 
+  // Pre-check-in
+  preCheckInDoc = '';
+  preCheckInCompanions = '';
+  preCheckInLoading = false;
+  preCheckInError = '';
+
+  // Modificar fechas
+  showModifyModal = false;
+  modifyCheckIn = '';
+  modifyCheckOut = '';
+  modifyLoading = false;
+  modifyError = '';
+  modifySuccess = '';
+  minDate = new Date().toISOString().substring(0, 10);
+
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
@@ -358,6 +464,12 @@ export class BookingDetailComponent implements OnInit {
         next: (res) => {
           this.booking = res.data || res;
           this.loading = false;
+          if (this.booking?.documentNumber) {
+            this.preCheckInDoc = this.booking.documentNumber;
+          }
+          if (this.booking?.companionGuests) {
+            this.preCheckInCompanions = this.booking.companionGuests;
+          }
           if (this.booking?.status === 'checked_out' || this.booking?.status === 'completed') {
             this.fetchBookingReview(this.booking._id || this.booking.id || id);
           }
@@ -486,6 +598,34 @@ export class BookingDetailComponent implements OnInit {
     }
   }
 
+  submitPreCheckIn(): void {
+    if (!this.booking || !this.preCheckInDoc.trim()) return;
+    this.preCheckInLoading = true;
+    this.preCheckInError = '';
+    const id = this.booking._id || this.booking.id;
+
+    this.api.post<any>(`/bookings/${id}/pre-checkin`, {
+      documentNumber: this.preCheckInDoc.trim(),
+      companionGuests: this.preCheckInCompanions.trim()
+    }).subscribe({
+      next: (res) => {
+        this.preCheckInLoading = false;
+        if (res && res.data) {
+          this.booking = res.data;
+        } else {
+          this.booking.preCheckInCompleted = true;
+          this.booking.documentNumber = this.preCheckInDoc.trim();
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.preCheckInLoading = false;
+        this.preCheckInError = err.error?.message || 'Error al procesar el pre-check-in. Verifica tus datos.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
   submitReview(): void {
     if (!this.booking || !this.isGuestOwner) return;
     this.isSubmittingReview = true;
@@ -507,6 +647,60 @@ export class BookingDetailComponent implements OnInit {
       error: (err) => {
         this.isSubmittingReview = false;
         this.reviewError = err.error?.message || 'Error al enviar la reseña.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  openModifyModal(): void {
+    if (!this.booking) return;
+    this.modifyCheckIn = this.booking.checkIn ? String(this.booking.checkIn).substring(0, 10) : '';
+    this.modifyCheckOut = this.booking.checkOut ? String(this.booking.checkOut).substring(0, 10) : '';
+    this.modifyError = '';
+    this.modifySuccess = '';
+    this.showModifyModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeModifyModal(): void {
+    this.showModifyModal = false;
+    this.modifyError = '';
+    this.cdr.detectChanges();
+  }
+
+  submitModifyDates(): void {
+    if (!this.booking) return;
+    if (!this.modifyCheckIn || !this.modifyCheckOut) {
+      this.modifyError = 'Por favor selecciona ambas fechas (check-in y check-out)';
+      return;
+    }
+    if (this.modifyCheckOut <= this.modifyCheckIn) {
+      this.modifyError = 'La fecha de salida debe ser posterior a la fecha de llegada';
+      return;
+    }
+    this.modifyLoading = true;
+    this.modifyError = '';
+    this.modifySuccess = '';
+
+    const id = this.booking._id || this.booking.id;
+    this.api.put<any>(`/bookings/${id}/modify`, {
+      checkIn: this.modifyCheckIn,
+      checkOut: this.modifyCheckOut
+    }).subscribe({
+      next: (res) => {
+        this.modifyLoading = false;
+        if (res && res.data) {
+          this.booking = res.data;
+        }
+        this.modifySuccess = '¡Fechas modificadas exitosamente!';
+        this.cdr.detectChanges();
+        setTimeout(() => {
+          this.closeModifyModal();
+        }, 1500);
+      },
+      error: (err) => {
+        this.modifyLoading = false;
+        this.modifyError = err.error?.message || 'No fue posible modificar las fechas. Verifica que la suite esté disponible.';
         this.cdr.detectChanges();
       }
     });

@@ -132,51 +132,15 @@ import { renderSVG } from '../../utils/qr';
           </div>
         </div>
 
-        <!-- Módulo de Reseña Verificada (post-check-out, no imprimible) -->
-        <div *ngIf="canLeaveReview" class="no-print" style="margin-top: 2.5rem; background: #fdfbf7; border: 1px solid #e8dfc8; border-radius: 8px; padding: 1.5rem;">
-          <div *ngIf="!isLoggedIn" style="text-align: center; padding: 10px;">
-            <p style="margin: 0 0 10px 0; font-size: 0.9rem; color: #555;">Inicia sesión con tu cuenta de huésped para calificar tu experiencia de estadía.</p>
-            <a routerLink="/login" style="display: inline-block; background: #0d0d0d; color: #d4af37; border: 1px solid #d4af37; padding: 6px 16px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; text-decoration: none;">
-              Iniciar Sesión
-            </a>
-          </div>
-
-          <div *ngIf="isLoggedIn && !reviewSubmitted">
-            <h4 style="margin: 0 0 6px 0; color: #8c7329; font-size: 1.1rem;">Califica tu experiencia de estadía</h4>
-            <p style="margin: 0 0 12px 0; font-size: 0.85rem; color: #666;">Tu calificación como huésped verificado ayuda a mantener la calidad del marketplace.</p>
-            
-            <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center;">
-              <span style="font-size: 0.9rem; font-weight: bold; margin-right: 6px;">Puntuación:</span>
-              <button *ngFor="let star of [1,2,3,4,5]" 
-                      type="button"
-                      (click)="reviewRating = star"
-                      [style.color]="star <= reviewRating ? '#d4af37' : '#ccc'"
-                      style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0 2px;">
-                ★
-              </button>
-            </div>
-
-            <textarea [(ngModel)]="reviewComment" 
-                      placeholder="Escribe tu opinión sobre el alojamiento, limpieza y atención..."
-                      rows="3"
-                      style="width: 100%; border: 1px solid #ddd; border-radius: 4px; padding: 8px; font-family: inherit; font-size: 0.9rem; box-sizing: border-box;"></textarea>
-
-            <div *ngIf="reviewError" style="color: #e74c3c; font-size: 0.85rem; margin-top: 8px;">
-              {{ reviewError }}
-            </div>
-
-            <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-              <button (click)="submitReview()" 
-                      [disabled]="reviewSubmitting || !reviewComment.trim()"
-                      style="background: #0d0d0d; color: #d4af37; border: 1px solid #d4af37; padding: 8px 18px; border-radius: 4px; font-weight: bold; cursor: pointer;">
-                {{ reviewSubmitting ? 'Enviando...' : 'Publicar Reseña Verificada' }}
-              </button>
-            </div>
-          </div>
-
-          <div *ngIf="isLoggedIn && reviewSubmitted" style="text-align: center; color: #2ecc71; padding: 10px;">
-            <strong>✓ ¡Gracias por tu reseña verificada! Ha sido registrada exitosamente.</strong>
-          </div>
+        <!-- Módulo Informativo de Reseña (el formulario activo vive en booking-detail) -->
+        <div *ngIf="canLeaveReview" class="no-print" style="margin-top: 2.5rem; background: #fdfbf7; border: 1px solid #e8dfc8; border-radius: 8px; padding: 1.5rem; text-align: center;">
+          <h4 style="margin: 0 0 6px 0; color: #8c7329; font-size: 1.1rem;">Tu Opinión como Huésped Verificado</h4>
+          <p style="margin: 0 0 14px 0; font-size: 0.88rem; color: #555;">
+            Ya puedes calificar tu estancia, limpieza y atención desde el panel detallado de tu reserva.
+          </p>
+          <a [routerLink]="['/reservas', bookingId]" style="display: inline-flex; align-items: center; gap: 8px; background: #0d0d0d; color: #d4af37; border: 1px solid #d4af37; padding: 10px 20px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; text-decoration: none; cursor: pointer;">
+            Calificar en Detalle de Reserva →
+          </a>
         </div>
 
         <div style="margin-top: 4rem; text-align: center; color: #888; font-size: 0.85rem; border-top: 1px solid #eee; padding-top: 2rem;">
@@ -215,13 +179,6 @@ export class ReceiptComponent implements OnInit {
   loading = true;
   today = new Date();
   qrSvgSafe: SafeHtml = '';
-
-  // Reseña post-estadía
-  reviewRating = 5;
-  reviewComment = '';
-  reviewSubmitting = false;
-  reviewSubmitted = false;
-  reviewError = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -317,29 +274,6 @@ export class ReceiptComponent implements OnInit {
       }
     }
     return true;
-  }
-
-  submitReview(): void {
-    if (this.reviewSubmitting || !this.bookingId || !this.reviewComment.trim()) return;
-    this.reviewSubmitting = true;
-    this.reviewError = '';
-
-    this.api.post('/reviews/verified', {
-      bookingId: this.booking._id || this.booking.id || this.bookingId,
-      rating: this.reviewRating,
-      comment: this.reviewComment.trim()
-    }).subscribe({
-      next: () => {
-        this.reviewSubmitting = false;
-        this.reviewSubmitted = true;
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        this.reviewSubmitting = false;
-        this.reviewError = err?.error?.message || 'No se pudo enviar la reseña. Inténtalo de nuevo.';
-        this.cdr.detectChanges();
-      }
-    });
   }
 }
 
