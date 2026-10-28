@@ -113,3 +113,71 @@ Diff acumulado sobre código web:
 1. **Estabilidad**: El sistema web backend/frontend se encuentra completamente estabilizado y con todas las pruebas automatizadas en verde.
 2. **Seguridad**: Se restablecieron las barreras de autorización para reservas de propiedades y acceso de anfitriones a datos confidenciales.
 3. **Mantenimiento**: Se recomienda actualizar el script `test` en `frontend-angular/package.json` para usar `cross-env` si se desea compatibilidad multiplataforma en scripts directos de npm.
+
+---
+
+## Auditoría de Seguimiento y Depuración (Hallazgos para Corrección Manual)
+
+Segunda ronda de depuración técnica profunda (análisis estático y dinámico) realizada sobre los componentes web (`backend-java` y `frontend-angular`).
+
+### Hallazgo WEB-005
+- **Componente**: Frontend (`frontend-angular`)
+- **Ubicación**: `frontend-angular/src/app/components/hotel-map/hotel-map.component.ts:1` y `angular.json`
+- **Descripción del problema**: Advertencia de optimización durante `ng build`: el módulo `leaflet` es importado como dependencia CommonJS/AMD, lo que provoca advertencias de "optimization bailouts" y reduce la efectividad del tree-shaking en la generación de bundles de producción.
+- **Instrucción de Corrección**:
+  1. En `frontend-angular/angular.json`, dentro de `projects["palacio-del-mar-web"].architect.build.options`, agregar `leaflet` en `allowedCommonJsDependencies`:
+     ```json
+     "allowedCommonJsDependencies": ["leaflet"]
+     ```
+  2. Alternativamente, evaluar el uso de wrappers nativos ESM para Leaflet en Angular o carga diferida por importación dinámica `await import('leaflet')`.
+
+### Hallazgo WEB-006
+- **Componente**: Frontend (`frontend-angular`)
+- **Ubicación**: `frontend-angular/src/app/reserva.component.ts:31`
+- **Descripción del problema**: Se detectó una sentencia residual `console.log('Enviando datos limpios al backend...', payload);` que expone los datos del formulario de reserva (potencialmente PII: nombre, teléfono, correo) en la consola del navegador del cliente en entornos productivos.
+- **Instrucción de Corrección**:
+  1. Remover la línea 31 de `reserva.component.ts` o envolverla bajo condicional de entorno de desarrollo:
+     ```typescript
+     if (!environment.production) {
+       console.log('Enviando datos limpios al backend...', payload);
+     }
+     ```
+  2. Si el componente `reserva.component.ts` es un artefacto no utilizado en favor de `booking-modal.component.ts`, evaluar su eliminación o refactorización.
+
+### Hallazgo WEB-007
+- **Componente**: Backend (`backend-java`)
+- **Ubicación**: `backend-java/src/main/java/co/palaciodelmar/backend/model/SuiteNight.java:49`
+- **Descripción del problema**: Uso de parámetro deprecado `expireAfterSeconds()` en la anotación `@Indexed` de Spring Data MongoDB (`@Indexed(expireAfterSeconds = 0)`). Produce 5 advertencias de compilación (`expireAfterSeconds() has been deprecated and marked for removal`).
+- **Instrucción de Corrección**:
+  1. En `SuiteNight.java:49`, migrar a la propiedad moderna soportada:
+     ```java
+     @Indexed(expireAfter = "0s")
+     ```
+     o definir la duración mediante formato ISO-8601 / `java.time.Duration` según la versión de Spring Data MongoDB 4.x+.
+
+### Hallazgo WEB-008
+- **Componente**: Backend (`backend-java`)
+- **Ubicación**: `backend-java/src/main/java/co/palaciodelmar/backend/security/JwtService.java:69`
+- **Descripción del problema**: `Jwts.parserBuilder()` en JJWT 0.11.x / 0.12.x genera avisos de deprecación al compilar (`uses or overrides a deprecated API`). En versiones recientes de JJWT, `parserBuilder()` ha sido reemplazado por `Jwts.parser()`.
+- **Instrucción de Corrección**:
+  1. En `JwtService.java`, actualizar la instanciación del parser de tokens:
+     ```java
+     return Jwts.parser()
+             .verifyWith(getSigningKey())
+             .build()
+             .parseSignedClaims(token)
+             .getPayload();
+     ```
+     (o la firma equivalente según la versión específica de `jjwt-api` en el `pom.xml`).
+
+### Hallazgo WEB-009
+- **Componente**: Frontend (`frontend-angular`)
+- **Ubicación**: `frontend-angular/src/app/interceptors/auth.interceptor.ts:23-38`
+- **Descripción del problema**: El interceptor global captura únicamente errores `401 Unauthorized` para desloguear y redirigir al usuario, pero deja sin intercepción ni notificación unificada los errores `500 Internal Server Error`, `502 Bad Gateway` o timeouts de red, requiriendo que cada componente implemente su propio bloque `error: (...)`.
+- **Instrucción de Corrección**:
+  1. En `auth.interceptor.ts`, agregar manejo para errores 5xx / de red que notifique al usuario mediante un servicio global de toast / alerta (ej. `ToastService` o `NotificationService`):
+     ```typescript
+     if (error.status >= 500) {
+       // Disparar toast de notificación: 'Error interno del servidor. Por favor, intenta de nuevo más tarde.'
+     }
+     ```
