@@ -46,7 +46,7 @@ public class PropertyController {
         return ResponseEntity.ok(ApiResponse.ok(suites));
     }
 
-    @GetMapping(value = "/{id}/calendar.ics", produces = "text/calendar;charset=UTF-8")
+    @GetMapping(value = "/{id}/calendar.ics", produces = {"text/calendar", "text/calendar;charset=UTF-8", "text/plain", "*/*"})
     public ResponseEntity<String> getPropertyCalendarIcs(@PathVariable String id) {
         if (icalService == null) {
             return ResponseEntity.status(503).body("Servicio de calendario no disponible");
@@ -58,7 +58,7 @@ public class PropertyController {
                 .body(ics);
     }
 
-    @GetMapping(value = "/{id}/suites/{suiteId}/calendar.ics", produces = "text/calendar;charset=UTF-8")
+    @GetMapping(value = "/{id}/suites/{suiteId}/calendar.ics", produces = {"text/calendar", "text/calendar;charset=UTF-8", "text/plain", "*/*"})
     public ResponseEntity<String> getPropertySuiteCalendarIcs(@PathVariable String id, @PathVariable String suiteId) {
         if (icalService == null) {
             return ResponseEntity.status(503).body("Servicio de calendario no disponible");

@@ -117,8 +117,11 @@ public class ApiKeyService {
         Optional<ApiKey> match = apiKeyRepository.findByHashedKeyAndActiveTrue(hashedKey);
         if (match.isPresent()) {
             ApiKey apiKey = match.get();
-            apiKey.setLastUsedAt(Instant.now());
-            apiKeyRepository.save(apiKey);
+            Instant now = Instant.now();
+            if (apiKey.getLastUsedAt() == null || apiKey.getLastUsedAt().isBefore(now.minusSeconds(300))) {
+                apiKey.setLastUsedAt(now);
+                apiKeyRepository.save(apiKey);
+            }
             return Optional.of(apiKey);
         }
 

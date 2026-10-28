@@ -185,7 +185,7 @@ public class BookingService {
                 throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
             }
 
-            Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), request.getCheckIn(), request.getCheckIn().plusDays(nights));
+            Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), suite.getPropertyId(), request.getCheckIn(), request.getCheckIn().plusDays(nights));
             BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null
                     ? BigDecimal.valueOf(activePromo.getDiscountPercent())
                     : BigDecimal.ZERO;
@@ -439,7 +439,7 @@ public class BookingService {
                 throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
             }
 
-            Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+            Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), suite.getPropertyId(), request.getCheckIn(), request.getCheckOut());
             BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null
                     ? BigDecimal.valueOf(activePromo.getDiscountPercent())
                     : BigDecimal.ZERO;
@@ -1278,10 +1278,27 @@ public class BookingService {
         }
     }
 
-    private Promotion findActiveBranchPromotionEntity(String branchId, LocalDate checkIn, LocalDate checkOut) {
-        if (branchId == null || checkIn == null || checkOut == null) return null;
-        List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(branchId);
-        return promotions.stream()
+    private Promotion findActiveBranchPromotionEntity(String branchId, String propertyId, LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn == null || checkOut == null) return null;
+        Map<String, Promotion> promoMap = new java.util.LinkedHashMap<>();
+        if (branchId != null && !branchId.isBlank()) {
+            for (Promotion p : promotionRepository.findByBranchAndActiveTrue(branchId.trim())) {
+                if (p != null && p.getId() != null) promoMap.put(p.getId(), p);
+            }
+        }
+        if (propertyId != null && !propertyId.isBlank() && !propertyId.trim().equals(branchId != null ? branchId.trim() : null)) {
+            for (Promotion p : promotionRepository.findByBranchAndActiveTrue(propertyId.trim())) {
+                if (p != null && p.getId() != null) promoMap.put(p.getId(), p);
+            }
+        }
+        for (Promotion p : promotionRepository.findByBranchAndActiveTrue("all")) {
+            if (p != null && p.getId() != null) promoMap.put(p.getId(), p);
+        }
+        for (Promotion p : promotionRepository.findByBranchAndActiveTrue("ALL")) {
+            if (p != null && p.getId() != null) promoMap.put(p.getId(), p);
+        }
+
+        return promoMap.values().stream()
                 .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
                 .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut)) &&
                              (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))

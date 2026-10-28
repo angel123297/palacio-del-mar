@@ -114,7 +114,7 @@ public class SuiteController {
         return ResponseEntity.ok(ApiResponse.ok(socialProofService.getSocialProof(idOrSlug)));
     }
 
-    @GetMapping(value = "/{id}/calendar.ics", produces = "text/calendar;charset=UTF-8")
+    @GetMapping(value = "/{id}/calendar.ics", produces = {"text/calendar", "text/calendar;charset=UTF-8", "text/plain", "*/*"})
     public ResponseEntity<String> getSuiteCalendarIcs(@PathVariable String id) {
         if (icalService == null) {
             return ResponseEntity.status(503).body("Servicio de calendario no disponible");

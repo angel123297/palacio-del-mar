@@ -4,6 +4,7 @@ import co.palaciodelmar.backend.dto.CalculatePriceRequest;
 import co.palaciodelmar.backend.dto.CalculatePriceResponseDTO;
 import co.palaciodelmar.backend.dto.SuiteResponseDTO;
 import co.palaciodelmar.backend.dto.SuiteTypeDTO;
+import co.palaciodelmar.backend.exception.ResourceNotFoundException;
 import co.palaciodelmar.backend.model.Branch;
 import co.palaciodelmar.backend.model.Experience;
 import co.palaciodelmar.backend.model.Property;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
@@ -133,7 +135,7 @@ public class SuiteService {
                     String alias = AvailabilityService.SLUG_ALIASES.get(lower);
                     return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
                 })
-                .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada con identificador: " + idOrSlug));
+                .orElseThrow(() -> new ResourceNotFoundException("Suite no encontrada con identificador: " + idOrSlug));
         if (suite.getPropertyId() != null) {
             Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
             if (p == null || Boolean.FALSE.equals(p.getActive()) || !"APPROVED".equalsIgnoreCase(p.getStatus())) {
@@ -207,7 +209,7 @@ public class SuiteService {
                     String alias = AvailabilityService.SLUG_ALIASES.get(lowerSuiteId);
                     return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
                 })
-                .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: " + request.getSuiteId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Suite no encontrada: " + request.getSuiteId()));
 
         if (suite.getPropertyId() != null) {
             Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
@@ -216,12 +218,20 @@ public class SuiteService {
             }
         }
 
-        long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
-        if (nights <= 0) {
-            nights = 1;
+        if (request.getCheckIn().isBefore(LocalDate.now(ZoneId.of("America/Bogota")))) {
+            throw new IllegalArgumentException("La fecha de check-in no puede ser anterior a la fecha actual");
         }
 
-        BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+        long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
+        if (nights <= 0) {
+            throw new IllegalArgumentException("La estadía debe ser de al menos 1 noche.");
+        }
+
+        if (request.getGuests() != null && request.getGuests() < 1) {
+            throw new IllegalArgumentException("El número de huéspedes debe ser al menos 1");
+        }
+
+        BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), suite.getPropertyId(), request.getCheckIn(), request.getCheckOut());
         Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
                 ? dynamicPricingService.adjustmentsFor(suite, request.getCheckIn(), request.getCheckOut(), null)
                 : Map.of();
@@ -284,10 +294,27 @@ public class SuiteService {
                 .build();
     }
 
-    private BigDecimal findActiveBranchPromotion(String branchId, LocalDate checkIn, LocalDate checkOut) {
-        if (branchId == null || checkIn == null || checkOut == null) return BigDecimal.ZERO;
-        List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(branchId);
-        Integer maxDiscount = promotions.stream()
+    private BigDecimal findActiveBranchPromotion(String branchId, String propertyId, LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn == null || checkOut == null) return BigDecimal.ZERO;
+        Map<String, Promotion> promoMap = new LinkedHashMap<>();
+        if (branchId != null && !branchId.isBlank()) {
+            for (Promotion p : promotionRepository.findByBranchAndActiveTrue(branchId.trim())) {
+                if (p != null && p.getId() != null) promoMap.put(p.getId(), p);
+            }
+        }
+        if (propertyId != null && !propertyId.isBlank() && !propertyId.trim().equals(branchId != null ? branchId.trim() : null)) {
+            for (Promotion p : promotionRepository.findByBranchAndActiveTrue(propertyId.trim())) {
+                if (p != null && p.getId() != null) promoMap.put(p.getId(), p);
+            }
+        }
+        for (Promotion p : promotionRepository.findByBranchAndActiveTrue("all")) {
+            if (p != null && p.getId() != null) promoMap.put(p.getId(), p);
+        }
+        for (Promotion p : promotionRepository.findByBranchAndActiveTrue("ALL")) {
+            if (p != null && p.getId() != null) promoMap.put(p.getId(), p);
+        }
+
+        Integer maxDiscount = promoMap.values().stream()
                 .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
                 .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut)) &&
                              (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
