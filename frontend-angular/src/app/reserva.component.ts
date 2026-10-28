@@ -3,7 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 @Component({
   selector: 'app-reserva',
-  templateUrl: './reserva.component.html',
+  template: '<div><p>Reserva component</p></div>',
   styleUrls: ['./reserva.component.css']
 })
 export class ReservaComponent {
