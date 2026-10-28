@@ -464,6 +464,17 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     window.scrollTo(0,0);
   }
 
+  quickBook(): void {
+    this.selectedExperiences = [];
+    this.airportPickup = false;
+    this.petFriendly = false;
+    this.wantFood = false;
+    this.foodType = '';
+    this.customFood = '';
+    this.breakfastCombo = false;
+    this.goToStep(4);
+  }
+
   // Re-chequeo de disponibilidad contra el servidor justo antes de crear la reserva (L1).
   // El snapshot del calendario puede estar desactualizado si otro huésped reservó mientras tanto.
   private ensureStillAvailable(): Promise<boolean> {

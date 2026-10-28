@@ -1,51 +1,106 @@
 <div class="wizard-container">
   <div *ngIf="loading" class="luxury-loader-container">
     <div class="luxury-spinner"></div>
-    <p class="luxury-loader-text">Cargando...</p>
+    <p class="luxury-loader-text">Cargando detalles de la suite...</p>
   </div>
 
-  <div *ngIf="!loading && !suite" style="text-align: center; color: #ff4d4d; padding: 4rem;">
+  <div *ngIf="!loading && !suite" class="empty-suite-state">
     <h3>La suite que buscas no existe o no está disponible.</h3>
-    <a routerLink="/" style="color: var(--gold); text-decoration: none; margin-top: 1rem; display: inline-block;">← Volver al inicio</a>
+    <a routerLink="/" class="back-link">← Volver al inicio</a>
   </div>
 
-  <div *ngIf="!loading && suite && isOwnSuite" style="text-align: center; padding: 4rem 1.5rem;">
-    <div style="max-width: 560px; margin: 0 auto; background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.35); border-radius: 12px; padding: 2rem;">
-      <h3 style="color: var(--gold); margin: 0 0 0.75rem 0;">Esta suite es de tu propio alojamiento</h3>
-      <p style="color: #ccc; margin: 0 0 1.5rem 0;">Como anfitrión no puedes reservar tu propia propiedad desde el marketplace. Gestiona su disponibilidad y precios desde tu panel.</p>
-      <a routerLink="/anfitrion" class="btn-primary" style="padding: 10px 20px; text-decoration: none;">Ir a mi panel de anfitrión</a>
+  <div *ngIf="!loading && suite && isOwnSuite" class="own-suite-banner">
+    <div class="own-suite-card">
+      <h3>Esta suite es de tu propio alojamiento</h3>
+      <p>Como anfitrión no puedes reservar tu propia propiedad desde el marketplace. Gestiona su disponibilidad y precios desde tu panel.</p>
+      <a routerLink="/anfitrion" class="btn-primary">Ir a mi panel de anfitrión</a>
     </div>
   </div>
 
   <div *ngIf="!loading && suite && !isOwnSuite">
-    <div *ngIf="availabilityConflict" role="alert" aria-live="assertive" style="background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.4); color: #e74c3c; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem;">
+    <div *ngIf="availabilityConflict" role="alert" aria-live="assertive" class="conflict-alert">
       {{ availabilityConflict }}
     </div>
-    <div class="step-indicator" role="progressbar" [attr.aria-valuenow]="step" aria-valuemin="1" aria-valuemax="4" aria-label="Progreso de la reserva">
-      <div class="step-item" [class.active]="step === 1" [class.completed]="step > 1" [attr.aria-current]="step === 1 ? 'step' : null">1. Detalles</div>
-      <div class="step-item" [class.active]="step === 2" [class.completed]="step > 2" [attr.aria-current]="step === 2 ? 'step' : null">2. Experiencias</div>
-      <div class="step-item" [class.active]="step === 3" [class.completed]="step > 3" [attr.aria-current]="step === 3 ? 'step' : null">3. VIP & Comida</div>
-      <div class="step-item" [class.active]="step === 4" [attr.aria-current]="step === 4 ? 'step' : null">4. Resumen</div>
-    </div>
 
-    <!-- PANEL 1: Suite Info -->
+    <!-- Stepper de Navegación Refinado -->
+    <nav class="step-indicator" role="progressbar" [attr.aria-valuenow]="step" aria-valuemin="1" aria-valuemax="4" aria-label="Progreso de la reserva">
+      <div class="step-item" [class.active]="step === 1" [class.completed]="step > 1" (click)="goToStep(1)" [attr.aria-current]="step === 1 ? 'step' : null">
+        <span class="step-circle"><span *ngIf="step <= 1">1</span><svg *ngIf="step > 1" class="check-svg" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+        <span class="step-label">1. Detalles</span>
+      </div>
+      <div class="step-divider" [class.active]="step > 1"></div>
+      <div class="step-item" [class.active]="step === 2" [class.completed]="step > 2" (click)="step >= 2 ? goToStep(2) : null" [attr.aria-current]="step === 2 ? 'step' : null">
+        <span class="step-circle"><span *ngIf="step <= 2">2</span><svg *ngIf="step > 2" class="check-svg" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+        <span class="step-label">2. Experiencias</span>
+      </div>
+      <div class="step-divider" [class.active]="step > 2"></div>
+      <div class="step-item" [class.active]="step === 3" [class.completed]="step > 3" (click)="step >= 3 ? goToStep(3) : null" [attr.aria-current]="step === 3 ? 'step' : null">
+        <span class="step-circle"><span *ngIf="step <= 3">3</span><svg *ngIf="step > 3" class="check-svg" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+        <span class="step-label">3. VIP & Comida</span>
+      </div>
+      <div class="step-divider" [class.active]="step > 3"></div>
+      <div class="step-item" [class.active]="step === 4" [class.completed]="step === 4" (click)="step >= 4 ? goToStep(4) : null" [attr.aria-current]="step === 4 ? 'step' : null">
+        <span class="step-circle">4</span>
+        <span class="step-label">4. Resumen</span>
+      </div>
+    </nav>
+
+    <!-- PANEL 1: SUITE PRINCIPAL (Layout 65/35 Balanceado con Sticky Sidebar) -->
     <div class="panel" *ngIf="step === 1">
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2.5rem;">
-        <div>
-          <img [src]="getSuiteImage(suite)" (error)="onImageError($event)" [alt]="suite.name" style="width: 100%; height: 380px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.2);">
-          <div *ngIf="suite.images && suite.images.length > 0" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; margin-top: 1rem;">
-            <img *ngFor="let img of suite.images.slice(0,4); let imgIdx = index" [src]="img" (error)="onImageError($event)" [alt]="suite.name + ' foto ' + (imgIdx + 1)" role="button" tabindex="0" (keydown.enter)="suite.mainImage = img" (keydown.space)="suite.mainImage = img; $event.preventDefault()" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2); cursor: pointer; opacity: 0.7;" (click)="suite.mainImage = img">
-          </div>
-          <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{ suite.name }}</h1>
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0.5rem; flex-wrap: wrap;">
-            <p style="color: var(--gold); margin: 0;">{{ suite.type }} · {{ suite.size || 45 }} m² · Máx {{ suite.maxGuests || 2 }} huéspedes</p>
-            <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(241,196,15,0.15); border: 1px solid rgba(241,196,15,0.35); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; color: #f1c40f;">
-              <span>★ {{ averageRating }}</span>
-              <span style="color: rgba(245,240,232,0.6);">({{ reviews.length }} {{ reviews.length === 1 ? 'reseña' : 'reseñas' }})</span>
+      <div class="suite-main-grid">
+        
+        <!-- Columna Izquierda: Galería y Experiencia de la Suite -->
+        <div class="suite-content-col">
+          <!-- Galería Editorial -->
+          <div class="gallery-showcase">
+            <div class="gallery-hero-wrapper">
+              <img [src]="getSuiteImage(suite)" (error)="onImageError($event)" [alt]="suite.name" class="gallery-hero-img">
+              <div class="gallery-badge">{{ suite.type || 'Suite Deluxe' }}</div>
+            </div>
+            <div *ngIf="suite.images && suite.images.length > 0" class="gallery-thumbs-grid">
+              <img *ngFor="let img of suite.images.slice(0,4); let imgIdx = index"
+                   [src]="img"
+                   (error)="onImageError($event)"
+                   [alt]="suite.name + ' miniatura ' + (imgIdx + 1)"
+                   class="gallery-thumb"
+                   [class.active]="suite.mainImage === img"
+                   role="button"
+                   tabindex="0"
+                   (keydown.enter)="suite.mainImage = img"
+                   (keydown.space)="suite.mainImage = img; $event.preventDefault()"
+                   (click)="suite.mainImage = img">
             </div>
           </div>
 
-          <!-- Redis Real-Time Social Proof & Urgency Banner -->
+          <!-- Encabezado y Metadatos de la Suite -->
+          <div class="suite-header-block">
+            <div class="suite-title-row">
+              <h1 class="suite-title">{{ suite.name }}</h1>
+              <div class="rating-badge-pill">
+                <span class="star-gold">★</span>
+                <span class="rating-val">{{ averageRating }}</span>
+                <span class="rating-count">({{ reviews.length }} {{ reviews.length === 1 ? 'reseña' : 'reseñas' }})</span>
+              </div>
+            </div>
+
+            <!-- Features Pills -->
+            <div class="specs-pills-row">
+              <span class="spec-pill">
+                <svg class="spec-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                Cartagena de Indias
+              </span>
+              <span class="spec-pill">
+                <svg class="spec-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2zm16 14H5V5h14v14z"/></svg>
+                {{ suite.size || 65 }} m²
+              </span>
+              <span class="spec-pill">
+                <svg class="spec-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                Máx {{ suite.maxGuests || 2 }} huéspedes
+              </span>
+            </div>
+          </div>
+
+          <!-- Social Proof Banner (Prueba Social en Tiempo Real) -->
           <div *ngIf="socialProof && (socialProof.activeViewers > 0 || socialProof.bookingsLast24h > 0 || socialProof.lastBookedMinutesAgo != null)"
                class="social-proof-banner"
                role="status"
@@ -61,7 +116,7 @@
             </div>
             <div *ngIf="socialProof.bookingsLast24h > 0 || socialProof.lastBookedMinutesAgo != null" class="social-proof-meta">
               <span *ngIf="socialProof.bookingsLast24h > 0">
-                🔥 {{ socialProof.bookingsLast24h === 1 ? '1 reserva confirmada en las últimas 24 h' : socialProof.bookingsLast24h + ' reservas en las últimas 24 h' }}
+                ⚡ {{ socialProof.bookingsLast24h === 1 ? '1 reserva confirmada en las últimas 24 h' : socialProof.bookingsLast24h + ' reservas en las últimas 24 h' }}
               </span>
               <span *ngIf="socialProof.lastBookedMinutesAgo != null">
                 · {{ formatLastBooked(socialProof.lastBookedMinutesAgo) }}
@@ -69,11 +124,41 @@
             </div>
           </div>
 
-          <p style="color: #ccc; margin-top: 1rem;">{{ suite.description }}</p>
+          <!-- Descripción -->
+          <div class="suite-description-section">
+            <h3 class="section-title">Sobre la Suite</h3>
+            <p class="suite-description-text">{{ suite.description }}</p>
+          </div>
 
-          <!-- Redis Geo Nearby Cartagena Landmarks -->
+          <!-- Comodidades de Lujo -->
+          <div class="amenities-section">
+            <h3 class="section-title">Comodidades Destacadas</h3>
+            <div class="amenities-grid">
+              <div class="amenity-item">
+                <svg class="amenity-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3C6.5 3 2 6.5 2 12c0 3.58 2.5 6.58 6 7.5v-2.13C5.54 16.5 4 14.48 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 2.48-1.54 4.5-4 5.37V19.5c3.5-.92 6-3.92 6-7.5 0-5.5-4.5-9-10-9z"/></svg>
+                <span>WiFi de Alta Velocidad</span>
+              </div>
+              <div class="amenity-item">
+                <svg class="amenity-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M19 7h-8v6H3V5H1v15h2v-3h18v3h2v-9a4 4 0 0 0-4-4zm-8 4H5V7h6v4z"/></svg>
+                <span>Cama King Size de Lujo</span>
+              </div>
+              <div class="amenity-item">
+                <svg class="amenity-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+                <span>Aire Acondicionado Central</span>
+              </div>
+              <div class="amenity-item">
+                <svg class="amenity-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+                <span>Smart TV con Streaming</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sitios Cercanos & Distancias Reales -->
           <div *ngIf="nearbyPlaces.length > 0; else fallbackHighlights" class="geo-nearby-section">
-            <h3 style="color: var(--gold); margin: 0 0 0.85rem 0; font-size: 1.05rem;">📍 Entorno & Distancias Reales en Cartagena</h3>
+            <div class="geo-header-row">
+              <h3 class="section-title">📍 Entorno & Sitios de Interés en Cartagena</h3>
+              <span class="geo-tag">Distancias Reales</span>
+            </div>
             <div class="geo-places-grid">
               <div *ngFor="let place of nearbyPlaces" class="geo-place-card">
                 <div class="geo-place-header">
@@ -81,342 +166,402 @@
                   <span *ngIf="place.distanceKm != null" class="geo-distance-badge">{{ place.distanceKm | number:'1.1-2' }} km</span>
                 </div>
                 <div class="geo-place-sub">
-                  <span *ngIf="place.zone">{{ place.zone }}</span>
-                  <span *ngIf="place.walkMinutes != null"> · 🚶 {{ place.walkMinutes }} min a pie</span>
-                  <span *ngIf="place.walkMinutes == null && place.driveMinutes != null"> · 🚗 {{ place.driveMinutes }} min</span>
+                  <span *ngIf="place.zone" class="zone-name">{{ place.zone }}</span>
+                  <span *ngIf="place.walkMinutes != null" class="travel-time">
+                    <svg class="icon-travel" viewBox="0 0 24 24"><path fill="currentColor" d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7z"/></svg>
+                    {{ place.walkMinutes }} min a pie
+                  </span>
+                  <span *ngIf="place.walkMinutes == null && place.driveMinutes != null" class="travel-time">
+                    <svg class="icon-travel" viewBox="0 0 24 24"><path fill="currentColor" d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.85 7h10.29l1.08 3.11H5.77L6.85 7zM19 17H5v-4.66l.12-.34h13.77l.11.34V17z"/></svg>
+                    {{ place.driveMinutes }} min en auto
+                  </span>
                 </div>
               </div>
             </div>
           </div>
           <ng-template #fallbackHighlights>
-            <div *ngIf="suite.branch?.highlights?.length" style="margin-top: 2rem;">
-              <h3 style="color: var(--gold);">Lugares Cercanos</h3>
-              <ul>
-                <li *ngFor="let h of suite.branch?.highlights" style="margin-bottom: 0.5rem;">{{h.name}} ({{h.walkMinutes}} min)</li>
+            <div *ngIf="suite.branch?.highlights?.length" class="geo-nearby-section">
+              <h3 class="section-title">Lugares Cercanos</h3>
+              <ul class="fallback-list">
+                <li *ngFor="let h of suite.branch?.highlights">{{h.name}} ({{h.walkMinutes}} min a pie)</li>
               </ul>
             </div>
           </ng-template>
-        </div>
-        <div class="card">
-          <h3 style="color: var(--gold); margin-top: 0;">Reserva</h3>
-          <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
-            <div style="display: block; height: 60px; border: 1px solid rgba(212,175,55,0.2); border-radius: 6px; background: rgba(0,0,0,0.5);">
-              <app-date-range-picker [checkIn]="checkIn" [checkOut]="checkOut" [guests]="guests" [branch]="branchIdentifier" [suiteId]="suite?.id || suite?._id || suite?.slug || ''" (rangeChange)="checkIn = $event.checkIn; checkOut = $event.checkOut; validateDates()"></app-date-range-picker>
-            </div>
-            <div>
-              <label for="suite-guests-select" style="color: var(--gold); font-size: 0.85rem;">Huéspedes</label>
-              <select id="suite-guests-select" [(ngModel)]="guests" (ngModelChange)="validateDates()" class="form-control" aria-label="Cantidad de huéspedes">
-                <option *ngFor="let i of [1,2,3,4,5,6,7,8].slice(0, suite.maxGuests || 2)" [value]="i">{{i}}</option>
-              </select>
-            </div>
-          </div>
-          <!-- Alerta de Tarifa Dinámica Inteligente -->
-          <div *ngIf="dynamicPricingNotes.length > 0" style="margin-bottom: 1rem; background: rgba(201,169,110,0.12); border: 1px solid rgba(201,169,110,0.4); padding: 0.6rem 0.8rem; border-radius: 6px; font-size: 0.78rem;">
-            <div style="font-weight: bold; color: var(--gold); margin-bottom: 0.25rem;">⚡ Tarifa Inteligente Aplicada</div>
-            <div *ngFor="let note of dynamicPricingNotes" style="color: #f5f0e8; opacity: 0.9;">
-              • {{ note }}
-            </div>
-          </div>
-          <p class="flex-between"><span>Precio ({{nights}} noches):</span> <strong>$ {{totalRoomPrice | number:'1.0-0'}}</strong></p>
-          <button class="btn-primary" style="width: 100%; margin-top: 1rem; margin-bottom: 2rem;" (click)="nextStep()">Continuar →</button>
-          
-          <!-- Beneficios y Políticas -->
-          <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem;">
-            <h4 style="color: var(--gold); margin: 0 0 1rem 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px;">Beneficios Reserva Directa</h4>
-            <ul style="list-style: none; padding: 0; margin: 0; color: #ccc; font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.8rem;">
-              <li style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="color: #2ecc71;">✓</span> Mejor tarifa garantizada
-              </li>
-              <li style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="color: #2ecc71;">✓</span> Cóctel de bienvenida de cortesía
-              </li>
-              <li style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="color: #2ecc71;">✓</span> Acceso prioritario al Spa
-              </li>
-            </ul>
 
-            <h4 style="color: var(--gold); margin: 1.5rem 0 1rem 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px;">Información Útil</h4>
-            <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 6px; font-size: 0.85rem; color: #aaa; display: flex; flex-direction: column; gap: 0.5rem;">
-              <div class="flex-between">
+          <!-- Reseñas Verificadas -->
+          <div class="reviews-section">
+            <div class="reviews-header">
+              <div>
+                <h3 class="section-title">Opiniones y Reseñas Verificadas</h3>
+                <p class="section-subtitle">Evaluaciones auténticas de huéspedes que completaron su estancia.</p>
+              </div>
+              <div class="reviews-score-pill">
+                <span class="star-gold">★</span>
+                <strong class="score-text">{{ averageRating }} / 5</strong>
+                <span class="score-count">({{ reviews.length }})</span>
+              </div>
+            </div>
+
+            <div *ngIf="reviews.length === 0" class="empty-reviews-box">
+              <p>Esta suite aún no tiene opiniones públicas registradas. ¡Sé de los primeros en vivir la experiencia!</p>
+            </div>
+
+            <div *ngIf="reviews.length > 0" class="reviews-cards-grid">
+              <div *ngFor="let rev of reviews" class="review-card">
+                <div class="review-card-header">
+                  <span class="reviewer-name">{{ rev.userName || 'Huésped Verificado' }}</span>
+                  <span class="reviewer-stars">{{ '★'.repeat(rev.rating || 5) }}</span>
+                </div>
+                <p class="reviewer-comment">"{{ rev.comment }}"</p>
+                <div class="verified-tag">
+                  <svg class="check-svg-small" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  <span>Estadía verificada</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna Derecha: Tarjeta de Reserva STICKY (Liquid Glass) -->
+        <aside class="suite-booking-sidebar">
+          <div class="booking-card-sticky">
+            <div class="booking-card-header">
+              <div>
+                <span class="price-label">Tarifa por noche</span>
+                <div class="price-hero">
+                  <strong class="price-amount">$ {{ suite.basePrice | number:'1.0-0' }}</strong>
+                  <span class="price-unit">COP</span>
+                </div>
+              </div>
+              <div class="badge-direct">Reserva Segura</div>
+            </div>
+
+            <!-- Selectores de Fechas y Huéspedes -->
+            <div class="booking-form-box">
+              <div class="date-picker-wrapper">
+                <app-date-range-picker [checkIn]="checkIn" [checkOut]="checkOut" [guests]="guests" [branch]="branchIdentifier" [suiteId]="suite?.id || suite?._id || suite?.slug || ''" (rangeChange)="checkIn = $event.checkIn; checkOut = $event.checkOut; validateDates()"></app-date-range-picker>
+              </div>
+
+              <div class="guests-select-group">
+                <label for="suite-guests-select" class="form-label">Huéspedes</label>
+                <div class="select-wrapper">
+                  <select id="suite-guests-select" [(ngModel)]="guests" (ngModelChange)="validateDates()" class="form-control" aria-label="Cantidad de huéspedes">
+                    <option *ngFor="let i of [1,2,3,4,5,6,7,8].slice(0, suite.maxGuests || 2)" [value]="i">{{i}} {{ i === 1 ? 'huésped' : 'huéspedes' }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Alerta de Tarifa Dinámica Inteligente -->
+            <div *ngIf="dynamicPricingNotes.length > 0" class="dynamic-pricing-card">
+              <div class="dynamic-header">⚡ Tarifa Inteligente Aplicada</div>
+              <div *ngFor="let note of dynamicPricingNotes" class="dynamic-item">• {{ note }}</div>
+            </div>
+
+            <!-- Resumen de Costo Inmediato -->
+            <div class="pricing-summary-box">
+              <div class="price-row">
+                <span>Estadía ({{nights}} {{ nights === 1 ? 'noche' : 'noches' }}):</span>
+                <strong>$ {{totalRoomPrice | number:'1.0-0'}}</strong>
+              </div>
+              <div *ngIf="extraGuestsFee > 0" class="price-row">
+                <span>Huéspedes adicionales:</span>
+                <strong>$ {{extraGuestsFee | number:'1.0-0'}}</strong>
+              </div>
+              <div class="price-row guarantee">
+                <span>Depósito reembolsable:</span>
+                <span>$ {{guaranteeDeposit | number:'1.0-0'}}</span>
+              </div>
+              <div class="total-row">
+                <span>Total Estimado:</span>
+                <span class="total-val">$ {{grandTotal | number:'1.0-0'}}</span>
+              </div>
+            </div>
+
+            <!-- Acciones de Conversión: Rápida vs Personalizada -->
+            <div class="cta-actions-group">
+              <button class="btn-primary btn-book-direct" (click)="quickBook()" [disabled]="bookingBusy">
+                <span>Reservar Directo</span>
+                <span class="btn-sub">Ir directo a confirmación y pago</span>
+              </button>
+              <button class="btn-secondary btn-customize" (click)="nextStep()">
+                <span>Añadir Experiencias o Servicios VIP →</span>
+              </button>
+            </div>
+
+            <!-- Beneficios de Reserva Directa -->
+            <div class="booking-perks-box">
+              <h4 class="perks-title">Beneficios Exclusivos</h4>
+              <ul class="perks-list">
+                <li>
+                  <svg class="check-svg-gold" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  <span>Mejor tarifa garantizada sin comisiones ocultas</span>
+                </li>
+                <li>
+                  <svg class="check-svg-gold" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  <span>Cóctel de bienvenida de cortesía en suite</span>
+                </li>
+                <li>
+                  <svg class="check-svg-gold" viewBox="0 0 24 24"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                  <span>Cancelación flexible hasta 48h antes</span>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Información Útil -->
+            <div class="info-specs-box">
+              <div class="info-row">
                 <span>Check-in:</span>
-                <span style="color: #fff;">15:00</span>
+                <strong>15:00</strong>
               </div>
-              <div class="flex-between">
+              <div class="info-row">
                 <span>Check-out:</span>
-                <span style="color: #fff;">12:00</span>
+                <strong>12:00</strong>
               </div>
-              <div class="flex-between">
-                <span>Cancelación:</span>
-                <span style="color: #fff;">Gratis hasta 48h antes</span>
+              <div class="info-row">
+                <span>Garantía:</span>
+                <strong>Reembolso al Check-out</strong>
               </div>
             </div>
           </div>
-        </div>
+        </aside>
 
-        <!-- Reseñas de Huéspedes Verificados -->
-        <div style="grid-column: 1 / -1; margin-top: 2rem; border-top: 1px solid rgba(212, 175, 55, 0.2); padding-top: 2rem;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-            <div>
-              <h3 style="font-family: var(--font-title); font-size: 1.6rem; color: var(--gold); margin: 0 0 4px 0;">
-                Opiniones y Reseñas Verificadas
-              </h3>
-              <p style="color: rgba(245,240,232,0.7); font-size: 0.9rem; margin: 0;">
-                Evaluaciones auténticas de huéspedes que completaron su estancia en esta suite.
-              </p>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px; background: rgba(201,169,110,0.12); border: 1px solid rgba(201,169,110,0.3); padding: 8px 16px; border-radius: 30px;">
-              <span style="color: #f1c40f; font-size: 1.2rem;">★</span>
-              <strong style="color: #fff; font-size: 1.1rem;">{{ averageRating }} / 5</strong>
-              <span style="color: #ccc; font-size: 0.85rem;">({{ reviews.length }} {{ reviews.length === 1 ? 'reseña' : 'reseñas' }})</span>
-            </div>
-          </div>
-
-          <div *ngIf="reviews.length === 0" style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(212,175,55,0.25); border-radius: 8px; padding: 2rem; text-align: center; color: rgba(245,240,232,0.6);">
-            <p style="margin: 0; font-size: 0.95rem;">Esta suite aún no tiene opiniones públicas registradas. ¡Sé de los primeros en vivir la experiencia!</p>
-          </div>
-
-          <div *ngIf="reviews.length > 0" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;">
-            <div *ngFor="let rev of reviews" style="background: #141414; border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 8px; padding: 1.25rem;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-weight: 600; color: #f5f0e8; font-size: 0.95rem;">{{ rev.userName || 'Huésped Verificado' }}</span>
-                <span style="color: #f1c40f; font-size: 0.9rem;">{{ '★'.repeat(rev.rating || 5) }}</span>
-              </div>
-              <p style="color: #ccc; font-size: 0.88rem; line-height: 1.45; margin: 0 0 0.75rem 0;">"{{ rev.comment }}"</p>
-              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #2ecc71;">
-                <span>✓ Estadía verificada</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
-    <!-- PANEL 2: Experiences -->
+    <!-- PANEL 2: EXPERIENCIAS (Full width luxury catalog) -->
     <div class="panel" *ngIf="step === 2">
-      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 0.5rem;">Mejora tu estancia con Experiencias</h2>
-      <p style="text-align: center; color: rgba(245,240,232,0.7); font-size: 0.95rem; margin-bottom: 2rem;">Servicios y actividades 100% opcionales</p>
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem;">
+      <div class="panel-header-centered">
+        <h2 class="panel-title">Mejora tu estancia con Experiencias</h2>
+        <p class="panel-subtitle">Añade actividades exclusivas en Cartagena a tu reserva (100% opcionales)</p>
+      </div>
+
+      <div class="experiences-grid">
         <div *ngFor="let exp of experiences" class="exp-card" [class.selected]="isExperienceSelected(exp)" (click)="toggleExperience(exp)">
-          <div>
-            <img [src]="getExperienceImage(exp)" (error)="onImageError($event)" [alt]="exp.name" style="width: 100%; height: 160px; object-fit: cover; border-radius: 6px; margin-bottom: 1rem;">
-            <h3 style="margin: 0 0 0.5rem 0; font-size: 1.1rem;">{{exp.name}}</h3>
-            <p style="font-size: 0.85rem; color: #bbb; line-height: 1.45;">{{exp.description}}</p>
+          <div class="exp-img-wrapper">
+            <img [src]="getExperienceImage(exp)" (error)="onImageError($event)" [alt]="exp.name" class="exp-img">
+            <span *ngIf="isExperienceSelected(exp)" class="exp-selected-badge">✓ Seleccionada</span>
           </div>
-          <div class="flex-between" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
-            <strong style="color: var(--gold);">$ {{exp.price | number:'1.0-0'}}</strong>
-            <div *ngIf="isExperienceSelected(exp)" style="display: flex; align-items: center; gap: 8px; background: rgba(201,169,110,0.18); border: 1px solid var(--gold); padding: 2px 10px; border-radius: 20px;">
-              <button type="button" (click)="updateExperienceQty(exp, -1, $event)" aria-label="Disminuir cantidad" style="background: none; border: none; color: var(--gold); font-size: 1.1rem; font-weight: bold; cursor: pointer; padding: 0 4px;">−</button>
-              <span style="color: #fff; font-size: 0.85rem; font-weight: bold;">{{ getExperienceQty(exp) }}</span>
-              <button type="button" (click)="updateExperienceQty(exp, 1, $event)" aria-label="Aumentar cantidad" style="background: none; border: none; color: var(--gold); font-size: 1.1rem; font-weight: bold; cursor: pointer; padding: 0 4px;">+</button>
+          <div class="exp-body">
+            <h3 class="exp-title">{{exp.name}}</h3>
+            <p class="exp-desc">{{exp.description}}</p>
+          </div>
+          <div class="exp-footer">
+            <strong class="exp-price">$ {{exp.price | number:'1.0-0'}} <span class="exp-unit">COP</span></strong>
+            <div *ngIf="isExperienceSelected(exp)" class="exp-stepper" (click)="$event.stopPropagation()">
+              <button type="button" (click)="updateExperienceQty(exp, -1, $event)" aria-label="Disminuir cantidad" class="btn-step">−</button>
+              <span class="qty-text">{{ getExperienceQty(exp) }}</span>
+              <button type="button" (click)="updateExperienceQty(exp, 1, $event)" aria-label="Aumentar cantidad" class="btn-step">+</button>
             </div>
-            <span *ngIf="!isExperienceSelected(exp)" style="color: rgba(245,240,232,0.6); font-size: 0.8rem;">+ Agregar</span>
+            <span *ngIf="!isExperienceSelected(exp)" class="exp-add-btn">+ Añadir</span>
           </div>
         </div>
       </div>
-      <div class="flex-between" style="margin-top: 3rem;">
-        <button class="btn-secondary" (click)="prevStep()">← Atrás</button>
-        <div style="display: flex; gap: 1rem;">
+
+      <div class="panel-nav-actions">
+        <button class="btn-secondary" (click)="prevStep()">← Volver a la Suite</button>
+        <div class="panel-forward-actions">
           <button class="btn-outline" (click)="skipStep(2)">Continuar sin extras →</button>
-          <button class="btn-primary" (click)="nextStep()">Continuar →</button>
+          <button class="btn-primary" (click)="nextStep()">Continuar a Servicios VIP →</button>
         </div>
       </div>
     </div>
 
-    <!-- PANEL 3: VIP Services -->
+    <!-- PANEL 3: SERVICIOS VIP -->
     <div class="panel" *ngIf="step === 3">
-      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 0.5rem;">Servicios VIP</h2>
-      <p style="text-align: center; color: rgba(245,240,232,0.7); font-size: 0.95rem; margin-bottom: 2rem;">Servicios y comodidades 100% opcionales</p>
-      
-      <div class="card" style="margin-bottom: 2rem;">
-        <div class="flex-between">
-          <div>
-            <h3 style="margin: 0 0 0.5rem 0;">🚗 Recogida en el Aeropuerto</h3>
-            <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Servicio de transporte privado desde el aeropuerto hasta tu suite.</p>
-          </div>
-          <div style="text-align: right;">
-            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ {{ 150000 | number:'1.0-0' }}</div>
-            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-              <input type="checkbox" [(ngModel)]="airportPickup" style="width: 20px; height: 20px; accent-color: var(--gold);">
-              <span>Agregar</span>
-            </label>
-          </div>
-        </div>
+      <div class="panel-header-centered">
+        <h2 class="panel-title">Servicios VIP & Gastronomía</h2>
+        <p class="panel-subtitle">Atención personalizada para que tu llegada y estadía sean perfectas</p>
       </div>
 
-      <div class="card">
-        <div class="flex-between" style="margin-bottom: 1.5rem;">
-          <div>
-            <h3 style="margin: 0 0 0.5rem 0;">🍽️ Comida Personalizada</h3>
-            <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Selecciona tu almuerzo y disfruta de los mejores platillos.</p>
+      <div class="vip-cards-container">
+        <!-- Recogida Aeropuerto -->
+        <div class="vip-card" [class.active]="airportPickup">
+          <div class="vip-info">
+            <div class="vip-icon-box">
+              <svg class="vip-svg" viewBox="0 0 24 24"><path fill="currentColor" d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.85 7h10.29l1.08 3.11H5.77L6.85 7zM19 17H5v-4.66l.12-.34h13.77l.11.34V17z"/></svg>
+            </div>
+            <div>
+              <h3 class="vip-title">Traslado Privado desde el Aeropuerto</h3>
+              <p class="vip-desc">Vehículo ejecutivo climatizado directo desde el Aeropuerto Rafael Núñez hasta la puerta de tu suite.</p>
+            </div>
           </div>
-          <div style="text-align: right;">
-            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ {{ 80000 | number:'1.0-0' }}</div>
-            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-              <input type="checkbox" [(ngModel)]="wantFood" style="width: 20px; height: 20px; accent-color: var(--gold);">
-              <span>Agregar Comida</span>
+          <div class="vip-action">
+            <span class="vip-price">+ $ 150.000 <span class="vip-price-unit">COP</span></span>
+            <label class="custom-toggle">
+              <input type="checkbox" [(ngModel)]="airportPickup" class="toggle-input">
+              <span class="toggle-slider"></span>
             </label>
           </div>
         </div>
 
-        <div *ngIf="wantFood" style="background: rgba(0,0,0,0.3); padding: 1.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-          <label style="display: block; color: var(--gold); margin-bottom: 0.5rem;">Elige tu platillo principal:</label>
-          <select [(ngModel)]="foodType" class="form-control" style="margin-bottom: 1rem;">
-            <option value="">-- Seleccionar --</option>
+        <!-- Comida Personalizada -->
+        <div class="vip-card" [class.active]="wantFood">
+          <div class="vip-info">
+            <div class="vip-icon-box">
+              <svg class="vip-svg" viewBox="0 0 24 24"><path fill="currentColor" d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>
+            </div>
+            <div>
+              <h3 class="vip-title">Menú de Almuerzo & Cena Gourmet</h3>
+              <p class="vip-desc">Platillos caribeños preparados al momento por nuestros chefs colaboradores.</p>
+            </div>
+          </div>
+          <div class="vip-action">
+            <span class="vip-price">+ $ 80.000 <span class="vip-price-unit">COP</span></span>
+            <label class="custom-toggle">
+              <input type="checkbox" [(ngModel)]="wantFood" class="toggle-input">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Opciones de comida si activa -->
+        <div *ngIf="wantFood" class="food-selection-box">
+          <label class="form-label">Elige tu plato principal:</label>
+          <select [(ngModel)]="foodType" class="form-control">
+            <option value="">-- Seleccionar plato --</option>
             <option *ngFor="let opt of foodOptions" [value]="opt.id">{{opt.name}}</option>
           </select>
 
-          <div *ngIf="foodType === 'other'" style="margin-bottom: 1rem;">
-            <textarea [(ngModel)]="customFood" placeholder="Escribe tu platillo detalladamente..." class="form-control" rows="3"></textarea>
+          <div *ngIf="foodType === 'other'" class="custom-food-group">
+            <textarea [(ngModel)]="customFood" placeholder="Describe tus preferencias o alergias..." class="form-control" rows="3"></textarea>
           </div>
 
-          <div *ngIf="foodType" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed rgba(212,175,55,0.3);">
-            <div class="flex-between">
-              <div>
-                <strong style="color: var(--gold);">☕ Combo Desayuno Gourmet</strong>
-                <p style="font-size: 0.85rem; color: #aaa; margin: 0.3rem 0 0 0;">Añade el desayuno tradicional cartagenero en tu suite por una tarifa preferencial.</p>
-              </div>
-              <div style="text-align: right;">
-                <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ {{ 35000 | number:'1.0-0' }}</div>
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; justify-content: flex-end;">
-                  <input type="checkbox" [(ngModel)]="breakfastCombo" style="width: 18px; height: 18px; accent-color: var(--gold);">
-                  <span>Añadir</span>
-                </label>
-              </div>
+          <div *ngIf="foodType" class="breakfast-addon-row">
+            <div>
+              <strong class="addon-title">☕ Combo Desayuno Típico Cartagenero</strong>
+              <p class="addon-desc">Frutas tropicales, arepa de huevo artesanal, café de origen y jugo recién exprimido.</p>
+            </div>
+            <div class="addon-action">
+              <span class="addon-price">+ $ 35.000 COP</span>
+              <label class="custom-toggle">
+                <input type="checkbox" [(ngModel)]="breakfastCombo" class="toggle-input">
+                <span class="toggle-slider"></span>
+              </label>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="flex-between" style="margin-top: 3rem;">
-        <button class="btn-secondary" (click)="prevStep()">← Atrás</button>
-        <div style="display: flex; gap: 1rem;">
-          <button class="btn-outline" (click)="skipStep(3)">Continuar sin extras →</button>
-          <button class="btn-primary" (click)="nextStep()">Continuar →</button>
+      <div class="panel-nav-actions">
+        <button class="btn-secondary" (click)="prevStep()">← Volver a Experiencias</button>
+        <div class="panel-forward-actions">
+          <button class="btn-outline" (click)="skipStep(3)">Continuar sin servicios VIP →</button>
+          <button class="btn-primary" (click)="nextStep()">Continuar al Resumen →</button>
         </div>
       </div>
     </div>
 
-    <!-- PANEL 4: Summary & Payment Redirect -->
+    <!-- PANEL 4: RESUMEN Y PROCEDER AL PAGO -->
     <div class="panel" *ngIf="step === 4">
-      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 2rem;">Resumen de tu Reserva</h2>
-      
-      <div style="max-width: 800px; margin: 0 auto;">
-        
-        <!-- Detailed Itemized Summary -->
-        <div class="card" style="margin-bottom: 2rem;">
-          <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1.25rem; font-size: 1.3rem;">Desglose de tu Estadía</h3>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-            <div>
-              <span style="color: #888; font-size: 0.8rem; text-transform: uppercase;">Alojamiento</span>
-              <p style="margin: 4px 0 0 0; color: #fff; font-weight: 600;">{{suite.name}}</p>
-              <p style="margin: 2px 0 0 0; color: #aaa; font-size: 0.85rem;">{{suite.type}}</p>
+      <div class="panel-header-centered">
+        <h2 class="panel-title">Resumen de tu Reserva</h2>
+        <p class="panel-subtitle">Revisa todos los detalles antes de proceder al pago seguro</p>
+      </div>
+
+      <div class="summary-container">
+        <div class="summary-card">
+          <!-- Banner de Suite y Fechas -->
+          <div class="summary-meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">Suite Seleccionada</span>
+              <p class="meta-val-primary">{{suite.name}}</p>
+              <p class="meta-val-sub">{{suite.type}} · {{suite.size || 65}} m²</p>
             </div>
-            <div>
-              <span style="color: #888; font-size: 0.8rem; text-transform: uppercase;">Itinerario</span>
-              <p style="margin: 4px 0 0 0; color: #fff; font-weight: 600;">{{checkIn}} al {{checkOut}}</p>
-              <p style="margin: 2px 0 0 0; color: #aaa; font-size: 0.85rem;">{{nights}} {{ nights === 1 ? 'noche' : 'noches' }} · {{guests}} {{ guests === 1 ? 'huésped' : 'huéspedes' }}</p>
+            <div class="meta-item">
+              <span class="meta-label">Itinerario de Estancia</span>
+              <p class="meta-val-primary">{{checkIn}} al {{checkOut}}</p>
+              <p class="meta-val-sub">{{nights}} {{ nights === 1 ? 'noche' : 'noches' }} · {{guests}} {{ guests === 1 ? 'huésped' : 'huéspedes' }}</p>
             </div>
           </div>
 
-          <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem; color: #ddd; margin-bottom: 1.5rem;">
+          <!-- Tabla de Desglose de Precios -->
+          <table class="summary-table">
             <tbody>
-              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                <td style="padding: 10px 0;">Estadía base ({{nights}} noches):</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{totalRoomPrice | number:'1.0-0'}}</td>
+              <tr>
+                <td>Estadía base ({{nights}} noches):</td>
+                <td class="text-right">$ {{totalRoomPrice | number:'1.0-0'}} COP</td>
               </tr>
-              <tr *ngFor="let item of selectedExperiences" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                <td style="padding: 10px 0;">
-                  {{item.exp.name}} <span style="color: var(--gold); font-size: 0.85rem;">(x{{item.qty}})</span>:
-                </td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{(item.exp.price * item.qty) | number:'1.0-0'}}</td>
+              <tr *ngFor="let item of selectedExperiences">
+                <td>{{item.exp.name}} <span class="exp-qty-tag">(x{{item.qty}})</span>:</td>
+                <td class="text-right">$ {{(item.exp.price * item.qty) | number:'1.0-0'}} COP</td>
               </tr>
-              <tr *ngIf="airportPickup" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                <td style="padding: 10px 0;">Traslado Privado Aeropuerto:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{150000 | number:'1.0-0'}}</td>
+              <tr *ngIf="airportPickup">
+                <td>Traslado Privado Aeropuerto:</td>
+                <td class="text-right">$ {{150000 | number:'1.0-0'}} COP</td>
               </tr>
-              <tr *ngIf="petFriendly" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                <td style="padding: 10px 0;">Tarifa Pet-Friendly:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{80000 | number:'1.0-0'}}</td>
+              <tr *ngIf="petFriendly">
+                <td>Tarifa Pet-Friendly:</td>
+                <td class="text-right">$ {{80000 | number:'1.0-0'}} COP</td>
               </tr>
-              <tr *ngIf="wantFood" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                <td style="padding: 10px 0;">Comida Gourmet:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{80000 | number:'1.0-0'}}</td>
+              <tr *ngIf="wantFood">
+                <td>Comida Gourmet:</td>
+                <td class="text-right">$ {{80000 | number:'1.0-0'}} COP</td>
               </tr>
-              <tr *ngIf="breakfastCombo" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                <td style="padding: 10px 0;">Combo Desayuno Tradicional:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{35000 | number:'1.0-0'}}</td>
+              <tr *ngIf="breakfastCombo">
+                <td>Combo Desayuno Tradicional:</td>
+                <td class="text-right">$ {{35000 | number:'1.0-0'}} COP</td>
               </tr>
-              <tr *ngIf="extraGuestsFee > 0" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                <td style="padding: 10px 0;">Huéspedes adicionales:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{extraGuestsFee | number:'1.0-0'}}</td>
+              <tr *ngIf="extraGuestsFee > 0">
+                <td>Huéspedes adicionales:</td>
+                <td class="text-right">$ {{extraGuestsFee | number:'1.0-0'}} COP</td>
               </tr>
-              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                <td style="padding: 10px 0; color: #aaa;">Depósito de Garantía (100% reembolsable):</td>
-                <td style="text-align: right; padding: 10px 0; color: #aaa;">$ {{guaranteeDeposit | number:'1.0-0'}}</td>
+              <tr class="guarantee-row">
+                <td>Depósito de Garantía (100% reembolsable al check-out):</td>
+                <td class="text-right text-muted">$ {{guaranteeDeposit | number:'1.0-0'}} COP</td>
               </tr>
             </tbody>
           </table>
 
-          <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem;">
-            <button class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 6px;" (click)="goToStep(1)">✏️ Modificar Fechas</button>
-            <button class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 6px;" (click)="goToStep(2)">✏️ Modificar Extras</button>
+          <!-- Acciones de edición rápida -->
+          <div class="summary-edit-links">
+            <button class="btn-edit" (click)="goToStep(1)">✏️ Modificar Fechas o Huéspedes</button>
+            <button class="btn-edit" (click)="goToStep(2)">✏️ Modificar Extras</button>
           </div>
 
-          <div style="padding-top: 1.25rem; border-top: 2px solid rgba(212,175,55,0.35); display: flex; justify-content: space-between; align-items: center; font-size: 1.35rem; font-weight: bold;">
-            <span style="color: #fff;">Total a Pagar:</span>
-            <span style="color: var(--gold); font-size: 1.5rem;">$ {{grandTotal | number:'1.0-0'}}</span>
+          <!-- Total Final -->
+          <div class="summary-total-banner">
+            <span class="total-caption">Total a Pagar:</span>
+            <span class="total-figure">$ {{grandTotal | number:'1.0-0'}} <span class="total-currency">COP</span></span>
           </div>
-          <p style="color: #888; font-size: 0.8rem; margin: 0.75rem 0 0 0; text-align: center;">El depósito de garantía se reintegra automáticamente al finalizar tu estadía tras la inspección.</p>
         </div>
 
-        <!-- Auth Check & Redirect -->
-
-        <div class="card" style="text-align: center;">
+        <!-- Formulario / Botón de Pago -->
+        <div class="checkout-action-card">
           <div *ngIf="!auth.isLoggedIn()">
-            <h3 style="margin-top: 0; color: #ff4d4d;">Requiere Iniciar Sesión</h3>
-            <p style="color: #ccc; font-size: 0.95rem; margin-bottom: 1.5rem;">Para confirmar tu reserva y proceder al pago, debes tener una cuenta.</p>
-            <button class="btn-primary" style="width: 100%; max-width: 300px;" (click)="openAuth()">Iniciar Sesión / Registrarse</button>
+            <h3 class="auth-required-title">Inicia Sesión para Confirmar</h3>
+            <p class="auth-required-desc">Para vincular tu reserva, emitir tu comprobante con PIN inteligente y acceder a la suite, inicia sesión o crea tu cuenta.</p>
+            <button class="btn-primary btn-auth-trigger" (click)="openAuth()">Iniciar Sesión / Registrarse</button>
           </div>
+
           <div *ngIf="auth.isLoggedIn()">
-            <div *ngIf="isCorporateRole(); else normalGuestPay" style="background: rgba(226, 201, 155, 0.08); border: 1px solid rgba(226, 201, 155, 0.3); border-radius: 12px; padding: 1.5rem; text-align: center; max-width: 500px; margin: 0 auto;">
-              <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🏢</div>
-              <h3 style="color: var(--gold); font-size: 1.25rem; margin-top: 0; margin-bottom: 0.75rem;">Perfil Corporativo</h3>
-              <p style="color: #ccc; font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.25rem;">
-                Las cuentas de Anfitrión y Administrador tienen un perfil corporativo para gestión y no pueden realizar reservas de hospedaje. Para reservar suites, utiliza una cuenta de huésped.
-              </p>
-              <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                <a *ngIf="isHost()" routerLink="/anfitrion" class="btn-primary" style="padding: 10px 20px; text-decoration: none; font-size: 0.9rem;">
-                  Ir a Panel Anfitrión
-                </a>
-                <a *ngIf="isAdmin()" routerLink="/admin" class="btn-primary" style="padding: 10px 20px; text-decoration: none; font-size: 0.9rem;">
-                  Ir a Panel Administrador
-                </a>
+            <div *ngIf="isCorporateRole(); else normalGuestPay" class="corporate-warning">
+              <div class="corp-icon">🏢</div>
+              <h3 class="corp-title">Perfil Corporativo</h3>
+              <p class="corp-desc">Las cuentas de Anfitrión y Administrador no pueden realizar reservas de hospedaje. Para reservar, utiliza una cuenta de huésped.</p>
+              <div class="corp-btns">
+                <a *ngIf="isHost()" routerLink="/anfitrion" class="btn-primary">Ir a Panel Anfitrión</a>
+                <a *ngIf="isAdmin()" routerLink="/admin" class="btn-primary">Ir a Panel Administrador</a>
               </div>
             </div>
+
             <ng-template #normalGuestPay>
-              <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1rem;">Proceder al Pago Seguro</h3>
-              <p style="color: #ccc; font-size: 0.95rem; margin-bottom: 1.5rem;">Al continuar, se registrará tu reserva y serás redirigido a nuestro Centro de Pago seguro para completarla.</p>
-              <p *ngIf="message" role="alert" aria-live="assertive" [style.color]="isError ? '#ff4d4d' : 'var(--gold)'" style="font-size: 0.9rem; margin-bottom: 1rem;">{{message}}</p>
-              <button class="btn-primary" style="width: 100%; max-width: 300px; font-size: 1.1rem; padding: 1rem;" (click)="createBooking()" [disabled]="bookingBusy">
-                {{ bookingBusy ? 'Creando Reserva...' : 'Pagar →' }}
+              <h3 class="pay-ready-title">Confirmar y Proceder al Pago</h3>
+              <p class="pay-ready-desc">Al hacer clic en pagar, tu reserva quedará bloqueada en inventario de forma segura y pasarás a la pasarela de pago.</p>
+              <p *ngIf="message" role="alert" aria-live="assertive" [class.error]="isError" class="booking-msg">{{message}}</p>
+              <button class="btn-primary btn-confirm-pay" (click)="createBooking()" [disabled]="bookingBusy">
+                {{ bookingBusy ? 'Procesando Reserva...' : 'Pagar Ahora ($ ' + (grandTotal | number:'1.0-0') + ' COP) →' }}
               </button>
             </ng-template>
           </div>
         </div>
-        
-        <div style="text-align: center; margin-top: 2rem;">
-           <button class="btn-secondary" (click)="prevStep()">← Atrás</button>
-        </div>
 
-        <!-- Nota de proceso de pago -->
-        <div style="margin-top: 3rem; text-align: center; border-top: 1px solid rgba(212,175,55,0.15); padding-top: 2rem;">
-          <p style="color: #888; font-size: 0.8rem; margin: 0;">
-            El pago se procesa con la pasarela en modo demostración del marketplace. El precio final lo confirma el sistema al crear la reserva.
-          </p>
+        <div class="summary-back-row">
+          <button class="btn-secondary" (click)="prevStep()">← Volver al paso anterior</button>
         </div>
       </div>
     </div>
   </div>
+
   <app-auth-modal [isOpen]="authModalOpen" [initialMode]="authMode" (closeEvent)="onAuthClose()"></app-auth-modal>
 </div>
