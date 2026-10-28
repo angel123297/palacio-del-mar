@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /anfitrion
+Disallow: /admin
+Disallow: /checkout/
+Disallow: /reservas/
+Disallow: /perfil
+
+Sitemap: https://rehab-perceive-landline.ngrok-free.dev/sitemap.xml
