@@ -116,7 +116,7 @@ import { Booking } from '../../models/types';
               Check-out procesado exitosamente. La cerradura inteligente ha sido deshabilitada.
             </p>
             <p style="color: #2ecc71; margin: 0.3rem 0; font-size: 0.9rem;" *ngIf="booking.guaranteeRefunded">
-              🛡️ {{ isGuestOwner ? 'Tu depósito de garantía de $' : 'Depósito de garantía de $' }} {{ (booking.guaranteeDeposit || 150000) | number:'1.0-0' }} COP {{ isGuestOwner ? 'fue liberado y reembolsado sin novedades.' : 'fue liberado y reembolsado al huésped.' }}
+              🛡️ {{ isGuestOwner ? 'Tu depósito de garantía de $' : 'Depósito de garantía de $' }} {{ (booking.guaranteeDeposit || 100000) | number:'1.0-0' }} COP {{ isGuestOwner ? 'fue liberado y reembolsado sin novedades.' : 'fue liberado y reembolsado al huésped.' }}
             </p>
           </div>
 

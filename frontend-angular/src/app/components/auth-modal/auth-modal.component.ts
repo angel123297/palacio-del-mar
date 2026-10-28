@@ -197,7 +197,7 @@ import { environment } from '../../../environments/environment';
         <form *ngIf="mode === 'forgot'" (ngSubmit)="submitForgot()" class="auth-form">
           <p class="modal-eyebrow" style="color: var(--gold); font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">Recuperar acceso</p>
           <h2 id="forgot-modal-title" class="modal-title" style="font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; margin: 0 0 1rem 0; color: #fff;">¿Olvidaste tu contraseña?</h2>
-          <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 1.5rem;">Escribe tu correo y te enviaremos una contraseña temporal a tu bandeja para ingresar de inmediato.</p>
+          <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 1.5rem;">Escribe tu correo y te enviaremos un enlace para restablecer tu contraseña a tu bandeja de entrada.</p>
 
           <div style="margin-bottom: 1.5rem;">
             <label for="auth-forgot-email" class="field-label">Correo electrónico</label>
@@ -205,7 +205,7 @@ import { environment } from '../../../environments/environment';
           </div>
 
           <button type="submit" class="btn-primary" [disabled]="busy" style="width: 100%; padding: 12px; font-size: 1rem;">
-            {{ busy ? 'Enviando contraseña…' : 'Enviar contraseña temporal' }}
+            {{ busy ? 'Enviando enlace…' : 'Enviar enlace de restablecimiento' }}
           </button>
 
           <p *ngIf="message" [attr.role]="sentForgot ? 'status' : 'alert'" aria-live="polite" [style.color]="sentForgot ? '#2ecc71' : '#ff4d4d'" [style.background]="sentForgot ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="sentForgot ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 10px 14px; border-radius: 6px; border-width: 1px; border-style: solid; display: flex; flex-direction: column; align-items: center; gap: 8px;">

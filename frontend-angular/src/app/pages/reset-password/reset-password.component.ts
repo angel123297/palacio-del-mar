@@ -29,8 +29,8 @@ export class ResetPasswordComponent implements OnInit {
 
   ngOnInit(): void {
     // Buscar token en params de ruta (/restablecer-contrasena/:token) o queryParams (?token=...)
-    const routeToken = this.route.snapshot.paramMap.get('token');
-    const queryToken = this.route.snapshot.queryParamMap.get('token');
+    const routeToken = this.route.snapshot?.paramMap?.get('token');
+    const queryToken = this.route.snapshot?.queryParamMap?.get('token');
     this.token = (routeToken || queryToken || '').trim();
 
     if (!this.token) {

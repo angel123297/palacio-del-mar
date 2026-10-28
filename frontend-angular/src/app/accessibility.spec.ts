@@ -1,3 +1,4 @@
+import { afterEach } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
@@ -11,6 +12,9 @@ import { ProfileComponent } from './pages/profile/profile';
 import { AuthService } from './services/auth.service';
 
 describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
   describe('App Root Landmarks & Bypass Blocks (WCAG 2.4.1)', () => {
     let fixture: ComponentFixture<App>;
     let compiled: HTMLElement;
