@@ -2,8 +2,8 @@ package co.palaciodelmar.backend.config;
 
 import co.palaciodelmar.backend.model.*;
 import co.palaciodelmar.backend.repository.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -14,7 +14,6 @@ import java.util.List;
 
 @Component
 @Slf4j
-@RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 
     private final BranchRepository branchRepository;
@@ -22,16 +21,32 @@ public class DataInitializer implements CommandLineRunner {
     private final ExperienceRepository experienceRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
-    private final PaymentRepository paymentRepository;
-    private final SuiteNightRepository suiteNightRepository;
     private final PropertyRepository propertyRepository;
     private final PasswordEncoder passwordEncoder;
+    private final String adminPassword;
+    private final boolean seedDemoData;
 
-    @org.springframework.beans.factory.annotation.Value("${admin.default.password:Admin123456!}")
-    private String adminPassword;
-
-    @org.springframework.beans.factory.annotation.Value("${app.seed-demo-data:false}")
-    private boolean seedDemoData;
+    public DataInitializer(
+            BranchRepository branchRepository,
+            SuiteRepository suiteRepository,
+            ExperienceRepository experienceRepository,
+            UserRepository userRepository,
+            BookingRepository bookingRepository,
+            PropertyRepository propertyRepository,
+            PasswordEncoder passwordEncoder,
+            @Value("${admin.default.password:Admin123456!}") String adminPassword,
+            @Value("${app.seed-demo-data:false}") boolean seedDemoData
+    ) {
+        this.branchRepository = branchRepository;
+        this.suiteRepository = suiteRepository;
+        this.experienceRepository = experienceRepository;
+        this.userRepository = userRepository;
+        this.bookingRepository = bookingRepository;
+        this.propertyRepository = propertyRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.adminPassword = adminPassword;
+        this.seedDemoData = seedDemoData;
+    }
 
     @Override
     public void run(String... args) {
