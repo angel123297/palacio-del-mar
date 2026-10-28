@@ -179,4 +179,89 @@ class PaymentServiceEdgeCasesTest {
         );
         assertEquals("La reserva ya ha sido pagada en su totalidad.", ex.getMessage());
     }
+
+    @Test
+    void testConfirmPaymentOnAlreadyCompletedIntentReturnsIdempotently() {
+        Booking booking = Booking.builder()
+                .id("book-paid")
+                .user("user-1")
+                .status("confirmed")
+                .totalPrice(new BigDecimal("1000"))
+                .paidAmount(new BigDecimal("1000"))
+                .balanceDue(BigDecimal.ZERO)
+                .paymentStatus("paid")
+                .build();
+
+        Payment completedPayment = Payment.builder()
+                .id("pay-done")
+                .booking("book-paid")
+                .user("user-1")
+                .amount(new BigDecimal("1000"))
+                .status("completed")
+                .intentId("intent-done")
+                .transactionId("tx-done-123")
+                .build();
+
+        when(paymentRepository.findByIntentId("intent-done")).thenReturn(Optional.of(completedPayment));
+        when(bookingRepository.findById("book-paid")).thenReturn(Optional.of(booking));
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment("user-1", "intent-done", "tok_4242");
+
+        assertEquals("completed", result.get("status"));
+        assertEquals("tx-done-123", result.get("transactionId"));
+        verify(paymentGateway, never()).confirmIntent(any(), any());
+    }
+
+    @Test
+    void testGetPaymentStatusBlocksUnauthenticatedAccessForRegisteredUser() {
+        Booking booking = Booking.builder()
+                .id("book-reg")
+                .user("user-owner-1")
+                .status("confirmed")
+                .build();
+        Payment registeredPayment = Payment.builder()
+                .id("pay-reg")
+                .booking("book-reg")
+                .user("user-owner-1")
+                .status("completed")
+                .intentId("intent-reg")
+                .build();
+        co.palaciodelmar.backend.model.User owner = co.palaciodelmar.backend.model.User.builder()
+                .id("user-owner-1")
+                .email("owner@palaciodelmar.co")
+                .password("$2a$10$hashbcrypt")
+                .build();
+
+        when(paymentRepository.findByIntentId("intent-reg")).thenReturn(Optional.of(registeredPayment));
+        when(bookingRepository.findById("book-reg")).thenReturn(Optional.of(booking));
+        when(userRepository.findById("user-owner-1")).thenReturn(Optional.of(owner));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                paymentService.getPaymentStatus("intent-reg", null)
+        );
+    }
+
+    @Test
+    void testCreatePaymentIntentBlocksUnauthenticatedIdempotencyReplayForRegisteredUser() {
+        Payment registeredPayment = Payment.builder()
+                .id("pay-idem")
+                .booking("book-idem")
+                .user("user-owner-1")
+                .status("pending")
+                .intentId("intent-idem")
+                .idempotencyKey("idem-key-secret")
+                .build();
+        co.palaciodelmar.backend.model.User owner = co.palaciodelmar.backend.model.User.builder()
+                .id("user-owner-1")
+                .email("owner@palaciodelmar.co")
+                .password("$2a$10$hashbcrypt")
+                .build();
+
+        when(paymentRepository.findByIdempotencyKey("idem-key-secret")).thenReturn(Optional.of(registeredPayment));
+        when(userRepository.findById("user-owner-1")).thenReturn(Optional.of(owner));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                paymentService.createPaymentIntent(null, "book-idem", "card", "idem-key-secret")
+        );
+    }
 }

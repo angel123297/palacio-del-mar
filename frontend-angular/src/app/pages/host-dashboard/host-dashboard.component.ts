@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, effect } from '@angular/core';
+import { Component, OnInit, inject, signal, effect, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -61,15 +61,20 @@ export interface HostPromotionItem {
                     class="px-4 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-1.5">
               <span>🔌</span> Integraciones & Modo Demostración
             </button>
+            <button (click)="activeTab.set('reviews'); fetchHostReviews();" role="tab" [attr.aria-selected]="activeTab() === 'reviews'" tabindex="0" 
+                    [ngClass]="activeTab() === 'reviews' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-4 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-1.5">
+              <span>⭐</span> Reseñas de Huéspedes
+            </button>
           </div>
         </div>
 
         <!-- Toast Feedback Banner -->
-        <div *ngIf="actionMessage()" class="mb-6 p-4 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded-lg text-sm flex items-center justify-between">
+        <div *ngIf="actionMessage()" role="status" aria-live="polite" class="mb-6 p-4 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded-lg text-sm flex items-center justify-between">
           <span>✔ {{ actionMessage() }}</span>
           <button (click)="actionMessage.set('')" class="text-xs opacity-70 hover:opacity-100">✕</button>
         </div>
-        <div *ngIf="actionError()" class="mb-6 p-4 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded-lg text-sm flex items-center justify-between">
+        <div *ngIf="actionError()" role="alert" aria-live="assertive" class="mb-6 p-4 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded-lg text-sm flex items-center justify-between">
           <span>✖ {{ actionError() }}</span>
           <button (click)="actionError.set('')" class="text-xs opacity-70 hover:opacity-100">✕</button>
         </div>
@@ -170,7 +175,7 @@ export interface HostPromotionItem {
                     <td colspan="7" class="py-12 text-center text-[#f5f0e8] text-sm">
                       <div class="flex flex-col items-center justify-center gap-3">
                         <p class="opacity-70">No hay reservas recientes para tus alojamientos.</p>
-                        <button type="button" (click)="activeTab.set('properties')" class="min-h-[38px] px-4 py-2 bg-[rgba(201,169,110,0.15)] hover:bg-[rgba(201,169,110,0.3)] text-[#c9a96e] border border-[rgba(201,169,110,0.4)] rounded-md text-xs font-semibold uppercase tracking-wider transition cursor-pointer">
+                        <button type="button" (click)="activeTab.set('properties')" class="min-h-[44px] px-4 py-2 bg-[rgba(201,169,110,0.15)] hover:bg-[rgba(201,169,110,0.3)] text-[#c9a96e] border border-[rgba(201,169,110,0.4)] rounded-md text-xs font-semibold uppercase tracking-wider transition cursor-pointer">
                           Publicar o Gestionar Alojamientos &rarr;
                         </button>
                       </div>
@@ -204,7 +209,7 @@ export interface HostPromotionItem {
                 <p class="text-xs text-[#f5f0e8] opacity-80">Para crear promociones estacionales y cupones de descuento, primero registra tu propiedad.</p>
               </div>
             </div>
-            <button type="button" (click)="activeTab.set('properties')" class="min-h-[40px] px-4 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider rounded-md whitespace-nowrap cursor-pointer">
+            <button type="button" (click)="activeTab.set('properties')" class="min-h-[44px] px-4 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider rounded-md whitespace-nowrap cursor-pointer">
               Registrar mi Alojamiento &rarr;
             </button>
           </div>
@@ -525,7 +530,7 @@ export interface HostPromotionItem {
                     </div>
 
                     <div class="flex justify-end pt-2">
-                      <button type="submit" [disabled]="submittingSuite" class="min-h-[40px] px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded uppercase tracking-wider text-xs transition duration-200 cursor-pointer">
+                      <button type="submit" [disabled]="submittingSuite" class="min-h-[44px] px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded uppercase tracking-wider text-xs transition duration-200 cursor-pointer">
                         {{ submittingSuite ? 'Guardando...' : '➕ Guardar Habitación' }}
                       </button>
                     </div>
@@ -1033,7 +1038,7 @@ export interface HostPromotionItem {
                     <label for="host-bank-holder" class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Titular / NIT *</label>
                     <input id="host-bank-holder" type="text" [(ngModel)]="bankAccount.holderName" name="holderName" required placeholder="Nombre o Razón Social" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded-md px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#c9a96e]">
                   </div>
-                  <button type="submit" class="px-5 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md text-xs uppercase tracking-wider transition cursor-pointer min-h-[40px] flex items-center justify-center">
+                  <button type="submit" class="px-5 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-md text-xs uppercase tracking-wider transition cursor-pointer min-h-[44px] flex items-center justify-center">
                     Guardar
                   </button>
                 </div>
@@ -1064,6 +1069,7 @@ export interface HostPromotionItem {
                       <th class="p-4 text-right">Total Bruto</th>
                       <th class="p-4 text-right">Comisión Plataforma (8%)</th>
                       <th class="p-4 text-right font-bold text-[#2ecc71]">Neto a Desembolsar (92%)</th>
+                      <th class="p-4">Cuenta Destino</th>
                       <th class="p-4 text-center">Estado</th>
                       <th class="p-4">Fecha Proceso</th>
                     </tr>
@@ -1077,6 +1083,7 @@ export interface HostPromotionItem {
                       <td class="p-4 text-right">$ {{ (p.grossTotal || 0) | number:'1.0-0' }}</td>
                       <td class="p-4 text-right text-[#e74c3c]">-$ {{ (p.platformFee || 0) | number:'1.0-0' }}</td>
                       <td class="p-4 text-right font-bold text-[#2ecc71] text-sm">$ {{ (p.netAmount || 0) | number:'1.0-0' }}</td>
+                      <td class="p-4 text-xs font-mono text-[#c9a96e]">{{ p.destinationBank ? (p.destinationBank + ' ' + (p.destinationAccountMasked || '')) : 'ACH Bancario' }}</td>
                       <td class="p-4 text-center">
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border border-[rgba(46,204,113,0.3)]">
                           {{ p.status }}
@@ -1086,6 +1093,55 @@ export interface HostPromotionItem {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- ==================== TAB 7: RESEÑAS DE HUÉSPEDES ==================== -->
+        <ng-container *ngIf="activeTab() === 'reviews'">
+          <div class="space-y-6">
+            <div class="bg-[#141414] border border-[rgba(201,169,110,0.3)] rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 class="text-xl font-bold text-[#c9a96e] mb-1">Opiniones y Calificaciones de tus Huéspedes</h3>
+                <p class="text-xs text-[#f5f0e8] opacity-75">Reseñas auténticas de huéspedes tras completar su estancia en tus suites.</p>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="bg-[rgba(201,169,110,0.12)] border border-[rgba(201,169,110,0.3)] px-4 py-2 rounded-lg flex items-center gap-2">
+                  <span class="text-[#f1c40f] text-lg">★</span>
+                  <span class="text-base font-bold text-white">{{ hostAverageRating() }} / 5</span>
+                  <span class="text-xs opacity-75">({{ hostReviews().length }} reseñas)</span>
+                </div>
+                <button (click)="fetchHostReviews()" class="min-h-[44px] px-4 py-2 bg-[#c9a96e] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider rounded-md hover:bg-[#d8b87d] transition cursor-pointer">
+                  Actualizar Reseñas
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-[#141414] border border-[rgba(255,255,255,0.08)] rounded-xl p-6">
+              <div *ngIf="loadingReviews()" class="p-12 text-center text-[#f5f0e8] opacity-60 text-sm">
+                Cargando reseñas de tus alojamientos...
+              </div>
+
+              <div *ngIf="!loadingReviews() && hostReviews().length === 0" class="p-12 text-center text-[#f5f0e8] opacity-60 text-sm">
+                No hay reseñas registradas aún para tus alojamientos. Las opiniones aparecerán aquí una vez tus huéspedes completen el check-out y califiquen su estadía.
+              </div>
+
+              <div *ngIf="!loadingReviews() && hostReviews().length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div *ngFor="let r of hostReviews()" class="bg-[#1a1a1a] border border-[rgba(201,169,110,0.2)] rounded-lg p-5 flex flex-col justify-between">
+                  <div>
+                    <div class="flex justify-between items-start mb-2">
+                      <span class="font-bold text-white text-sm">{{ r.userName || 'Huésped' }}</span>
+                      <span class="text-[#f1c40f] text-xs">{{ '★'.repeat(r.rating || 5) }}</span>
+                    </div>
+                    <p class="text-xs text-[#c9a96e] mb-3 font-semibold">{{ r.suiteName || 'Alojamiento' }}</p>
+                    <p class="text-xs text-[#f5f0e8] opacity-80 leading-relaxed italic mb-4">"{{ r.comment }}"</p>
+                  </div>
+                  <div class="flex justify-between items-center text-[10px] text-[#2ecc71] border-t border-[rgba(255,255,255,0.05)] pt-3">
+                    <span>✓ Estadía verificada</span>
+                    <span class="text-[#f5f0e8] opacity-50">{{ r.createdAt | date:'shortDate' }}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1110,7 +1166,7 @@ export class HostDashboardComponent implements OnInit {
     });
   }
   
-  activeTab = signal<'properties' | 'bookings' | 'payouts' | 'promotions' | 'integrations' | 'webhooks' | 'apikeys'>('properties');
+  activeTab = signal<'properties' | 'bookings' | 'payouts' | 'promotions' | 'integrations' | 'webhooks' | 'apikeys' | 'reviews'>('properties');
   integrationSubTab = signal<'webhooks' | 'pms'>('webhooks');
   expandedDeliveryIds = signal<Set<string>>(new Set());
 
@@ -1173,6 +1229,14 @@ export class HostDashboardComponent implements OnInit {
   demoEvents = signal<any[]>([]);
   demoSimulateFailure = signal<boolean>(false);
   payouts = signal<any[]>([]);
+  hostReviews = signal<any[]>([]);
+  loadingReviews = signal<boolean>(false);
+  hostAverageRating = computed(() => {
+    const revs = this.hostReviews();
+    if (!revs.length) return 5.0;
+    const sum = revs.reduce((acc, r) => acc + (r.rating || 5), 0);
+    return Number((sum / revs.length).toFixed(1));
+  });
   loading = signal(true);
   actionMessage = signal<string>('');
   actionError = signal<string>('');
@@ -1184,6 +1248,21 @@ export class HostDashboardComponent implements OnInit {
         this.payouts.set(Array.isArray(data) ? data : []);
       },
       error: () => this.payouts.set([])
+    });
+  }
+
+  fetchHostReviews(): void {
+    this.loadingReviews.set(true);
+    this.api.get<ApiResponse<any[]>>('/host/properties/reviews').subscribe({
+      next: (res) => {
+        const list = res?.data || (res as any) || [];
+        this.hostReviews.set(Array.isArray(list) ? list : []);
+        this.loadingReviews.set(false);
+      },
+      error: () => {
+        this.hostReviews.set([]);
+        this.loadingReviews.set(false);
+      }
     });
   }
 
@@ -1250,12 +1329,44 @@ export class HostDashboardComponent implements OnInit {
     holderName: ''
   };
 
+  fetchBankAccount() {
+    this.api.get<ApiResponse<any>>('/host/bank-account').subscribe({
+      next: (res) => {
+        const d = res?.data || res;
+        if (d) {
+          this.bankAccount = {
+            bankName: d.bankName || 'Bancolombia',
+            accountType: d.accountType || 'Ahorros',
+            accountNumber: d.accountNumberMasked || d.accountNumber || '',
+            holderName: d.holderName || ''
+          };
+        }
+      },
+      error: () => {}
+    });
+  }
+
   saveBankAccount() {
-    try {
-      localStorage.setItem('pdm_host_bank_account', JSON.stringify(this.bankAccount));
-    } catch {}
-    this.actionMessage.set(`Datos bancarios actualizados (${this.bankAccount.bankName} - ${this.bankAccount.accountType} ${this.bankAccount.accountNumber}).`);
-    setTimeout(() => this.actionMessage.set(''), 4000);
+    this.api.put<ApiResponse<any>>('/host/bank-account', this.bankAccount).subscribe({
+      next: (res) => {
+        const d = res?.data || res;
+        if (d) {
+          this.bankAccount = {
+            bankName: d.bankName || this.bankAccount.bankName,
+            accountType: d.accountType || this.bankAccount.accountType,
+            accountNumber: d.accountNumberMasked || d.accountNumber || this.bankAccount.accountNumber,
+            holderName: d.holderName || this.bankAccount.holderName
+          };
+        }
+        this.actionMessage.set('Datos bancarios guardados exitosamente en el servidor.');
+        setTimeout(() => this.actionMessage.set(''), 4000);
+      },
+      error: (err) => {
+        const msg = err?.error?.message || 'Error al guardar los datos bancarios.';
+        this.actionMessage.set(msg);
+        setTimeout(() => this.actionMessage.set(''), 4000);
+      }
+    });
   }
 
   getBookingStatusLabel(b: Booking): string {
@@ -1324,12 +1435,7 @@ export class HostDashboardComponent implements OnInit {
   };
 
   ngOnInit(): void {
-    try {
-      const savedBank = localStorage.getItem('pdm_host_bank_account');
-      if (savedBank) {
-        this.bankAccount = { ...this.bankAccount, ...JSON.parse(savedBank) };
-      }
-    } catch {}
+    this.fetchBankAccount();
     this.fetchMetrics();
     this.fetchBookings();
     this.fetchPromotions();
@@ -1338,6 +1444,7 @@ export class HostDashboardComponent implements OnInit {
     this.fetchDeliveries();
     this.fetchDemoFailureStatus();
     this.fetchApiKeys();
+    this.fetchHostReviews();
   }
 
   fetchApiKeys() {

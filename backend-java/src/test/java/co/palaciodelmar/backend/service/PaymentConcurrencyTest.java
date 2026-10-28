@@ -87,7 +87,9 @@ class PaymentConcurrencyTest {
         );
 
         assertEquals("Conflicto al procesar el pago. La reserva fue modificada o cancelada simultáneamente.", ex.getMessage());
-        assertEquals("failed", payment.getStatus());
+        assertEquals("requires_refund", payment.getStatus());
+        assertEquals("tx-999", payment.getTransactionId());
+        verify(paymentGateway).refund("tx-999", new BigDecimal("500000"));
         verify(paymentRepository).save(payment);
     }
 }

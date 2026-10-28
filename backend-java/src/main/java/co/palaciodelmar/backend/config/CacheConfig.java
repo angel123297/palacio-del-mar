@@ -2,14 +2,19 @@ package co.palaciodelmar.backend.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.Cache;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 @Slf4j
 @Configuration
@@ -48,7 +53,34 @@ public class CacheConfig implements CachingConfigurer {
     @ConditionalOnClass(RedisCacheConfiguration.class)
     public RedisCacheConfiguration defaultRedisCacheConfiguration() {
         return RedisCacheConfiguration.defaultCacheConfig()
+                .prefixCacheNameWith("palacio:cache:")
                 .entryTtl(Duration.ofMinutes(15))
                 .disableCachingNullValues();
+    }
+
+    /**
+     * Pilar 6 Redis: Gestor de caché multi-TTL especializado por volatilidad de dominio.
+     * Solo se activa cuando spring.cache.type=redis (producción/Docker), preservando el caché
+     * simple en memoria para suites de pruebas sin servidor Redis.
+     */
+    @Bean
+    @ConditionalOnClass(RedisCacheManager.class)
+    @ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis")
+    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+        RedisCacheConfiguration defaults = defaultRedisCacheConfiguration();
+
+        Map<String, RedisCacheConfiguration> perCacheConfig = new HashMap<>();
+        perCacheConfig.put("availability_monthly", defaults.entryTtl(Duration.ofMinutes(3)));
+        perCacheConfig.put("availability_search", defaults.entryTtl(Duration.ofMinutes(2)));
+        perCacheConfig.put("dynamic_pricing", defaults.entryTtl(Duration.ofMinutes(3)));
+        perCacheConfig.put("suites", defaults.entryTtl(Duration.ofMinutes(15)));
+        perCacheConfig.put("suite_detail", defaults.entryTtl(Duration.ofMinutes(15)));
+        perCacheConfig.put("suite_types", defaults.entryTtl(Duration.ofMinutes(30)));
+
+        return RedisCacheManager.builder(connectionFactory)
+                .cacheDefaults(defaults)
+                .withInitialCacheConfigurations(perCacheConfig)
+                .transactionAware()
+                .build();
     }
 }

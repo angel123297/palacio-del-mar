@@ -18,14 +18,14 @@
   </div>
 
   <div *ngIf="!loading && suite && !isOwnSuite">
-    <div *ngIf="availabilityConflict" style="background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.4); color: #e74c3c; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem;">
+    <div *ngIf="availabilityConflict" role="alert" aria-live="assertive" style="background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.4); color: #e74c3c; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem;">
       {{ availabilityConflict }}
     </div>
     <div class="step-indicator" role="progressbar" [attr.aria-valuenow]="step" aria-valuemin="1" aria-valuemax="4" aria-label="Progreso de la reserva">
       <div class="step-item" [class.active]="step === 1" [class.completed]="step > 1" [attr.aria-current]="step === 1 ? 'step' : null">1. Detalles</div>
       <div class="step-item" [class.active]="step === 2" [class.completed]="step > 2" [attr.aria-current]="step === 2 ? 'step' : null">2. Experiencias</div>
       <div class="step-item" [class.active]="step === 3" [class.completed]="step > 3" [attr.aria-current]="step === 3 ? 'step' : null">3. VIP & Comida</div>
-      <div class="step-item" [class.active]="step === 4" [attr.aria-current]="step === 4 ? 'step' : null">4. Pago</div>
+      <div class="step-item" [class.active]="step === 4" [attr.aria-current]="step === 4 ? 'step' : null">4. Resumen</div>
     </div>
 
     <!-- PANEL 1: Suite Info -->
@@ -37,15 +37,65 @@
             <img *ngFor="let img of suite.images.slice(0,4); let imgIdx = index" [src]="img" (error)="onImageError($event)" [alt]="suite.name + ' foto ' + (imgIdx + 1)" role="button" tabindex="0" (keydown.enter)="suite.mainImage = img" (keydown.space)="suite.mainImage = img; $event.preventDefault()" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2); cursor: pointer; opacity: 0.7;" (click)="suite.mainImage = img">
           </div>
           <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{ suite.name }}</h1>
-          <p style="color: var(--gold);">{{ suite.type }} · {{ suite.size || 45 }} m² · Máx {{ suite.maxGuests || 2 }} huéspedes</p>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0.5rem; flex-wrap: wrap;">
+            <p style="color: var(--gold); margin: 0;">{{ suite.type }} · {{ suite.size || 45 }} m² · Máx {{ suite.maxGuests || 2 }} huéspedes</p>
+            <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(241,196,15,0.15); border: 1px solid rgba(241,196,15,0.35); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; color: #f1c40f;">
+              <span>★ {{ averageRating }}</span>
+              <span style="color: rgba(245,240,232,0.6);">({{ reviews.length }} {{ reviews.length === 1 ? 'reseña' : 'reseñas' }})</span>
+            </div>
+          </div>
+
+          <!-- Redis Real-Time Social Proof & Urgency Banner -->
+          <div *ngIf="socialProof && (socialProof.activeViewers > 0 || socialProof.bookingsLast24h > 0 || socialProof.lastBookedMinutesAgo != null)"
+               class="social-proof-banner"
+               role="status"
+               aria-live="polite">
+            <div class="social-proof-live">
+              <span class="pulse-dot" aria-hidden="true"></span>
+              <span>
+                {{ socialProof.activeViewers === 1
+                    ? '1 viajero está explorando esta suite ahora mismo'
+                    : socialProof.activeViewers + ' viajeros están viendo esta suite en tiempo real' }}
+              </span>
+              <span *ngIf="socialProof.highDemand" class="high-demand-pill">Alta demanda</span>
+            </div>
+            <div *ngIf="socialProof.bookingsLast24h > 0 || socialProof.lastBookedMinutesAgo != null" class="social-proof-meta">
+              <span *ngIf="socialProof.bookingsLast24h > 0">
+                🔥 {{ socialProof.bookingsLast24h === 1 ? '1 reserva confirmada en las últimas 24 h' : socialProof.bookingsLast24h + ' reservas en las últimas 24 h' }}
+              </span>
+              <span *ngIf="socialProof.lastBookedMinutesAgo != null">
+                · {{ formatLastBooked(socialProof.lastBookedMinutesAgo) }}
+              </span>
+            </div>
+          </div>
+
           <p style="color: #ccc; margin-top: 1rem;">{{ suite.description }}</p>
 
-          <div *ngIf="suite.branch?.highlights?.length" style="margin-top: 2rem;">
-            <h3 style="color: var(--gold);">Lugares Cercanos</h3>
-            <ul>
-              <li *ngFor="let h of suite.branch.highlights" style="margin-bottom: 0.5rem;">{{h.name}} ({{h.walkMinutes}} min)</li>
-            </ul>
+          <!-- Redis Geo Nearby Cartagena Landmarks -->
+          <div *ngIf="nearbyPlaces.length > 0; else fallbackHighlights" class="geo-nearby-section">
+            <h3 style="color: var(--gold); margin: 0 0 0.85rem 0; font-size: 1.05rem;">📍 Entorno & Distancias Reales en Cartagena</h3>
+            <div class="geo-places-grid">
+              <div *ngFor="let place of nearbyPlaces" class="geo-place-card">
+                <div class="geo-place-header">
+                  <strong class="geo-place-name">{{ place.name }}</strong>
+                  <span *ngIf="place.distanceKm != null" class="geo-distance-badge">{{ place.distanceKm | number:'1.1-2' }} km</span>
+                </div>
+                <div class="geo-place-sub">
+                  <span *ngIf="place.zone">{{ place.zone }}</span>
+                  <span *ngIf="place.walkMinutes != null"> · 🚶 {{ place.walkMinutes }} min a pie</span>
+                  <span *ngIf="place.walkMinutes == null && place.driveMinutes != null"> · 🚗 {{ place.driveMinutes }} min</span>
+                </div>
+              </div>
+            </div>
           </div>
+          <ng-template #fallbackHighlights>
+            <div *ngIf="suite.branch?.highlights?.length" style="margin-top: 2rem;">
+              <h3 style="color: var(--gold);">Lugares Cercanos</h3>
+              <ul>
+                <li *ngFor="let h of suite.branch?.highlights" style="margin-bottom: 0.5rem;">{{h.name}} ({{h.walkMinutes}} min)</li>
+              </ul>
+            </div>
+          </ng-template>
         </div>
         <div class="card">
           <h3 style="color: var(--gold); margin-top: 0;">Reserva</h3>
@@ -102,12 +152,49 @@
             </div>
           </div>
         </div>
+
+        <!-- Reseñas de Huéspedes Verificados -->
+        <div style="grid-column: 1 / -1; margin-top: 2rem; border-top: 1px solid rgba(212, 175, 55, 0.2); padding-top: 2rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <h3 style="font-family: var(--font-title); font-size: 1.6rem; color: var(--gold); margin: 0 0 4px 0;">
+                Opiniones y Reseñas Verificadas
+              </h3>
+              <p style="color: rgba(245,240,232,0.7); font-size: 0.9rem; margin: 0;">
+                Evaluaciones auténticas de huéspedes que completaron su estancia en esta suite.
+              </p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; background: rgba(201,169,110,0.12); border: 1px solid rgba(201,169,110,0.3); padding: 8px 16px; border-radius: 30px;">
+              <span style="color: #f1c40f; font-size: 1.2rem;">★</span>
+              <strong style="color: #fff; font-size: 1.1rem;">{{ averageRating }} / 5</strong>
+              <span style="color: #ccc; font-size: 0.85rem;">({{ reviews.length }} {{ reviews.length === 1 ? 'reseña' : 'reseñas' }})</span>
+            </div>
+          </div>
+
+          <div *ngIf="reviews.length === 0" style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(212,175,55,0.25); border-radius: 8px; padding: 2rem; text-align: center; color: rgba(245,240,232,0.6);">
+            <p style="margin: 0; font-size: 0.95rem;">Esta suite aún no tiene opiniones públicas registradas. ¡Sé de los primeros en vivir la experiencia!</p>
+          </div>
+
+          <div *ngIf="reviews.length > 0" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;">
+            <div *ngFor="let rev of reviews" style="background: #141414; border: 1px solid rgba(212, 175, 55, 0.2); border-radius: 8px; padding: 1.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: 600; color: #f5f0e8; font-size: 0.95rem;">{{ rev.userName || 'Huésped Verificado' }}</span>
+                <span style="color: #f1c40f; font-size: 0.9rem;">{{ '★'.repeat(rev.rating || 5) }}</span>
+              </div>
+              <p style="color: #ccc; font-size: 0.88rem; line-height: 1.45; margin: 0 0 0.75rem 0;">"{{ rev.comment }}"</p>
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #2ecc71;">
+                <span>✓ Estadía verificada</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- PANEL 2: Experiences -->
     <div class="panel" *ngIf="step === 2">
-      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 2rem;">Mejora tu estancia con Experiencias</h2>
+      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 0.5rem;">Mejora tu estancia con Experiencias</h2>
+      <p style="text-align: center; color: rgba(245,240,232,0.7); font-size: 0.95rem; margin-bottom: 2rem;">Servicios y actividades 100% opcionales</p>
       <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem;">
         <div *ngFor="let exp of experiences" class="exp-card" [class.selected]="isExperienceSelected(exp)" (click)="toggleExperience(exp)">
           <div>
@@ -117,19 +204,28 @@
           </div>
           <div class="flex-between" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
             <strong style="color: var(--gold);">$ {{exp.price | number:'1.0-0'}}</strong>
-            <span *ngIf="isExperienceSelected(exp)" style="background: var(--gold); color: #000; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;">✓ Añadido</span>
+            <div *ngIf="isExperienceSelected(exp)" style="display: flex; align-items: center; gap: 8px; background: rgba(201,169,110,0.18); border: 1px solid var(--gold); padding: 2px 10px; border-radius: 20px;">
+              <button type="button" (click)="updateExperienceQty(exp, -1, $event)" aria-label="Disminuir cantidad" style="background: none; border: none; color: var(--gold); font-size: 1.1rem; font-weight: bold; cursor: pointer; padding: 0 4px;">−</button>
+              <span style="color: #fff; font-size: 0.85rem; font-weight: bold;">{{ getExperienceQty(exp) }}</span>
+              <button type="button" (click)="updateExperienceQty(exp, 1, $event)" aria-label="Aumentar cantidad" style="background: none; border: none; color: var(--gold); font-size: 1.1rem; font-weight: bold; cursor: pointer; padding: 0 4px;">+</button>
+            </div>
+            <span *ngIf="!isExperienceSelected(exp)" style="color: rgba(245,240,232,0.6); font-size: 0.8rem;">+ Agregar</span>
           </div>
         </div>
       </div>
       <div class="flex-between" style="margin-top: 3rem;">
         <button class="btn-secondary" (click)="prevStep()">← Atrás</button>
-        <button class="btn-primary" (click)="nextStep()">Continuar →</button>
+        <div style="display: flex; gap: 1rem;">
+          <button class="btn-outline" (click)="skipStep(2)">Continuar sin extras →</button>
+          <button class="btn-primary" (click)="nextStep()">Continuar →</button>
+        </div>
       </div>
     </div>
 
     <!-- PANEL 3: VIP Services -->
     <div class="panel" *ngIf="step === 3">
-      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 2rem;">Servicios VIP</h2>
+      <h2 style="font-family: var(--font-title); color: var(--gold); text-align: center; margin-bottom: 0.5rem;">Servicios VIP</h2>
+      <p style="text-align: center; color: rgba(245,240,232,0.7); font-size: 0.95rem; margin-bottom: 2rem;">Servicios y comodidades 100% opcionales</p>
       
       <div class="card" style="margin-bottom: 2rem;">
         <div class="flex-between">
@@ -193,7 +289,10 @@
 
       <div class="flex-between" style="margin-top: 3rem;">
         <button class="btn-secondary" (click)="prevStep()">← Atrás</button>
-        <button class="btn-primary" (click)="nextStep()">Continuar →</button>
+        <div style="display: flex; gap: 1rem;">
+          <button class="btn-outline" (click)="skipStep(3)">Continuar sin extras →</button>
+          <button class="btn-primary" (click)="nextStep()">Continuar →</button>
+        </div>
       </div>
     </div>
 
@@ -203,22 +302,72 @@
       
       <div style="max-width: 800px; margin: 0 auto;">
         
-        <!-- Minimal Summary -->
-        <div class="card" style="margin-bottom: 2rem; text-align: center;">
-          <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1rem;">Detalles de tu Estancia</h3>
-          <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 1.5rem;">Estás a un paso de confirmar tu estadía en <strong>{{suite.name}}</strong>.</p>
+        <!-- Detailed Itemized Summary -->
+        <div class="card" style="margin-bottom: 2rem;">
+          <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1.25rem; font-size: 1.3rem;">Desglose de tu Estadía</h3>
           
-          <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem;">
-            <button class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 6px;" (click)="goToStep(1)">✏️ Editar Fechas</button>
-            <button class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 6px;" (click)="goToStep(2)">✏️ Editar Extras</button>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+            <div>
+              <span style="color: #888; font-size: 0.8rem; text-transform: uppercase;">Alojamiento</span>
+              <p style="margin: 4px 0 0 0; color: #fff; font-weight: 600;">{{suite.name}}</p>
+              <p style="margin: 2px 0 0 0; color: #aaa; font-size: 0.85rem;">{{suite.type}}</p>
+            </div>
+            <div>
+              <span style="color: #888; font-size: 0.8rem; text-transform: uppercase;">Itinerario</span>
+              <p style="margin: 4px 0 0 0; color: #fff; font-weight: 600;">{{checkIn}} al {{checkOut}}</p>
+              <p style="margin: 2px 0 0 0; color: #aaa; font-size: 0.85rem;">{{nights}} {{ nights === 1 ? 'noche' : 'noches' }} · {{guests}} {{ guests === 1 ? 'huésped' : 'huéspedes' }}</p>
+            </div>
           </div>
 
-          <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(212,175,55,0.3); font-size: 1.5rem; font-weight: bold;">
-            <span style="color: #fff; margin-right: 15px;">Total Estimado:</span>
-            <span style="color: var(--gold);">$ {{grandTotal | number:'1.0-0'}}</span>
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem; color: #ddd; margin-bottom: 1.5rem;">
+            <tbody>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px 0;">Estadía base ({{nights}} noches):</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{totalRoomPrice | number:'1.0-0'}}</td>
+              </tr>
+              <tr *ngFor="let item of selectedExperiences" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px 0;">
+                  {{item.exp.name}} <span style="color: var(--gold); font-size: 0.85rem;">(x{{item.qty}})</span>:
+                </td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{(item.exp.price * item.qty) | number:'1.0-0'}}</td>
+              </tr>
+              <tr *ngIf="airportPickup" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px 0;">Traslado Privado Aeropuerto:</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{150000 | number:'1.0-0'}}</td>
+              </tr>
+              <tr *ngIf="petFriendly" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px 0;">Tarifa Pet-Friendly:</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{80000 | number:'1.0-0'}}</td>
+              </tr>
+              <tr *ngIf="wantFood" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px 0;">Comida Gourmet:</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{80000 | number:'1.0-0'}}</td>
+              </tr>
+              <tr *ngIf="breakfastCombo" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px 0;">Combo Desayuno Tradicional:</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{35000 | number:'1.0-0'}}</td>
+              </tr>
+              <tr *ngIf="extraGuestsFee > 0" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px 0;">Huéspedes adicionales:</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{extraGuestsFee | number:'1.0-0'}}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px 0; color: #aaa;">Depósito de Garantía (100% reembolsable):</td>
+                <td style="text-align: right; padding: 10px 0; color: #aaa;">$ {{guaranteeDeposit | number:'1.0-0'}}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem;">
+            <button class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 6px;" (click)="goToStep(1)">✏️ Modificar Fechas</button>
+            <button class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; border: 1px solid var(--gold); background: transparent; color: var(--gold); border-radius: 6px;" (click)="goToStep(2)">✏️ Modificar Extras</button>
           </div>
-          <p style="color: #888; font-size: 0.85rem; margin-top: 1rem;">Incluye un depósito de garantía reembolsable de $ {{guaranteeDeposit | number:'1.0-0'}}<span *ngIf="extraGuestsFee > 0"> y $ {{extraGuestsFee | number:'1.0-0'}} por huéspedes adicionales</span>.</p>
-          <p style="color: #888; font-size: 0.85rem; margin-top: 0.5rem;">Podrás revisar el desglose detallado en el Centro de Pago.</p>
+
+          <div style="padding-top: 1.25rem; border-top: 2px solid rgba(212,175,55,0.35); display: flex; justify-content: space-between; align-items: center; font-size: 1.35rem; font-weight: bold;">
+            <span style="color: #fff;">Total a Pagar:</span>
+            <span style="color: var(--gold); font-size: 1.5rem;">$ {{grandTotal | number:'1.0-0'}}</span>
+          </div>
+          <p style="color: #888; font-size: 0.8rem; margin: 0.75rem 0 0 0; text-align: center;">El depósito de garantía se reintegra automáticamente al finalizar tu estadía tras la inspección.</p>
         </div>
 
         <!-- Auth Check & Redirect -->
@@ -248,7 +397,7 @@
             <ng-template #normalGuestPay>
               <h3 style="margin-top: 0; color: var(--gold); margin-bottom: 1rem;">Proceder al Pago Seguro</h3>
               <p style="color: #ccc; font-size: 0.95rem; margin-bottom: 1.5rem;">Al continuar, se registrará tu reserva y serás redirigido a nuestro Centro de Pago seguro para completarla.</p>
-              <p *ngIf="message" [style.color]="isError ? '#ff4d4d' : 'var(--gold)'" style="font-size: 0.9rem; margin-bottom: 1rem;">{{message}}</p>
+              <p *ngIf="message" role="alert" aria-live="assertive" [style.color]="isError ? '#ff4d4d' : 'var(--gold)'" style="font-size: 0.9rem; margin-bottom: 1rem;">{{message}}</p>
               <button class="btn-primary" style="width: 100%; max-width: 300px; font-size: 1.1rem; padding: 1rem;" (click)="createBooking()" [disabled]="bookingBusy">
                 {{ bookingBusy ? 'Creando Reserva...' : 'Pagar →' }}
               </button>

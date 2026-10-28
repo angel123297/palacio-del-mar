@@ -18,7 +18,7 @@ export class AuthService {
 
   isLoggedIn(): boolean {
     const user = this.currentUserSignal();
-    return !!user && user.emailVerified !== false;
+    return !!user && user.emailVerified === true;
   }
 
   constructor(private http: HttpClient, private router: Router) {
@@ -131,6 +131,12 @@ export class AuthService {
     );
   }
 
+  resetPassword(token: string, newPassword: string) {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/reset-password`, { token, newPassword }).pipe(
+      timeout(this.TIMEOUT_MS)
+    );
+  }
+
   logout() {
     const token = localStorage.getItem('token');
     this.clearLocalData();
@@ -142,5 +148,14 @@ export class AuthService {
       next: () => {},
       error: () => {}
     });
+  }
+
+  logoutAllDevices() {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/logout-all`, {}).pipe(
+      timeout(this.TIMEOUT_MS),
+      tap(() => {
+        this.clearLocalData();
+      })
+    );
   }
 }

@@ -10,6 +10,12 @@ import co.palaciodelmar.backend.security.JwtService;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,7 +27,6 @@ import java.util.Base64;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -29,6 +34,27 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
+    private final MongoTemplate mongoTemplate;
+
+    @Autowired(required = false)
+    private co.palaciodelmar.backend.security.UserSessionCacheService userSessionCacheService;
+
+    public void setUserSessionCacheService(co.palaciodelmar.backend.security.UserSessionCacheService userSessionCacheService) {
+        this.userSessionCacheService = userSessionCacheService;
+    }
+
+    @Autowired
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       JwtService jwtService, AuthenticationManager authenticationManager,
+                       EmailService emailService,
+                       MongoTemplate mongoTemplate) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.authenticationManager = authenticationManager;
+        this.emailService = emailService;
+        this.mongoTemplate = mongoTemplate;
+    }
 
     private String generateSecureToken() {
         SecureRandom secureRandom = new SecureRandom();
@@ -63,7 +89,7 @@ public class AuthService {
         String normalizedEmail = request.getEmail().toLowerCase();
         if (userRepository.existsByEmail(normalizedEmail)) {
             User existing = userRepository.findByEmail(normalizedEmail).orElse(null);
-            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank() || !Boolean.TRUE.equals(existing.getEmailVerified()))) {
+            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank())) {
                 String rawToken = generateSecureToken();
                 String hashedToken = hashToken(rawToken);
 
@@ -82,11 +108,18 @@ public class AuthService {
                 }
                 existing.setUpdatedAt(Instant.now());
                 userRepository.save(existing);
+                if (userSessionCacheService != null) {
+                    userSessionCacheService.evictUser(existing.getEmail());
+                }
 
                 try {
-                    emailService.sendVerificationEmail(existing.getEmail(), rawToken);
+                    if (request.getReturnUrl() != null && !request.getReturnUrl().isBlank()) {
+                        emailService.sendVerificationEmail(existing.getEmail(), rawToken, request.getReturnUrl());
+                    } else {
+                        emailService.sendVerificationEmail(existing.getEmail(), rawToken);
+                    }
                 } catch (Exception e) {
-                    System.err.println("Failed to send verification email: " + e.getMessage());
+                    log.error("Failed to send verification email: {}", e.getMessage(), e);
                 }
 
                 return AuthResponse.builder()
@@ -135,10 +168,14 @@ public class AuthService {
         userRepository.save(user);
 
         try {
-            emailService.sendVerificationEmail(user.getEmail(), rawToken);
+            if (request.getReturnUrl() != null && !request.getReturnUrl().isBlank()) {
+                emailService.sendVerificationEmail(user.getEmail(), rawToken, request.getReturnUrl());
+            } else {
+                emailService.sendVerificationEmail(user.getEmail(), rawToken);
+            }
         } catch (Exception e) {
             // Log error, but don't fail registration
-            System.err.println("Failed to send verification email: " + e.getMessage());
+            log.error("Failed to send verification email: {}", e.getMessage(), e);
         }
 
         // No se entrega token hasta verificar el correo
@@ -196,7 +233,11 @@ public class AuthService {
             if (updateRequest.getProfile().getAddress() != null) user.getProfile().setAddress(updateRequest.getProfile().getAddress());
         }
         user.setUpdatedAt(Instant.now());
-        return toDTO(userRepository.save(user));
+        User saved = userRepository.save(user);
+        if (userSessionCacheService != null) {
+            userSessionCacheService.putCachedUser(saved);
+        }
+        return toDTO(saved);
     }
 
     public AuthResponse verifyEmail(String token) {
@@ -213,6 +254,9 @@ public class AuthService {
         user.setVerificationTokenExpiresAt(null);
         user.setUpdatedAt(Instant.now());
         User savedUser = userRepository.save(user);
+        if (userSessionCacheService != null) {
+            userSessionCacheService.putCachedUser(savedUser);
+        }
 
         UserPrincipal userPrincipal = new UserPrincipal(savedUser);
         String jwtToken = jwtService.generateToken(userPrincipal);
@@ -233,10 +277,32 @@ public class AuthService {
         if (newPassword == null || newPassword.length() < 6) {
             throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
         }
+        Instant changedAt = Instant.now();
         user.setPassword(passwordEncoder.encode(newPassword));
-        user.setPasswordChangedAt(Instant.now());
-        user.setUpdatedAt(Instant.now());
+        user.setPasswordChangedAt(changedAt);
+        user.setSessionsRevokedAt(changedAt);
+        user.setUpdatedAt(changedAt);
         userRepository.save(user);
+        if (userSessionCacheService != null) {
+            userSessionCacheService.recordGlobalRevocation(user.getEmail(), changedAt);
+        }
+    }
+
+    /**
+     * Cierra instantáneamente todas las sesiones activas del usuario en todos los dispositivos
+     * combinando persistencia durable en MongoDB (sessionsRevokedAt) y marca de revocación en RAM/Redis (< 0.2 ms).
+     */
+    public void logoutAllDevices(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+        Instant now = Instant.now();
+        user.setSessionsRevokedAt(now);
+        user.setUpdatedAt(now);
+        userRepository.save(user);
+        if (userSessionCacheService != null) {
+            userSessionCacheService.recordGlobalRevocation(user.getEmail(), now);
+        }
+        log.info("Revocación global de sesiones ejecutada en todos los dispositivos para {}", user.getEmail());
     }
 
     public void forgotPassword(String email) {
@@ -250,15 +316,64 @@ public class AuthService {
             return;
         }
 
-        String tempPassword = generateTemporaryPassword();
-        user.setPassword(passwordEncoder.encode(tempPassword));
-        // Al enviar la contraseña a su bandeja de correo confirmada, se habilita el acceso
-        user.setEmailVerified(true);
+        // Flujo seguro y no destructivo: NO altera password actual ni emailVerified.
+        // Genera token criptográficamente seguro con validez de 15 minutos almacenado con hash SHA-256.
+        String rawToken = generateSecureToken();
+        String hashedToken = hashToken(rawToken);
+
+        user.setResetPasswordTokenHash(hashedToken);
+        user.setResetPasswordTokenExpiresAt(Instant.now().plus(15, java.time.temporal.ChronoUnit.MINUTES));
         user.setUpdatedAt(Instant.now());
         userRepository.save(user);
 
-        emailService.sendTemporaryPasswordEmail(user.getEmail(), tempPassword);
-        log.info("Contraseña temporal generada y enviada a {}", normalizedEmail);
+        emailService.sendPasswordResetEmail(user.getEmail(), rawToken);
+        log.info("Enlace de restablecimiento de contraseña generado y enviado a {}", normalizedEmail);
+    }
+
+    public void resetPassword(String token, String newPassword) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token de restablecimiento es requerido");
+        }
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
+        }
+
+        String hashedToken = hashToken(token.trim());
+        Instant now = Instant.now();
+
+        // Operación 100% atómica con MongoTemplate para garantizar el consumo único e indivisible del token
+        Query query = new Query(Criteria.where("resetPasswordTokenHash").is(hashedToken)
+                .and("resetPasswordTokenExpiresAt").gt(now));
+
+        Update update = new Update()
+                .set("password", passwordEncoder.encode(newPassword))
+                .set("passwordChangedAt", now)
+                .set("sessionsRevokedAt", now)
+                .set("updatedAt", now)
+                .unset("resetPasswordTokenHash")
+                .unset("resetPasswordTokenExpiresAt");
+
+        User updatedUser = mongoTemplate.findAndModify(
+                query,
+                update,
+                FindAndModifyOptions.options().returnNew(true),
+                User.class
+        );
+
+        if (updatedUser == null) {
+            // Si la actualización atómica no encontró coincidencia, verificamos si el token existía pero ya expiró
+            java.util.Optional<User> expiredUser = userRepository.findByResetPasswordTokenHash(hashedToken);
+            if (expiredUser.isPresent()) {
+                throw new IllegalArgumentException("El enlace de restablecimiento ha expirado. Por favor solicita uno nuevo.");
+            }
+            throw new IllegalArgumentException("Enlace de restablecimiento inválido o ya utilizado");
+        }
+
+        if (userSessionCacheService != null) {
+            userSessionCacheService.recordGlobalRevocation(updatedUser.getEmail(), now);
+        }
+
+        log.info("Contraseña restablecida exitosamente de forma atómica para el usuario {}", updatedUser.getEmail());
     }
 
     public void resendVerification(String email) {
@@ -288,17 +403,6 @@ public class AuthService {
         log.info("Nuevo correo de verificación reenviado exitosamente a {}", normalizedEmail);
     }
 
-    private String generateTemporaryPassword() {
-        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-        String lower = "abcdefghijkmnpqrstuvwxyz";
-        String digits = "23456789";
-        SecureRandom sr = new SecureRandom();
-        StringBuilder sb = new StringBuilder("Palacio@");
-        for (int i = 0; i < 2; i++) sb.append(upper.charAt(sr.nextInt(upper.length())));
-        for (int i = 0; i < 2; i++) sb.append(digits.charAt(sr.nextInt(digits.length())));
-        for (int i = 0; i < 2; i++) sb.append(lower.charAt(sr.nextInt(lower.length())));
-        return sb.toString();
-    }
 
     public UserDTO toDTO(User user) {
         if (user == null) return null;

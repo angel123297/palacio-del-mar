@@ -130,6 +130,11 @@ public class EmailService {
 
     @Async
     public void sendVerificationEmail(String toEmail, String token) {
+        sendVerificationEmail(toEmail, token, null);
+    }
+
+    @Async
+    public void sendVerificationEmail(String toEmail, String token, String returnUrl) {
         if (isBlank(toEmail)) return;
         try {
             MimeMessage message = javaMailSender.createMimeMessage();
@@ -139,7 +144,10 @@ public class EmailService {
             helper.setTo(toEmail.trim());
             helper.setSubject("Verifica tu cuenta - Palacio del Mar");
 
-            String verifyLink = normalizedBaseUrl() + "/verificar-email/" + token;
+            String queryParam = (returnUrl != null && !returnUrl.isBlank())
+                    ? "?returnUrl=" + java.net.URLEncoder.encode(returnUrl, java.nio.charset.StandardCharsets.UTF_8)
+                    : "";
+            String verifyLink = normalizedBaseUrl() + "/verificar-email/" + token + queryParam;
             String htmlMsg = "<div style=\"background:#0d0d0d; color:#fff; font-family:'Segoe UI',sans-serif; padding:30px; border-radius:10px; max-width:600px; margin:auto; border:1px solid #c9a96e;\">"
                     + "<div style=\"text-align:center; margin-bottom:20px;\">"
                     + "<h1 style=\"color:#c9a96e; font-size:24px; margin:0 0 6px 0; font-family:Georgia,serif;\">Palacio del Mar</h1>"
@@ -178,7 +186,7 @@ public class EmailService {
 
             configureSender(helper, "reservas@palaciodelmar.co");
             helper.setTo(ctx.guestEmail().trim());
-            helper.setSubject("Confirmación de Reserva y Comprobante de Pago [" + ctx.bookingCode() + "] - Palacio del Mar");
+            helper.setSubject("¡Tu reserva ha sido registrada y confirmada! [" + ctx.bookingCode() + "] - Palacio del Mar");
 
             String pinCode = getAccessPin(booking);
             String voucherLink = normalizedBaseUrl() + "/reservas/" + booking.getId() + "/comprobante";
@@ -195,7 +203,7 @@ public class EmailService {
                     + "<h1 style=\"color:#c9a96e; font-size:26px; margin:0 0 5px 0; font-family:Georgia,serif;\">Palacio del Mar</h1>"
                     + "<p style=\"color:#e2c99b; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin:0;\">Confirmación Oficial de Reserva y Pago</p>"
                     + "</div>"
-                    + "<h2 style=\"color:#ffffff; font-size:18px; margin-top:0;\">¡Hola, " + escapeHtml(ctx.guestName()) + "! Tu estadía está confirmada</h2>"
+                    + "<h2 style=\"color:#ffffff; font-size:18px; margin-top:0;\">¡Hola, " + escapeHtml(ctx.guestName()) + "! Tu reserva ha sido registrada y confirmada exitosamente</h2>"
                     + "<p style=\"color:#ccc; font-size:14px; line-height:1.6;\">Hemos verificado tu pago exitosamente. Aquí tienes toda la información de tu alojamiento, el desglose de tu transacción y tu llave digital de ingreso:</p>"
                     + "<div style=\"background:#1a1a1a; border:2px solid #c9a96e; padding:18px; border-radius:8px; text-align:center; margin:22px 0;\">"
                     + "<p style=\"color:#c9a96e; text-transform:uppercase; font-size:11px; letter-spacing:2px; margin:0 0 6px 0;\">PIN de Acceso Digital (Smart Lock)</p>"
@@ -259,78 +267,7 @@ public class EmailService {
         }
     }
 
-    @Async
-    public void sendBookingCreatedNotification(Booking booking) {
-        if (booking == null) return;
-        try {
-            BookingEmailContext ctx = resolveBookingContext(booking);
-            if (isBlank(ctx.guestEmail())) {
-                log.debug("sendBookingCreatedNotification: no se encontró correo de huésped para la reserva {}", booking.getId());
-                return;
-            }
 
-            MimeMessage message = javaMailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            configureSender(helper, "reservas@palaciodelmar.co");
-            helper.setTo(ctx.guestEmail().trim());
-            helper.setSubject("¡Tu reserva ha sido registrada! Pendiente de pago [" + ctx.bookingCode() + "] - Palacio del Mar");
-
-            String payLink = normalizedBaseUrl() + "/checkout/" + booking.getId();
-            String myBookingsLink = normalizedBaseUrl() + "/mis-reservas";
-
-            StringBuilder priceRows = new StringBuilder();
-            if (booking.getSubtotal() != null && booking.getSubtotal().compareTo(BigDecimal.ZERO) > 0) {
-                priceRows.append(rowHtml("Subtotal Alojamiento:", formatCop(booking.getSubtotal())));
-            }
-            if (booking.getDiscount() != null && booking.getDiscount().compareTo(BigDecimal.ZERO) > 0) {
-                priceRows.append(rowHtml("Descuento Aplicado:", "-" + formatCop(booking.getDiscount())));
-            }
-            if (booking.getTaxes() != null && booking.getTaxes().compareTo(BigDecimal.ZERO) > 0) {
-                priceRows.append(rowHtml("Impuestos y Tasas:", formatCop(booking.getTaxes())));
-            }
-            if (booking.getGuaranteeDeposit() != null && booking.getGuaranteeDeposit().compareTo(BigDecimal.ZERO) > 0) {
-                priceRows.append(rowHtml("Depósito Reembolsable:", formatCop(booking.getGuaranteeDeposit())));
-            }
-            BigDecimal total = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
-            priceRows.append(rowHtml("Total a Pagar:", "<strong style=\"font-size:16px; color:#2ecc71;\">" + formatCop(total) + "</strong>"));
-
-            String html = "<div style=\"background:#0d0d0d; color:#fff; font-family:'Segoe UI',sans-serif; padding:30px; border-radius:10px; max-width:620px; margin:auto; border:1px solid #c9a96e;\">"
-                    + "<div style=\"text-align:center; margin-bottom:24px;\">"
-                    + "<h1 style=\"color:#c9a96e; font-size:26px; margin:0 0 5px 0; font-family:Georgia,serif;\">Palacio del Mar</h1>"
-                    + "<p style=\"color:#e2c99b; font-size:12px; letter-spacing:2px; text-transform:uppercase; margin:0;\">Cartagena de Indias · Colombia</p>"
-                    + "</div>"
-                    + "<h2 style=\"color:#ffffff; font-size:18px; margin-top:0;\">¡Hola, " + escapeHtml(ctx.guestName()) + "!</h2>"
-                    + "<p style=\"color:#ccc; font-size:14px; line-height:1.6;\">Tu solicitud de reserva ha sido registrada exitosamente y tus fechas han quedado bloqueadas temporalmente. Revisa los detalles de tu itinerario y completa tu pago para confirmar definitivamente la estadía:</p>"
-                    + "<div style=\"background:#141414; border:1px solid rgba(201,169,110,0.3); border-radius:8px; padding:18px; margin:20px 0;\">"
-                    + "<table style=\"width:100%; border-collapse:collapse; color:#ddd; font-size:14px;\">"
-                    + rowHtml("Código de Reserva:", "<strong style=\"color:#c9a96e;\">" + escapeHtml(ctx.bookingCode()) + "</strong>")
-                    + rowHtml("Propiedad / Sede:", "<strong>" + escapeHtml(ctx.propertyName()) + "</strong>")
-                    + rowHtml("Ubicación:", escapeHtml(ctx.address()))
-                    + rowHtml("Suite / Habitación:", "<strong>" + escapeHtml(ctx.suiteDisplay()) + "</strong>")
-                    + rowHtml("Llegada (Check-in):", escapeHtml(formatDateEs(booking.getCheckIn())) + " (desde las " + escapeHtml(ctx.checkInTime()) + ")")
-                    + rowHtml("Salida (Check-out):", escapeHtml(formatDateEs(booking.getCheckOut())) + " (hasta las " + escapeHtml(ctx.checkOutTime()) + ")")
-                    + rowHtml("Estadía:", escapeHtml(ctx.nightsLabel()))
-                    + rowHtml("Huéspedes:", escapeHtml(ctx.guestsLabel()))
-                    + priceRows
-                    + rowHtml("Estado Actual:", "<strong style=\"color:#f1c40f;\">Pendiente de Pago</strong>")
-                    + "</table>"
-                    + "</div>"
-                    + "<div style=\"text-align:center; margin:28px 0;\">"
-                    + "<a href=\"" + payLink + "\" style=\"background:#c9a96e; color:#0d0d0d; padding:14px 28px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:15px; display:inline-block;\">Completar Pago Seguro &rarr;</a>"
-                    + "</div>"
-                    + "<p style=\"color:#aaa; font-size:12px; line-height:1.5;\">Nota: Una vez confirmado el pago, recibirás de inmediato tu voucher oficial en PDF, tu invitación de calendario y tu PIN de acceso inteligente.</p>"
-                    + "<p style=\"color:#888; font-size:11px; margin-top:20px; border-top:1px solid #222; padding-top:15px;\">También puedes consultar tus itinerarios en cualquier momento desde <a href=\"" + myBookingsLink + "\" style=\"color:#c9a96e;\">Mis Reservas</a>.</p>"
-                    + "</div>";
-
-            helper.setText(html, true);
-            javaMailSender.send(message);
-            log.info("Notificación de reserva creada {} enviada exitosamente a {}", ctx.bookingCode(), ctx.guestEmail());
-        } catch (Exception e) {
-            log.warn("No se pudo enviar correo de reserva creada para {} (servidor SMTP no disponible): {}",
-                    booking != null ? booking.getId() : "N/A", e.getMessage());
-        }
-    }
 
     @Async
     public void sendHostBookingNotification(Booking booking) {
@@ -512,6 +449,42 @@ public class EmailService {
             javaMailSender.send(message);
         } catch (Exception e) {
             log.warn("No se pudo enviar invitación de reseña para la reserva {} (servidor SMTP no disponible): {}", booking.getId(), e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendPasswordResetEmail(String toEmail, String token) {
+        if (isBlank(toEmail)) return;
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            configureSender(helper, "seguridad@palaciodelmar.co");
+            helper.setTo(toEmail.trim());
+            helper.setSubject("Restablece tu Contraseña - Palacio del Mar");
+
+            String resetLink = normalizedBaseUrl() + "/restablecer-contrasena/" + token;
+            String htmlMsg = "<div style=\"background:#0d0d0d; color:#fff; font-family:'Segoe UI',Roboto,Helvetica,sans-serif; padding:30px; border-radius:10px; max-width:600px; margin:auto; border:1px solid #c9a96e;\">"
+                    + "<div style=\"text-align:center; margin-bottom:20px;\">"
+                    + "<h1 style=\"color:#c9a96e; font-size:24px; margin:0 0 6px 0; font-family:Georgia,serif;\">Palacio del Mar</h1>"
+                    + "<p style=\"color:#e2c99b; font-size:11px; letter-spacing:2px; text-transform:uppercase; margin:0;\">Seguridad y Acceso</p>"
+                    + "</div>"
+                    + "<h2 style=\"color:#ffffff; font-size:19px; margin-top:0;\">Restablecimiento de Contraseña</h2>"
+                    + "<p style=\"color:#ccc; font-size:14px; line-height:1.6;\">Has solicitado restablecer la contraseña de tu cuenta en Palacio del Mar. Haz clic en el siguiente botón para definir tu nueva clave:</p>"
+                    + "<div style=\"text-align:center; margin:28px 0;\">"
+                    + "<a href=\"" + resetLink + "\" style=\"background:#c9a96e; color:#0d0d0d; padding:13px 28px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:15px; display:inline-block;\">Restablecer mi Contraseña</a>"
+                    + "</div>"
+                    + "<p style=\"color:#999; font-size:12px; line-height:1.5; word-break:break-all;\">Si el botón no abre directamente, copia y pega este enlace en tu navegador:<br>"
+                    + "<a href=\"" + resetLink + "\" style=\"color:#c9a96e;\">" + resetLink + "</a></p>"
+                    + "<p style=\"color:#e6c887; font-size:12px; margin-top:16px;\">⏱️ Este enlace es válido por <strong>15 minutos</strong> y expira automáticamente tras su uso.</p>"
+                    + "<p style=\"color:#777; font-size:11px; margin-top:20px; border-top:1px solid #222; padding-top:12px;\">Si no solicitaste este cambio, puedes ignorar este correo; tu contraseña actual continúa siendo segura y nadie puede acceder sin este enlace.</p>"
+                    + "</div>";
+
+            helper.setText(htmlMsg, true);
+            javaMailSender.send(message);
+            log.info("Correo con enlace de restablecimiento de contraseña enviado exitosamente a {}", toEmail);
+        } catch (Exception e) {
+            log.warn("No se pudo enviar correo con enlace de restablecimiento a {}: {}", toEmail, e.getMessage());
         }
     }
 

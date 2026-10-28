@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.ReviewDTO;
+import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Review;
 import co.palaciodelmar.backend.model.User;
@@ -52,7 +53,7 @@ public class ReviewService {
                 if (s.getPropertyId() != null) {
                     propertyRepository.findById(s.getPropertyId()).ifPresent(p -> {
                         if (userId.equals(p.getOwnerId())) {
-                            throw new IllegalArgumentException("Un anfitrión no puede calificar su propia propiedad");
+                            throw new ForbiddenAccessException("Un anfitrión no puede calificar su propia propiedad");
                         }
                     });
                 }
@@ -95,11 +96,15 @@ public class ReviewService {
                 .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
 
         if (userId != null && !userId.equals(booking.getUser())) {
-            throw new IllegalArgumentException("Solo el huésped titular puede calificar esta reserva");
+            throw new ForbiddenAccessException("Solo el huésped titular puede calificar esta reserva");
         }
 
-        if (booking.getStatus() != null && "cancelled".equalsIgnoreCase(booking.getStatus())) {
+        String st = booking.getStatus() != null ? booking.getStatus().toLowerCase() : "";
+        if ("cancelled".equals(st)) {
             throw new IllegalStateException("No se pueden enviar reseñas para reservas canceladas");
+        }
+        if (!"checked_out".equals(st) && !"completed".equals(st)) {
+            throw new IllegalStateException("Solo puedes calificar tu estadía después del check-out");
         }
 
         if (reviewRepository.existsByBookingId(bookingId)) {
@@ -140,15 +145,15 @@ public class ReviewService {
         if (analysis.maintenanceAlert() != null && webhookDispatcher != null) {
             String propId = booking.getPropertyId() != null ? booking.getPropertyId() : booking.getBranch();
             if (propId != null) {
-                webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", Map.of(
-                        "reviewId", saved.getId(),
-                        "bookingId", booking.getId(),
-                        "suiteId", saved.getSuite(),
-                        "alert", analysis.maintenanceAlert(),
-                        "comment", saved.getComment(),
-                        "rating", saved.getRating(),
-                        "createdAt", saved.getCreatedAt().toString()
-                ));
+                Map<String, Object> alertPayload = new java.util.LinkedHashMap<>();
+                alertPayload.put("reviewId", saved.getId() != null ? saved.getId() : "");
+                alertPayload.put("bookingId", booking.getId() != null ? booking.getId() : bookingId);
+                alertPayload.put("suiteId", saved.getSuite() != null ? saved.getSuite() : "");
+                alertPayload.put("alert", analysis.maintenanceAlert());
+                alertPayload.put("comment", saved.getComment() != null ? saved.getComment() : "");
+                alertPayload.put("rating", saved.getRating());
+                alertPayload.put("createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : Instant.now().toString());
+                webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", alertPayload);
             }
         }
 

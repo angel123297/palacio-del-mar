@@ -122,4 +122,40 @@ class DynamicPricingTest {
 
         assertTrue(adjustments.isEmpty());
     }
+
+    @Test
+    @DisplayName("Tarifa dinámica: Holds expirados y noches canceladas no disparan falso recargo de alta demanda")
+    void testExpiredAndCancelledSuiteNightsDoNotTriggerFalseSurgePricing() {
+        Suite suite = Suite.builder().id("s1").propertyId("prop-1").totalUnits(2).basePrice(new BigDecimal("100000")).build();
+        when(suiteRepository.findByPropertyIdAndActiveTrue("prop-1")).thenReturn(List.of(suite));
+
+        LocalDate checkIn = fixedToday.plusDays(4);
+        LocalDate checkOut = checkIn.plusDays(1);
+        Instant fixedNow = fixedToday.atStartOfDay(bogota).toInstant();
+
+        // 1 unidad realmente ocupada (50%), más 1 cancelada y 1 expirada -> NO debe superar el umbral del 75%
+        SuiteNight activeBooked = SuiteNight.builder()
+                .suite("s1")
+                .status("booked")
+                .dates(List.of(checkIn))
+                .build();
+        SuiteNight cancelledNight = SuiteNight.builder()
+                .suite("s1")
+                .status("cancelled")
+                .dates(List.of(checkIn))
+                .build();
+        SuiteNight expiredHold = SuiteNight.builder()
+                .suite("s1")
+                .status("hold")
+                .expiresAt(fixedNow.minusSeconds(120))
+                .dates(List.of(checkIn))
+                .build();
+
+        when(suiteNightRepository.findBySuiteAndDatesBetween(eq("s1"), any(), any()))
+                .thenReturn(List.of(activeBooked, cancelledNight, expiredHold));
+
+        Map<LocalDate, DynamicPricingService.Adjustment> adjustments = dynamicPricingService.adjustmentsFor(suite, checkIn, checkOut, null);
+
+        assertTrue(adjustments.isEmpty(), "Los holds expirados y noches canceladas no deben inflar la ocupación ni activar surge pricing");
+    }
 }

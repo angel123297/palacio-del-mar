@@ -16,6 +16,7 @@ public class CalculatePriceRequest {
     private String suiteId;
     private LocalDate checkIn;
     private LocalDate checkOut;
+    private Integer guests;
     private Boolean includeExperiences;
     private List<String> experienceIds;
 }

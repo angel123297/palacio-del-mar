@@ -37,7 +37,8 @@ public class TokenBlacklistService {
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
 
-    // Almacén en memoria L1 para lecturas ultrarrápidas
+    // Almacén en memoria L1 para lecturas ultrarrápidas de tokens revocados (acotado)
+    private static final int MAX_L1_BLACKLIST = 10_000;
     private final Map<String, Long> inMemoryBlacklist = new ConcurrentHashMap<>();
 
     /**
@@ -88,8 +89,7 @@ public class TokenBlacklistService {
             }
 
             // 3. Almacén L1 en memoria local
-            inMemoryBlacklist.put(tokenHash, System.currentTimeMillis() + ttlMillis);
-            cleanExpiredInMemory();
+            putBoundedL1(tokenHash, System.currentTimeMillis() + ttlMillis);
 
             log.info("Token JWT revocado exitosamente (hash={}) por {} ms", tokenHash, ttlMillis);
         } catch (Exception e) {
@@ -123,12 +123,12 @@ public class TokenBlacklistService {
                 }
             }
 
-            // 2. Verificación en Redis L2
+            // 2. Verificación en Redis L2 (< 0.2 ms en RAM)
             if (redisTemplate != null) {
                 try {
                     Boolean hasKey = redisTemplate.hasKey(REDIS_PREFIX + tokenHash);
                     if (Boolean.TRUE.equals(hasKey)) {
-                        inMemoryBlacklist.put(tokenHash, System.currentTimeMillis() + 60000); // Calentar L1
+                        putBoundedL1(tokenHash, System.currentTimeMillis() + 60000); // Calentar L1
                         return true;
                     }
                 } catch (Exception ex) {
@@ -136,10 +136,10 @@ public class TokenBlacklistService {
                 }
             }
 
-            // 3. Verificación duradera obligatoria en MongoDB L3 (elimina el fail-open)
+            // 3. Verificación duradera obligatoria en MongoDB L3 (sin caché negativo local que cause ventanas ciegas ante reinicios de Redis)
             try {
                 if (revokedTokenRepository.existsById(tokenHash)) {
-                    inMemoryBlacklist.put(tokenHash, System.currentTimeMillis() + 60000); // Calentar L1
+                    putBoundedL1(tokenHash, System.currentTimeMillis() + 60000); // Calentar L1
                     return true;
                 }
             } catch (Exception mongoEx) {
@@ -152,6 +152,20 @@ public class TokenBlacklistService {
         }
 
         return false;
+    }
+
+    private void putBoundedL1(String tokenHash, long expiresAtMillis) {
+        inMemoryBlacklist.put(tokenHash, expiresAtMillis);
+        if (inMemoryBlacklist.size() > MAX_L1_BLACKLIST) {
+            cleanExpiredInMemory();
+            if (inMemoryBlacklist.size() > MAX_L1_BLACKLIST) {
+                var it = inMemoryBlacklist.keySet().iterator();
+                while (inMemoryBlacklist.size() > MAX_L1_BLACKLIST && it.hasNext()) {
+                    it.next();
+                    it.remove();
+                }
+            }
+        }
     }
 
     @Scheduled(fixedRate = 600000)

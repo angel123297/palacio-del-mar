@@ -95,8 +95,8 @@ export class BookingBarComponent implements OnInit {
       next: (res) => {
         const list = Array.isArray(res) ? res : (res?.data || []);
         const filtered = list.filter(b => {
-          const n = (b.name || '').trim().toLowerCase();
-          return n !== 'waos' && n !== 'si' && n.length > 2;
+          const n = (b?.name || '').trim();
+          return n.length > 2;
         });
         this.branches = filtered.length > 0 ? filtered : this.defaultBranches;
       },

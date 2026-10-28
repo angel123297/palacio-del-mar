@@ -140,4 +140,20 @@ class TokenBlacklistServiceTest {
 
         assertThrows(IllegalStateException.class, () -> tokenBlacklistService.blacklistToken("failing.token"));
     }
+
+    @Test
+    void testNoStaleNegativeCacheWindowWhenTokenRevokedOnAnotherInstanceAndRedisRestarts() {
+        ReflectionTestUtils.setField(tokenBlacklistService, "redisTemplate", redisTemplate);
+        when(redisTemplate.hasKey(anyString())).thenReturn(false);
+
+        String token = "cross.instance.revoked.jwt";
+        // Primera petición: token aún limpio en Redis y MongoDB
+        when(revokedTokenRepository.existsById(anyString())).thenReturn(false);
+        assertFalse(tokenBlacklistService.isBlacklisted(token));
+
+        // 1 segundo después: otra instancia lo revoca en MongoDB y Redis pierde estado tras reinicio (hasKey=false)
+        when(revokedTokenRepository.existsById(anyString())).thenReturn(true);
+        assertTrue(tokenBlacklistService.isBlacklisted(token),
+                "M-6: No debe existir ventana ciega de 30s que omita MongoDB cuando Redis responde false");
+    }
 }

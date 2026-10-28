@@ -12,8 +12,9 @@ export class BookingService {
       map(res => (res?.data || res) as Booking[])
     );
   }
-  createBooking(booking: any): Observable<Booking> {
-    return this.api.post<any>('/bookings', booking).pipe(
+  createBooking(booking: any, idempotencyKey?: string): Observable<Booking> {
+    const key = idempotencyKey || `bk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    return this.api.post<any>('/bookings', booking, { 'Idempotency-Key': key }).pipe(
       map(res => (res?.data || res) as Booking)
     );
   }

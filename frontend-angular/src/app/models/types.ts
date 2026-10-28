@@ -238,5 +238,28 @@ export interface ApiKeyItem {
   revokedAt?: string;
 }
 
+export interface SocialProofSnapshot {
+  suiteKey: string;
+  activeViewers: number;
+  lastBookedMinutesAgo?: number | null;
+  bookingsLast24h: number;
+  highDemand: boolean;
+}
+
+export interface GeoPlace {
+  id: string;
+  name: string;
+  type: string;
+  category?: string;
+  zone?: string;
+  address?: string;
+  slug?: string;
+  lat: number;
+  lng: number;
+  distanceKm?: number;
+  walkMinutes?: number | null;
+  driveMinutes?: number | null;
+}
+
 
 

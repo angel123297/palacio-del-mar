@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -56,6 +57,9 @@ class CrearUsuarioUnitTest {
 
     @Mock
     private EmailService emailService;
+
+    @Mock
+    private MongoTemplate mongoTemplate;
 
     @InjectMocks
     private AuthService authService;
@@ -112,10 +116,11 @@ class CrearUsuarioUnitTest {
     @Test
     @DisplayName("Debe lanzar excepción y no guardar cuando el email ya está registrado")
     void deberiaLanzarExcepcionCuandoEmailYaExiste() {
-        // GIVEN: El email ya existe con contraseña previa
+        // GIVEN: El email ya existe y está verificado
         User usuarioExistente = User.builder()
                 .email("carlos.mendoza@palacio.co")
                 .password("$2a$10$hashPrevio")
+                .emailVerified(true)
                 .build();
         when(userRepository.existsByEmail("carlos.mendoza@palacio.co")).thenReturn(true);
         when(userRepository.findByEmail("carlos.mendoza@palacio.co")).thenReturn(Optional.of(usuarioExistente));

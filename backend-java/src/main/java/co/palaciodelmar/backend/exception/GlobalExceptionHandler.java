@@ -5,8 +5,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import java.util.stream.Collectors;
@@ -22,18 +24,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.error(errors));
     }
 
+    @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ApiResponse<Void>> handleInvalidRequestParameters(Exception ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.error("Parámetro de solicitud inválido o faltante"));
+    }
+
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(RuntimeException ex) {
-        String msg = ex.getMessage();
-        if (msg != null && (msg.toLowerCase().contains("permiso") || msg.toLowerCase().contains("acceder"))) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(msg));
-        }
-        return ResponseEntity.badRequest().body(ApiResponse.error(msg));
+        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ForbiddenAccessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbiddenAccess(ForbiddenAccessException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Acceso denegado: no posees los permisos necesarios"));
+        String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "Acceso denegado: no posees los permisos necesarios";
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(msg));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

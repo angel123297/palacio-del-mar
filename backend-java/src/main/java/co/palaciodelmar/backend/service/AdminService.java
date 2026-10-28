@@ -28,6 +28,12 @@ public class AdminService {
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RedisLockService redisLockService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AvailabilityCacheEvictor availabilityCacheEvictor;
+
     @org.springframework.beans.factory.annotation.Autowired
     public AdminService(
             BookingRepository bookingRepository,
@@ -99,9 +105,7 @@ public class AdminService {
     }
 
     public Booking updateBookingStatus(String bookingId, String newStatus) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .or(() -> bookingRepository.findByBookingCode(bookingId))
-                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
+        Booking booking = findBookingByIdOrCode(bookingId);
 
         if (newStatus == null || newStatus.isBlank()) {
             throw new IllegalArgumentException("El nuevo estado no puede ser nulo o vacío");
@@ -114,12 +118,50 @@ public class AdminService {
             throw new IllegalArgumentException("Estado no válido: " + newStatus);
         }
 
-        bookingService.changeBookingStatus(booking, targetStatus, "ADMIN", "Cambio administrativo de estado");
-        if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
-            suiteNightRepository.deleteByBooking(bookingId);
-        }
+        return executeWithSuiteLock(booking.getSuite(), () -> {
+            Booking fresh = findBookingByIdOrCode(bookingId);
+            bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado");
+            Booking saved = bookingRepository.save(fresh);
 
-        return bookingRepository.save(booking);
+            if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED
+                    || targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED
+                    || targetStatus == co.palaciodelmar.backend.model.BookingStatus.NO_SHOW) {
+                String effectiveBookingId = saved.getId() != null ? saved.getId() : bookingId;
+                suiteNightRepository.deleteByBooking(effectiveBookingId);
+                if (redisLockService != null) {
+                    redisLockService.releaseSuiteHold(
+                            saved.getSuite(),
+                            saved.getUnitSlot(),
+                            saved.getCheckIn(),
+                            saved.getCheckOut(),
+                            effectiveBookingId
+                    );
+                }
+            }
+
+            if (availabilityCacheEvictor != null) {
+                availabilityCacheEvictor.evictAvailability();
+            }
+            return saved;
+        });
+    }
+
+    private Booking findBookingByIdOrCode(String bookingId) {
+        return bookingRepository.findById(bookingId)
+                .or(() -> bookingRepository.findByBookingCode(bookingId))
+                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
+    }
+
+    private <T> T executeWithSuiteLock(String suiteId, java.util.function.Supplier<T> action) {
+        if (redisLockService == null || suiteId == null || suiteId.isBlank()) {
+            return action.get();
+        }
+        return redisLockService.executeWithStrictDistributedLock(
+                "suite:" + suiteId,
+                java.time.Duration.ofSeconds(10),
+                java.time.Duration.ofSeconds(4),
+                action
+        );
     }
 
     public List<Promotion> getAllPromotions() {
@@ -129,11 +171,18 @@ public class AdminService {
     public Promotion createPromotion(Promotion promotion) {
         promotion.setCreatedAt(Instant.now());
         promotion.setUpdatedAt(Instant.now());
-        return promotionRepository.save(promotion);
+        Promotion saved = promotionRepository.save(promotion);
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAvailability();
+        }
+        return saved;
     }
 
     public void deletePromotion(String promotionId) {
         promotionRepository.deleteById(promotionId);
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAvailability();
+        }
     }
 
     /** Estados "vivos": el flujo real es pending → confirmed → checked_in → checked_out (no existe "completed"). */

@@ -5,10 +5,14 @@ import co.palaciodelmar.backend.dto.BookingDTO;
 import co.palaciodelmar.backend.dto.BookingRequest;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.BookingService;
+import co.palaciodelmar.backend.service.IdempotencyService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -21,19 +25,45 @@ public class BookingController {
 
     private final BookingService bookingService;
 
+    @Autowired(required = false)
+    private IdempotencyService idempotencyService;
+
+    private String requireUserId(UserPrincipal principal) {
+        if (principal == null || principal.getUser() == null || principal.getUser().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No autenticado");
+        }
+        return principal.getUser().getId();
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<BookingDTO>> createBooking(
             @AuthenticationPrincipal UserPrincipal principal,
-            @Valid @RequestBody BookingRequest request
+            @Valid @RequestBody BookingRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
-        String userId = principal != null ? principal.getUser().getId() : null;
+        String userId = (principal != null && principal.getUser() != null) ? principal.getUser().getId() : null;
+        if (idempotencyService != null && idempotencyKey != null && !idempotencyKey.isBlank()) {
+            IdempotencyService.IdempotentResult<BookingDTO> res = idempotencyService.execute(
+                    "bookings:create",
+                    userId,
+                    idempotencyKey,
+                    request,
+                    BookingDTO.class,
+                    () -> bookingService.createBooking(userId, request)
+            );
+            ResponseEntity.BodyBuilder builder = ResponseEntity.ok();
+            if (res.replayed()) {
+                builder.header("X-Idempotent-Replay", "true");
+            }
+            return builder.body(ApiResponse.ok("Reserva creada exitosamente", res.body()));
+        }
         BookingDTO booking = bookingService.createBooking(userId, request);
         return ResponseEntity.ok(ApiResponse.ok("Reserva creada exitosamente", booking));
     }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<BookingDTO>>> getUserBookings(@AuthenticationPrincipal UserPrincipal principal) {
-        if (principal == null) {
+        if (principal == null || principal.getUser() == null) {
             return ResponseEntity.ok(ApiResponse.ok(List.of()));
         }
         List<BookingDTO> bookings = bookingService.getUserBookings(principal.getUser().getId());
@@ -42,7 +72,7 @@ public class BookingController {
 
     @GetMapping("/my-bookings")
     public ResponseEntity<ApiResponse<List<BookingDTO>>> getMyBookings(@AuthenticationPrincipal UserPrincipal principal) {
-        if (principal == null) {
+        if (principal == null || principal.getUser() == null) {
             return ResponseEntity.ok(ApiResponse.ok(List.of()));
         }
         List<BookingDTO> bookings = bookingService.getUserBookings(principal.getUser().getId());
@@ -51,7 +81,7 @@ public class BookingController {
 
     @GetMapping("/upcoming")
     public ResponseEntity<ApiResponse<List<BookingDTO>>> getUpcomingBookings(@AuthenticationPrincipal UserPrincipal principal) {
-        List<BookingDTO> bookings = bookingService.getUpcomingBookings(principal.getUser().getId());
+        List<BookingDTO> bookings = bookingService.getUpcomingBookings(requireUserId(principal));
         return ResponseEntity.ok(ApiResponse.ok(bookings));
     }
 
@@ -91,7 +121,7 @@ public class BookingController {
         if (request.getChildren() != null && request.getChildren() < 0) {
             throw new IllegalArgumentException("El número de niños no puede ser negativo");
         }
-        BookingDTO booking = bookingService.modifyBooking(id, principal.getUser().getId(), request);
+        BookingDTO booking = bookingService.modifyBooking(id, requireUserId(principal), request);
         return ResponseEntity.ok(ApiResponse.ok("Reserva modificada exitosamente", booking));
     }
 
@@ -102,7 +132,7 @@ public class BookingController {
             @RequestBody Map<String, String> body
     ) {
         String experienceId = body != null ? body.get("experienceId") : null;
-        BookingDTO booking = bookingService.addExperienceToBooking(id, principal.getUser().getId(), experienceId);
+        BookingDTO booking = bookingService.addExperienceToBooking(id, requireUserId(principal), experienceId);
         return ResponseEntity.ok(ApiResponse.ok("Experiencia agregada exitosamente", booking));
     }
 
@@ -112,7 +142,7 @@ public class BookingController {
             @PathVariable String id,
             @PathVariable String experienceId
     ) {
-        BookingDTO booking = bookingService.removeExperienceFromBooking(id, principal.getUser().getId(), experienceId);
+        BookingDTO booking = bookingService.removeExperienceFromBooking(id, requireUserId(principal), experienceId);
         return ResponseEntity.ok(ApiResponse.ok("Experiencia eliminada exitosamente", booking));
     }
 
@@ -132,7 +162,7 @@ public class BookingController {
             @RequestBody(required = false) Map<String, String> body
     ) {
         String reason = body != null ? body.get("reason") : null;
-        BookingDTO booking = bookingService.cancelBooking(id, principal.getUser().getId(), reason);
+        BookingDTO booking = bookingService.cancelBooking(id, requireUserId(principal), reason);
         return ResponseEntity.ok(ApiResponse.ok("Reserva cancelada exitosamente", booking));
     }
 
@@ -144,8 +174,7 @@ public class BookingController {
     ) {
         String doc = body != null ? body.get("documentNumber") : null;
         String companions = body != null ? body.get("companionGuests") : null;
-        String userId = principal != null ? principal.getUser().getId() : null;
-        BookingDTO booking = bookingService.performPreCheckIn(id, userId, doc, companions);
+        BookingDTO booking = bookingService.performPreCheckIn(id, requireUserId(principal), doc, companions);
         return ResponseEntity.ok(ApiResponse.ok("Pre-check-in completado exitosamente. Llave digital activada.", booking));
     }
 
@@ -156,9 +185,9 @@ public class BookingController {
     ) {
         BookingDTO booking = bookingService.getBookingByIdSecure(id, principal != null ? principal.getUser() : null);
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
-                "bookingId", booking.getId(),
+                "bookingId", booking.getId() != null ? booking.getId() : id,
                 "smartLockPin", booking.getSmartLockPin() != null ? booking.getSmartLockPin() : "PENDIENTE",
-                "suite", booking.getSuite() != null ? booking.getSuite().getName() : "Suite",
+                "suite", booking.getSuite() != null && booking.getSuite().getName() != null ? booking.getSuite().getName() : "Suite",
                 "validFrom", booking.getCheckIn() != null ? booking.getCheckIn().toString() + " 15:00" : "15:00",
                 "validUntil", booking.getCheckOut() != null ? booking.getCheckOut().toString() + " 11:00" : "11:00",
                 "preCheckInCompleted", Boolean.TRUE.equals(booking.getPreCheckInCompleted())

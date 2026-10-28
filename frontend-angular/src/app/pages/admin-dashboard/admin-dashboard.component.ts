@@ -175,7 +175,7 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
           <span>✔ {{ actionMessage() }}</span>
           <button (click)="actionMessage.set('')" class="text-xs opacity-70 hover:opacity-100">✕</button>
         </div>
-        <div *ngIf="actionError()" class="mb-6 p-4 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded-lg text-sm flex items-center justify-between">
+        <div *ngIf="actionError()" role="alert" aria-live="assertive" class="mb-6 p-4 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded-lg text-sm flex items-center justify-between">
           <span>✖ {{ actionError() }}</span>
           <button (click)="actionError.set('')" class="text-xs opacity-70 hover:opacity-100">✕</button>
         </div>
@@ -345,7 +345,7 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
                   </div>
                 </div>
 
-                <div *ngIf="promoError" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
+                <div *ngIf="promoError" role="alert" aria-live="assertive" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
                   {{ promoError }}
                 </div>
                 <div *ngIf="promoSuccess" class="p-3 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded text-xs">

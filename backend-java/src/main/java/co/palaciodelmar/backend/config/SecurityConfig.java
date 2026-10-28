@@ -28,12 +28,29 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final co.palaciodelmar.backend.security.RateLimitFilter rateLimitFilter;
     private final UserDetailsService userDetailsService;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthFilter,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) co.palaciodelmar.backend.security.RateLimitFilter rateLimitFilter,
+            UserDetailsService userDetailsService
+    ) {
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.rateLimitFilter = rateLimitFilter;
+        this.userDetailsService = userDetailsService;
+    }
+
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthFilter,
+            UserDetailsService userDetailsService
+    ) {
+        this(jwtAuthFilter, null, userDetailsService);
+    }
     @Value("${app.base-url:http://localhost:4200}")
     private String appBaseUrl = "http://localhost:4200";
 
@@ -49,20 +66,30 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new org.springframework.security.web.authentication.HttpStatusEntryPoint(org.springframework.http.HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding(java.nio.charset.StandardCharsets.UTF_8.name());
+                            response.getWriter().write("{\"success\":false,\"message\":\"Acceso denegado: no posees los permisos necesarios\",\"data\":null}");
+                        })
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/verify-email", "/api/auth/resend-verification", "/api/auth/reset-password", "/api/auth/forgot-password", "/api/auth/logout").permitAll()
-                        .requestMatchers("/api/auth/profile", "/api/auth/change-password", "/api/auth/me").authenticated()
+                        .requestMatchers("/api/auth/profile", "/api/auth/change-password", "/api/auth/me", "/api/auth/logout-all").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/branches/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/properties/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/suites/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/suites/calculate-price").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/suites/*/viewers/ping").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/geo/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/experiences/**").permitAll()
                         .requestMatchers("/api/availability/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/config").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/status/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/webhooks/**").permitAll()
-                        .requestMatchers("/api/demo/webhook-receiver/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/demo/webhook-receiver").permitAll()
+                        .requestMatchers("/api/demo/webhook-receiver/**").hasAnyRole("HOST", "ADMIN")
                         .requestMatchers("/api/integration/**").permitAll()
                         .requestMatchers("/demo/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
@@ -76,8 +103,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/host/**").hasAnyRole("HOST", "ADMIN")
                         .anyRequest().authenticated()
                 )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .authenticationProvider(authenticationProvider());
+
+        if (rateLimitFilter != null) {
+            http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+        }
+        http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -106,8 +137,7 @@ public class SecurityConfig {
                 "http://localhost:4200",
                 "http://localhost:5000",
                 "http://127.0.0.1:4200",
-                "http://127.0.0.1:5000",
-                "https://*.trycloudflare.com"
+                "http://127.0.0.1:5000"
         ));
         if (appBaseUrl != null && !appBaseUrl.isBlank()) {
             String normalizedBaseUrl = appBaseUrl.trim().replaceAll("/+$", "");
@@ -118,6 +148,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(originPatterns);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("X-Idempotent-Replay", "Retry-After"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

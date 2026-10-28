@@ -17,7 +17,7 @@
     <p class="message">{{ message() }}</p>
     
     <div class="actions" *ngIf="status() !== 'loading'">
-      <a routerLink="/" class="btn-gold">{{ status() === 'success' ? 'Entrar a Palacio del Mar →' : 'Volver al Inicio' }}</a>
+      <a [routerLink]="returnUrl()" class="btn-gold">{{ status() === 'success' ? 'Continuar →' : 'Volver al Inicio' }}</a>
     </div>
   </div>
 </div>

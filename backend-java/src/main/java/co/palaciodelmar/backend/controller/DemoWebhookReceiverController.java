@@ -16,6 +16,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @RequestMapping("/api/demo/webhook-receiver")
 public class DemoWebhookReceiverController {
 
+    private static final int MAX_DEMO_PAYLOAD_CHARS = 16_384;
+    private static final java.util.regex.Pattern EMAIL_PII_PATTERN =
+            java.util.regex.Pattern.compile("([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*(@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})");
+    private static final java.util.regex.Pattern SENSITIVE_JSON_FIELD_PATTERN =
+            java.util.regex.Pattern.compile("(\"(?:guestPhone|phone|smartLockPin|documentId|documentNumber|accountNumber)\"\\s*:\\s*\")([^\"]+)(\")");
+
     private final List<Map<String, Object>> receivedEvents = new CopyOnWriteArrayList<>();
     private volatile boolean simulateFailure = false;
 
@@ -39,6 +45,11 @@ public class DemoWebhookReceiverController {
             @RequestParam(required = false) String secret,
             @RequestBody(required = false) String rawBody
     ) {
+        if (rawBody != null && rawBody.length() > MAX_DEMO_PAYLOAD_CHARS) {
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                    .body(ApiResponse.error("El payload excede el tamaño máximo permitido (16 KB) en el receptor de demostración"));
+        }
+
         if (simulateFailure) {
             log.warn("Receptor Demo: Simulando fallo 500 a solicitud del usuario para probar reintentos");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -50,13 +61,18 @@ public class DemoWebhookReceiverController {
             signatureValid = WebhookSigner.verify(rawBody, secret, signature);
         }
 
+        String sanitizedPayload = sanitizePayloadPii(rawBody);
+        String maskedSignature = (signature != null && signature.length() > 14)
+                ? signature.substring(0, 14) + "..."
+                : signature;
+
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("eventId", eventId);
         record.put("eventType", eventType);
-        record.put("signature", signature);
+        record.put("signature", maskedSignature);
         record.put("timestamp", timestamp);
         record.put("signatureValid", signatureValid);
-        record.put("payload", rawBody);
+        record.put("payload", sanitizedPayload);
         record.put("receivedAt", Instant.now().toString());
 
         receivedEvents.add(0, record);
@@ -103,5 +119,13 @@ public class DemoWebhookReceiverController {
     public ResponseEntity<ApiResponse<Void>> clearEvents() {
         receivedEvents.clear();
         return ResponseEntity.ok(ApiResponse.ok("Eventos eliminados", null));
+    }
+
+    static String sanitizePayloadPii(String rawBody) {
+        if (rawBody == null || rawBody.isBlank()) {
+            return rawBody;
+        }
+        String maskedEmails = EMAIL_PII_PATTERN.matcher(rawBody).replaceAll("$1***$2");
+        return SENSITIVE_JSON_FIELD_PATTERN.matcher(maskedEmails).replaceAll("$1***REDACTED***$3");
     }
 }

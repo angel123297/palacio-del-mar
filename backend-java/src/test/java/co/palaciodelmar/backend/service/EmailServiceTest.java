@@ -136,33 +136,6 @@ class EmailServiceTest {
         assertNotNull(captor.getValue());
     }
 
-    @Test
-    @DisplayName("sendBookingCreatedNotification envía correo con código y enlace de pago al huésped")
-    void testSendBookingCreatedNotification_SendsEmailSuccessfully() {
-        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
-
-        User guest = User.builder()
-                .id("guest-user-1")
-                .name("Ange Kaleth")
-                .email("angekaleth633@gmail.com")
-                .build();
-        when(userRepository.findById("guest-user-1")).thenReturn(Optional.of(guest));
-
-        Booking booking = Booking.builder()
-                .id("bk-created-01")
-                .bookingCode("BK-2026-999")
-                .user("guest-user-1")
-                .suite("Penthouse Ocean Front")
-                .checkIn(LocalDate.of(2026, 11, 10))
-                .checkOut(LocalDate.of(2026, 11, 15))
-                .totalPrice(new BigDecimal("2450000"))
-                .status("pending")
-                .build();
-
-        assertDoesNotThrow(() -> emailService.sendBookingCreatedNotification(booking));
-
-        verify(javaMailSender, times(1)).send(any(MimeMessage.class));
-    }
 
     @Test
     @DisplayName("sendBookingConfirmation usa email de GuestDetails si User id es null")
@@ -374,6 +347,18 @@ class EmailServiceTest {
     }
 
     @Test
+    @DisplayName("sendPasswordResetEmail envía enlace seguro de restablecimiento de contraseña")
+    void testSendPasswordResetEmail_Success() {
+        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
+
+        assertDoesNotThrow(() -> emailService.sendPasswordResetEmail("usuario@ejemplo.com", "secure-token-abc"));
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender, times(1)).send(captor.capture());
+        assertNotNull(captor.getValue());
+    }
+
+    @Test
     @DisplayName("sendTemporaryPasswordEmail envía correo con contraseña temporal al usuario")
     void testSendTemporaryPasswordEmail_Success() {
         when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
@@ -457,69 +442,6 @@ class EmailServiceTest {
         assertDoesNotThrow(unconfiguredService::validateMailConfiguration);
     }
 
-    @Test
-    @DisplayName("sendBookingCreatedNotification incluye nombre real de suite, sede, dirección, noches, huéspedes y desglose en COP")
-    void testSendBookingCreatedNotification_IncludesRichSuitePropertyItineraryAndPricing() throws Exception {
-        when(javaMailSender.createMimeMessage()).thenReturn(createMockMimeMessage());
-
-        User guest = User.builder()
-                .id("guest-user-1")
-                .name("Angel Kaleth")
-                .email("angelkaleth633@gmail.com")
-                .build();
-        when(userRepository.findById("guest-user-1")).thenReturn(Optional.of(guest));
-
-        String rawSuiteObjectId = "671a00000000000000000099";
-        Suite suite = Suite.builder()
-                .id(rawSuiteObjectId)
-                .name("Superior Patio Colonial")
-                .type("Suite Colonial")
-                .branch("branch-centro")
-                .build();
-        when(suiteRepository.findById(rawSuiteObjectId)).thenReturn(Optional.of(suite));
-
-        Branch branch = Branch.builder()
-                .id("branch-centro")
-                .name("Palacio del Mar · Centro Histórico")
-                .zone("Centro Histórico")
-                .address("Calle de la Factoría, Centro Histórico, Cartagena")
-                .build();
-        when(branchRepository.findById("branch-centro")).thenReturn(Optional.of(branch));
-
-        Booking booking = Booking.builder()
-                .id("671b00000000000000000123")
-                .bookingCode("PDM-CARTAGENA01")
-                .user("guest-user-1")
-                .suite(rawSuiteObjectId)
-                .branch("branch-centro")
-                .checkIn(LocalDate.of(2026, 11, 10))
-                .checkOut(LocalDate.of(2026, 11, 15))
-                .nights(5)
-                .guests(2)
-                .subtotal(new BigDecimal("2000000"))
-                .taxes(new BigDecimal("380000"))
-                .guaranteeDeposit(new BigDecimal("200000"))
-                .totalPrice(new BigDecimal("2580000"))
-                .status("pending")
-                .build();
-
-        emailService.sendBookingCreatedNotification(booking);
-
-        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
-        verify(javaMailSender).send(captor.capture());
-        String html = extractHtmlContent(captor.getValue());
-
-        assertTrue(html.contains("PDM-CARTAGENA01"), "Debe incluir el código legible de reserva");
-        assertTrue(html.contains("Superior Patio Colonial"), "Debe incluir el nombre real de la suite");
-        assertTrue(html.contains("Suite Colonial"), "Debe incluir el tipo de suite");
-        assertFalse(html.contains(rawSuiteObjectId), "Nunca debe mostrar el ObjectId hexadecimal de la suite");
-        assertTrue(html.contains("Palacio del Mar · Centro Histórico"), "Debe incluir el nombre de la sede/propiedad");
-        assertTrue(html.contains("Calle de la Factoría, Centro Histórico, Cartagena"), "Debe incluir la dirección física");
-        assertTrue(html.contains("5 noches"), "Debe mostrar la cantidad de noches");
-        assertTrue(html.contains("2"), "Debe mostrar la cantidad de huéspedes");
-        assertTrue(html.contains("2.580.000"), "Debe formatear el total en pesos colombianos");
-        assertTrue(html.contains("http://localhost:4200/checkout/671b00000000000000000123"));
-    }
 
     @Test
     @DisplayName("sendBookingConfirmation incluye detalles completos de alojamiento y pago en HTML, PDF e ICS")

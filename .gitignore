@@ -4,14 +4,16 @@
 node_modules/
 dist/
 .idea/
+.vscode/
 .DS_Store
 logs/
 *.log
 *.patch
 
+# Testing artifacts
 frontend/playwright-report/
 frontend/test-results/
-.env
+jmeter/
 
 # Backend
 backend-java/target/
@@ -22,24 +24,14 @@ frontend-angular/.angular/
 frontend-angular/.vite/
 frontend-angular/dist/
 
-
-# Archify local diagram output
+# Analysis, agent scratches and diagram working directories
 .archify/
 graphify-out/
-*.delivery.json
-
-# AI tools and agent instructions
-.agents/
-AGENTS.md
-docs/*GEMINI*
-docs/*gemini*
-docs/*ANTIGRAVITY*
-docs/*antigravity*
-docs/*VIBE*
-docs/*vibe*
-docs/AUDITORIA_FRONTEND.md
-docs/README-GEMINI-BACKEND.md
-docs/para_antigravity.md
-
-
 scratch/
+.agents/
+.claude/
+skills-lock.json
+AGENTS.md
+*.delivery.json
+docs/*.delivery.json
+docs/*.md

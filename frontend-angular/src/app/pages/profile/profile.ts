@@ -1,6 +1,7 @@
-import { Component, OnInit, ChangeDetectorRef, effect } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { finalize } from 'rxjs';
@@ -89,6 +90,26 @@ import { finalize } from 'rxjs';
             <p *ngIf="passwordSuccess" role="status" style="color: #2ecc71; margin-top: 1rem; text-align: center; font-size: 0.9rem;">{{ passwordSuccess }}</p>
             <p *ngIf="passwordError" role="alert" style="color: #ff4d4d; margin-top: 1rem; text-align: center; font-size: 0.9rem;">{{ passwordError }}</p>
           </form>
+
+          <!-- Global Device Session Security (Redis Pillar 7) -->
+          <section aria-label="Seguridad de sesiones activas" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 2rem; margin-top: 2rem;">
+            <h3 style="color: #fff; margin: 0 0 0.75rem 0; font-size: 1.2rem; border-bottom: 1px solid rgba(212,175,55,0.2); padding-bottom: 0.5rem;">Seguridad de Sesiones · Dispositivos Conectados</h3>
+            <p style="color: #d6ceb8; font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.25rem;">
+              ¿Iniciaste sesión en un computador compartido o cambiaste de teléfono? Revoca de inmediato todos tus tokens activos en otros navegadores y dispositivos móviles.
+            </p>
+            <button
+              id="btn-logout-all-devices"
+              type="button"
+              (click)="logoutAllDevices()"
+              [disabled]="revokingAllSessions"
+              aria-label="Cerrar sesión en todos los dispositivos"
+              style="width: 100%; min-height: 44px; padding: 12px 16px; border-radius: 6px; border: 1px solid #e74c3c; background: rgba(231, 76, 60, 0.14); color: #ffb3ad; font-size: 0.95rem; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 10px;">
+              <span *ngIf="!revokingAllSessions">Cerrar sesión en todos los dispositivos</span>
+              <span *ngIf="revokingAllSessions">Revocando sesiones activas...</span>
+            </button>
+            <p *ngIf="sessionsSuccess" role="status" style="color: #2ecc71; margin-top: 1rem; text-align: center; font-size: 0.9rem;">{{ sessionsSuccess }}</p>
+            <p *ngIf="sessionsError" role="alert" style="color: #ff4d4d; margin-top: 1rem; text-align: center; font-size: 0.9rem;">{{ sessionsError }}</p>
+          </section>
         </div>
       </div>
     </div>
@@ -98,11 +119,14 @@ export class ProfileComponent implements OnInit {
   loading = true;
   savingProfile = false;
   savingPassword = false;
+  revokingAllSessions = false;
 
   profileSuccess = '';
   profileError = '';
   passwordSuccess = '';
   passwordError = '';
+  sessionsSuccess = '';
+  sessionsError = '';
   showCurrentPassword = false;
   showNewPassword = false;
 
@@ -114,6 +138,7 @@ export class ProfileComponent implements OnInit {
     private auth: AuthService,
     private fb: FormBuilder,
     private cdr: ChangeDetectorRef,
+    private router: Router,
   ) {
     this.profileForm = this.fb.group({
       name: ['', Validators.required],
@@ -204,6 +229,31 @@ export class ProfileComponent implements OnInit {
       },
       error: () => {
         this.passwordError = 'Error al cambiar contraseña. Verifica tu contraseña actual.';
+      }
+    });
+  }
+
+  logoutAllDevices() {
+    this.revokingAllSessions = true;
+    this.sessionsSuccess = '';
+    this.sessionsError = '';
+    this.cdr.detectChanges();
+
+    this.auth.logoutAllDevices().pipe(
+      finalize(() => {
+        this.revokingAllSessions = false;
+        this.cdr.detectChanges();
+      })
+    ).subscribe({
+      next: (res) => {
+        this.sessionsSuccess = res?.message || 'Se han cerrado todas tus sesiones activas.';
+        this.cdr.detectChanges();
+        setTimeout(() => {
+          this.router.navigate(['/']);
+        }, 900);
+      },
+      error: (err) => {
+        this.sessionsError = err?.error?.message || 'No se pudieron cerrar las sesiones. Intenta nuevamente.';
       }
     });
   }

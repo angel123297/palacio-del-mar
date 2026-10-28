@@ -37,12 +37,11 @@ class SecurityConfigCorsTest {
     }
 
     @Test
-    @DisplayName("CORS permite cualquier subdominio HTTPS de Cloudflare Quick Tunnel (*.trycloudflare.com)")
-    void testAllowsCloudflareQuickTunnelOrigins() {
+    @DisplayName("CORS bloquea subdominios arbitrarios de Cloudflare (*.trycloudflare.com) por política de seguridad")
+    void testRejectsCloudflareWildcardOrigins() {
         CorsConfiguration config = buildCorsConfig("http://localhost:4200");
         assertNotNull(config);
-        assertEquals(
-                "https://palacio-cartagena-demo.trycloudflare.com",
+        assertNull(
                 config.checkOrigin("https://palacio-cartagena-demo.trycloudflare.com")
         );
     }

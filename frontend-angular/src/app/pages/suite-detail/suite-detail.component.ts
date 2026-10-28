@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -7,7 +7,7 @@ import { DateRangePickerComponent } from '../../components/date-range-picker/dat
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { SearchStateService } from '../../services/search-state.service';
-import { Suite, Experience } from '../../models/types';
+import { Suite, Experience, SocialProofSnapshot, GeoPlace } from '../../models/types';
 import { format } from 'date-fns';
 import { AuthModalComponent } from '../../components/auth-modal/auth-modal.component';
 
@@ -24,99 +24,6 @@ const addDaysIso = (iso: string, days: number): string => {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 };
 
-const FALLBACK_SUITES_CATALOG: Suite[] = [
-  {
-    id: 'penthouse-bocagrande',
-    name: 'Penthouse Ocean Front',
-    slug: 'penthouse-bocagrande',
-    type: 'Suite Presidencial',
-    description: 'Penthouse exclusivo de dos niveles con piscina privada infiniti al Caribe, ventanales panorámicos y mayordomo personal 24/7.',
-    propertyId: 'bocagrande',
-    branch: { name: 'Palacio del Mar · Bocagrande', slug: 'bocagrande', address: 'Avenida San Martín, Bocagrande, Cartagena' } as any,
-    basePrice: 2450000,
-    pricePerNight: 2450000,
-    size: 160,
-    maxGuests: 4,
-    amenities: ['Piscina privada', 'Vista al mar', 'Mayordomo 24/7', 'Terraza', 'Wi-Fi 500Mbps', 'Cava de vinos'],
-    mainImage: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800'
-  } as Suite,
-  {
-    id: 'suite-presidencial-mar',
-    name: 'Suite Presidencial Mar Caribe',
-    slug: 'suite-presidencial-mar',
-    type: 'Presidencial',
-    description: 'Vistas panorámicas a la bahía de Bocagrande, jacuzzi privado sobre terraza colonial y mayordomo personal 24/7.',
-    propertyId: 'bocagrande',
-    branch: { name: 'Palacio Bocagrande', slug: 'bocagrande', address: 'Cra. 1 # 5-40, Bocagrande, Cartagena' } as any,
-    basePrice: 850000,
-    pricePerNight: 850000,
-    size: 78,
-    maxGuests: 4,
-    amenities: ['Jacuzzi privado', 'Vista al mar', 'Mayordomo 24/7', 'Terraza', 'Wi-Fi 500Mbps', 'Cava de vinos'],
-    mainImage: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'
-  } as Suite,
-  {
-    id: 'suite-arte-patio-getsemani',
-    name: 'Suite Arte & Patio',
-    slug: 'suite-arte-patio-getsemani',
-    type: 'Suite Deluxe',
-    description: 'Suite con galería de arte contemporáneo independiente y zona de descanso en patio interior privado.',
-    propertyId: 'getsemani',
-    branch: { name: 'Palacio del Mar · Getsemaní', slug: 'getsemani', address: 'Calle del Arsenal, Getsemaní, Cartagena' } as any,
-    basePrice: 1150000,
-    pricePerNight: 1150000,
-    size: 58,
-    maxGuests: 2,
-    amenities: ['Patio privado', 'Colección de arte', 'Tina hidromasaje', 'Minibar gourmet'],
-    mainImage: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'
-  } as Suite,
-  {
-    id: 'casona-colonial-getsemani',
-    name: 'Casona Colonial Getsemaní',
-    slug: 'casona-colonial-getsemani',
-    type: 'Casona Colonial',
-    description: 'Patio andaluz del siglo XVIII, techos de doble altura con maderas nobles y piscina interior privada.',
-    propertyId: 'getsemani',
-    branch: { name: 'Casona Colonial Getsemaní', slug: 'getsemani', address: 'Calle de la Sierpe # 29-11, Getsemaní, Cartagena' } as any,
-    basePrice: 620000,
-    pricePerNight: 620000,
-    size: 65,
-    maxGuests: 4,
-    amenities: ['Piscina interior', 'Patio colonial', 'Desayuno de autor', 'Camas King artesanales'],
-    mainImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800'
-  } as Suite,
-  {
-    id: 'suite-colonial-centro',
-    name: 'Suite Colonial Imperial',
-    slug: 'suite-colonial-centro',
-    type: 'Suite Deluxe',
-    description: 'Suite histórica con patio colonial, arcos originales del siglo XVIII, tina hidromasaje y balcón.',
-    propertyId: 'centro-historico',
-    branch: { name: 'Palacio del Mar · Centro Histórico', slug: 'centro-historico', address: 'Calle de la Factoría, Centro Histórico, Cartagena' } as any,
-    basePrice: 1310000,
-    pricePerNight: 1310000,
-    size: 65,
-    maxGuests: 2,
-    amenities: ['Patio colonial', 'Tina hidromasaje', 'Balcón', 'Desayuno de autor'],
-    mainImage: 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800'
-  } as Suite,
-  {
-    id: 'suite-colonial-patio',
-    name: 'Gran Suite Colonial con Balcón',
-    slug: 'suite-colonial-patio',
-    type: 'Imperial',
-    description: 'Balcón colonial sobre las murallas, cama King artesanal y desayuno de autor.',
-    propertyId: 'centro-historico',
-    branch: { name: 'Palacio Imperial San Diego', slug: 'centro-historico', address: 'Calle del Curato # 38-99, Cartagena' } as any,
-    basePrice: 620000,
-    pricePerNight: 620000,
-    size: 55,
-    maxGuests: 2,
-    amenities: ['Balcón colonial', 'Cama King artesanal', 'Desayuno gourmet'],
-    mainImage: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800'
-  } as Suite
-];
-
 @Component({
   selector: 'app-suite-detail',
   standalone: true,
@@ -124,10 +31,17 @@ const FALLBACK_SUITES_CATALOG: Suite[] = [
   templateUrl: './suite-detail.component.html',
   styleUrls: ['./suite-detail.component.scss']
 })
-export class SuiteDetailComponent implements OnInit {
+export class SuiteDetailComponent implements OnInit, OnDestroy {
   suite: Suite | null = null;
   loading = true;
   step = 1;
+
+  // Redis Social Proof & Geo Nearby
+  socialProof: SocialProofSnapshot | null = null;
+  nearbyPlaces: GeoPlace[] = [];
+  private viewerPingTimer: ReturnType<typeof setInterval> | null = null;
+  private bookingIdempotencyKey = '';
+  private bookingFingerprint = '';
   
   // Step 1: Basic Booking Info
   today = bogotaTodayIso();
@@ -138,6 +52,10 @@ export class SuiteDetailComponent implements OnInit {
   // Step 2: Experiences
   experiences: Experience[] = [];
   selectedExperiences: { exp: Experience; qty: number }[] = [];
+
+  // Reviews
+  reviews: any[] = [];
+  averageRating = 5.0;
 
   // Step 3: VIP Services
   airportPickup = false;
@@ -267,12 +185,19 @@ export class SuiteDetailComponent implements OnInit {
           this.loading = false;
           this.checkOwnSuite();
           this.fetchLiveQuote();
+          this.initSocialProofPing(idOrSlug);
+          this.fetchNearbyGeoPlaces(idOrSlug);
+          const sId = this.suite ? (this.suite.id || this.suite._id) : idOrSlug;
+          this.loadReviews(sId || idOrSlug);
           this.cdr.detectChanges();
         },
         error: () => {
-          const match = FALLBACK_SUITES_CATALOG.find(s => s.slug === idOrSlug || s.id === idOrSlug) || FALLBACK_SUITES_CATALOG[0];
-          this.suite = match;
+          this.suite = null;
           this.loading = false;
+          if (this.viewerPingTimer) {
+            clearInterval(this.viewerPingTimer);
+            this.viewerPingTimer = null;
+          }
           this.cdr.detectChanges();
         }
       });
@@ -285,6 +210,64 @@ export class SuiteDetailComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    if (this.viewerPingTimer) {
+      clearInterval(this.viewerPingTimer);
+      this.viewerPingTimer = null;
+    }
+  }
+
+  private getViewerSessionId(): string {
+    try {
+      const existing = sessionStorage.getItem('pdm_viewer_sid');
+      if (existing) return existing;
+      const fresh = `vw_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      sessionStorage.setItem('pdm_viewer_sid', fresh);
+      return fresh;
+    } catch {
+      return `vw_${Date.now()}`;
+    }
+  }
+
+  private initSocialProofPing(idOrSlug: string): void {
+    const sendPing = () => {
+      const sid = this.getViewerSessionId();
+      this.api.post<any>(`/suites/${encodeURIComponent(idOrSlug)}/viewers/ping`, { sessionId: sid }, { 'X-Viewer-Session': sid }).subscribe({
+        next: (res) => {
+          this.socialProof = (res?.data || res) as SocialProofSnapshot;
+          this.cdr.detectChanges();
+        },
+        error: () => {}
+      });
+    };
+    sendPing();
+    if (this.viewerPingTimer) {
+      clearInterval(this.viewerPingTimer);
+    }
+    this.viewerPingTimer = setInterval(sendPing, 45000);
+  }
+
+  private fetchNearbyGeoPlaces(idOrSlug: string): void {
+    this.api.get<any>(`/geo/suites/${encodeURIComponent(idOrSlug)}/nearby`, { radiusKm: 3.5, limit: 6 }).subscribe({
+      next: (res) => {
+        const list = res?.data || res;
+        if (Array.isArray(list)) {
+          this.nearbyPlaces = list as GeoPlace[];
+          this.cdr.detectChanges();
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  formatLastBooked(minutes: number | null | undefined): string {
+    if (minutes == null || minutes < 0) return '';
+    if (minutes < 1) return 'Reservada hace instantes';
+    if (minutes < 60) return `Última reserva hace ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    return hours === 1 ? 'Última reserva hace 1 hora' : `Última reserva hace ${hours} h`;
+  }
+
   dynamicPricingNotes: string[] = [];
   dynamicQuoteTotal: number | null = null;
 
@@ -294,12 +277,15 @@ export class SuiteDetailComponent implements OnInit {
     this.api.post<any>('/suites/calculate-price', {
       suiteId: sId,
       checkIn: this.checkIn,
-      checkOut: this.checkOut
+      checkOut: this.checkOut,
+      guests: Number(this.guests) || 2
     }).subscribe({
       next: (res) => {
         const d = res?.data || res;
         this.dynamicPricingNotes = d?.dynamicPricingNotes || [];
-        if (d?.total) {
+        if (d?.roomTotal != null) {
+          this.dynamicQuoteTotal = d.roomTotal;
+        } else if (d?.total != null) {
           this.dynamicQuoteTotal = d.total;
         }
         this.cdr.detectChanges();
@@ -329,6 +315,10 @@ export class SuiteDetailComponent implements OnInit {
     const base = (this.suite?.basePrice || 0) * this.nights;
     const taxes = Math.round(base * 0.19);
     return base + taxes;
+  }
+
+  get totalSuitePrice(): number {
+    return this.totalRoomPrice;
   }
 
   get totalExperiencesPrice(): number {
@@ -387,6 +377,62 @@ export class SuiteDetailComponent implements OnInit {
     return (exp.id || exp._id || '') as string;
   }
 
+  loadReviews(suiteId: string): void {
+    this.api.get<any>(`/suites/${suiteId}/reviews`).subscribe({
+      next: (res) => {
+        const list = res.data || res || [];
+        this.reviews = Array.isArray(list) ? list : [];
+        if (this.reviews.length > 0) {
+          const sum = this.reviews.reduce((acc, r) => acc + (r.rating || 5), 0);
+          this.averageRating = Number((sum / this.reviews.length).toFixed(1));
+        } else {
+          this.averageRating = 5.0;
+        }
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.reviews = [];
+        this.averageRating = 5.0;
+      }
+    });
+  }
+
+  updateExperienceQty(exp: Experience, delta: number, event?: Event): void {
+    if (event) event.stopPropagation();
+    const expKey = this.expId(exp) || exp.name;
+    const item = this.selectedExperiences.find(e => (this.expId(e.exp) || e.exp.name) === expKey);
+    if (item) {
+      const newQty = item.qty + delta;
+      if (newQty <= 0) {
+        this.selectedExperiences = this.selectedExperiences.filter(e => (this.expId(e.exp) || e.exp.name) !== expKey);
+      } else {
+        item.qty = newQty;
+      }
+    } else if (delta > 0) {
+      this.selectedExperiences.push({ exp, qty: 1 });
+    }
+    this.fetchLiveQuote();
+  }
+
+  getExperienceQty(exp: Experience): number {
+    const expKey = this.expId(exp) || exp.name;
+    const item = this.selectedExperiences.find(e => (this.expId(e.exp) || e.exp.name) === expKey);
+    return item ? item.qty : 0;
+  }
+
+  skipStep(currentStep: number): void {
+    if (currentStep === 2) {
+      this.selectedExperiences = [];
+    } else if (currentStep === 3) {
+      this.airportPickup = false;
+      this.petFriendly = false;
+      this.wantFood = false;
+      this.foodType = '';
+      this.customFood = '';
+    }
+    this.nextStep();
+  }
+
   toggleExperience(exp: Experience) {
     const expKey = this.expId(exp) || exp.name;
     const idx = this.selectedExperiences.findIndex(e => (this.expId(e.exp) || e.exp.name) === expKey);
@@ -395,6 +441,7 @@ export class SuiteDetailComponent implements OnInit {
     } else {
       this.selectedExperiences.push({ exp, qty: 1 });
     }
+    this.fetchLiveQuote();
   }
 
   isExperienceSelected(exp: Experience): boolean {
@@ -523,7 +570,7 @@ export class SuiteDetailComponent implements OnInit {
        });
     }
 
-    this.api.post<any>('/bookings', {
+    const payload = {
       suiteId: this.suite?.id || this.suite?._id,
       checkIn: this.checkIn,
       checkOut: this.checkOut,
@@ -532,11 +579,19 @@ export class SuiteDetailComponent implements OnInit {
       petFriendly: this.petFriendly,
       needsCrib: this.needsCrib,
       foodOrders: foodOrders,
-      experiences: this.selectedExperiences.map(e => this.expId(e.exp)),
+      experiences: this.selectedExperiences.map(e => ({ experienceId: this.expId(e.exp), quantity: e.qty })),
       guestName: this.guestName,
       guestEmail: this.guestEmail,
       guestPhone: this.guestPhone
-    }).subscribe({
+    };
+
+    const currentFp = JSON.stringify(payload);
+    if (!this.bookingIdempotencyKey || this.bookingFingerprint !== currentFp) {
+      this.bookingFingerprint = currentFp;
+      this.bookingIdempotencyKey = `bk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    this.api.post<any>('/bookings', payload, { 'Idempotency-Key': this.bookingIdempotencyKey }).subscribe({
       next: (res) => {
         this.bookingBusy = false;
         this.cdr.detectChanges();

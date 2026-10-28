@@ -29,6 +29,9 @@ public class IntegrationService {
     private final SuiteRepository suiteRepository;
     private final SuiteNightRepository suiteNightRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AvailabilityCacheEvictor availabilityCacheEvictor;
+
     @Caching(evict = {
             @CacheEvict(value = "suites", allEntries = true),
             @CacheEvict(value = "suite_detail", allEntries = true),
@@ -78,7 +81,11 @@ public class IntegrationService {
                     .build();
         }
 
-        return suiteRepository.save(suite);
+        Suite saved = suiteRepository.save(suite);
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
+        return saved;
     }
 
     public Map<String, Object> manageAvailability(ApiKey apiKey, IntegrationAvailabilityRequest request) {
@@ -109,7 +116,12 @@ public class IntegrationService {
         response.put("action", action);
 
         if ("BLOCK".equals(action)) {
-            List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), start, end.minusDays(1));
+            Instant now = Instant.now();
+            List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), start, end.minusDays(1))
+                    .stream()
+                    .filter(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus()))
+                    .filter(sn -> sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(now))
+                    .toList();
 
             // Verificar si hay reservas nativas o bloqueos conflictivos en ese slot
             for (SuiteNight sn : occupied) {
@@ -151,6 +163,10 @@ public class IntegrationService {
                 throw new IllegalStateException("Colisión de concurrencia al bloquear fechas. Intente nuevamente.");
             }
 
+            if (availabilityCacheEvictor != null) {
+                availabilityCacheEvictor.evictAvailability();
+            }
+
             response.put("status", "SUCCESS");
             response.put("nightsBlocked", nights);
             response.put("recordsCreated", inserted.size());
@@ -167,6 +183,9 @@ public class IntegrationService {
                     .toList();
 
             suiteNightRepository.deleteAll(toRemove);
+            if (availabilityCacheEvictor != null) {
+                availabilityCacheEvictor.evictAvailability();
+            }
 
             response.put("status", "SUCCESS");
             response.put("recordsRemoved", toRemove.size());

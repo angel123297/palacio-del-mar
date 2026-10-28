@@ -31,11 +31,15 @@
               }
             ],
             "styles": [
-              "node_modules/leaflet/dist/leaflet.css", "src/styles.scss"
+              "node_modules/leaflet/dist/leaflet.css",
+              "src/styles.scss"
             ],
             "optimization": {
               "scripts": true,
-              "styles": true,
+              "styles": {
+                "minify": true,
+                "inlineCritical": false
+              },
               "fonts": {
                 "inline": false
               }

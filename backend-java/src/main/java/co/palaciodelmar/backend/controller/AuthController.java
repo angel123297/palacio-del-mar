@@ -42,7 +42,9 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> register(@RequestBody RegisterRequest request, jakarta.servlet.http.HttpServletResponse httpResponse, jakarta.servlet.http.HttpServletRequest httpRequest) {
         AuthResponse response = authService.register(request);
-        addJwtCookie(httpResponse, response.getToken(), httpRequest);
+        if (response.getToken() != null && !response.getToken().isBlank()) {
+            addJwtCookie(httpResponse, response.getToken(), httpRequest);
+        }
 
         Map<String, Object> body = new HashMap<>();
         body.put("success", true);
@@ -118,10 +120,28 @@ public class AuthController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("message", "Si tu correo se encuentra registrado, recibirás una contraseña temporal para acceder.");
+        response.put("message", "Si tu correo se encuentra registrado, recibirás un enlace de restablecimiento de contraseña en breve.");
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, String> body) {
+        String token = body != null ? body.get("token") : null;
+        String newPassword = body != null ? body.get("newPassword") : null;
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token es requerido");
+        }
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            throw new IllegalArgumentException("Nueva contraseña es requerida");
+        }
+
+        authService.resetPassword(token, newPassword);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.");
+        return ResponseEntity.ok(response);
+    }
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal UserPrincipal principal) {
         if (principal == null) {
@@ -166,6 +186,36 @@ public class AuthController {
         return ResponseEntity.ok(body);
     }
 
+    @PostMapping("/logout-all")
+    public ResponseEntity<ApiResponse<Void>> logoutAllDevices(
+            @AuthenticationPrincipal UserPrincipal principal,
+            jakarta.servlet.http.HttpServletRequest httpRequest,
+            jakarta.servlet.http.HttpServletResponse httpResponse
+    ) {
+        if (principal == null || principal.getUser() == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("No autenticado"));
+        }
+
+        authService.logoutAllDevices(principal.getUser().getId());
+
+        String token = extractToken(httpRequest);
+        if (token != null && !token.isBlank()) {
+            tokenBlacklistService.blacklistToken(token);
+        }
+
+        boolean isSecure = cookieSecure || (httpRequest != null && (httpRequest.isSecure() || "https".equalsIgnoreCase(httpRequest.getHeader("X-Forwarded-Proto"))));
+        org.springframework.http.ResponseCookie springCookie = org.springframework.http.ResponseCookie.from("jwt", "")
+                .httpOnly(true)
+                .secure(isSecure)
+                .path("/")
+                .maxAge(java.time.Duration.ZERO)
+                .sameSite("Lax")
+                .build();
+        httpResponse.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, springCookie.toString());
+
+        return ResponseEntity.ok(ApiResponse.ok("Se han cerrado todas tus sesiones activas en todos los dispositivos", null));
+    }
+
     private String extractToken(jakarta.servlet.http.HttpServletRequest request) {
         if (request == null) return null;
         String authHeader = request.getHeader("Authorization");
@@ -187,6 +237,9 @@ public class AuthController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestBody User request
     ) {
+        if (principal == null || principal.getUser() == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("No autenticado"));
+        }
         UserDTO updated = authService.updateProfile(principal.getUser().getId(), request);
         return ResponseEntity.ok(ApiResponse.ok("Perfil actualizado exitosamente", updated));
     }
@@ -198,6 +251,9 @@ public class AuthController {
             jakarta.servlet.http.HttpServletRequest httpRequest,
             jakarta.servlet.http.HttpServletResponse httpResponse
     ) {
+        if (principal == null || principal.getUser() == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("No autenticado"));
+        }
         String currentPassword = body != null ? body.get("currentPassword") : null;
         String newPassword = body != null ? body.get("newPassword") : null;
         authService.changePassword(principal.getUser().getId(), currentPassword, newPassword);

@@ -243,7 +243,16 @@ public class SuiteService {
             }
         }
 
-        BigDecimal total = result.total().add(experiencesTotal);
+        BigDecimal extraGuestsFee = BigDecimal.ZERO;
+        if (request.getGuests() != null && request.getGuests() > 2) {
+            extraGuestsFee = new BigDecimal("120000")
+                    .multiply(BigDecimal.valueOf(request.getGuests() - 2))
+                    .multiply(BigDecimal.valueOf(nights));
+        }
+
+        BigDecimal roomTotal = result.total();
+        BigDecimal guaranteeDeposit = new BigDecimal("100000");
+        BigDecimal total = roomTotal.add(experiencesTotal).add(extraGuestsFee);
 
         CalculatePriceResponseDTO.DatesInfo datesInfo = CalculatePriceResponseDTO.DatesInfo.builder()
                 .checkIn(request.getCheckIn())
@@ -263,6 +272,9 @@ public class SuiteService {
                 .dates(datesInfo)
                 .nightlyPrice(suite.getBasePrice())
                 .subtotal(subtotal)
+                .roomTotal(roomTotal)
+                .extraGuestsFee(extraGuestsFee)
+                .guaranteeDeposit(guaranteeDeposit)
                 .experiencesTotal(experiencesTotal)
                 .discount(result.discount())
                 .discountReason(result.discount().compareTo(BigDecimal.ZERO) > 0 ? "Promoción / Larga estadía" : null)

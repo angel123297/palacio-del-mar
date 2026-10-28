@@ -35,8 +35,27 @@ public class PropertyService {
     @Autowired(required = false)
     private EmailService emailService;
 
+    @Autowired(required = false)
+    private AvailabilityCacheEvictor availabilityCacheEvictor;
+
+    @Autowired(required = false)
+    private GeoSearchService geoSearchService;
+
     public void setEmailService(EmailService emailService) {
         this.emailService = emailService;
+    }
+
+    private void syncCachesAndGeo() {
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
+        if (geoSearchService != null) {
+            try {
+                geoSearchService.refreshCatalogIndex();
+            } catch (Exception e) {
+                log.debug("No se pudo refrescar índice geo tras mutación de propiedad: {}", e.getMessage());
+            }
+        }
     }
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
@@ -70,6 +89,7 @@ public class PropertyService {
                 .build();
 
         Property saved = propertyRepository.save(property);
+        syncCachesAndGeo();
         return toDTO(saved);
     }
 
@@ -144,7 +164,9 @@ public class PropertyService {
         }
         property.setUpdatedAt(Instant.now());
 
-        return toDTO(propertyRepository.save(property));
+        Property saved = propertyRepository.save(property);
+        syncCachesAndGeo();
+        return toDTO(saved);
     }
 
     /**
@@ -161,6 +183,7 @@ public class PropertyService {
         property.setStatus(status.toUpperCase());
         property.setUpdatedAt(Instant.now());
         Property saved = propertyRepository.save(property);
+        syncCachesAndGeo();
         if (emailService != null) {
             try {
                 emailService.sendPropertyStatusNotification(saved, status);
@@ -263,7 +286,11 @@ public class PropertyService {
                 .updatedAt(Instant.now())
                 .build();
 
-        return suiteRepository.save(suite);
+        Suite saved = suiteRepository.save(suite);
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
+        return saved;
     }
 
     @Caching(evict = {
@@ -302,7 +329,11 @@ public class PropertyService {
         if (req.getActive() != null) suite.setActive(req.getActive());
         suite.setUpdatedAt(Instant.now());
 
-        return suiteRepository.save(suite);
+        Suite saved = suiteRepository.save(suite);
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
+        return saved;
     }
 
     @Caching(evict = {
@@ -324,6 +355,9 @@ public class PropertyService {
         suite.setAvailable(false);
         suite.setUpdatedAt(Instant.now());
         suiteRepository.save(suite);
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
     }
 
     // --- Helpers y Mappers ---
