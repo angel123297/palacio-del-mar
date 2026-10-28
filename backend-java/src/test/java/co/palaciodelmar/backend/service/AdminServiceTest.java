@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.model.Booking;
+import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +13,9 @@ import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 class AdminServiceTest {
@@ -23,6 +27,7 @@ class AdminServiceTest {
     private SuiteNightRepository suiteNightRepository;
     private BookingService bookingService;
     private PropertyRepository propertyRepository;
+    private BranchRepository branchRepository;
     private PaymentRepository paymentRepository;
     private PaymentGateway paymentGateway;
 
@@ -37,6 +42,7 @@ class AdminServiceTest {
         suiteNightRepository = mock(SuiteNightRepository.class);
         bookingService = mock(BookingService.class);
         propertyRepository = mock(PropertyRepository.class);
+        branchRepository = mock(BranchRepository.class);
         paymentRepository = mock(PaymentRepository.class);
         paymentGateway = mock(PaymentGateway.class);
 
@@ -48,6 +54,7 @@ class AdminServiceTest {
                 suiteNightRepository,
                 bookingService,
                 propertyRepository,
+                branchRepository,
                 paymentRepository,
                 paymentGateway
         );
@@ -324,5 +331,99 @@ class AdminServiceTest {
         );
 
         verify(suiteNightRepository, never()).deleteByBooking(anyString());
+    }
+
+    @Test
+    @DisplayName("createPromotion rechaza un scope inexistente: ni 'all', ni sede, ni propiedad -> no se guarda promo huérfana")
+    void createPromotionRejectsUnknownScope() {
+        when(branchRepository.existsById("sede-falsa")).thenReturn(false);
+        when(propertyRepository.existsById("sede-falsa")).thenReturn(false);
+
+        Promotion promo = Promotion.builder()
+                .title("Promo con scope corrupto")
+                .branch("sede-falsa")
+                .discountPercent(10)
+                .active(true)
+                .build();
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> adminService.createPromotion(promo)
+        );
+        assertTrue(ex.getMessage().toLowerCase().contains("sede"),
+                "El mensaje debe explicar que el scope no es una sede o propiedad válida");
+        verify(promotionRepository, never()).save(any(Promotion.class));
+    }
+
+    @Test
+    @DisplayName("createPromotion rechaza scope nulo o vacío: una promo sin scope es huérfana")
+    void createPromotionRejectsNullScope() {
+        Promotion sinScope = Promotion.builder()
+                .title("Promo sin scope")
+                .discountPercent(10)
+                .active(true)
+                .build();
+
+        assertThrows(IllegalArgumentException.class, () -> adminService.createPromotion(sinScope));
+        verify(promotionRepository, never()).save(any(Promotion.class));
+
+        Promotion scopeVacio = Promotion.builder()
+                .title("Promo con scope vacío")
+                .branch("   ")
+                .discountPercent(10)
+                .active(true)
+                .build();
+
+        assertThrows(IllegalArgumentException.class, () -> adminService.createPromotion(scopeVacio));
+        verify(promotionRepository, never()).save(any(Promotion.class));
+    }
+
+    @Test
+    @DisplayName("createPromotion acepta el scope global 'all' en mayúsculas o minúsculas")
+    void createPromotionAcceptsGlobalScope() {
+        when(promotionRepository.save(any(Promotion.class))).thenAnswer(i -> i.getArgument(0));
+
+        Promotion promoGlobal = Promotion.builder()
+                .title("Promoción global")
+                .branch("all")
+                .discountPercent(15)
+                .active(true)
+                .build();
+        assertNotNull(adminService.createPromotion(promoGlobal));
+
+        Promotion promoGlobalMayusculas = Promotion.builder()
+                .title("Promoción global MAYÚSCULAS")
+                .branch("ALL")
+                .discountPercent(15)
+                .active(true)
+                .build();
+        assertNotNull(adminService.createPromotion(promoGlobalMayusculas));
+        verify(promotionRepository, times(2)).save(any(Promotion.class));
+    }
+
+    @Test
+    @DisplayName("createPromotion acepta como scope una sede existente o una propiedad existente")
+    void createPromotionAcceptsExistingBranchOrProperty() {
+        when(branchRepository.existsById("br-boca")).thenReturn(true);
+        when(propertyRepository.existsById("prop-boca")).thenReturn(false);
+        when(branchRepository.existsById("prop-boca")).thenReturn(false);
+        when(propertyRepository.existsById("prop-waos")).thenReturn(true);
+        when(promotionRepository.save(any(Promotion.class))).thenAnswer(i -> i.getArgument(0));
+
+        Promotion porSede = Promotion.builder()
+                .title("Promo por sede")
+                .branch("br-boca")
+                .discountPercent(10)
+                .active(true)
+                .build();
+        assertNotNull(adminService.createPromotion(porSede));
+
+        Promotion porPropiedad = Promotion.builder()
+                .title("Promo por propiedad")
+                .branch("prop-waos")
+                .discountPercent(12)
+                .active(true)
+                .build();
+        assertNotNull(adminService.createPromotion(porPropiedad));
     }
 }

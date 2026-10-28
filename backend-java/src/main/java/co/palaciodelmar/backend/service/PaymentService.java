@@ -2,7 +2,6 @@ package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.BookingDTO;
 import co.palaciodelmar.backend.dto.PaymentDTO;
-import co.palaciodelmar.backend.dto.PaymentRequest;
 import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Payment;

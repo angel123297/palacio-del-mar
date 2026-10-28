@@ -47,6 +47,7 @@ public class IntegrationService {
         if (existingOpt.isPresent()) {
             suite = existingOpt.get();
             log.info("Actualizando habitación externa existente {} para propiedad {}", externalId, propertyId);
+            suite.setBranch(propertyId); // normaliza scopes heredados (p. ej. 'branch-1') al ID de la propiedad
             suite.setName(request.getName().trim());
             if (request.getType() != null) suite.setType(request.getType());
             suite.setBasePrice(request.getBasePrice());
@@ -63,7 +64,7 @@ public class IntegrationService {
 
             suite = Suite.builder()
                     .propertyId(propertyId)
-                    .branch("branch-1") // Compatibilidad con consultas monohotel
+                    .branch(propertyId) // scope por ID de propiedad, mismo criterio que PropertyService
                     .source("EXTERNAL")
                     .externalId(externalId)
                     .name(request.getName().trim())

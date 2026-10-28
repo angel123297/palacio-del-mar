@@ -7,6 +7,7 @@ import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.service.AdminService;
 import co.palaciodelmar.backend.service.BookingService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -62,7 +63,7 @@ public class AdminController {
     @PutMapping("/bookings/{id}/status")
     public ResponseEntity<ApiResponse<BookingDTO>> updateBookingStatus(
             @PathVariable String id,
-            @jakarta.validation.Valid @RequestBody co.palaciodelmar.backend.dto.UpdateStatusRequest body
+            @Valid @RequestBody co.palaciodelmar.backend.dto.UpdateStatusRequest body
     ) {
         Booking booking = adminService.updateBookingStatus(id, body.getStatus());
         return ResponseEntity.ok(ApiResponse.ok("Estado actualizado exitosamente", bookingService.toDTO(booking)));
@@ -78,10 +79,10 @@ public class AdminController {
 
     @PostMapping("/promotions")
     public ResponseEntity<ApiResponse<PromotionDTO>> createPromotion(
-            @jakarta.validation.Valid @RequestBody co.palaciodelmar.backend.dto.PromotionRequest request) {
+            @Valid @RequestBody co.palaciodelmar.backend.dto.PromotionRequest request) {
         Promotion promotion = Promotion.builder()
                 .title(request.getTitle())
-                .branch(request.resolveBranch())
+                .branch(request.getBranchId())
                 .discountPercent(request.getDiscountPercent())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())

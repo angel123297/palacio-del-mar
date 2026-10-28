@@ -169,8 +169,8 @@ public class AvailabilityService {
 
         for (Suite suite : allSuites) {
             if (branchId != null && !branchId.isEmpty()) {
-                boolean matchesBranch = suite.getBranch() != null && (suite.getBranch().equals(resolvedBranchId) || suite.getBranch().equals(branchId));
-                boolean matchesProperty = suite.getPropertyId() != null && (suite.getPropertyId().equals(resolvedPropertyId) || suite.getPropertyId().equals(branchId));
+                boolean matchesBranch = suite.getBranch() != null && suite.getBranch().equals(resolvedBranchId);
+                boolean matchesProperty = suite.getPropertyId() != null && suite.getPropertyId().equals(resolvedPropertyId);
                 if (!matchesBranch && !matchesProperty) {
                     continue;
                 }
@@ -286,8 +286,8 @@ public class AvailabilityService {
         if (filteredSuites.isEmpty()) {
             for (Suite suite : allSuites) {
                 if (branchId != null && !branchId.isEmpty()) {
-                    boolean matchesBranch = suite.getBranch() != null && (suite.getBranch().equals(resolvedBranchId) || suite.getBranch().equals(branchId));
-                    boolean matchesProperty = suite.getPropertyId() != null && (suite.getPropertyId().equals(resolvedPropertyId) || suite.getPropertyId().equals(branchId));
+                    boolean matchesBranch = suite.getBranch() != null && suite.getBranch().equals(resolvedBranchId);
+                    boolean matchesProperty = suite.getPropertyId() != null && suite.getPropertyId().equals(resolvedPropertyId);
                     if (!matchesBranch && !matchesProperty) {
                         continue;
                     }

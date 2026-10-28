@@ -296,4 +296,62 @@ class AvailabilityServiceTest {
         assertEquals(1, res.getUnavailableSuites().size());
         assertFalse(res.getUnavailableSuites().get(0).getIsAvailable());
     }
+
+    @Test
+    @DisplayName("El filtro por sede solo empareja por ID resuelto: una suite con slug en branch (dato corrupto) no aparece")
+    void checkAvailabilityDoesNotMatchSuitesWhoseBranchFieldContainsSlugText() {
+        Suite corruptSuite = Suite.builder()
+                .id("suite-branch-corrupto")
+                .slug("suite-corrupta")
+                .name("Suite con slug en branch")
+                .branch("bocagrande") // dato corrupto: texto del slug, no un ID
+                .basePrice(new BigDecimal("150000"))
+                .totalUnits(1)
+                .maxGuests(2)
+                .active(true)
+                .build();
+
+        when(propertyRepository.findAll()).thenReturn(List.of(bocagrandeProp));
+        when(suiteRepository.findByActiveTrue()).thenReturn(List.of(corruptSuite));
+        when(branchRepository.findBySlug("bocagrande")).thenReturn(Optional.of(bocagrandeBranch));
+        when(propertyRepository.findBySlug("bocagrande")).thenReturn(Optional.of(bocagrandeProp));
+        lenient().when(suiteNightRepository.findBySuiteAndDatesBetween(eq("suite-branch-corrupto"), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        AvailabilityService.AvailabilityResponseData res =
+                availabilityService.checkAvailability(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 3), 2, "bocagrande", null);
+
+        assertNotNull(res);
+        assertEquals(0, res.getAvailableSuites().size(),
+                "La suite con slug en el campo branch no pertenece a la sede y no debe listarse");
+        assertEquals(0, res.getUnavailableSuites().size(),
+                "Tampoco debe aparecer como no disponible: el filtro la excluye por completo");
+    }
+
+    @Test
+    @DisplayName("El calendario mensual también excluye suites con slug en branch: mismo criterio que la búsqueda")
+    void monthlyAvailabilityDoesNotMatchSuitesWhoseBranchFieldContainsSlugText() {
+        Suite corruptSuite = Suite.builder()
+                .id("suite-branch-corrupto")
+                .slug("suite-corrupta")
+                .name("Suite con slug en branch")
+                .branch("bocagrande") // dato corrupto: texto del slug, no un ID
+                .basePrice(new BigDecimal("150000"))
+                .totalUnits(1)
+                .maxGuests(2)
+                .active(true)
+                .build();
+
+        when(propertyRepository.findAll()).thenReturn(List.of(bocagrandeProp));
+        when(suiteRepository.findByActiveTrue()).thenReturn(List.of(corruptSuite));
+        when(branchRepository.findBySlug("bocagrande")).thenReturn(Optional.of(bocagrandeBranch));
+        when(propertyRepository.findBySlug("bocagrande")).thenReturn(Optional.of(bocagrandeProp));
+
+        AvailabilityService.MonthlyAvailabilityResponseData res =
+                availabilityService.getMonthlyAvailability(2026, 11, 2, "bocagrande", null, null);
+
+        assertNotNull(res);
+        assertEquals(0, res.getTotalSuites(),
+                "La suite con slug en branch no debe contarse en el calendario de la sede");
+    }
 }

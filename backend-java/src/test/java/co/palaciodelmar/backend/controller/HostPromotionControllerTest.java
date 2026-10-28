@@ -11,6 +11,7 @@ import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.PromotionRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import co.palaciodelmar.backend.security.UserPrincipal;
+import co.palaciodelmar.backend.service.AdminService;
 import co.palaciodelmar.backend.service.BookingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,6 +23,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -32,6 +35,7 @@ class HostPromotionControllerTest {
     private BookingService bookingService;
     private PromotionRepository promotionRepository;
     private PropertyRepository propertyRepository;
+    private AdminService adminService;
 
     private HostController hostController;
 
@@ -42,13 +46,15 @@ class HostPromotionControllerTest {
         bookingService = mock(BookingService.class);
         promotionRepository = mock(PromotionRepository.class);
         propertyRepository = mock(PropertyRepository.class);
+        adminService = mock(AdminService.class);
 
         hostController = new HostController(
                 bookingRepository,
                 suiteRepository,
                 bookingService,
                 promotionRepository,
-                propertyRepository
+                propertyRepository,
+                adminService
         );
     }
 
@@ -77,7 +83,7 @@ class HostPromotionControllerTest {
                 .discountPercent(15)
                 .build();
 
-        when(promotionRepository.save(any(Promotion.class))).thenAnswer(i -> {
+        when(adminService.createPromotion(any(Promotion.class))).thenAnswer(i -> {
             Promotion p = i.getArgument(0);
             p.setId("promo-1");
             return p;
@@ -91,9 +97,44 @@ class HostPromotionControllerTest {
     }
 
     @Test
+    @DisplayName("ADMIN con scope inexistente vía ruta host no puede guardar promo huérfana (delega en AdminService)")
+    void adminCannotCreatePromotionWithUnknownScopeViaHostRoute() {
+        User adminUser = User.builder()
+                .id("admin-1")
+                .role("ADMIN")
+                .branches(List.of())
+                .build();
+        UserPrincipal principal = new UserPrincipal(adminUser);
+
+        PromotionRequest req = PromotionRequest.builder()
+                .title("Promo Scope Basura")
+                .branchId("sede-basura")
+                .startDate(LocalDate.now())
+                .endDate(LocalDate.now().plusDays(5))
+                .discountPercent(10)
+                .build();
+
+        when(adminService.createPromotion(any(Promotion.class)))
+                .thenThrow(new IllegalArgumentException("La sede o propiedad especificada no existe: sede-basura"));
+        // Con el código actual (sin delegar) el save directo tendría éxito, como en producción:
+        when(promotionRepository.save(any(Promotion.class))).thenAnswer(i -> {
+            Promotion p = i.getArgument(0);
+            p.setId("promo-basura");
+            return p;
+        });
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> hostController.createPromotion(principal, req)
+        );
+        assertTrue(ex.getMessage().contains("no existe"),
+                "El rechazo debe venir de la validación de scope, no del bypass de ADMIN");
+        verify(promotionRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Anti-IDOR: Host no puede crear promoción para propiedad ajena (retorna 403)")
-    void hostCannotCreatePromotionForOtherHostProperty() {
-        User hostUser = User.builder()
+    void hostCannotCreatePromotionForOtherHostProperty() {        User hostUser = User.builder()
                 .id("host-1")
                 .role("HOST")
                 .branches(List.of())

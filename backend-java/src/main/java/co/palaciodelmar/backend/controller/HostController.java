@@ -16,6 +16,7 @@ import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
 import co.palaciodelmar.backend.security.UserPrincipal;
+import co.palaciodelmar.backend.service.AdminService;
 import co.palaciodelmar.backend.service.BookingService;
 import jakarta.validation.Valid;
 import lombok.Builder;
@@ -50,6 +51,7 @@ public class HostController {
     private final BookingRepository bookingRepository;
     private final SuiteRepository suiteRepository;
     private final BookingService bookingService;
+    private final AdminService adminService;
     private final PromotionRepository promotionRepository;
 
     @Autowired(required = false)
@@ -64,22 +66,15 @@ public class HostController {
             SuiteRepository suiteRepository,
             BookingService bookingService,
             PromotionRepository promotionRepository,
-            @Autowired(required = false) PropertyRepository propertyRepository
+            @Autowired(required = false) PropertyRepository propertyRepository,
+            AdminService adminService
     ) {
         this.bookingRepository = bookingRepository;
         this.suiteRepository = suiteRepository;
         this.bookingService = bookingService;
         this.promotionRepository = promotionRepository;
         this.propertyRepository = propertyRepository;
-    }
-
-    public HostController(
-            BookingRepository bookingRepository,
-            SuiteRepository suiteRepository,
-            BookingService bookingService,
-            PromotionRepository promotionRepository
-    ) {
-        this(bookingRepository, suiteRepository, bookingService, promotionRepository, null);
+        this.adminService = adminService;
     }
 
     @Data
@@ -335,7 +330,7 @@ public class HostController {
             @Valid @RequestBody PromotionRequest request) {
 
         User user = userPrincipal != null ? userPrincipal.getUser() : null;
-        String targetBranch = request.resolveBranch();
+        String targetBranch = request.getBranchId();
         if (targetBranch == null || targetBranch.isBlank()) {
             return ResponseEntity.badRequest().body(ApiResponse.error("Debes especificar una sede o propiedad para la promoción"));
         }
@@ -356,7 +351,7 @@ public class HostController {
                 .isSample(false)
                 .build();
 
-        Promotion saved = promotionRepository.save(promo);
+        Promotion saved = adminService.createPromotion(promo);
 
         PromotionDTO dto = PromotionDTO.builder()
                 .id(saved.getId())

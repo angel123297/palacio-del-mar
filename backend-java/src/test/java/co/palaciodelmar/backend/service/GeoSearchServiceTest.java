@@ -103,4 +103,56 @@ class GeoSearchServiceTest {
         verify(geoOps).remove(GeoSearchService.GEO_KEY, "property:suspendida-hotel");
         verify(hashOps).delete(GeoSearchService.META_HASH_KEY, "property:suspendida-hotel");
     }
+
+    @Test
+    @DisplayName("El campo branch de una suite se resuelve solo por ID: un slug en branch NO empareja la sede; cae a la propiedad")
+    void suiteBranchFieldIsResolvedByIdOnly() {
+        BranchRepository branchRepo = mock(BranchRepository.class);
+        PropertyRepository propRepo = mock(PropertyRepository.class);
+        SuiteRepository suiteRepo = mock(SuiteRepository.class);
+
+        // Sede cuyo slug coincide con el texto corrupto que guarda la suite en branch.
+        // Está en La Boquilla: si el slug emparejara, los resultados serían de La Boquilla.
+        Branch slugHomónima = Branch.builder()
+                .id("br-boquilla")
+                .slug("bocagrande")
+                .name("Sede Lejana Bocagrande")
+                .zone("La Boquilla")
+                .active(true)
+                .location(Branch.GeoLocation.builder().lat(10.4735).lng(-75.5015).build())
+                .build();
+        when(branchRepo.findById("bocagrande")).thenReturn(Optional.empty());
+        when(branchRepo.findBySlug("bocagrande")).thenReturn(Optional.of(slugHomónima));
+        when(branchRepo.findAll()).thenReturn(List.of());
+
+        Property hotelProp = Property.builder()
+                .id("prop-hotel")
+                .slug("hotel-marina")
+                .name("Hotel Marina")
+                .city("Bocagrande")
+                .address("Cra. 1 #12-118, Bocagrande")
+                .status("APPROVED")
+                .active(true)
+                .build();
+        when(propRepo.findById("prop-hotel")).thenReturn(Optional.of(hotelProp));
+        when(propRepo.findAll()).thenReturn(List.of(hotelProp));
+
+        Suite suiteConSlugEnBranch = Suite.builder()
+                .id("s-ext-1")
+                .slug("suite-externa-marina")
+                .branch("bocagrande") // dato corrupto: slug, no ID
+                .propertyId("prop-hotel")
+                .build();
+        when(suiteRepo.findById("s-ext-1")).thenReturn(Optional.of(suiteConSlugEnBranch));
+
+        GeoSearchService geoService = new GeoSearchService(null, branchRepo, propRepo, suiteRepo, new ObjectMapper());
+
+        List<GeoPlaceDTO> nearby = geoService.findNearbyForSuite("s-ext-1", 1.5, null, 5);
+
+        java.util.Set<String> nombres = nearby.stream().map(GeoPlaceDTO::getName).collect(java.util.stream.Collectors.toSet());
+        assertTrue(nombres.contains("Playa VIP Bocagrande"),
+                "Las coordenadas deben inferirse de la propiedad (Bocagrande), no de una sede emparejada por slug");
+        assertFalse(nombres.contains("Manglares Eco-Reserva La Boquilla"),
+                "Si apareciera La Boquilla, el slug del branch habría emparejado la sede equivocada");
+    }
 }

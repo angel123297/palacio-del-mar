@@ -273,4 +273,52 @@ class IntegrationServiceTest {
         assertEquals(1, result.get("recordsRemoved"));
         verify(suiteNightRepository).deleteAll(List.of(externalBlockedNight));
     }
+
+    @Test
+    void testUpsertNewRoomUsesPropertyIdAsBranchScope() {
+        when(suiteRepository.findByPropertyIdAndExternalId("prop_hotel_01", "PMS-202"))
+                .thenReturn(Optional.empty());
+        when(suiteRepository.save(any(Suite.class))).thenAnswer(i -> {
+            Suite s = i.getArgument(0);
+            s.setId("suite_new_2");
+            return s;
+        });
+
+        IntegrationRoomRequest req = IntegrationRoomRequest.builder()
+                .externalId("PMS-202")
+                .name("Suite Externa Mar")
+                .basePrice(new BigDecimal("280000"))
+                .build();
+
+        Suite saved = integrationService.upsertRoom(apiKey, req);
+
+        assertEquals("prop_hotel_01", saved.getBranch(),
+                "El scope branch de una suite externa debe ser el ID de la propiedad, no un literal de compatibilidad");
+    }
+
+    @Test
+    void testUpsertUpdateNormalizesLegacyBranchScopeToPropertyId() {
+        Suite existing = Suite.builder()
+                .id("suite_ext_vieja")
+                .propertyId("prop_hotel_01")
+                .externalId("PMS-101")
+                .branch("branch-1") // valor corrupto heredado del código anterior
+                .name("Suite Vieja")
+                .basePrice(new BigDecimal("300000"))
+                .build();
+        when(suiteRepository.findByPropertyIdAndExternalId("prop_hotel_01", "PMS-101"))
+                .thenReturn(Optional.of(existing));
+        when(suiteRepository.save(any(Suite.class))).thenAnswer(i -> i.getArgument(0));
+
+        IntegrationRoomRequest req = IntegrationRoomRequest.builder()
+                .externalId("PMS-101")
+                .name("Suite Vieja Actualizada")
+                .basePrice(new BigDecimal("310000"))
+                .build();
+
+        Suite saved = integrationService.upsertRoom(apiKey, req);
+
+        assertEquals("prop_hotel_01", saved.getBranch(),
+                "El update de una suite externa debe normalizar el scope al ID de la propiedad");
+    }
 }
