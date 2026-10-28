@@ -21,7 +21,7 @@ export const routes: Routes = [
   { path: 'reset-password/:token', redirectTo: 'restablecer-contrasena/:token', pathMatch: 'full' },
   { path: 'restablecer-contrasena', loadComponent: () => import('./pages/reset-password/reset-password.component').then(m => m.ResetPasswordComponent) },
   { path: 'reset-password', redirectTo: 'restablecer-contrasena', pathMatch: 'full' },
-  { path: 'demo/external-hotel', loadComponent: () => import('./pages/external-hotel/external-hotel.component').then(m => m.ExternalHotelComponent) },
+  { path: 'demo/external-hotel', loadComponent: () => import('./pages/external-hotel/external-hotel.component').then(m => m.ExternalHotelComponent), canMatch: [hostMatchGuard], canActivate: [hostGuard] },
   { path: 'simulador-hotel-externo', redirectTo: 'demo/external-hotel', pathMatch: 'full' },
   { path: '**', loadComponent: () => import('./pages/not-found/not-found.component').then(m => m.NotFoundComponent) }
 ];

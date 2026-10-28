@@ -13,6 +13,7 @@ import { CommonModule } from '@angular/common';
 export class VerifyEmail implements OnInit {
   status = signal<'loading' | 'success' | 'error'>('loading');
   message = signal<string>('Verificando tu correo electrónico...');
+  returnUrl = signal<string>('/');
 
   constructor(
     private route: ActivatedRoute,
@@ -21,6 +22,11 @@ export class VerifyEmail implements OnInit {
   ) {}
 
   ngOnInit() {
+    const rawReturn = this.route.snapshot.queryParamMap.get('returnUrl');
+    if (rawReturn && rawReturn.startsWith('/')) {
+      this.returnUrl.set(rawReturn);
+    }
+
     const token = this.route.snapshot.paramMap.get('token');
     if (!token) {
       this.status.set('error');
@@ -33,7 +39,7 @@ export class VerifyEmail implements OnInit {
         this.status.set('success');
         this.message.set('¡Tu correo ha sido verificado con éxito! Hemos iniciado tu sesión automáticamente.');
         setTimeout(() => {
-          this.router.navigate(['/']);
+          this.router.navigateByUrl(this.returnUrl());
         }, 2000);
       },
       error: (err) => {

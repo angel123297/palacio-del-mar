@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, ChangeDetectorRef } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectorRef, ViewChild, ElementRef, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -10,8 +10,8 @@ import { environment } from '../../../environments/environment';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="modal-backdrop" *ngIf="isOpen" (click)="close()" role="dialog" aria-modal="true" [attr.aria-labelledby]="mode === 'login' ? 'login-modal-title' : (mode === 'register' ? 'reg-modal-title' : 'forgot-modal-title')" tabindex="-1" (keydown.escape)="close()" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
-      <div class="modal-content" (click)="$event.stopPropagation()" style="background: var(--dark); border: 1px solid var(--gold); border-radius: 12px; padding: 2rem; width: 100%; max-width: 440px; color: var(--cream); position: relative;">
+    <div class="modal-backdrop" *ngIf="isOpen" (click)="close()" role="dialog" aria-modal="true" [attr.aria-labelledby]="mode === 'login' ? 'login-modal-title' : (mode === 'register' ? 'reg-modal-title' : 'forgot-modal-title')" tabindex="-1" (keydown)="handleKeydown($event)" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
+      <div class="modal-content" (click)="$event.stopPropagation()" #modalContainer style="background: var(--dark); border: 1px solid var(--gold); border-radius: 12px; padding: 2rem; width: 100%; max-width: 440px; color: var(--cream); position: relative; max-height: 90vh; overflow-y: auto;">
         
         <button type="button" aria-label="Cerrar modal de autenticación" (click)="close()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;">×</button>
 
@@ -24,21 +24,24 @@ import { environment } from '../../../environments/environment';
                     [style.color]="selectedPortal === 'guest' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="selectedPortal === 'guest' ? '700' : '500'"
                     style="flex: 1; padding: 8px 4px; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
-              🛎️ Huésped
+              <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+              Huésped
             </button>
             <button type="button" (click)="selectLoginPortal('host')"
                     [style.background]="selectedPortal === 'host' ? 'var(--gold)' : 'transparent'"
                     [style.color]="selectedPortal === 'host' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="selectedPortal === 'host' ? '700' : '500'"
                     style="flex: 1; padding: 8px 4px; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
-              🏢 Anfitrión
+              <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3zm0 3.5l5 4.5v6.5h-2v-6H9v6H7v-6.5l5-4.5z"/></svg>
+              Anfitrión
             </button>
             <button type="button" (click)="selectLoginPortal('admin')"
                     [style.background]="selectedPortal === 'admin' ? 'var(--gold)' : 'transparent'"
                     [style.color]="selectedPortal === 'admin' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="selectedPortal === 'admin' ? '700' : '500'"
                     style="flex: 1; padding: 8px 4px; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
-              🔒 Admin
+              <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+              Admin
             </button>
           </div>
 
@@ -48,13 +51,13 @@ import { environment } from '../../../environments/environment';
           
           <div style="margin-bottom: 1rem;">
             <label for="auth-login-email" class="field-label">Correo electrónico</label>
-            <input id="auth-login-email" type="email" [(ngModel)]="email" name="email" required [placeholder]="portalPlaceholder" style="width: 100%;" />
+            <input id="auth-login-email" type="email" autocomplete="email" inputmode="email" [(ngModel)]="email" name="email" required [placeholder]="portalPlaceholder" style="width: 100%;" />
           </div>
 
           <div style="margin-bottom: 1rem;">
             <label for="auth-login-password" class="field-label">Contraseña</label>
             <div style="position: relative; display: flex; align-items: center;">
-              <input id="auth-login-password" [type]="showLoginPassword ? 'text' : 'password'" [(ngModel)]="password" name="password" required placeholder="••••••••" style="width: 100%; padding-right: 42px;" />
+              <input id="auth-login-password" [type]="showLoginPassword ? 'text' : 'password'" autocomplete="current-password" [(ngModel)]="password" name="password" required placeholder="••••••••" style="width: 100%; padding-right: 42px;" />
               <button type="button" (click)="showLoginPassword = !showLoginPassword" [attr.aria-label]="showLoginPassword ? 'Ocultar contraseña' : 'Ver contraseña'" style="position: absolute; right: 4px; background: none; border: none; color: var(--gold); cursor: pointer; padding: 8px; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; min-width: 40px;">
                 <svg *ngIf="showLoginPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -102,14 +105,16 @@ import { environment } from '../../../environments/environment';
                     [style.color]="registerRole === 'user' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="registerRole === 'user' ? '700' : '500'"
                     style="flex: 1; padding: 8px 6px; border: none; border-radius: 6px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
-              🛎️ Huésped
+              <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+              Huésped
             </button>
             <button type="button" (click)="selectRegisterRole('host')"
                     [style.background]="registerRole === 'host' ? 'var(--gold)' : 'transparent'"
                     [style.color]="registerRole === 'host' ? '#0d0d0d' : '#f5f0e8'"
                     [style.font-weight]="registerRole === 'host' ? '700' : '500'"
                     style="flex: 1; padding: 8px 6px; border: none; border-radius: 6px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 4px;">
-              🏢 Anfitrión
+              <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3zm0 3.5l5 4.5v6.5h-2v-6H9v6H7v-6.5l5-4.5z"/></svg>
+              Anfitrión
             </button>
           </div>
 
@@ -122,23 +127,23 @@ import { environment } from '../../../environments/environment';
           
           <div style="margin-bottom: 1rem;">
             <label for="auth-reg-name" class="field-label">Nombre completo</label>
-            <input id="auth-reg-name" type="text" [(ngModel)]="name" name="name" required placeholder="Tu nombre completo" style="width: 100%;" />
+            <input id="auth-reg-name" type="text" autocomplete="name" [(ngModel)]="name" name="name" required placeholder="Tu nombre completo" style="width: 100%;" />
           </div>
 
           <div style="margin-bottom: 1rem;">
             <label for="auth-reg-email" class="field-label">Correo electrónico</label>
-            <input id="auth-reg-email" type="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
+            <input id="auth-reg-email" type="email" autocomplete="email" inputmode="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
           </div>
 
           <div style="margin-bottom: 1rem;">
             <label for="auth-reg-phone" class="field-label">Teléfono celular</label>
-            <input id="auth-reg-phone" type="tel" [(ngModel)]="phone" name="phone" required placeholder="300 123 4567" style="width: 100%;" />
+            <input id="auth-reg-phone" type="tel" autocomplete="tel" inputmode="tel" [(ngModel)]="phone" name="phone" required placeholder="300 123 4567" style="width: 100%;" />
           </div>
 
           <div style="margin-bottom: 1rem;">
             <label for="auth-reg-password" class="field-label">Contraseña</label>
             <div style="position: relative; display: flex; align-items: center;">
-              <input id="auth-reg-password" [type]="showRegPassword ? 'text' : 'password'" [(ngModel)]="password" name="password" required placeholder="Mínimo 8 caracteres" style="width: 100%; padding-right: 42px;" />
+              <input id="auth-reg-password" [type]="showRegPassword ? 'text' : 'password'" autocomplete="new-password" [(ngModel)]="password" name="password" required placeholder="Mínimo 8 caracteres" style="width: 100%; padding-right: 42px;" />
               <button type="button" (click)="showRegPassword = !showRegPassword" [attr.aria-label]="showRegPassword ? 'Ocultar contraseña' : 'Ver contraseña'" style="position: absolute; right: 4px; background: none; border: none; color: var(--gold); cursor: pointer; padding: 8px; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; min-width: 40px;">
                 <svg *ngIf="showRegPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -155,7 +160,7 @@ import { environment } from '../../../environments/environment';
           <div style="margin-bottom: 1.5rem;">
             <label for="auth-reg-confirm" class="field-label">Confirmar contraseña</label>
             <div style="position: relative; display: flex; align-items: center;">
-              <input id="auth-reg-confirm" [type]="showConfirmPassword ? 'text' : 'password'" [(ngModel)]="confirmPassword" name="confirmPassword" required placeholder="••••••••" style="width: 100%; padding-right: 42px;" />
+              <input id="auth-reg-confirm" [type]="showConfirmPassword ? 'text' : 'password'" autocomplete="new-password" [(ngModel)]="confirmPassword" name="confirmPassword" required placeholder="••••••••" style="width: 100%; padding-right: 42px;" />
               <button type="button" (click)="showConfirmPassword = !showConfirmPassword" [attr.aria-label]="showConfirmPassword ? 'Ocultar contraseña' : 'Ver contraseña'" style="position: absolute; right: 4px; background: none; border: none; color: var(--gold); cursor: pointer; padding: 8px; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; min-width: 40px;">
                 <svg *ngIf="showConfirmPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -196,7 +201,7 @@ import { environment } from '../../../environments/environment';
 
           <div style="margin-bottom: 1.5rem;">
             <label for="auth-forgot-email" class="field-label">Correo electrónico</label>
-            <input id="auth-forgot-email" type="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
+            <input id="auth-forgot-email" type="email" autocomplete="email" inputmode="email" [(ngModel)]="email" name="email" required placeholder="tu@email.com" style="width: 100%;" />
           </div>
 
           <button type="submit" class="btn-primary" [disabled]="busy" style="width: 100%; padding: 12px; font-size: 1rem;">
@@ -221,7 +226,8 @@ import { environment } from '../../../environments/environment';
     </div>
   `
 })
-export class AuthModalComponent {
+export class AuthModalComponent implements OnChanges {
+  @ViewChild('modalContainer') modalContainer?: ElementRef<HTMLElement>;
   private _isOpen = false;
   private _initialMode: 'login' | 'register' | 'forgot' = 'login';
   private _initialPortal: 'guest' | 'host' | 'admin' = 'guest';
@@ -267,6 +273,57 @@ export class AuthModalComponent {
   selectedPortal: 'guest' | 'host' | 'admin' = 'guest';
   registerRole: 'user' | 'host' = 'user';
 
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['isOpen'] && changes['isOpen'].currentValue === true) {
+      this.focusFirstInput();
+    }
+  }
+
+  handleKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.close();
+      return;
+    }
+    if (event.key === 'Tab') {
+      this.trapFocus(event);
+    }
+  }
+
+  private trapFocus(event: KeyboardEvent): void {
+    if (!this.modalContainer) return;
+    const focusable = this.modalContainer.nativeElement.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusable.length) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (event.shiftKey) {
+      if (document.activeElement === first) {
+        last.focus();
+        event.preventDefault();
+      }
+    } else {
+      if (document.activeElement === last) {
+        first.focus();
+        event.preventDefault();
+      }
+    }
+  }
+
+  private focusFirstInput(): void {
+    setTimeout(() => {
+      if (!this.modalContainer) return;
+      const input = this.modalContainer.nativeElement.querySelector<HTMLInputElement>(
+        'input:not([disabled]), select:not([disabled]), button:not([disabled])'
+      );
+      if (input) {
+        input.focus();
+      }
+    }, 80);
+  }
+
   open(mode: 'login' | 'register' | 'forgot' = 'login', portal: 'guest' | 'host' | 'admin' = 'guest'): void {
     this._initialMode = mode;
     this._initialPortal = portal;
@@ -281,6 +338,7 @@ export class AuthModalComponent {
     this.showResendVerification = false;
     this.busyResend = false;
     this.targetVerificationEmail = '';
+    this.focusFirstInput();
     this.cdr.detectChanges();
   }
 
@@ -508,13 +566,17 @@ export class AuthModalComponent {
     this.showResendVerification = false;
     this.cdr.detectChanges();
 
-    const payload = {
+    const payload: any = {
       email: (this.email || '').trim(),
       password: this.password,
       name: (this.name || '').trim(),
       phone: (this.phone || '').trim(),
       role: this.registerRole
     };
+    const currentUrl = this.router.url;
+    if (currentUrl && currentUrl !== '/' && !currentUrl.startsWith('/login') && !currentUrl.startsWith('/verificar-email')) {
+      payload.returnUrl = currentUrl;
+    }
 
     this.auth.register(payload).subscribe({
       next: () => {

@@ -18,7 +18,7 @@ export class AuthService {
 
   isLoggedIn(): boolean {
     const user = this.currentUserSignal();
-    return !!user && user.emailVerified !== false;
+    return !!user && user.emailVerified === true;
   }
 
   constructor(private http: HttpClient, private router: Router) {
