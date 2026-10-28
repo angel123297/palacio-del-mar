@@ -2,8 +2,8 @@
   min-height: 85vh;
   background: #0d0d0d;
   color: #fff;
-  padding: 2rem 1.5rem 5rem;
-  max-width: 1280px;
+  padding: 2.5rem 2rem 5rem;
+  max-width: 1400px;
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -76,8 +76,8 @@
 
 .suite-main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 390px;
-  gap: 3rem;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 3.5rem;
   align-items: start;
   width: 100%;
 

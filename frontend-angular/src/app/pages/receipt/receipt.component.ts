@@ -116,14 +116,18 @@ import { renderSVG } from '../../utils/qr';
         </table>
 
         <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
-          <div style="width: 300px;">
+          <div style="width: 320px;">
             <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
               <span style="color: #666;">Subtotal:</span>
-              <span>$ {{ (booking.totalPrice / 1.19) | number:'1.0-0' }}</span>
+              <span>$ {{ netSubtotal | number:'1.0-0' }}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 2px solid #333;">
+            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
               <span style="color: #666;">IVA (19%):</span>
-              <span>$ {{ (booking.totalPrice - (booking.totalPrice / 1.19)) | number:'1.0-0' }}</span>
+              <span>$ {{ netIva | number:'1.0-0' }}</span>
+            </div>
+            <div *ngIf="booking.guaranteeDeposit && booking.guaranteeDeposit > 0" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 2px solid #333;">
+              <span style="color: #666;">Depósito Garantía:</span>
+              <span>$ {{ booking.guaranteeDeposit | number:'1.0-0' }}</span>
             </div>
             <div style="display: flex; justify-content: space-between; padding: 15px 0; font-size: 1.5rem; font-weight: bold; color: #000;">
               <span>Total pagado:</span>
@@ -243,6 +247,21 @@ export class ReceiptComponent implements OnInit {
 
   get smartLockPinDisplay(): string {
     return this.booking?.smartLockPin || 'Pendiente de asignación';
+  }
+
+  get taxableAmount(): number {
+    if (!this.booking) return 0;
+    const total = this.booking.totalPrice || 0;
+    const guarantee = this.booking.guaranteeDeposit || 0;
+    return Math.max(0, total - guarantee);
+  }
+
+  get netSubtotal(): number {
+    return Math.round(this.taxableAmount / 1.19);
+  }
+
+  get netIva(): number {
+    return Math.max(0, this.taxableAmount - this.netSubtotal);
   }
 
   get suiteName(): string {

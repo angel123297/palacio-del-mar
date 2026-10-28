@@ -262,8 +262,8 @@ import { Booking } from '../../models/types';
               
               <!-- Para Anfitrión / Admin: desglose de comisión y pago neto -->
               <div *ngIf="isHostOrAdmin && !isGuestOwner" style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem;">
-                <p style="margin: 0;"><strong>Comisión Plataforma (8%):</strong>&nbsp;<span style="color: #ff9f43;">- $ {{ (booking.platformFee || (booking.totalPrice * 0.08)) | number:'1.0-0' }} COP</span></p>
-                <p style="margin: 0;"><strong>Pago Neto al Anfitrión:</strong>&nbsp;<span style="color: #2ecc71; font-weight: bold; font-size: 1.1rem;">$ {{ (booking.hostPayout || (booking.totalPrice * 0.92)) | number:'1.0-0' }} COP</span></p>
+                <p style="margin: 0;"><strong>Comisión Plataforma (8%):</strong>&nbsp;<span style="color: #ff9f43;">- $ {{ platformFeeCalculated | number:'1.0-0' }} COP</span></p>
+                <p style="margin: 0;"><strong>Pago Neto al Anfitrión:</strong>&nbsp;<span style="color: #2ecc71; font-weight: bold; font-size: 1.1rem;">$ {{ hostPayoutCalculated | number:'1.0-0' }} COP</span></p>
                 <p style="margin: 0.4rem 0 0;"><strong>Estado del Pago:</strong>&nbsp;<span class="status-badge" [ngClass]="booking.paymentStatus || 'pending'" style="font-size: 0.75rem; padding: 3px 10px;">{{ getPaymentStatusLabel(booking.paymentStatus) }}</span></p>
               </div>
 
@@ -555,6 +555,20 @@ export class BookingDetailComponent implements OnInit {
   get suiteName(): string {
     if (!this.booking?.suite) return 'Suite Desconocida';
     return typeof this.booking.suite === 'string' ? this.booking.suite : this.booking.suite.name;
+  }
+
+  get hostPayoutCalculated(): number {
+    if (!this.booking) return 0;
+    if (this.booking.hostPayout != null) return this.booking.hostPayout;
+    const baseRevenue = Math.max(0, (this.booking.totalPrice || 0) - (this.booking.guaranteeDeposit || 100000));
+    return Math.round(baseRevenue * 0.92);
+  }
+
+  get platformFeeCalculated(): number {
+    if (!this.booking) return 0;
+    if (this.booking.platformFee != null) return this.booking.platformFee;
+    const baseRevenue = Math.max(0, (this.booking.totalPrice || 0) - (this.booking.guaranteeDeposit || 100000));
+    return Math.round(baseRevenue * 0.08);
   }
 
   getStatusLabel(status?: string): string {

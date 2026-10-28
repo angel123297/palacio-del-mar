@@ -139,14 +139,25 @@ export class MyBookingsComponent implements OnInit {
     const now = Date.now();
     const cIn = new Date(b.checkIn).getTime();
     const diffDays = (cIn - now) / (1000 * 60 * 60 * 24);
-    const paid = b.paidAmount || b.totalPrice || 0;
+    const paid = b.paidAmount || 0;
+    const deposit = b.guaranteeDeposit || 0;
+    const lodgingPaid = Math.max(0, paid - deposit);
 
-    if (diffDays > 7) {
-      this.cancelRefundAmount = paid;
-      this.cancelRefundInfo = 'Reembolso total del 100% sin retención por anticipación superior a 7 días.';
+    if (paid <= 0) {
+      this.cancelRefundAmount = 0;
+      this.cancelRefundInfo = 'La reserva está pendiente de pago. No se generarán cobros ni reembolsos al cancelar.';
+    } else if (diffDays < 2) {
+      // RN-F03: Menos de 48 horas -> retención del 100% de la estadía, se reembolsa únicamente el depósito de garantía.
+      this.cancelRefundAmount = deposit;
+      this.cancelRefundInfo = 'Cancelación con menos de 48 horas (No-Show): penalidad del 100% sobre la estadía. Se reintegra únicamente el depósito de garantía reembolsable.';
+    } else if (diffDays < 7) {
+      // Entre 2 y 7 días: retención del 10% sobre la estadía, 100% del depósito.
+      const retention = Math.round(lodgingPaid * 0.10);
+      this.cancelRefundAmount = paid - retention;
+      this.cancelRefundInfo = 'Cancelación entre 2 y 7 días previos: retención del 10% por gastos operativos sobre la estadía.';
     } else {
-      this.cancelRefundAmount = Math.round(paid * 0.9);
-      this.cancelRefundInfo = 'Reembolso del 90% con 10% de retención por gastos operativos al cancelar con 7 días o menos. El monto final lo calcula el sistema al procesar la cancelación.';
+      this.cancelRefundAmount = paid;
+      this.cancelRefundInfo = 'Cancelación con más de 7 días de anticipación: reembolso total del 100% sin retención.';
     }
   }
 
