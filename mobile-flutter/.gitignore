@@ -50,3 +50,5 @@ app.*.map.json
 # Ignorar binarios pesados
 build/
 **/*.so
+
+linux/flutter/ephemeral/.plugin_symlinks/

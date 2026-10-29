@@ -1,30 +1,33 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:palacio_del_mar_mobile/main.dart';
+import 'package:provider/provider.dart';
+import 'package:palacio_del_mar_mobile/core/providers/auth_provider.dart';
+import 'package:palacio_del_mar_mobile/features/auth/digital_key_view.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('DigitalKeyView renders authentication toggle form', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChangeNotifierProvider(
+            create: (_) => AuthProvider(),
+            child: const DigitalKeyView(),
+          ),
+        ),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Palacio del Mar'), findsOneWidget);
+    expect(find.text('LLAVE DIGITAL & ACCESO A SUITES'), findsOneWidget);
+    expect(find.text('INICIAR SESIÓN'), findsOneWidget);
+    expect(find.text('¿NO TIENES CUENTA? REGÍSTRATE AQUÍ'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    // Alternar a modo registro
+    await tester.tap(find.text('¿NO TIENES CUENTA? REGÍSTRATE AQUÍ'));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('CREAR CUENTA DE HUÉSPED'), findsOneWidget);
+    expect(find.text('REGISTRARSE'), findsOneWidget);
+    expect(find.text('¿YA TIENES CUENTA? INICIA SESIÓN'), findsOneWidget);
   });
 }

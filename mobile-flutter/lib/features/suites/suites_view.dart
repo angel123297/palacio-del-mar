@@ -1,7 +1,7 @@
-﻿import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/providers/booking_provider.dart';
+import '../../core/services/api_service.dart';
+import 'suite_zone_filter.dart';
 
 class SuitesCatalogView extends StatefulWidget {
   const SuitesCatalogView({super.key});
@@ -12,41 +12,194 @@ class SuitesCatalogView extends StatefulWidget {
 
 class _SuitesCatalogViewState extends State<SuitesCatalogView> {
   String _selectedZone = 'Todas';
+  int _guests = 1;
+  DateTimeRange? _selectedDateRange;
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<Map<String, dynamic>> _catalogSuites = [];
+  Set<String>? _availableSuiteIds;
+  Map<String, String> _availableZones = {'Todas': 'Todas'};
 
-  final List<Map<String, dynamic>> _suites = [
-    {
-      'title': 'Superior Patio Colonial',
-      'zone': 'Centro Histórico',
-      'category': 'HABITACIÓN',
-      'price': '\$ 860.000',
-      'image': 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800',
-      'amenities': ['JARDÍN PRIVADO', 'AIRE ACONDICIONADO', 'MINIBAR', '42 M²'],
-    },
-    {
-      'title': 'Suite Colonial Imperial',
-      'zone': 'Centro Histórico',
-      'category': 'SUITE DELUXE',
-      'price': '\$ 1.310.000',
-      'image': 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800',
-      'amenities': ['PATIO COLONIAL', 'TINA HIDROMASAJE', 'BALCÓN', '65 M²'],
-    },
-    {
-      'title': 'Suite Vista Murallas',
-      'zone': 'Centro Histórico',
-      'category': 'SUITE PREMIUM',
-      'price': '\$ 1.720.000',
-      'image': 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800',
-      'amenities': ['VISTA A MURALLAS', 'JACUZZI', 'BALCÓN PRIVADO', '85 M²'],
-    },
-    {
-      'title': 'Gran Suite Presidencial',
-      'zone': 'Centro Histórico',
-      'category': 'SUITE PRESIDENCIAL',
-      'price': '\$ 2.780.000',
-      'image': 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
-      'amenities': ['TERRAZA PRIVADA', 'JACUZZI', 'MAYORDOMO 24/7', '180 M²'],
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadSuites();
+  }
+
+  Future<void> _loadSuites() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final branchParam = _selectedZone == 'Todas' ? null : _selectedZone;
+    final catalogData = await ApiService.getSuites(
+      guests: _guests,
+      branch: branchParam,
+    );
+
+    if (!mounted) return;
+
+    if (catalogData == null) {
+      setState(() {
+        _errorMessage = 'Error de conexión al cargar las suites. Verifica tu red.';
+        _catalogSuites = [];
+        _availableSuiteIds = null;
+        _isLoading = false;
+      });
+      return;
+    }
+
+    Set<String>? availableIds;
+    if (_selectedDateRange != null) {
+      final availData = await ApiService.checkAvailability(
+        checkIn: _selectedDateRange!.start,
+        checkOut: _selectedDateRange!.end,
+        guests: _guests,
+        branch: branchParam,
+      );
+
+      if (!mounted) return;
+
+      if (availData == null) {
+        setState(() {
+          _errorMessage = 'Error de conexión al consultar disponibilidad.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final ids = <String>{};
+      final rawAvailable = availData['availableSuites'];
+      if (rawAvailable is List) {
+        for (final item in rawAvailable) {
+          if (item is Map) {
+            final suiteObj = item['suite'];
+            if (suiteObj is Map) {
+              final sid = suiteObj['id'] ?? suiteObj['_id'];
+              if (sid != null) ids.add(sid.toString());
+            } else {
+              final sid = item['id'] ?? item['_id'] ?? item['suiteId'];
+              if (sid != null) ids.add(sid.toString());
+            }
+          }
+        }
+      }
+      availableIds = ids;
+    }
+
+    final mapped = <Map<String, dynamic>>[];
+
+    for (final s in catalogData) {
+      if (s is! Map) continue;
+      final id = s['id'] ?? s['_id'];
+      final name = s['name'];
+      if (id == null || name == null || name.toString().trim().isEmpty) {
+        continue;
+      }
+
+      final branch = s['branch'];
+      final branchSlug = (branch is Map && branch['slug'] != null && branch['slug'].toString().trim().isNotEmpty)
+          ? branch['slug'].toString().trim()
+          : null;
+      final branchLabel = (branch is Map && branch['zone'] != null && branch['zone'].toString().trim().isNotEmpty)
+          ? branch['zone'].toString().trim()
+          : (branch is Map && branch['name'] != null && branch['name'].toString().trim().isNotEmpty)
+              ? branch['name'].toString().trim()
+              : branchSlug;
+
+      final type = (s['type'] != null && s['type'].toString().trim().isNotEmpty)
+          ? s['type'].toString().trim().toUpperCase()
+          : null;
+
+      final basePrice = s['basePrice'] ?? s['price'];
+      final priceStr = basePrice != null ? '\$ $basePrice' : null;
+
+      final rawAmenities = s['amenities'];
+      final amenitiesList = (rawAmenities is List)
+          ? rawAmenities
+              .where((a) => a != null && a.toString().trim().isNotEmpty)
+              .map((a) => a.toString().trim().toUpperCase())
+              .toList()
+          : <String>[];
+
+      final mainImage = (s['mainImage'] != null && s['mainImage'].toString().trim().isNotEmpty)
+          ? s['mainImage'].toString().trim()
+          : null;
+
+      mapped.add({
+        'id': id.toString(),
+        'title': name.toString(),
+        'zone': branchSlug,
+        'zoneLabel': branchLabel,
+        'category': type,
+        'price': priceStr,
+        'image': mainImage,
+        'amenities': amenitiesList,
+      });
+    }
+
+    final updatedZones = Map<String, String>.from(_availableZones);
+    if (_availableZones.length <= 1 || _selectedZone == 'Todas') {
+      updatedZones.addAll(SuiteZoneFilter.extractZones(mapped));
+    }
+
+    setState(() {
+      _catalogSuites = mapped;
+      _availableSuiteIds = availableIds;
+      _availableZones = updatedZones;
+      if (!_availableZones.containsKey(_selectedZone)) {
+        _selectedZone = 'Todas';
+      }
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final initialRange = _selectedDateRange ??
+        DateTimeRange(
+          start: today,
+          end: today.add(const Duration(days: 1)),
+        );
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365)),
+      initialDateRange: initialRange,
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppTheme.gold,
+              onPrimary: Colors.black,
+              surface: Color(0xFF1E1E1E),
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      if (picked.end.isAfter(picked.start)) {
+        setState(() {
+          _selectedDateRange = picked;
+        });
+        _loadSuites();
+      }
+    }
+  }
+
+  void _clearDateRange() {
+    setState(() {
+      _selectedDateRange = null;
+    });
+    _loadSuites();
+  }
 
   void _openBookingModal(Map<String, dynamic> suite) {
     showModalBottomSheet(
@@ -54,45 +207,73 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
       isScrollControlled: true,
       backgroundColor: AppTheme.cardBg,
       builder: (context) {
+        final category = suite['category'];
+        final zone = suite['zone'];
+        final subtitleParts = [
+          if (category != null && category.toString().isNotEmpty) category.toString(),
+          if (zone != null && zone.toString().isNotEmpty) zone.toString(),
+        ].join(' • ');
+
         return Padding(
           padding: EdgeInsets.only(
-            top: 24, left: 24, right: 24,
+            top: 24,
+            left: 24,
+            right: 24,
             bottom: MediaQuery.of(context).viewInsets.bottom + 24,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(suite['title'], style: const TextStyle(fontFamily: 'serif', fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-              Text('${suite['category']} · ${suite['zone']}', style: const TextStyle(color: AppTheme.gold, fontSize: 12)),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Tarifa por noche:', style: TextStyle(color: Colors.white70)),
-                  Text(suite['price'], style: const TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold, fontSize: 18)),
-                ],
+              Text(
+                suite['title'],
+                style: const TextStyle(
+                  fontFamily: 'serif',
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-              const SizedBox(height: 20),
+              if (subtitleParts.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  subtitleParts.toUpperCase(),
+                  style: const TextStyle(
+                    color: AppTheme.gold,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Text(
+                suite['price'] != null ? '${suite['price']} / noche' : 'Precio a consultar',
+                style: const TextStyle(
+                  color: AppTheme.gold,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
+                height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.gold,
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () {
-                    context.read<BookingProvider>().addSuiteToCart(suite);
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('"${suite['title']}" añadida a la reserva'),
-                        backgroundColor: AppTheme.gold,
+                        content: Text('Solicitud iniciada para ${suite['title']}'),
+                        backgroundColor: AppTheme.cardBg,
                       ),
                     );
                   },
-                  child: const Text('AGREGAR A LA RESERVA', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  child: const Text('CONFIRMAR SOLICITUD', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -102,101 +283,342 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
     );
   }
 
+  List<Map<String, dynamic>> _getDisplayedSuites() {
+    return SuiteZoneFilter.filterSuites(
+      suites: _catalogSuites,
+      selectedZone: _selectedZone,
+      availableSuiteIds: _availableSuiteIds,
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final filtered = _selectedZone == 'Todas'
-        ? _suites
-        : _suites.where((s) => s['zone'] == _selectedZone).toList();
+    final displayedSuites = _getDisplayedSuites();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('NUESTRAS SUITES', style: TextStyle(color: AppTheme.gold, fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.bold)),
+          const Text(
+            'NUESTRAS SUITES',
+            style: TextStyle(
+              color: AppTheme.gold,
+              fontSize: 10,
+              letterSpacing: 2,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 4),
-          const Text('Elige tu Palacio en Cartagena', style: TextStyle(fontFamily: 'serif', color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: ['Todas', 'Centro Histórico', 'Getsemaní', 'Bocagrande', 'La Boquilla'].map((zone) {
-                final isSelected = _selectedZone == zone;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(zone),
-                    selected: isSelected,
-                    onSelected: (_) => setState(() => _selectedZone = zone),
-                    selectedColor: AppTheme.gold,
-                    backgroundColor: const Color(0xFF1E1E1E),
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.black : Colors.white70,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 11,
-                    ),
-                    side: BorderSide(color: isSelected ? AppTheme.gold : Colors.white12),
-                  ),
-                );
-              }).toList(),
+          const Text(
+            'Elige tu Palacio en Cartagena',
+            style: TextStyle(
+              fontFamily: 'serif',
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 16),
-          ...filtered.map((suite) {
-            final List<String> amenities = List<String>.from(suite['amenities']);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(color: AppTheme.cardBg, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white10)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                    child: Image.network(
-                      suite['image'], height: 190, width: double.infinity, fit: BoxFit.cover,
+          // Barra de filtros: Adultos y Fechas
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.people_outline, color: AppTheme.gold, size: 20),
+                    const SizedBox(width: 8),
+                    const Text('Adultos:', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, color: Colors.white70, size: 20),
+                      onPressed: _guests > 1
+                          ? () {
+                              setState(() => _guests--);
+                              _loadSuites();
+                            }
+                          : null,
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${suite['category']} · ${suite['zone']}'.toUpperCase(), style: const TextStyle(color: AppTheme.gold, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                        const SizedBox(height: 4),
-                        Text(suite['title'], style: const TextStyle(fontFamily: 'serif', color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 6, runSpacing: 6,
-                          children: amenities.map((a) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(2), border: Border.all(color: Colors.white12)),
-                            child: Text(a, style: const TextStyle(color: Colors.white60, fontSize: 9)),
-                          )).toList(),
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('${suite['price']} / noche', style: const TextStyle(color: AppTheme.gold, fontSize: 16, fontWeight: FontWeight.bold)),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent, foregroundColor: AppTheme.gold,
-                                side: const BorderSide(color: AppTheme.gold), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                              ),
-                              onPressed: () => _openBookingModal(suite),
-                              child: const Text('RESERVAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                            )
-                          ],
-                        )
-                      ],
+                    Text(
+                      '$_guests',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                     ),
-                  )
-                ],
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline, color: Colors.white70, size: 20),
+                      onPressed: () {
+                        setState(() => _guests++);
+                        _loadSuites();
+                      },
+                    ),
+                  ],
+                ),
+                const Divider(color: Colors.white10),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined, color: AppTheme.gold, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _selectedDateRange != null
+                            ? '${_formatDate(_selectedDateRange!.start)} - ${_formatDate(_selectedDateRange!.end)}'
+                            : 'Cualquier fecha',
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (_selectedDateRange != null)
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white60, size: 18),
+                        onPressed: _clearDateRange,
+                        tooltip: 'Limpiar fechas',
+                      ),
+                    TextButton(
+                      onPressed: _pickDateRange,
+                      child: Text(
+                        _selectedDateRange == null ? 'Seleccionar fechas' : 'Cambiar',
+                        style: const TextStyle(color: AppTheme.gold, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (_availableZones.length > 1) ...[
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _availableZones.entries.map((entry) {
+                  final zoneSlug = entry.key;
+                  final zoneLabel = entry.value;
+                  final isSelected = _selectedZone == zoneSlug;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text(zoneLabel),
+                      selected: isSelected,
+                      onSelected: (_) {
+                        setState(() => _selectedZone = zoneSlug);
+                        _loadSuites();
+                      },
+                      selectedColor: AppTheme.gold,
+                      backgroundColor: const Color(0xFF1E1E1E),
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.black : Colors.white70,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 11,
+                      ),
+                      side: BorderSide(color: isSelected ? AppTheme.gold : Colors.white12),
+                    ),
+                  );
+                }).toList(),
               ),
-            );
-          }),
+            ),
+          ],
+          const SizedBox(height: 16),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Center(child: CircularProgressIndicator(color: AppTheme.gold)),
+            )
+          else if (_errorMessage != null)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.white70, fontSize: 15),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.gold,
+                        foregroundColor: Colors.black,
+                      ),
+                      onPressed: _loadSuites,
+                      child: const Text('Reintentar', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (displayedSuites.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.hotel_outlined, color: AppTheme.gold, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      _selectedDateRange != null
+                          ? 'No hay suites disponibles para esas fechas'
+                          : 'No se encontraron suites con los filtros seleccionados',
+                      style: const TextStyle(color: Colors.white70, fontSize: 15),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    if (_selectedDateRange != null)
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.gold,
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: _clearDateRange,
+                        child: const Text('Limpiar fechas', style: TextStyle(fontWeight: FontWeight.bold)),
+                      )
+                    else
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.gold,
+                          foregroundColor: Colors.black,
+                        ),
+                        onPressed: _loadSuites,
+                        child: const Text('Reintentar', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...displayedSuites.map((suite) {
+              final List<String> amenities = List<String>.from(suite['amenities'] ?? []);
+              final category = suite['category'];
+              final zone = suite['zone'];
+              final subtitleParts = [
+                if (category != null && category.toString().isNotEmpty) category.toString(),
+                if (zone != null && zone.toString().isNotEmpty) zone.toString(),
+              ].join(' • ');
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: AppTheme.cardBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white10),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                      child: suite['image'] != null
+                          ? Image.network(
+                              suite['image'],
+                              height: 190,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _imagePlaceholder();
+                              },
+                            )
+                          : _imagePlaceholder(),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (subtitleParts.isNotEmpty) ...[
+                            Text(
+                              subtitleParts.toUpperCase(),
+                              style: const TextStyle(
+                                color: AppTheme.gold,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          Text(
+                            suite['title'],
+                            style: const TextStyle(
+                              fontFamily: 'serif',
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (amenities.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: amenities.map((a) => Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(2),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                child: Text(a, style: const TextStyle(color: Colors.white60, fontSize: 9)),
+                              )).toList(),
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                suite['price'] != null ? '${suite['price']} / noche' : 'Consultar precio',
+                                style: const TextStyle(
+                                  color: AppTheme.gold,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  foregroundColor: AppTheme.gold,
+                                  side: const BorderSide(color: AppTheme.gold),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                ),
+                                onPressed: () => _openBookingModal(suite),
+                                child: const Text('RESERVAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
         ],
+      ),
+    );
+  }
+
+  Widget _imagePlaceholder() {
+    return Container(
+      height: 190,
+      width: double.infinity,
+      color: const Color(0xFF1A1A1A),
+      child: const Center(
+        child: Icon(Icons.hotel_outlined, color: AppTheme.gold, size: 48),
       ),
     );
   }

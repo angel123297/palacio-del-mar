@@ -47,7 +47,7 @@ class PalacioDelMarHome extends StatelessWidget {
                     ),
                     child: const Center(
                       child: Text(
-                        'Aquí integraremos el widget del mapa',
+                        'AquÃ­ integraremos el widget del mapa',
                         style: TextStyle(color: Colors.black54),
                       ),
                     ),
