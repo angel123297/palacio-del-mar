@@ -1,5 +1,28 @@
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-10-29 — Revisión diaria de Vibe: sin cambios de código en el día; nuevo PR draft #25 (reporte de auditoría)
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios de código en el día.** Los únicos commits dentro de la ventana ya estaban documentados en el reporte del 28 oct: [fix(config): constructor explicito en DataInitializer](https://github.com/angel123297/palacio-del-mar/commit/0c9df4cf37dde6e74f85cf1b0a434fa95197e2a3) (28 oct 14:32 UTC) y el propio reporte de QA ([56a9938](https://github.com/angel123297/palacio-del-mar/commit/56a99384024db6fe71ba9fdc6c4c046d140c4d9a), 28 oct 14:44 UTC). Ningún commit nuevo de agentes (Antigravity/Jules) en el día.
+
+**Pull requests: 2 PRs abiertos:**
+- 🆕 [#25 — Add System Audit Report](https://github.com/angel123297/palacio-del-mar/pull/25) (draft, base `plan/marketplace-webhooks`, head `audit-report-10494833610902290366`, actualizado hoy 12:19 UTC). Solo agrega `REPORT.md` en la raíz (+41 líneas): reporte de un agente que afirma **446 tests backend y 43 frontend en verde (0 fallos, 0 omitidos)**, verifica endpoints críticos autenticados y `jwt.secret=${JWT_SECRET}`. Cifras auto-reportadas, no verificadas por Vibe en CI. ⚠️ Sugiere mover `REPORT.md` a `docs/` antes de fusionar (la convención del repo centraliza reportes en `docs/`).
+- [#23 — Cleanup unused frontend code and dependencies](https://github.com/angel123297/palacio-del-mar/pull/23) (draft, sin actividad desde el 26 oct). ⚠️ Su base es `proyecto-angular-java` (rama original protegida): NO fusionar sin decisión explícita del usuario.
+
+**Fase en curso:** plan de 5 fases **entregado** (fusionado vía #20 el 21 oct). Sin avance post-plan en el día: la última actividad funcional sigue siendo la remediación de auditoría del 28 oct (2ad52bc + 0c9df4c).
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — siguen confirmados corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`). Los 10 hallazgos de AUDITORIA_SEGURIDAD.md permanecen cerrados.
+
+**Tests esperados en verde:** **446 de backend y 43 de frontend** (cifras del reporte de #25 y README, heredadas del 28 oct; sin commits de código hoy no hay riesgo de regresión nueva). **Cifra reportada por agente, no verificada por Vibe en CI**; pendiente verificar la corrida de GitHub Actions sobre el HEAD actual (0c9df4c).
+
+**Riesgos / problemas detectados:**
+- ⚠️ `REPORT.md` de PR #25 en la raíz del repo: duplica información de `docs/QA_REPORTE.md` y rompe la convención `docs/`; revisar antes de fusionar.
+- ⚠️ Cifras de tests (446/43) aún sin verificación local/CI por Vibe sobre 0c9df4c.
+- ⚠️ PR #23 con base en `proyecto-angular-java` (rama original protegida): NO fusionar sin decisión explícita; considerar cerrar o cambiar la base.
+- ⚠️ Docs eliminados por 0ff7a9e (`PLAN_MARKETPLACE.md`, `AUDITORIA_SEGURIDAD.md`, `CORRECCIONES.md`, `DEMO_SCRIPT.md`, `README.md` bajo `docs/`) siguen sin restaurarse (recuperables del commit fd81791).
+- ⚠️ Commit 4ddecea ("Actualización de credencial de Gmail"): sigue pendiente verificar secretos en historial y rotar la credencial si se expuso.
+- ⚠️ `AGENTS.md` sigue fuera del repositorio (ignorado vía .gitignore).
+- ⚠️ La app móvil (respaldada en `archive/mobile-flutter-v1`) sigue sin suite de tests propia.
+
 ### 📅 2026-10-28 — Revisión diaria de Vibe: remediaciones de seguridad masivas, merge a producción y ⚠️ eliminación de docs de QA/auditoría (restaurado este reporte)
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`, 27–28 oct):**
