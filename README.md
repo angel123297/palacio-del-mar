@@ -158,7 +158,7 @@ Servicios locales disponibles:
 
 ---
 
-## 📱 Guía de Instalación Móvil (Android & iOS — 100% Gratuito)
+## 📱 Guía de Instalación Móvil (Android & iOS)
 
 Puedes instalar y probar la aplicación de **Palacio del Mar** en tu celular sin pagar licencias de tiendas de apps, mediante los métodos oficiales y gratuitos de cada plataforma:
 
