@@ -182,9 +182,9 @@ En Android cualquier usuario puede instalar la aplicación directamente desde su
 
 ---
 
-### 🍏 2. En Dispositivos iOS (iPhone & iPad — 100% Gratuito)
+### 🍏 2. En Dispositivos iOS (iPhone & iPad)
 
-Debido a que Apple no permite descargar archivos ejecutables fuera de la App Store, la única manera **100% gratuita y sin pagar cuenta de desarrollador de Apple ($99 USD)** de tener la app instalada en la pantalla de tu iPhone es mediante la **Web App Progresiva (PWA)** oficial:
+Puedes agregar y usar la aplicación directamente en tu iPhone en pocos segundos con el icono oficial y vista a pantalla completa:
 
 1. **Abre el enlace en Safari:**
    - Abre el navegador **Safari** en tu iPhone e ingresa al dominio web activo de la plataforma:
