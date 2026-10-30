@@ -156,64 +156,42 @@ Servicios locales disponibles:
 | `**** **** **** 9995` | Fondos insuficientes (`payment.failed`) |
 | `**** **** **** 0069` | Tarjeta expirada / vencida (`payment.failed`) |
 
+---
+
+## 📱 Guía de Instalación Móvil (Directo desde tu Celular)
+
+Instala la aplicación de **Palacio del Mar** en tu dispositivo móvil en menos de 1 minuto, sin necesidad de cables ni computadores, sincronizada automáticamente y en tiempo real con la versión web del hotel.
 
 ---
 
-## 📱 Guía de Instalación de la Aplicación Móvil (Android & iOS)
+### 🤖 1. En Dispositivos Android (Instalación por APK Autónomo)
 
-La aplicación móvil de **Palacio del Mar** está construida sobre Flutter y sincronizada en tiempo real con el backend mediante Server-Sent Events (SSE). A continuación se detallan las opciones de instalación para cada plataforma:
+La aplicación para Android se instala directamente descargando el paquete instalador desde tu celular y se comunica de forma automática con la misma base de datos y reservas de la página web:
 
-### 🤖 1. Instalación en Dispositivos Android
-
-Existen dos maneras de instalar la aplicación en cualquier celular o tableta Android:
-
-#### Opción A: Descarga directa desde GitHub Actions (Recomendada)
-1. En la parte superior de este repositorio en GitHub, ingresa a la pestaña **Actions**.
-2. En la lista lateral izquierda, haz clic en el flujo **`Mobile App Build (Flutter Android & Web)`**.
-3. Selecciona la ejecución más reciente (marcada con check verde ✅).
-4. Desplázate hasta la sección inferior titulada **Artifacts**.
-5. Descarga el paquete comprimido **`palacio-del-mar-android-apk`** y descomprímelo para obtener el archivo `app-release.apk`.
-6. Transfiere el archivo `app-release.apk` a tu teléfono (o descárgalo directamente desde el navegador de tu celular).
-7. Al abrir el archivo, si el sistema lo solicita, activa el permiso de **"Instalar aplicaciones de fuentes desconocidas"** para ese navegador o gestor de archivos.
-8. Presiona **Instalar** y abre la aplicación con el icono oficial de Palacio del Mar.
-
-#### Opción B: Compilación local con Flutter SDK
-Si cuentas con el entorno de desarrollo configurado en tu computadora:
-```bash
-cd mobile-flutter
-flutter pub get
-flutter build apk --release
-```
-El archivo instalador se generará en:
-`mobile-flutter/build/app/outputs/flutter-apk/app-release.apk`
+1. **Descarga el instalador desde tu celular:**
+   - Abre el navegador web en tu teléfono y entra a la sección **Actions** del repositorio (o la pestaña **Releases**).
+   - Toca el paquete generado **`palacio-del-mar-android-apk`** y descarga el archivo **`app-release.apk`**.
+2. **Instala la aplicación:**
+   - Abre la notificación de descarga finalizada en tu celular.
+   - Si tu dispositivo solicita autorización, presiona **Ajustes** y activa la opción **"Permitir desde esta fuente"** (solo toma 2 segundos).
+   - Toca el botón **Instalar**.
+3. **Apertura y sincronización automática:**
+   - Abre **Palacio del Mar** desde la pantalla de inicio o cajón de aplicaciones de tu celular.
+   - ¡Listo! Cualquier reserva, suite o actualización que ocurra en la página web se sincronizará automáticamente en tu celular en tiempo real mediante el motor de eventos SSE.
 
 ---
 
-### 🍏 2. Instalación en Dispositivos iOS (iPhone & iPad)
+### 🍏 2. En Dispositivos iOS (iPhone & iPad vía Enlace Activo Permanente)
 
-Debido a las políticas de seguridad del ecosistema Apple, existen dos métodos de instalación según tu perfil de usuario:
+En iPhone y iPad la aplicación se instala permanentemente como **Web App Nativa (PWA)** a través del enlace activo de la plataforma, sin certificados que expiren ni necesidad de supervisión continua:
 
-#### Opción A: Acceso Inmediato como Web App / PWA (Sin costo ni certificados)
-Permite instalar la aplicación en la pantalla de inicio del iPhone con apariencia, rendimiento e icono nativo oficial:
-1. Abre el navegador **Safari** en tu iPhone o iPad.
-2. Ingresa a la URL pública de la plataforma (por ejemplo, el dominio público HTTPS o túnel activo).
-3. Toca el botón **Compartir** (icono del cuadrado con una flecha hacia arriba en la barra inferior de Safari).
-4. Desplázate hacia abajo y selecciona **"Agregar al inicio"** (o *"Add to Home Screen"*).
-5. Confirma el nombre **Palacio del Mar** y presiona **Agregar**.
-6. La aplicación aparecerá en tu pantalla de inicio junto a tus demás apps, abriéndose a pantalla completa sin barras de navegador.
-
-#### Opción B: Instalación Nativa para Desarrolladores (vía Mac y Xcode)
-Para ejecutar la versión compilada directamente en el dispositivo físico:
-1. Conecta tu iPhone a una computadora Mac mediante cable USB y desbloquea el teléfono aceptando "Confiar en esta computadora".
-2. En la terminal de la Mac, navega a la carpeta del proyecto:
-   ```bash
-   cd mobile-flutter
-   flutter pub get
-   cd ios
-   pod install
-   ```
-3. Abre el archivo `Runner.xcworkspace` en **Xcode**.
-4. En la configuración del proyecto (*Signing & Capabilities*), selecciona tu Apple ID en la casilla **Team**.
-5. Selecciona tu iPhone físico en la lista de dispositivos de destino arriba a la izquierda.
-6. Presiona el botón **Play (Run)** para compilar e instalar la app directamente en tu teléfono.
-7. En tu iPhone, ve a *Configuración > General > Administración de VPN y dispositivos*, y aprueba tu certificado de desarrollador personal.
+1. **Abre el enlace en Safari:**
+   - En tu iPhone, abre el navegador **Safari** e ingresa a la dirección web oficial de la plataforma:
+     `https://rehab-perceive-landline.ngrok-free.dev/` (o el dominio público activo del hotel).
+2. **Agrégala a tu pantalla de inicio:**
+   - Toca el botón **Compartir** en la barra inferior de Safari (icono del cuadrado con la flecha hacia arriba: ⎋).
+   - En el menú que aparece, desplázate hacia abajo y presiona **"Agregar al inicio"** (o *"Add to Home Screen"*).
+   - Deja el nombre sugerido **Palacio del Mar** y toca **Agregar** arriba a la derecha.
+3. **Disfruta de la experiencia de aplicación nativa:**
+   - Verás el icono dorado oficial de Palacio del Mar directamente junto a tus demás aplicaciones de iOS.
+   - Al tocarlo, abrirá a pantalla completa sin barra de navegación de Safari, manteniéndose activa y sincronizada las 24 horas sin requerir que nadie la reactive.
