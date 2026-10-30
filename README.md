@@ -170,7 +170,7 @@ La aplicación para Android está firmada con el certificado criptográfico ofic
 
 1. **Descarga el instalador APK en tu celular:**
    - Abre el navegador web en tu teléfono y toca el siguiente enlace de descarga directa en GitHub:
-     👉 **[Descargar Palacio del Mar APK (v1.0.0)](https://github.com/angel123297/palacio-del-mar/releases/download/v1.0.0/palacio-del-mar.apk)**
+     👉 **[Descargar Palacio del Mar APK (v1.0.0)](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)**
      *(O entra a la sección [Releases de GitHub](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0) y descarga `palacio-del-mar.apk`)*.
 2. **Instala la aplicación:**
    - Abre el archivo descargado desde las notificaciones o la carpeta de descargas de tu celular.
@@ -187,7 +187,7 @@ Puedes agregar y usar la aplicación directamente en tu iPhone en pocos segundos
 
 1. **Abre el enlace en Safari:**
    - Abre el navegador **Safari** en tu iPhone e ingresa al dominio web activo de la plataforma:
-     `https://unbroke-unsized-zandra.ngrok-free.dev` *(o el enlace público HTTPS del despliegue en la nube)*.
+     `https://unbroke-unsized-zandra.ngrok-free.dev/app/` *(o el enlace público HTTPS del despliegue en la nube)*.
 2. **Instálala en tu pantalla de inicio en 2 toques:**
    - Toca el botón **Compartir** de Safari (icono del cuadrado con la flecha hacia arriba: ⎋ en la barra inferior).
    - Desplázate hacia abajo en el menú y selecciona **"Agregar al inicio"** (o *"Add to Home Screen"*).
