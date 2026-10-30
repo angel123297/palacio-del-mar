@@ -155,3 +155,65 @@ Servicios locales disponibles:
 | `**** **** **** 0002` | Tarjeta rechazada por la entidad bancaria (`payment.failed`) |
 | `**** **** **** 9995` | Fondos insuficientes (`payment.failed`) |
 | `**** **** **** 0069` | Tarjeta expirada / vencida (`payment.failed`) |
+
+
+---
+
+## 📱 Guía de Instalación de la Aplicación Móvil (Android & iOS)
+
+La aplicación móvil de **Palacio del Mar** está construida sobre Flutter y sincronizada en tiempo real con el backend mediante Server-Sent Events (SSE). A continuación se detallan las opciones de instalación para cada plataforma:
+
+### 🤖 1. Instalación en Dispositivos Android
+
+Existen dos maneras de instalar la aplicación en cualquier celular o tableta Android:
+
+#### Opción A: Descarga directa desde GitHub Actions (Recomendada)
+1. En la parte superior de este repositorio en GitHub, ingresa a la pestaña **Actions**.
+2. En la lista lateral izquierda, haz clic en el flujo **`Mobile App Build (Flutter Android & Web)`**.
+3. Selecciona la ejecución más reciente (marcada con check verde ✅).
+4. Desplázate hasta la sección inferior titulada **Artifacts**.
+5. Descarga el paquete comprimido **`palacio-del-mar-android-apk`** y descomprímelo para obtener el archivo `app-release.apk`.
+6. Transfiere el archivo `app-release.apk` a tu teléfono (o descárgalo directamente desde el navegador de tu celular).
+7. Al abrir el archivo, si el sistema lo solicita, activa el permiso de **"Instalar aplicaciones de fuentes desconocidas"** para ese navegador o gestor de archivos.
+8. Presiona **Instalar** y abre la aplicación con el icono oficial de Palacio del Mar.
+
+#### Opción B: Compilación local con Flutter SDK
+Si cuentas con el entorno de desarrollo configurado en tu computadora:
+```bash
+cd mobile-flutter
+flutter pub get
+flutter build apk --release
+```
+El archivo instalador se generará en:
+`mobile-flutter/build/app/outputs/flutter-apk/app-release.apk`
+
+---
+
+### 🍏 2. Instalación en Dispositivos iOS (iPhone & iPad)
+
+Debido a las políticas de seguridad del ecosistema Apple, existen dos métodos de instalación según tu perfil de usuario:
+
+#### Opción A: Acceso Inmediato como Web App / PWA (Sin costo ni certificados)
+Permite instalar la aplicación en la pantalla de inicio del iPhone con apariencia, rendimiento e icono nativo oficial:
+1. Abre el navegador **Safari** en tu iPhone o iPad.
+2. Ingresa a la URL pública de la plataforma (por ejemplo, el dominio público HTTPS o túnel activo).
+3. Toca el botón **Compartir** (icono del cuadrado con una flecha hacia arriba en la barra inferior de Safari).
+4. Desplázate hacia abajo y selecciona **"Agregar al inicio"** (o *"Add to Home Screen"*).
+5. Confirma el nombre **Palacio del Mar** y presiona **Agregar**.
+6. La aplicación aparecerá en tu pantalla de inicio junto a tus demás apps, abriéndose a pantalla completa sin barras de navegador.
+
+#### Opción B: Instalación Nativa para Desarrolladores (vía Mac y Xcode)
+Para ejecutar la versión compilada directamente en el dispositivo físico:
+1. Conecta tu iPhone a una computadora Mac mediante cable USB y desbloquea el teléfono aceptando "Confiar en esta computadora".
+2. En la terminal de la Mac, navega a la carpeta del proyecto:
+   ```bash
+   cd mobile-flutter
+   flutter pub get
+   cd ios
+   pod install
+   ```
+3. Abre el archivo `Runner.xcworkspace` en **Xcode**.
+4. En la configuración del proyecto (*Signing & Capabilities*), selecciona tu Apple ID en la casilla **Team**.
+5. Selecciona tu iPhone físico en la lista de dispositivos de destino arriba a la izquierda.
+6. Presiona el botón **Play (Run)** para compilar e instalar la app directamente en tu teléfono.
+7. En tu iPhone, ve a *Configuración > General > Administración de VPN y dispositivos*, y aprueba tu certificado de desarrollador personal.
