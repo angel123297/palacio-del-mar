@@ -158,44 +158,41 @@ Servicios locales disponibles:
 
 ---
 
-## 📱 Guía de Instalación Móvil (Directo desde tu Celular)
+## 📱 Guía de Instalación Móvil (Android & iOS — 100% Gratuito)
 
-Instala y prueba la aplicación de **Palacio del Mar** directamente en tu celular, sincronizada en tiempo real con las reservas de la plataforma web.
+Puedes instalar y probar la aplicación de **Palacio del Mar** en tu celular sin pagar licencias de tiendas de apps, mediante los métodos oficiales y gratuitos de cada plataforma:
 
 ---
 
-### 🤖 1. En Dispositivos Android (Instalación por APK Funcional)
+### 🤖 1. En Dispositivos Android (Descarga Directa de APK)
 
-La aplicación para Android permite reservar, consultar suites y recibir confirmaciones en tiempo real:
+En Android cualquier usuario puede instalar la aplicación directamente desde su navegador móvil sin necesidad de computadores:
 
 1. **Descarga el instalador APK en tu celular:**
-   - Si estás conectado a la misma red Wi-Fi del servidor, abre desde el navegador de tu celular:
-     👉 **`http://192.168.80.15:4200/app-release.apk`** *(Descarga directa inmediata)*
-   - O visita la sección **Releases** en GitHub:
-     `https://github.com/angel123297/palacio-del-mar` y descarga el paquete `app-release.apk`.
-2. **Instala la aplicación en tu celular:**
-   - Abre el archivo `app-release.apk` desde la barra de notificaciones o la carpeta de descargas de tu teléfono.
-   - Si Android te muestra el aviso de seguridad de aplicaciones externas, presiona **Configuración/Ajustes** y activa la casilla **"Permitir desde esta fuente"** (solo toma 2 segundos).
-   - Presiona **Instalar**.
-3. **Prueba y Sincronización Automática con la Web:**
-   - Abre la aplicación **Palacio del Mar** en tu teléfono.
-   - La aplicación está enlazada al servidor backend (`192.168.80.15:5000` / endpoint activo).
-   - Realiza cualquier reserva o consulta desde la página web en tu navegador: verás cómo se sincroniza en tu celular en tiempo real mediante el motor de eventos SSE sin necesidad de recargar.
+   - Abre el navegador web en tu teléfono y toca el siguiente enlace de descarga directa en GitHub:
+     👉 **[Descargar Palacio del Mar APK (v1.0.0)](https://github.com/angel123297/palacio-del-mar/releases/download/v1.0.0/palacio-del-mar.apk)**
+     *(O entra a la sección [Releases de GitHub](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0) y descarga `palacio-del-mar.apk`)*.
+2. **Instala la aplicación:**
+   - Abre el archivo descargado desde las notificaciones o la carpeta de descargas de tu celular.
+   - Si tu teléfono muestra el mensaje de seguridad de Android para descargas de internet, presiona **Ajustes** y activa **"Permitir desde esta fuente"**.
+   - Toca **Instalar**.
+3. **Prueba y Sincronización:**
+   - Abre la aplicación **Palacio del Mar** con su icono oficial.
+   - Navega por el catálogo de suites de lujo y realiza reservas sincronizadas con la plataforma web.
 
 ---
 
-### 🍏 2. En Dispositivos iOS (iPhone & iPad vía App Web PWA)
+### 🍏 2. En Dispositivos iOS (iPhone & iPad — 100% Gratuito)
 
-En iOS la aplicación funciona como aplicación nativa a pantalla completa a través de Safari, sin certificados que expiren ni necesidad de supervisión constante:
+Debido a que Apple no permite descargar archivos ejecutables fuera de la App Store, la única manera **100% gratuita y sin pagar cuenta de desarrollador de Apple ($99 USD)** de tener la app instalada en la pantalla de tu iPhone es mediante la **Web App Progresiva (PWA)** oficial:
 
 1. **Abre el enlace en Safari:**
-   - Conecta tu iPhone a la misma red Wi-Fi y abre el navegador **Safari**.
-   - Ingresa a la dirección del servidor:
-     👉 **`http://192.168.80.15:4200`** *(o la URL pública HTTPS activa del hotel)*.
-2. **Instálala en tu pantalla de inicio:**
-   - Toca el botón **Compartir** de Safari (icono del cuadrado con una flecha hacia arriba: ⎋ en la barra inferior).
-   - En el menú de opciones que aparece, selecciona **"Agregar al inicio"** (o *"Add to Home Screen"*).
+   - Abre el navegador **Safari** en tu iPhone e ingresa al dominio web activo de la plataforma:
+     `https://rehab-perceive-landline.ngrok-free.dev/` *(o el enlace público HTTPS del despliegue)*.
+2. **Instálala en tu pantalla de inicio en 2 toques:**
+   - Toca el botón **Compartir** de Safari (icono del cuadrado con la flecha hacia arriba: ⎋ en la barra inferior).
+   - Desplázate hacia abajo en el menú y selecciona **"Agregar al inicio"** (o *"Add to Home Screen"*).
    - Confirma el nombre **Palacio del Mar** y toca **Agregar** en la esquina superior derecha.
-3. **Uso como aplicación nativa:**
-   - En la pantalla de inicio de tu iPhone aparecerá el icono oficial dorado de Palacio del Mar.
-   - Al tocarlo, se abrirá a pantalla completa sin la interfaz del navegador, con sincronización continua de datos las 24 horas.
+3. **Experiencia de App Nativa:**
+   - En tu pantalla de inicio se creará el icono oficial dorado de Palacio del Mar.
+   - Al tocarlo, abrirá a pantalla completa sin barra de navegación ni controles de Safari, comportándose exactamente como una app nativa de iOS sin costo alguno.
