@@ -31,8 +31,6 @@ public class PaymentService {
     private final PaymentGateway paymentGateway;
     private final EmailService emailService;
     private final UserRepository userRepository;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private BookingSseService bookingSseService;
 
     @Setter
     @Autowired(required = false)
@@ -296,13 +294,6 @@ public class PaymentService {
              }
              emailService.sendBookingConfirmation(updatedBooking);
              emailService.sendHostBookingNotification(updatedBooking);
-             try {
-                 if (updatedBooking.getUser() != null) {
-                     bookingSseService.emitBookingUpdate(updatedBooking.getUser(), bookingService.toDTO(updatedBooking));
-                 }
-             } catch (Exception ex) {
-                 // Non-blocking SSE notification
-             }
         }
 
         java.util.Map<String, Object> returnMap = new java.util.HashMap<>();

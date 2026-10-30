@@ -155,3 +155,43 @@ Servicios locales disponibles:
 | `**** **** **** 0002` | Tarjeta rechazada por la entidad bancaria (`payment.failed`) |
 | `**** **** **** 9995` | Fondos insuficientes (`payment.failed`) |
 | `**** **** **** 0069` | Tarjeta expirada / vencida (`payment.failed`) |
+
+---
+
+## 📱 Guía de Instalación Móvil (Directo desde tu Celular)
+
+Instala la aplicación de **Palacio del Mar** en tu dispositivo móvil en menos de 1 minuto, sin necesidad de cables ni computadores, sincronizada automáticamente y en tiempo real con la versión web del hotel.
+
+---
+
+### 🤖 1. En Dispositivos Android (Instalación por APK Autónomo)
+
+La aplicación para Android se instala directamente descargando el paquete instalador desde tu celular y se comunica de forma automática con la misma base de datos y reservas de la página web:
+
+1. **Descarga el instalador desde tu celular:**
+   - Abre el navegador web en tu teléfono y entra a la sección **Actions** del repositorio (o la pestaña **Releases**).
+   - Toca el paquete generado **`palacio-del-mar-android-apk`** y descarga el archivo **`app-release.apk`**.
+2. **Instala la aplicación:**
+   - Abre la notificación de descarga finalizada en tu celular.
+   - Si tu dispositivo solicita autorización, presiona **Ajustes** y activa la opción **"Permitir desde esta fuente"** (solo toma 2 segundos).
+   - Toca el botón **Instalar**.
+3. **Apertura y sincronización automática:**
+   - Abre **Palacio del Mar** desde la pantalla de inicio o cajón de aplicaciones de tu celular.
+   - ¡Listo! Cualquier reserva, suite o actualización que ocurra en la página web se sincronizará automáticamente en tu celular en tiempo real mediante el motor de eventos SSE.
+
+---
+
+### 🍏 2. En Dispositivos iOS (iPhone & iPad vía Enlace Activo Permanente)
+
+En iPhone y iPad la aplicación se instala permanentemente como **Web App Nativa (PWA)** a través del enlace activo de la plataforma, sin certificados que expiren ni necesidad de supervisión continua:
+
+1. **Abre el enlace en Safari:**
+   - En tu iPhone, abre el navegador **Safari** e ingresa a la dirección web oficial de la plataforma:
+     `https://rehab-perceive-landline.ngrok-free.dev/` (o el dominio público activo del hotel).
+2. **Agrégala a tu pantalla de inicio:**
+   - Toca el botón **Compartir** en la barra inferior de Safari (icono del cuadrado con la flecha hacia arriba: ⎋).
+   - En el menú que aparece, desplázate hacia abajo y presiona **"Agregar al inicio"** (o *"Add to Home Screen"*).
+   - Deja el nombre sugerido **Palacio del Mar** y toca **Agregar** arriba a la derecha.
+3. **Disfruta de la experiencia de aplicación nativa:**
+   - Verás el icono dorado oficial de Palacio del Mar directamente junto a tus demás aplicaciones de iOS.
+   - Al tocarlo, abrirá a pantalla completa sin barra de navegación de Safari, manteniéndose activa y sincronizada las 24 horas sin requerir que nadie la reactive.

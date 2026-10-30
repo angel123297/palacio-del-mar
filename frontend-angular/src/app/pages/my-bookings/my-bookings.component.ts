@@ -1,10 +1,8 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
-import { BookingStreamService } from '../../services/booking-stream.service';
-import { Subscription } from 'rxjs';
 import { Booking } from '../../models/types';
 import { finalize } from 'rxjs';
 
@@ -100,8 +98,7 @@ import { finalize } from 'rxjs';
     </div>
   `
 })
-export class MyBookingsComponent implements OnInit, OnDestroy {
-  private streamSub?: Subscription;
+export class MyBookingsComponent implements OnInit {
   bookings: Booking[] = [];
   loading = true;
 
@@ -115,8 +112,7 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
     private api: ApiService,
     private auth: AuthService,
     private cdr: ChangeDetectorRef,
-    private router: Router,
-    private bookingStream: BookingStreamService
+    private router: Router
   ) {}
 
   /** L8: una reserva pending con TTL vencido ya no debe ofrecer pago ni cancelación. */
@@ -220,24 +216,5 @@ export class MyBookingsComponent implements OnInit, OnDestroy {
       return;
     }
     this.fetchMyBookings();
-    this.streamSub = this.bookingStream.getBookingUpdates().subscribe({
-      next: (updatedBooking) => {
-        if (!updatedBooking) return;
-        const bookingId = updatedBooking.id || updatedBooking._id;
-        const idx = this.bookings.findIndex(b => (b.id || b._id) === bookingId);
-        if (idx >= 0) {
-          this.bookings[idx] = { ...this.bookings[idx], ...updatedBooking };
-        } else {
-          this.bookings.unshift(updatedBooking);
-        }
-        this.cdr.detectChanges();
-      }
-    });
-  }
-
-  ngOnDestroy(): void {
-    if (this.streamSub) {
-      this.streamSub.unsubscribe();
-    }
   }
 }

@@ -32,8 +32,6 @@ public class PaymentWebhookService {
     private final ObjectMapper objectMapper;
 
     private final PaymentGateway paymentGateway;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private co.palaciodelmar.backend.service.BookingSseService bookingSseService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private co.palaciodelmar.backend.service.RedisLockService redisLockService;
@@ -323,13 +321,6 @@ public class PaymentWebhookService {
                     emailService.sendHostBookingNotification(booking);
                 } catch (Exception e) {
                     log.warn("Error enviando email al anfitrión: {}", e.getMessage());
-                }
-                try {
-                    if (bookingSseService != null && booking.getUser() != null) {
-                        bookingSseService.emitBookingUpdate(booking.getUser(), bookingService.toDTO(booking));
-                    }
-                } catch (Exception e) {
-                    log.warn("Error emitiendo SSE via webhook: {}", e.getMessage());
                 }
             }
 

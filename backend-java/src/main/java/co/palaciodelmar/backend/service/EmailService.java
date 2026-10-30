@@ -171,7 +171,7 @@ public class EmailService {
         }
     }
 
-    @Async("mailTaskExecutor")
+    @Async
     public void sendBookingConfirmation(Booking booking) {
         if (booking == null) return;
         try {
