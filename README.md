@@ -187,7 +187,7 @@ Puedes agregar y usar la aplicación directamente en tu iPhone en pocos segundos
 
 1. **Abre el enlace en Safari:**
    - Abre el navegador **Safari** en tu iPhone e ingresa al dominio web activo de la plataforma:
-     `https://unbroke-unsized-zandra.ngrok-free.dev/app/` *(o el enlace público HTTPS del despliegue en la nube)*.
+     `https://unbroke-unsized-zandra.ngrok-free.dev` *(o el enlace público HTTPS del despliegue en la nube)*.
 2. **Instálala en tu pantalla de inicio en 2 toques:**
    - Toca el botón **Compartir** de Safari (icono del cuadrado con la flecha hacia arriba: ⎋ en la barra inferior).
    - Desplázate hacia abajo en el menú y selecciona **"Agregar al inicio"** (o *"Add to Home Screen"*).
