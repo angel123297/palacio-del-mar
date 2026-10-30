@@ -2420,16 +2420,60 @@ footer {
   .receipt { box-shadow: none; padding: 0; }
 }
 
-/* ===== Accessible Input Placeholders & High Contrast (WCAG 2.2 AA) ===== */
+/* ===== Accessible Form Inputs, Labels & Placeholders (WCAG 2.2 AA) ===== */
+.field-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  margin-top: 6px;
+  margin-bottom: 4px;
+  display: block;
+  font-weight: 500;
+}
+
+input, select, textarea {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(201, 169, 110, 0.3) !important;
+  color: #ffffff !important;
+  padding: 12px 14px;
+  border-radius: 6px;
+  font-family: Jost, sans-serif;
+  font-size: 0.95rem;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  color-scheme: dark;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--gold) !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.35) !important;
+  color: #ffffff !important;
+}
+
+select option {
+  background: #1a1a17 !important;
+  color: #ffffff !important;
+}
+
 ::placeholder {
-  color: rgba(245, 240, 232, 0.65) !important;
+  color: rgba(245, 240, 232, 0.55) !important;
   opacity: 1;
 }
 
 input::placeholder,
 textarea::placeholder,
 select::placeholder {
-  color: rgba(245, 240, 232, 0.65) !important;
+  color: rgba(245, 240, 232, 0.55) !important;
   opacity: 1;
+}
+
+.auth-form, .booking-step-body, .admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
