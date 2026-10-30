@@ -169,8 +169,8 @@ Instala la aplicación de **Palacio del Mar** en tu dispositivo móvil en menos 
 La aplicación para Android se instala directamente descargando el paquete instalador desde tu celular y se comunica de forma automática con la misma base de datos y reservas de la página web:
 
 1. **Descarga el instalador desde tu celular:**
-   - Abre el navegador web en tu teléfono y entra a la sección **Actions** del repositorio (o la pestaña **Releases**).
-   - Toca el paquete generado **`palacio-del-mar-android-apk`** y descarga el archivo **`app-release.apk`**.
+   - Descarga directa: [Descargar APK Oficial de Palacio del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)
+   - O desde GitHub: [Release v1.0.0 Oficial](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)
 2. **Instala la aplicación:**
    - Abre la notificación de descarga finalizada en tu celular.
    - Si tu dispositivo solicita autorización, presiona **Ajustes** y activa la opción **"Permitir desde esta fuente"** (solo toma 2 segundos).
@@ -187,7 +187,7 @@ En iPhone y iPad la aplicación se instala permanentemente como **Web App Nativa
 
 1. **Abre el enlace en Safari:**
    - En tu iPhone, abre el navegador **Safari** e ingresa a la dirección web oficial de la plataforma:
-     `https://rehab-perceive-landline.ngrok-free.dev/` (o el dominio público activo del hotel).
+     `https://unbroke-unsized-zandra.ngrok-free.dev/app/` (o el dominio público activo del hotel).
 2. **Agrégala a tu pantalla de inicio:**
    - Toca el botón **Compartir** en la barra inferior de Safari (icono del cuadrado con la flecha hacia arriba: ⎋).
    - En el menú que aparece, desplázate hacia abajo y presiona **"Agregar al inicio"** (o *"Add to Home Screen"*).
