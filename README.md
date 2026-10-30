@@ -164,9 +164,9 @@ Puedes instalar y probar la aplicación de **Palacio del Mar** en tu celular sin
 
 ---
 
-### 🤖 1. En Dispositivos Android (Descarga Directa de APK)
+### 🤖 1. En Dispositivos Android (APK Firmado Oficial)
 
-En Android cualquier usuario puede instalar la aplicación directamente desde su navegador móvil sin necesidad de computadores:
+La aplicación para Android está firmada con el certificado criptográfico oficial de **Palacio del Mar S.A.S.**, garantizando que el paquete es genuino y seguro:
 
 1. **Descarga el instalador APK en tu celular:**
    - Abre el navegador web en tu teléfono y toca el siguiente enlace de descarga directa en GitHub:
@@ -174,11 +174,10 @@ En Android cualquier usuario puede instalar la aplicación directamente desde su
      *(O entra a la sección [Releases de GitHub](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0) y descarga `palacio-del-mar.apk`)*.
 2. **Instala la aplicación:**
    - Abre el archivo descargado desde las notificaciones o la carpeta de descargas de tu celular.
-   - Si tu teléfono muestra el mensaje de seguridad de Android para descargas de internet, presiona **Ajustes** y activa **"Permitir desde esta fuente"**.
-   - Toca **Instalar**.
+   - Presiona **Instalar**. Al contar con certificado oficial, la app se instalará de forma limpia y directa.
 3. **Prueba y Sincronización:**
-   - Abre la aplicación **Palacio del Mar** con su icono oficial.
-   - Navega por el catálogo de suites de lujo y realiza reservas sincronizadas con la plataforma web.
+   - Abre la aplicación **Palacio del Mar** con su icono oficial dorado.
+   - Navega por el catálogo de suites de lujo y realiza reservas sincronizadas en tiempo real con la plataforma web.
 
 ---
 
@@ -188,11 +187,11 @@ Puedes agregar y usar la aplicación directamente en tu iPhone en pocos segundos
 
 1. **Abre el enlace en Safari:**
    - Abre el navegador **Safari** en tu iPhone e ingresa al dominio web activo de la plataforma:
-     `https://rehab-perceive-landline.ngrok-free.dev/` *(o el enlace público HTTPS del despliegue)*.
+     `https://rehab-perceive-landline.ngrok-free.dev/` *(o el enlace público HTTPS del despliegue en la nube)*.
 2. **Instálala en tu pantalla de inicio en 2 toques:**
    - Toca el botón **Compartir** de Safari (icono del cuadrado con la flecha hacia arriba: ⎋ en la barra inferior).
    - Desplázate hacia abajo en el menú y selecciona **"Agregar al inicio"** (o *"Add to Home Screen"*).
    - Confirma el nombre **Palacio del Mar** y toca **Agregar** en la esquina superior derecha.
 3. **Experiencia de App Nativa:**
    - En tu pantalla de inicio se creará el icono oficial dorado de Palacio del Mar.
-   - Al tocarlo, abrirá a pantalla completa sin barra de navegación ni controles de Safari, comportándose exactamente como una app nativa de iOS sin costo alguno.
+   - Al tocarlo, abrirá a pantalla completa sin barra de navegación ni controles de Safari, comportándose exactamente como una app nativa de iOS.
