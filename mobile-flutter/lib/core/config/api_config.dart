@@ -27,7 +27,7 @@ class ApiConfig {
     }
     if (defaultTargetPlatform == TargetPlatform.android) {
       // Por defecto en dispositivo físico usa la IP LAN del equipo servidor
-      return 'http://192.168.80.15:5000/api';
+      return 'https://unbroke-unsized-zandra.ngrok-free.dev/api';
     }
     return 'http://localhost:5000/api';
   }

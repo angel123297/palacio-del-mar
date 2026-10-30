@@ -130,7 +130,13 @@ public class SecurityConfig {
                 "http://localhost:4200",
                 "http://localhost:5000",
                 "http://127.0.0.1:4200",
-                "http://127.0.0.1:5000"
+                "http://127.0.0.1:5000",
+                "http://localhost:8085",
+                "http://127.0.0.1:8085",
+                "https://*.ngrok-free.dev",
+                "https://*.ngrok.app",
+                "https://*.loca.lt",
+                "*"
         ));
         if (appBaseUrl != null && !appBaseUrl.isBlank()) {
             String normalizedBaseUrl = appBaseUrl.trim().replaceAll("/+$", "");

@@ -36,6 +36,8 @@ android {
             keyPassword = keystoreProperties.getProperty("keyPassword") ?: "PalacioDelMar2026SecureKey"
             storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) } ?: file("palacio-release-key.jks")
             storePassword = keystoreProperties.getProperty("storePassword") ?: "PalacioDelMar2026SecureKey"
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 
