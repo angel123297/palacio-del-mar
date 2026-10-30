@@ -18,7 +18,7 @@ void main() {
     );
 
     expect(find.text('Palacio del Mar'), findsOneWidget);
-    expect(find.text('LLAVE DIGITAL & ACCESO A SUITES'), findsOneWidget);
+    expect(find.text('MI ESTANCIA & LLAVE DIGITAL'), findsOneWidget);
     expect(find.text('INICIAR SESIÓN'), findsOneWidget);
     expect(find.text('¿NO TIENES CUENTA? REGÍSTRATE AQUÍ'), findsOneWidget);
 

@@ -1,11 +1,11 @@
 {
-    "name": "palacio_del_mar_mobile",
-    "short_name": "palacio_del_mar_mobile",
+    "name": "Palacio del Mar",
+    "short_name": "Palacio del Mar",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0B0C10",
+    "theme_color": "#C5A059",
+    "description": "Palacio del Mar - Hotel Boutique y Suites de Lujo",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

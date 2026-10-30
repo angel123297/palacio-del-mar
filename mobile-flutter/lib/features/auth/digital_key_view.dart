@@ -5,6 +5,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/booking_stream_client.dart';
+import 'dart:async';
 
 class DigitalKeyView extends StatefulWidget {
   const DigitalKeyView({super.key});
@@ -23,6 +25,9 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
   bool _obscurePassword = true;
   List<dynamic> _userBookings = [];
   bool _isLoadingBookings = false;
+  final Set<String> _revealedPins = {};
+  int _selectedFilterIndex = 0;
+  StreamSubscription? _bookingStreamSub;
 
   static final RegExp _emailRegExp = RegExp(
     r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
@@ -35,7 +40,29 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBookings());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadBookings();
+      _initBookingStream();
+    });
+  }
+
+  void _initBookingStream() {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) return;
+    BookingStreamClient().connect();
+    _bookingStreamSub?.cancel();
+    _bookingStreamSub = BookingStreamClient().bookingUpdates.listen((updated) {
+      if (!mounted) return;
+      final bookingId = updated['id'] ?? updated['_id'];
+      setState(() {
+        final idx = _userBookings.indexWhere((b) => (b is Map && (b['id'] == bookingId || b['_id'] == bookingId)));
+        if (idx >= 0) {
+          _userBookings[idx] = updated;
+        } else {
+          _userBookings.insert(0, updated);
+        }
+      });
+    });
   }
 
   Future<void> _loadBookings() async {
@@ -52,6 +79,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
 
   @override
   void dispose() {
+    _bookingStreamSub?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -275,105 +303,245 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
         _loadBookings();
       }
 
-      return Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+      final activeBookings = _userBookings.where((b) {
+        final status = (b is Map ? b['status'] : null)?.toString().toLowerCase();
+        return status != 'cancelled' && status != 'cancelada';
+      }).toList();
+
+      final historicalBookings = _userBookings.where((b) {
+        final status = (b is Map ? b['status'] : null)?.toString().toLowerCase();
+        return status == 'cancelled' || status == 'cancelada';
+      }).toList();
+
+      final displayedBookings = _selectedFilterIndex == 0 ? activeBookings : historicalBookings;
+
+      final initial = authProvider.displayName.isNotEmpty
+          ? authProvider.displayName.substring(0, 1).toUpperCase()
+          : 'H';
+
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: Center(
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 480),
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppTheme.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.gold.withValues(alpha: 0.4)),
-            ),
+            constraints: const BoxConstraints(maxWidth: 520),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Palacio del Mar',
-                          style: TextStyle(
+                // TARJETA DE PERFIL PROFESIONAL
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.gold.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: AppTheme.gold.withValues(alpha: 0.15),
+                        child: Text(
+                          initial,
+                          style: const TextStyle(
                             fontFamily: 'serif',
                             color: AppTheme.gold,
-                            fontSize: 20,
+                            fontSize: 26,
                             fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
                           ),
                         ),
-                        Text(
-                          authProvider.currentUserEmail ?? 'Sesión activa',
-                          style: const TextStyle(color: Colors.white54, fontSize: 11),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    authProvider.displayName,
+                                    style: const TextStyle(
+                                      fontFamily: 'serif',
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.gold.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: AppTheme.gold.withValues(alpha: 0.6)),
+                                  ),
+                                  child: const Text(
+                                    'HUÉSPED',
+                                    style: TextStyle(color: AppTheme.gold, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 1),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              authProvider.currentUserEmail ?? 'Sesión activa',
+                              style: const TextStyle(color: Colors.white60, fontSize: 12),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.logout_rounded, color: AppTheme.gold, size: 22),
-                      tooltip: 'Cerrar Sesión',
-                      onPressed: () => context.read<AuthProvider>().logout(),
-                    ),
-                  ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.logout_rounded, color: AppTheme.gold, size: 22),
+                        tooltip: 'Cerrar Sesión',
+                        onPressed: () => context.read<AuthProvider>().logout(),
+                      ),
+                    ],
+                  ),
                 ),
-                const Divider(height: 30, color: Colors.white10),
+
+                const SizedBox(height: 20),
+
+                // SELECTOR DE PESTAÑAS: PRÓXIMAS / ACTIVAS vs HISTORIAL
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardBg,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => _selectedFilterIndex = 0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _selectedFilterIndex == 0 ? AppTheme.gold.withValues(alpha: 0.15) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: _selectedFilterIndex == 0 ? AppTheme.gold : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              'PRÓXIMAS Y ACTIVAS (${activeBookings.length})',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _selectedFilterIndex == 0 ? AppTheme.gold : Colors.white60,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => _selectedFilterIndex = 1),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _selectedFilterIndex == 1 ? AppTheme.gold.withValues(alpha: 0.15) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: _selectedFilterIndex == 1 ? AppTheme.gold : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              'HISTORIAL (${historicalBookings.length})',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _selectedFilterIndex == 1 ? AppTheme.gold : Colors.white60,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
                 if (_isLoadingBookings) ...[
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 40),
                     child: Center(child: CircularProgressIndicator(color: AppTheme.gold)),
                   ),
-                ] else if (_userBookings.isEmpty) ...[
+                ] else if (displayedBookings.isEmpty) ...[
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 30),
+                    padding: const EdgeInsets.symmetric(vertical: 40),
                     child: Center(
                       child: Column(
                         children: [
-                          const Icon(Icons.hotel_outlined, color: Colors.white38, size: 40),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'No tienes reservas activas',
-                            style: TextStyle(color: Colors.white60, fontSize: 14),
+                          Icon(
+                            _selectedFilterIndex == 0 ? Icons.hotel_outlined : Icons.history_outlined,
+                            color: Colors.white24,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            _selectedFilterIndex == 0
+                                ? 'No tienes reservas activas por el momento'
+                                : 'No tienes reservas en el historial',
+                            style: const TextStyle(color: Colors.white60, fontSize: 14),
                           ),
                           const SizedBox(height: 16),
-                          OutlinedButton(
+                          OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppTheme.gold,
                               side: const BorderSide(color: AppTheme.gold),
                             ),
+                            icon: const Icon(Icons.refresh, size: 16),
                             onPressed: _loadBookings,
-                            child: const Text('Actualizar'),
+                            label: const Text('Actualizar'),
                           ),
                         ],
                       ),
                     ),
                   ),
                 ] else ...[
-                  ..._userBookings.map((booking) {
+                  ...displayedBookings.map((booking) {
                     final bookingMap = booking is Map ? booking : <String, dynamic>{};
                     final suite = bookingMap['suite'];
                     final suiteName = (suite is Map ? suite['name'] : null) ??
                         bookingMap['guestName'] ??
                         'Suite Palacio del Mar';
                     final branch = bookingMap['branch'];
-                    final location = (branch is Map ? branch['name'] : null) ?? 'Centro Histórico • Cartagena';
+                    final location = (branch is Map ? branch['name'] : null) ?? 'Centro Histórico · Cartagena';
                     final bookingId = (bookingMap['id'] ?? bookingMap['_id'])?.toString() ?? '';
                     final code = (bookingMap['bookingCode'] ?? bookingId).toString();
                     final smartPin = bookingMap['smartLockPin']?.toString();
                     final checkIn = bookingMap['checkIn']?.toString();
                     final checkOut = bookingMap['checkOut']?.toString();
-                    final dateRange = (checkIn != null && checkOut != null) ? '$checkIn - $checkOut' : null;
+                    final dateRange = (checkIn != null && checkOut != null) ? '$checkIn al $checkOut' : null;
                     final status = (bookingMap['status']?.toString() ?? 'PENDIENTE').toUpperCase();
-                    final canCancel = status == 'PENDING' || status == 'CONFIRMED' || status == 'PENDIENTE' || status == 'CONFIRMADA';
+                    final isCancelled = status == 'CANCELLED' || status == 'CANCELADA';
+                    final canCancel = !isCancelled;
+                    final isPinRevealed = _revealedPins.contains(bookingId);
+                    final foodOrders = bookingMap['foodOrders'] as List?;
+                    final totalPrice = bookingMap['totalPrice']?.toString();
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 20),
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         color: const Color(0xFF161616),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isCancelled ? Colors.white12 : AppTheme.gold.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,16 +561,22 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.gold.withValues(alpha: 0.15),
+                                  color: isCancelled
+                                      ? Colors.redAccent.withValues(alpha: 0.15)
+                                      : AppTheme.gold.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: AppTheme.gold.withValues(alpha: 0.5)),
+                                  border: Border.all(
+                                    color: isCancelled
+                                        ? Colors.redAccent.withValues(alpha: 0.5)
+                                        : AppTheme.gold.withValues(alpha: 0.5),
+                                  ),
                                 ),
                                 child: Text(
                                   status,
-                                  style: const TextStyle(
-                                    color: AppTheme.gold,
+                                  style: TextStyle(
+                                    color: isCancelled ? Colors.redAccent : AppTheme.gold,
                                     fontSize: 9,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1,
@@ -411,59 +585,87 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(location.toString(), style: const TextStyle(color: AppTheme.gold, fontSize: 11)),
+                          const SizedBox(height: 4),
+                          Text(location.toString(), style: const TextStyle(color: AppTheme.gold, fontSize: 12)),
                           if (dateRange != null) ...[
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(Icons.calendar_today_outlined, size: 12, color: Colors.white54),
-                                const SizedBox(width: 4),
-                                Text(dateRange, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                                const Icon(Icons.calendar_today_outlined, size: 14, color: Colors.white60),
+                                const SizedBox(width: 6),
+                                Text(dateRange, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                               ],
                             ),
                           ],
-                          const Divider(height: 24, color: Colors.white10),
-                          Center(
-                            child: Column(
-                              children: [
-                                const Text(
-                                  'LLAVE DIGITAL DE ACCESO',
-                                  style: TextStyle(
-                                    color: AppTheme.gold,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                const Text(
-                                  'Presenta este código en la cerradura',
-                                  style: TextStyle(color: Colors.white38, fontSize: 9),
-                                ),
-                                const SizedBox(height: 12),
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: QrImageView(
-                                    data: code,
-                                    version: QrVersions.auto,
-                                    size: 140,
-                                  ),
-                                ),
-                              ],
+                          if (totalPrice != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Total: \$ $totalPrice COP',
+                              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          InkWell(
-                            onTap: smartPin != null ? () => _copyPin(smartPin) : null,
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
+                          ],
+                          if (foodOrders != null && foodOrders.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.restaurant, color: AppTheme.gold, size: 14),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Incluye ${foodOrders.length} platillos ordenados',
+                                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          if (!isCancelled) ...[
+                            const Divider(height: 28, color: Colors.white10),
+                            Center(
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'LLAVE DIGITAL DE ACCESO',
+                                    style: TextStyle(
+                                      color: AppTheme.gold,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'Presenta este código en la cerradura inteligente',
+                                    style: TextStyle(color: Colors.white38, fontSize: 10),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: QrImageView(
+                                      data: code,
+                                      version: QrVersions.auto,
+                                      size: 130,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: AppTheme.gold.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
@@ -484,26 +686,49 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                                         ),
                                       ),
                                       if (smartPin != null) ...[
-                                        const SizedBox(width: 6),
-                                        const Icon(Icons.copy_rounded, color: AppTheme.gold, size: 12),
+                                        const SizedBox(width: 8),
+                                        InkWell(
+                                          onTap: () {
+                                            setState(() {
+                                              if (isPinRevealed) {
+                                                _revealedPins.remove(bookingId);
+                                              } else {
+                                                _revealedPins.add(bookingId);
+                                              }
+                                            });
+                                          },
+                                          child: Icon(
+                                            isPinRevealed ? Icons.visibility_off : Icons.visibility,
+                                            color: AppTheme.gold,
+                                            size: 15,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        InkWell(
+                                          onTap: () => _copyPin(smartPin),
+                                          child: const Icon(Icons.copy_rounded, color: AppTheme.gold, size: 15),
+                                        ),
                                       ],
                                     ],
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   Text(
-                                    smartPin ?? 'El PIN estará disponible al confirmar tu reserva',
+                                    smartPin != null
+                                        ? (isPinRevealed ? smartPin : '••••••')
+                                        : 'El PIN estará disponible al confirmar tu reserva',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: smartPin != null ? 26 : 11,
+                                      fontSize: smartPin != null ? 24 : 11,
                                       fontWeight: smartPin != null ? FontWeight.bold : FontWeight.normal,
-                                      letterSpacing: smartPin != null ? 6 : 0.5,
+                                      letterSpacing: smartPin != null ? (isPinRevealed ? 6 : 4) : 0.5,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
+                          ],
+
                           if (canCancel && bookingId.isNotEmpty) ...[
                             const SizedBox(height: 12),
                             Align(
@@ -528,6 +753,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
       );
     }
 
+    // FORMULARIO DE LOGIN / REGISTRO
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -554,7 +780,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                   ),
                 ),
                 Text(
-                  _isRegister ? 'CREAR CUENTA DE HUÉSPED' : 'LLAVE DIGITAL & ACCESO A SUITES',
+                  _isRegister ? 'CREAR CUENTA DE HUÉSPED' : 'MI ESTANCIA & LLAVE DIGITAL',
                   style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 10,

@@ -3,6 +3,27 @@ import '../network/http_client.dart';
 import '../security/secure_storage.dart';
 
 class ApiService {
+  static Future<Map<String, dynamic>?> getCurrentUser() async {
+    try {
+      final response = await AuthenticatedHttpClient.get('/auth/me');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map<String, dynamic>) {
+          if (data['user'] is Map<String, dynamic>) {
+            return data['user'] as Map<String, dynamic>;
+          }
+          if (data['data'] is Map<String, dynamic> && data['data']['user'] is Map<String, dynamic>) {
+            return data['data']['user'] as Map<String, dynamic>;
+          }
+          return data;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       final response = await AuthenticatedHttpClient.post('/auth/login', {
@@ -138,12 +159,26 @@ class ApiService {
     }
   }
 
-  static Future<bool> createBooking(Map<String, dynamic> bookingData) async {
+  static Future<Map<String, dynamic>> createBooking(Map<String, dynamic> bookingData) async {
     try {
       final response = await AuthenticatedHttpClient.post('/bookings', bookingData);
-      return response.statusCode == 200 || response.statusCode == 201;
+      Map<String, dynamic> data = {};
+      try {
+        data = jsonDecode(response.body);
+      } catch (_) {}
+
+      final isSuccess = response.statusCode == 200 || response.statusCode == 201;
+      return {
+        'success': isSuccess,
+        'statusCode': response.statusCode,
+        'data': data['data'] ?? data,
+        'message': data['message'] ?? (isSuccess ? 'Reserva creada con éxito' : 'No se pudo crear la reserva'),
+      };
     } catch (e) {
-      return false;
+      return {
+        'success': false,
+        'message': 'Error de conexión al procesar la reserva',
+      };
     }
   }
 

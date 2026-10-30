@@ -131,7 +131,7 @@ class _HotelLandingViewState extends State<HotelLandingView> {
             decoration: BoxDecoration(
               color: AppTheme.cardBg,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.gold.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
             ),
             child: Column(
               children: [
@@ -238,7 +238,7 @@ class _HotelLandingViewState extends State<HotelLandingView> {
               decoration: BoxDecoration(
                 color: AppTheme.cardBg,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppTheme.gold.withOpacity(0.2)),
+                border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

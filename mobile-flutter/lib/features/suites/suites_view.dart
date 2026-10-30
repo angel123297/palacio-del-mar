@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/api_service.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/providers/booking_provider.dart';
 import 'suite_zone_filter.dart';
 
 class SuitesCatalogView extends StatefulWidget {
@@ -202,82 +205,206 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
   }
 
   void _openBookingModal(Map<String, dynamic> suite) {
+    final auth = context.read<AuthProvider>();
+    final checkInDate = _selectedDateRange?.start ?? DateTime.now().add(const Duration(days: 1));
+    final checkOutDate = _selectedDateRange?.end ?? DateTime.now().add(const Duration(days: 3));
+    bool isSubmitting = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppTheme.cardBg,
-      builder: (context) {
-        final category = suite['category'];
-        final zone = suite['zone'];
-        final subtitleParts = [
-          if (category != null && category.toString().isNotEmpty) category.toString(),
-          if (zone != null && zone.toString().isNotEmpty) zone.toString(),
-        ].join(' • ');
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final category = suite['category'];
+            final zone = suite['zoneLabel'] ?? suite['zone'];
+            final subtitleParts = [
+              if (category != null && category.toString().isNotEmpty) category.toString(),
+              if (zone != null && zone.toString().isNotEmpty) zone.toString(),
+            ].join(' · ');
 
-        return Padding(
-          padding: EdgeInsets.only(
-            top: 24,
-            left: 24,
-            right: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                suite['title'],
-                style: const TextStyle(
-                  fontFamily: 'serif',
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+            final inStr = '${checkInDate.year.toString().padLeft(4, '0')}-${checkInDate.month.toString().padLeft(2, '0')}-${checkInDate.day.toString().padLeft(2, '0')}';
+            final outStr = '${checkOutDate.year.toString().padLeft(4, '0')}-${checkOutDate.month.toString().padLeft(2, '0')}-${checkOutDate.day.toString().padLeft(2, '0')}';
+
+            return Padding(
+              padding: EdgeInsets.only(
+                top: 24,
+                left: 24,
+                right: 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
               ),
-              if (subtitleParts.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  subtitleParts.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppTheme.gold,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    suite['title'],
+                    style: const TextStyle(
+                      fontFamily: 'serif',
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Text(
-                suite['price'] != null ? '${suite['price']} / noche' : 'Precio a consultar',
-                style: const TextStyle(
-                  color: AppTheme.gold,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.gold,
-                    foregroundColor: Colors.black,
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Solicitud iniciada para ${suite['title']}'),
-                        backgroundColor: AppTheme.cardBg,
+                  if (subtitleParts.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitleParts.toUpperCase(),
+                      style: const TextStyle(
+                        color: AppTheme.gold,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
                       ),
-                    );
-                  },
-                  child: const Text('CONFIRMAR SOLICITUD', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined, size: 14, color: AppTheme.gold),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Fechas: $inStr al $outStr',
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.people_outline, size: 14, color: AppTheme.gold),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Huéspedes: $_guests',
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Builder(
+                    builder: (context) {
+                      final bp = context.watch<BookingProvider>();
+                      final foodTotal = bp.totalFoodPrice;
+                      final foodCount = bp.totalFoodItems;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            suite['price'] != null ? '${suite['price']} / noche' : 'Precio a consultar',
+                            style: const TextStyle(
+                              color: AppTheme.gold,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (foodCount > 0) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppTheme.gold.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.restaurant_menu, color: AppTheme.gold, size: 14),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '+ $foodCount platillos seleccionados (+\$ ${foodTotal.toInt()} COP)',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                  if (!auth.isAuthenticated) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Debes iniciar sesión con tu cuenta para confirmar la reserva.',
+                      style: TextStyle(color: Colors.orangeAccent, fontSize: 12),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.gold,
+                        foregroundColor: Colors.black,
+                      ),
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              if (!auth.isAuthenticated) {
+                                Navigator.pop(bottomSheetContext);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Por favor inicia sesión en la pestaña "LLAVE DIGITAL" para reservar.'),
+                                    backgroundColor: Colors.orangeAccent,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              setModalState(() => isSubmitting = true);
+
+                              final bookingProvider = context.read<BookingProvider>();
+                              final foodOrders = bookingProvider.getFormattedFoodOrders();
+
+                              final bookingPayload = {
+                                'suiteId': suite['id'],
+                                'checkIn': inStr,
+                                'checkOut': outStr,
+                                'guests': _guests,
+                                if (foodOrders.isNotEmpty) 'foodOrders': foodOrders,
+                              };
+
+                              final res = await ApiService.createBooking(bookingPayload);
+                              if (!bottomSheetContext.mounted) return;
+                              setModalState(() => isSubmitting = false);
+                              Navigator.pop(bottomSheetContext);
+
+                              if (!mounted) return;
+
+                              if (res['success'] == true) {
+                                bookingProvider.clearFoodOrders();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('¡Reserva creada exitosamente! Revisa tu Llave Digital.'),
+                                    backgroundColor: AppTheme.gold,
+                                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(res['message'] ?? 'Error al procesar la reserva'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              }
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                            )
+                          : const Text('CONFIRMAR RESERVA', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

@@ -1,62 +1,108 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'core/theme/app_theme.dart';
+import 'core/providers/auth_provider.dart';
+import 'core/providers/booking_provider.dart';
+import 'features/home/home_view.dart';
+import 'features/suites/suites_view.dart';
+import 'features/gastronomy/gastronomy_view.dart';
+import 'features/auth/digital_key_view.dart';
 
 void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: PalacioDelMarHome(),
-  ));
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()..checkAuthStatus()),
+        ChangeNotifierProvider(create: (_) => BookingProvider()),
+      ],
+      child: const PalacioDelMarApp(),
+    ),
+  );
 }
 
-class PalacioDelMarHome extends StatelessWidget {
-  const PalacioDelMarHome({super.key});
+class PalacioDelMarApp extends StatelessWidget {
+  const PalacioDelMarApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
+    return MaterialApp(
+      title: 'Palacio del Mar - Hotel Boutique',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.darkTheme,
+      home: const MainHomeScreen(),
+    );
+  }
+}
+
+class MainHomeScreen extends StatefulWidget {
+  const MainHomeScreen({super.key});
+
+  @override
+  State<MainHomeScreen> createState() => _MainHomeScreenState();
+}
+
+class _MainHomeScreenState extends State<MainHomeScreen> {
+  int _currentIndex = 0;
+
+  void _navigateToTab(int index) {
+    setState(() => _currentIndex = index);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> pages = [
+      HotelLandingView(onNavigateToSuites: () => _navigateToTab(1)),
+      const SuitesCatalogView(),
+      const GastronomySpaView(),
+      const DigitalKeyView(),
+    ];
+
+    final authProvider = context.watch<AuthProvider>();
+    final guestName = authProvider.displayName;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Column(
-              children: [
-                Container(
-                  height: screenSize.height * 0.25,
-                  width: constraints.maxWidth,
-                  color: const Color(0xFF1E3A8A),
-                  child: const Center(
-                    child: Text(
-                      'Palacio del Mar',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    width: constraints.maxWidth,
-                    margin: const EdgeInsets.all(16.0),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.transparent),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Aquí integraremos el widget del mapa',
-                        style: TextStyle(color: Colors.black54),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              guestName.isNotEmpty ? 'Hola, $guestName' : 'Palacio del Mar',
+              style: const TextStyle(
+                fontFamily: 'serif',
+                color: AppTheme.gold,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const Text(
+              'HOTEL BOUTIQUE · CARTAGENA',
+              style: TextStyle(color: Colors.white38, fontSize: 8, letterSpacing: 2),
+            ),
+          ],
         ),
+      ),
+      body: pages[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        backgroundColor: AppTheme.surface,
+        selectedItemColor: AppTheme.gold,
+        unselectedItemColor: Colors.white38,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+        unselectedLabelStyle: const TextStyle(fontSize: 10),
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Inicio'),
+          BottomNavigationBarItem(icon: Icon(Icons.hotel_outlined), activeIcon: Icon(Icons.hotel), label: 'Suites'),
+          BottomNavigationBarItem(icon: Icon(Icons.restaurant_outlined), activeIcon: Icon(Icons.restaurant), label: 'Experiencias'),
+          BottomNavigationBarItem(icon: Icon(Icons.key_outlined), activeIcon: Icon(Icons.key), label: 'Llave Digital'),
+        ],
       ),
     );
   }

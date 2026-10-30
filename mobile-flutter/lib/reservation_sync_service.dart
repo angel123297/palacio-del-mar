@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
+import 'core/config/api_config.dart';
+import 'core/network/http_client.dart';
 import 'dart:convert';
 
 class ReservationSyncService {
-  final String baseUrl = 'http://10.10.176.120:8080/api';
+  static String get baseUrl => ApiConfig.baseUrl;
 
   Future<void> saveGuestReservation(Map<String, dynamic> reservationData) async {
     final prefs = await SharedPreferences.getInstance();
@@ -15,24 +17,20 @@ class ReservationSyncService {
     final guestDataString = prefs.getString('guest_reservation');
 
     if (guestDataString != null) {
-      final guestData = json.decode(guestDataString);
-      
-      final response = await http.post(
-        Uri.parse('$baseUrl/reservas/sincronizar'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $userToken',
-        },
-        body: json.encode({
+      try {
+        final guestData = json.decode(guestDataString);
+        final response = await AuthenticatedHttpClient.post('/bookings', {
+          if (guestData is Map<String, dynamic>) ...guestData,
           'userId': userId,
-          'reservationDetails': guestData,
-        }),
-      );
+        });
 
-      if (response.statusCode == 200) {
-        await prefs.remove('guest_reservation');
-      } else {
-        throw Exception('Fallo al sincronizar la reserva con el servidor');
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          await prefs.remove('guest_reservation');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error al sincronizar reserva offline: $e');
+        }
       }
     }
   }

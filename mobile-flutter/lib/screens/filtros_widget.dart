@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 class FiltrosWidget extends StatefulWidget {
   final Function(double, int, bool) onFiltrosAplicados;
 
-  const FiltrosWidget({Key? key, required this.onFiltrosAplicados}) : super(key: key);
+  const FiltrosWidget({super.key, required this.onFiltrosAplicados});
 
   @override
-  _FiltrosWidgetState createState() => _FiltrosWidgetState();
+  State<FiltrosWidget> createState() => _FiltrosWidgetState();
 }
 
 class _FiltrosWidgetState extends State<FiltrosWidget> {
