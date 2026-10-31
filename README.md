@@ -158,40 +158,40 @@ Servicios locales disponibles:
 
 ---
 
-## 📱 Guía de Instalación Móvil (Android & iOS)
+## 📱 Guía de Instalación Móvil (Directo desde tu Celular)
 
-Puedes instalar y probar la aplicación de **Palacio del Mar** en tu celular sin pagar licencias de tiendas de apps, mediante los métodos oficiales y gratuitos de cada plataforma:
+Instala la aplicación de **Palacio del Mar** en tu dispositivo móvil en menos de 1 minuto, sin necesidad de cables ni computadores, sincronizada automáticamente y en tiempo real con la versión web del hotel.
 
 ---
 
-### 🤖 1. En Dispositivos Android (APK Firmado Oficial)
+### 🤖 1. En Dispositivos Android (Instalación por APK Autónomo)
 
-La aplicación para Android está firmada con el certificado criptográfico oficial de **Palacio del Mar S.A.S.**, garantizando que el paquete es genuino y seguro:
+La aplicación para Android se instala directamente descargando el paquete instalador desde tu celular y se comunica de forma automática con la misma base de datos y reservas de la página web:
 
-1. **Descarga el instalador APK en tu celular:**
-   - Abre el navegador web en tu teléfono y toca el siguiente enlace de descarga directa en GitHub:
-     👉 **[Descargar Palacio del Mar APK (v1.0.0)](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)**
-     *(O entra a la sección [Releases de GitHub](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0) y descarga `palacio-del-mar.apk`)*.
+1. **Descarga el instalador desde tu celular:**
+   - Descarga directa: [Descargar APK Oficial de Palacio del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)
+   - O desde GitHub: [Release v1.0.0 Oficial](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)
 2. **Instala la aplicación:**
-   - Abre el archivo descargado desde las notificaciones o la carpeta de descargas de tu celular.
-   - Presiona **Instalar**. Al contar con certificado oficial, la app se instalará de forma limpia y directa.
-3. **Prueba y Sincronización:**
-   - Abre la aplicación **Palacio del Mar** con su icono oficial dorado.
-   - Navega por el catálogo de suites de lujo y realiza reservas sincronizadas en tiempo real con la plataforma web.
+   - Abre la notificación de descarga finalizada en tu celular.
+   - Si tu dispositivo solicita autorización, presiona **Ajustes** y activa la opción **"Permitir desde esta fuente"** (solo toma 2 segundos).
+   - Toca el botón **Instalar**.
+3. **Apertura y sincronización automática:**
+   - Abre **Palacio del Mar** desde la pantalla de inicio o cajón de aplicaciones de tu celular.
+   - ¡Listo! Cualquier reserva, suite o actualización que ocurra en la página web se sincronizará automáticamente en tu celular en tiempo real mediante el motor de eventos SSE.
 
 ---
 
-### 🍏 2. En Dispositivos iOS (iPhone & iPad)
+### 🍏 2. En Dispositivos iOS (iPhone & iPad vía Enlace Activo Permanente)
 
-Puedes agregar y usar la aplicación directamente en tu iPhone en pocos segundos con el icono oficial y vista a pantalla completa:
+En iPhone y iPad la aplicación se instala permanentemente como **Web App Nativa (PWA)** a través del enlace activo de la plataforma, sin certificados que expiren ni necesidad de supervisión continua:
 
 1. **Abre el enlace en Safari:**
-   - Abre el navegador **Safari** en tu iPhone e ingresa al dominio web activo de la plataforma:
-     `https://unbroke-unsized-zandra.ngrok-free.dev/app/` *(o el enlace público HTTPS del despliegue en la nube)*.
-2. **Instálala en tu pantalla de inicio en 2 toques:**
-   - Toca el botón **Compartir** de Safari (icono del cuadrado con la flecha hacia arriba: ⎋ en la barra inferior).
-   - Desplázate hacia abajo en el menú y selecciona **"Agregar al inicio"** (o *"Add to Home Screen"*).
-   - Confirma el nombre **Palacio del Mar** y toca **Agregar** en la esquina superior derecha.
-3. **Experiencia de App Nativa:**
-   - En tu pantalla de inicio se creará el icono oficial dorado de Palacio del Mar.
-   - Al tocarlo, abrirá a pantalla completa sin barra de navegación ni controles de Safari, comportándose exactamente como una app nativa de iOS.
+   - En tu iPhone, abre el navegador **Safari** e ingresa a la dirección web oficial de la plataforma:
+     `https://unbroke-unsized-zandra.ngrok-free.dev/app/` (o el dominio público activo del hotel).
+2. **Agrégala a tu pantalla de inicio:**
+   - Toca el botón **Compartir** en la barra inferior de Safari (icono del cuadrado con la flecha hacia arriba: ⎋).
+   - En el menú que aparece, desplázate hacia abajo y presiona **"Agregar al inicio"** (o *"Add to Home Screen"*).
+   - Deja el nombre sugerido **Palacio del Mar** y toca **Agregar** arriba a la derecha.
+3. **Disfruta de la experiencia de aplicación nativa:**
+   - Verás el icono dorado oficial de Palacio del Mar directamente junto a tus demás aplicaciones de iOS.
+   - Al tocarlo, abrirá a pantalla completa sin barra de navegación de Safari, manteniéndose activa y sincronizada las 24 horas sin requerir que nadie la reactive.
