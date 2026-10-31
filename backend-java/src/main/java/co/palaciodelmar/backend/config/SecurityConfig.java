@@ -135,8 +135,7 @@ public class SecurityConfig {
                 "http://127.0.0.1:8085",
                 "https://*.ngrok-free.dev",
                 "https://*.ngrok.app",
-                "https://*.loca.lt",
-                "*"
+                "https://*.loca.lt"
         ));
         if (appBaseUrl != null && !appBaseUrl.isBlank()) {
             String normalizedBaseUrl = appBaseUrl.trim().replaceAll("/+$", "");
