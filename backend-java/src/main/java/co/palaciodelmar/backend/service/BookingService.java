@@ -102,9 +102,85 @@ public class BookingService {
         );
     }
 
+
+    private BookingDTO createStandaloneExperienceBooking(String userId, BookingRequest request) {
+        List<Booking.SelectedExperience> selectedExpList = parseExperiences(request.getExperiences());
+        if (selectedExpList.isEmpty()) {
+            throw new IllegalArgumentException("Debes seleccionar al menos una actividad o experiencia válida");
+        }
+
+        LocalDate actDate = request.getCheckIn() != null ? request.getCheckIn() : LocalDate.now(BOGOTA_ZONE);
+        if (actDate.isBefore(LocalDate.now(BOGOTA_ZONE))) {
+            throw new IllegalArgumentException("La fecha de la experiencia no puede ser anterior a la fecha actual");
+        }
+
+        BigDecimal experiencesTotal = BigDecimal.ZERO;
+        for (Booking.SelectedExperience exp : selectedExpList) {
+            if (exp.getPrice() != null && exp.getQuantity() != null) {
+                experiencesTotal = experiencesTotal.add(exp.getPrice().multiply(BigDecimal.valueOf(exp.getQuantity())));
+            }
+        }
+
+        String bookingCode = "PDM-EXP-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        Booking.GuestDetails guestDetails = parseGuestDetails(request);
+
+        Booking booking = Booking.builder()
+                .user(userId)
+                .suite("standalone-experience")
+                .branch("cartagena-indias")
+                .platformFee(experiencesTotal.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP))
+                .hostPayout(experiencesTotal.multiply(new BigDecimal("0.92")).setScale(2, RoundingMode.HALF_UP))
+                .checkIn(actDate)
+                .checkOut(actDate)
+                .nights(1)
+                .guests(request.getGuests() != null ? request.getGuests() : 1)
+                .children(request.getChildren() != null ? request.getChildren() : 0)
+                .pricePerNight(BigDecimal.ZERO)
+                .subtotal(experiencesTotal)
+                .discount(BigDecimal.ZERO)
+                .taxes(BigDecimal.ZERO)
+                .totalPrice(experiencesTotal)
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(experiencesTotal)
+                .status("pending")
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .guaranteeRefunded(false)
+                .paymentStatus("pending")
+                .bookingCode(bookingCode)
+                .guestDetails(guestDetails)
+                .experiences(selectedExpList)
+                .expiresAt(Instant.now().plusSeconds(900))
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+
+        Booking persistedBooking = bookingRepository.save(booking);
+
+        BookingDTO dto = toDTO(persistedBooking);
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                    "booking.created",
+                    persistedBooking.getId(),
+                    null,
+                    dto,
+                    Instant.now()
+            ));
+        }
+        return dto;
+    }
+
     public BookingDTO createBooking(String userId, BookingRequest request) {
         if (userId == null || userId.isBlank()) {
             throw new ForbiddenAccessException("Debes iniciar sesión para realizar una reserva");
+        }
+
+        // Soporte de Reserva Exclusiva de Experiencia / Actividad independiente
+        if ((request.getSuiteId() == null || request.getSuiteId().isBlank()) && request.getExperiences() != null && !request.getExperiences().isEmpty()) {
+            return createStandaloneExperienceBooking(userId, request);
+        }
+
+        if (request.getSuiteId() == null || request.getSuiteId().isBlank()) {
+            throw new IllegalArgumentException("Por favor selecciona una habitación o experiencia válida");
         }
 
         String rawSuiteId = request.getSuiteId().trim();
