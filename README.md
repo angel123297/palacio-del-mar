@@ -181,3 +181,34 @@ Segunda ronda de depuración técnica profunda (análisis estático y dinámico)
        // Disparar toast de notificación: 'Error interno del servidor. Por favor, intenta de nuevo más tarde.'
      }
      ```
+
+
+---
+
+## 3ra Ronda: Auditoría Integral y Depuración de Vulnerabilidades y Datos
+
+Fecha: 2026-10-30
+Commit de Referencia: `620c2ac` (sincronizado en `fix/web-backend-confirmacion-stream` y `proyecto-angular-java`)
+
+### Matriz de Nuevos Hallazgos Auditados y Resueltos
+
+| ID | Severidad | Componente | Descripción del Problema | Remediación Aplicada | Estado |
+|---|---|---|---|---|---|
+| **WEB-010** | **GRAVE** | `frontend-angular` / `nginx` | **Error 403 Forbidden por Origin Header**: Al acceder vía Ngrok o dominios externos, Spring Boot bloqueaba el inicio de sesión y endpoints REST con `Invalid CORS request` porque el header `Origin` no coincidía exactamente. | En `nginx.conf`, se sanitizó `proxy_set_header Origin ""` para peticiones internas del proxy, permitiendo que el backend trate el tráfico interno de forma autorizada y responda 200/401 en lugar de 403. | **Resuelto** |
+| **WEB-011** | **GRAVE** | `backend-java` / `AuthService` | **Cuentas Inaccesibles sin Servidor SMTP**: En entornos locales o de desarrollo sin credenciales SMTP de Gmail configuradas en `.env`, el usuario se creaba con `emailVerified: false`, bloqueando permanentemente el inicio de sesión. | En `EmailService.isConfigured()`, se verifica si existen credenciales válidas. Si no hay SMTP configurado, `AuthService` auto-verifica el usuario al registrarse permitiendo el acceso inmediato sin depender de correos en entornos locales. | **Resuelto** |
+| **WEB-012** | **MEDIA** | `frontend-angular` / `nginx` | **MIME Type Genérico en Descarga de APK Android**: El servidor Nginx devolvía el instalador APK con `application/octet-stream` o `text/plain`, impidiendo que los teléfonos Android activaran el instalador de paquetes al tocar el enlace. | Se configuró en `nginx.conf` un bloque específico para `/palacio-del-mar-release.apk` con `default_type application/vnd.android.package-archive;` y cabecera `Content-Disposition: attachment; filename="palacio-del-mar.apk"`. | **Resuelto** |
+| **WEB-013** | **MEDIA** | `mobile-flutter` / `http_client` | **Intercepción de Ngrok Interstitial Warning**: Las peticiones de la aplicación recibían la página HTML de advertencia de Ngrok en lugar del payload JSON de la API. | Se inyectó en el cliente HTTP de la app el encabezado oficial `'ngrok-skip-browser-warning': 'true'`. | **Resuelto** |
+| **WEB-014** | **GRAVE** | `backend-java` / `JwtAuthFilter` | **Vulnerabilidad de Conexión en Streaming SSE**: Los navegadores no permiten enviar el encabezado `Authorization: Bearer` al instanciar `EventSource`. La conexión a `/api/bookings/stream` fallaba con 401 Unauthorized impidiendo eventos en tiempo real. | Se actualizó `JwtAuthenticationFilter.java` para extraer el token JWT desde el parámetro query `?token=`, restringido estrictamente a la ruta `/api/bookings/stream` para no debilitar el resto de la API. | **Resuelto** |
+| **WEB-015** | **BAJA / UX** | `frontend-angular` | **Ausencia de Catálogo de Experiencias en Portada**: Las experiencias turísticas (islas, catamarán, gastronomía) solo eran visibles en el paso 2 de la reserva. | Se construyó el componente autónomo `ExperiencesSectionComponent` y se integró en la portada (`HomeComponent`). | **Resuelto** |
+| **WEB-016** | **BAJA / UX** | `frontend-angular` | **Moneda Fija en COP sin Soporte Multidivisa**: Los turistas internacionales no disponían de conversión visual de precios en dólares o euros. | Se implementó el servicio global reactivo `CurrencyService` y un selector en el `NavbarComponent` para alternar entre COP, USD y EUR en todo el catálogo de suites. | **Resuelto** |
+| **WEB-017** | **BAJA / UX** | `frontend-angular` | **Ausencia de Canal Inmediato de Concierge en Vivo**: El contacto de WhatsApp estaba relegado al pie de página. | Se desarrolló el componente flotante `ConciergeChatComponent` con apertura contextual de WhatsApp indicando la suite consultada. | **Resuelto** |
+| **WEB-018** | **BAJA / UX** | `frontend-angular` | **Carga Abrupta de Habitaciones (Falta de Skeletons)**: El usuario visualizaba un spinner genérico centrado mientras cargaban las suites. | Se diseñó una cuadrícula de Skeleton Cards animadas en `RoomsSectionComponent` con Tailwind CSS para una experiencia de carga fluida. | **Resuelto** |
+| **WEB-019** | **BAJA / UX** | `frontend-angular` | **Imposibilidad de Zoom y Galería en Pantalla Completa**: No se podían ver las fotografías de las suites en alta resolución. | Se creó el componente `LightboxModalComponent` con visor a pantalla completa, navegación por teclado y carrusel de miniaturas en `SuiteDetailComponent`. | **Resuelto** |
+
+---
+
+## 4. Estado Final de Pruebas y Despliegue
+- **Pruebas de Backend**: 446 pruebas unitarias y de integración ejecutadas: **446 aprobadas, 0 fallos, 0 errores**.
+- **Compilación de Frontend**: Angular 19 compilado exitosamente para producción (`dist/palacio-del-mar-web`).
+- **Verificación de Vulnerabilidades de Datos (Data Burning)**: Confirmado que el frontend no usa mocks quemados (`of(...)`) en producción y que todos los precios, calendarios e identidades se calculan con autenticidad en el backend y la base de datos MongoDB.
+- **Aislamiento IDOR**: Verificado que los huéspedes no pueden acceder a reservas de otros usuarios ni a endpoints de anfitrión o administrador (`HTTP 403`).
