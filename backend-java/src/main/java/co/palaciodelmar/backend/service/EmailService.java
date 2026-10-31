@@ -807,6 +807,14 @@ public class EmailService {
         return value.replace("\r", " ").replace("\n", " ").replace(",", "\\,").replace(";", "\\;");
     }
 
+    public boolean isConfigured() {
+        if (mailAuth && isBlank(mailUsername)) return false;
+        if (javaMailSender instanceof JavaMailSenderImpl senderImpl) {
+            return !isBlank(senderImpl.getPassword());
+        }
+        return !isBlank(mailUsername);
+    }
+
     private boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
     }

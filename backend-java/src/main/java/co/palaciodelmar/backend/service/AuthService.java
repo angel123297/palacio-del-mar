@@ -101,7 +101,8 @@ public class AuthService {
                     existing.setLastName(request.getLastName());
                 }
                 existing.setPassword(passwordEncoder.encode(request.getPassword()));
-                existing.setEmailVerified(false);
+                boolean autoVerify = !emailService.isConfigured();
+                existing.setEmailVerified(autoVerify);
                 existing.setVerificationTokenHash(hashedToken);
                 existing.setVerificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS));
                 if (existing.getProfile() == null) {
@@ -158,7 +159,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(assignedRole)
                 .status("active")
-                .emailVerified(false)
+                .emailVerified(!emailService.isConfigured())
                 .verificationTokenHash(hashedToken)
                 .verificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS))
                 .profile(User.Profile.builder()
