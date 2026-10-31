@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -10,6 +10,9 @@ import { SearchStateService } from '../../services/search-state.service';
 import { Suite, Experience, SocialProofSnapshot, GeoPlace } from '../../models/types';
 import { format } from 'date-fns';
 import { AuthModalComponent } from '../../components/auth-modal/auth-modal.component';
+import { LightboxModalComponent } from '../../components/lightbox-modal/lightbox-modal.component';
+import { ConciergeChatComponent } from '../../components/concierge-chat/concierge-chat.component';
+import { CurrencyService } from '../../services/currency.service';
 
 const bogotaTodayIso = (): string => {
   try {
@@ -27,11 +30,14 @@ const addDaysIso = (iso: string, days: number): string => {
 @Component({
   selector: 'app-suite-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, DateRangePickerComponent, AuthModalComponent],
+  imports: [CommonModule, RouterModule, FormsModule, DateRangePickerComponent, AuthModalComponent, LightboxModalComponent, ConciergeChatComponent],
   templateUrl: './suite-detail.component.html',
   styleUrls: ['./suite-detail.component.scss']
 })
 export class SuiteDetailComponent implements OnInit, OnDestroy {
+  public currency = inject(CurrencyService);
+  lightboxOpen = false;
+  lightboxIndex = 0;
   suite: Suite | null = null;
   loading = true;
   step = 1;
@@ -128,6 +134,25 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     if (!this.suite) return '';
     const b: any = this.suite.branch;
     return b?.id || b?._id || b?.slug || this.suite.propertyId || (typeof b === 'string' ? b : '') || '';
+  }
+
+  openLightbox(index: number = 0): void {
+    this.lightboxIndex = index;
+    this.lightboxOpen = true;
+    this.cdr.detectChanges();
+  }
+
+  get allSuiteImages(): string[] {
+    if (!this.suite) return [];
+    const list: string[] = [];
+    const main = this.getSuiteImage(this.suite);
+    if (main) list.push(main);
+    if (this.suite.images && Array.isArray(this.suite.images)) {
+      for (const img of this.suite.images) {
+        if (!list.includes(img)) list.push(img);
+      }
+    }
+    return list;
   }
 
   getSuiteImage(suite: Suite | null): string {

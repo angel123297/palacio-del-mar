@@ -1,14 +1,16 @@
 import { Component, ViewChild, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule, Router, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
+import { CurrencyService, Currency } from '../../services/currency.service';
 import { AuthModalComponent } from '../auth-modal/auth-modal.component';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [CommonModule, RouterModule, AuthModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, AuthModalComponent],
   template: `
     <header id="navbar" role="banner">
       <nav class="main-nav" aria-label="Navegación principal" style="gap: 10px; display: flex; align-items: center; justify-content: space-between; position: relative;">
@@ -40,6 +42,12 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
         </div>
 
         <div class="nav-right" style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+            <!-- Selector de Divisa -->
+            <select [ngModel]="currency.currentCurrency()" (ngModelChange)="onCurrencyChange($event)" aria-label="Seleccionar divisa de visualización" class="desktop-only-btn" style="background: rgba(0,0,0,0.6); border: 1px solid rgba(201,169,110,0.4); color: #c9a96e; font-size: 0.8rem; padding: 4px 8px; border-radius: 4px; outline: none; cursor: pointer; height: 32px;">
+              <option value="COP" style="background: #161311; color: #fff;">COP ($)</option>
+              <option value="USD" style="background: #161311; color: #fff;">USD (US$)</option>
+              <option value="EUR" style="background: #161311; color: #fff;">EUR (€)</option>
+            </select>
           <ng-container *ngIf="auth.currentUser() as user; else notLogged">
             <div class="nav-user-menu" style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;">
               <a *ngIf="isGuest()" routerLink="/mis-reservas" class="btn-outline nav-user-btn desktop-only-btn" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; text-decoration: none; white-space: nowrap;">
@@ -153,6 +161,7 @@ export class NavbarComponent implements OnInit {
 
   constructor(
     public auth: AuthService,
+    public currency: CurrencyService,
     private router: Router,
     private route: ActivatedRoute
   ) {}
@@ -234,6 +243,12 @@ export class NavbarComponent implements OnInit {
     this.authModalOpen = true;
     if (this.authModal) {
       this.authModal.open(mode, portal);
+    }
+  }
+
+  onCurrencyChange(val: any): void {
+    if (val === 'COP' || val === 'USD' || val === 'EUR') {
+      this.currency.setCurrency(val);
     }
   }
 

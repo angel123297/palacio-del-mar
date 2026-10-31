@@ -2,6 +2,7 @@ import { Component, OnInit, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { CurrencyService } from '../../services/currency.service';
 import { SearchStateService } from '../../services/search-state.service';
 import { Suite, Branch } from '../../models/types';
 
@@ -72,10 +73,20 @@ const DEFAULT_FALLBACK_BRANCHES: Branch[] = [
         </button>
       </div>
 
-      <!-- Loading / Empty states -->
-      <div *ngIf="loading" class="luxury-loader-container">
-        <div class="luxury-spinner"></div>
-        <p class="luxury-loader-text">Cargando...</p>
+      <!-- Skeleton Cards Loader -->
+      <div *ngIf="loading" class="rooms-grid">
+        <div *ngFor="let s of [1,2,3,4,5,6]" class="room-card animate-pulse" style="background: #141414; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden;">
+          <div style="height: 220px; background: rgba(255,255,255,0.05);"></div>
+          <div style="padding: 1.5rem;">
+            <div style="height: 14px; background: rgba(255,255,255,0.08); border-radius: 4px; width: 40%; margin-bottom: 12px;"></div>
+            <div style="height: 22px; background: rgba(255,255,255,0.06); border-radius: 4px; width: 75%; margin-bottom: 16px;"></div>
+            <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+              <div style="height: 20px; background: rgba(255,255,255,0.04); border-radius: 12px; width: 60px;"></div>
+              <div style="height: 20px; background: rgba(255,255,255,0.04); border-radius: 12px; width: 80px;"></div>
+            </div>
+            <div style="height: 24px; background: rgba(201,169,110,0.15); border-radius: 4px; width: 50%;"></div>
+          </div>
+        </div>
       </div>
 
       <div *ngIf="!loading && visibleSuites.length === 0" style="text-align: center; padding: 4rem;">
@@ -116,8 +127,8 @@ const DEFAULT_FALLBACK_BRANCHES: Branch[] = [
             </div>
 
             <div class="room-price">
-              <span class="price-old" *ngIf="suite.originalPrice">$ {{ suite.originalPrice | number:'1.0-0' }}</span>
-              <strong>$ {{ (suite.basePrice || suite.pricePerNight || 450000) | number:'1.0-0' }}</strong>
+              <span class="price-old" *ngIf="suite.originalPrice">{{ currency.formatPrice(suite.originalPrice) }}</span>
+              <strong>{{ currency.formatPrice(suite.basePrice || suite.pricePerNight || 450000) }}</strong>
               <span> / noche</span>
             </div>
 
@@ -136,6 +147,7 @@ const DEFAULT_FALLBACK_BRANCHES: Branch[] = [
 })
 export class RoomsSectionComponent implements OnInit {
   private searchState = inject(SearchStateService);
+  public currency = inject(CurrencyService);
   suites: Suite[] = [];
   branches: Branch[] = [];
   types: any[] = [];

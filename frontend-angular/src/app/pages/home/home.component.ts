@@ -1,4 +1,3 @@
-import { HotelMapComponent } from '../../components/hotel-map/hotel-map.component';
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -7,8 +6,11 @@ import { HeroComponent } from '../../components/hero/hero.component';
 import { BookingBarComponent } from '../../components/booking-bar/booking-bar.component';
 import { BranchSelectorComponent } from '../../components/branch-selector/branch-selector.component';
 import { RoomsSectionComponent } from '../../components/rooms-section/rooms-section.component';
+import { ExperiencesSectionComponent } from '../../components/experiences-section/experiences-section.component';
 import { FaqSectionComponent } from '../../components/faq-section/faq-section.component';
 import { ContactSectionComponent } from '../../components/contact-section/contact-section.component';
+import { HotelMapComponent } from '../../components/hotel-map/hotel-map.component';
+import { ConciergeChatComponent } from '../../components/concierge-chat/concierge-chat.component';
 
 @Component({
   selector: 'app-home',
@@ -19,9 +21,12 @@ import { ContactSectionComponent } from '../../components/contact-section/contac
     BookingBarComponent,
     BranchSelectorComponent,
     RoomsSectionComponent,
+    ExperiencesSectionComponent,
     FaqSectionComponent,
-    ContactSectionComponent
-  , HotelMapComponent],
+    ContactSectionComponent,
+    HotelMapComponent,
+    ConciergeChatComponent
+  ],
   template: `
     <ng-container *ngIf="!isCorporateUser">
       <app-hero></app-hero>
@@ -29,8 +34,10 @@ import { ContactSectionComponent } from '../../components/contact-section/contac
       <app-branch-selector></app-branch-selector>
       <app-hotel-map></app-hotel-map>
       <app-rooms-section></app-rooms-section>
+      <app-experiences-section></app-experiences-section>
       <app-faq-section></app-faq-section>
       <app-contact-section></app-contact-section>
+      <app-concierge-chat></app-concierge-chat>
     </ng-container>
   `
 })
