@@ -30,7 +30,7 @@ import { RouterModule } from '@angular/router';
           <h4>Contacto</h4>
           <ul>
             <li><a href="mailto:reservas@palaciomar.co" class="footer-link" aria-label="Escribir correo a reservas@palaciomar.co">reservas&#64;palaciomar.co</a></li>
-            <li><a href="https://wa.me/573009876543" target="_blank" rel="noopener noreferrer" class="footer-link" aria-label="Escribir por WhatsApp al +57 300 987 6543 (abre en nueva pestaña)">+57 300 987 6543</a></li>
+            <li><a href="https://wa.me/573162389171" target="_blank" rel="noopener noreferrer" class="footer-link" aria-label="Escribir por WhatsApp al +57 316 2389171 (abre en nueva pestaña)">+57 316 2389171</a></li>
             <li>Calle del Santísimo # 8-12, Centro Histórico</li>
           </ul>
         </div>
