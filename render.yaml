@@ -1,0 +1,43 @@
+services:
+  # --- Backend Java Spring Boot 3 ---
+  - type: web
+    name: palacio-backend
+    runtime: docker
+    dockerfilePath: backend-java/Dockerfile
+    dockerContext: backend-java
+    plan: free
+    region: oregon
+    envVars:
+      - key: SERVER_PORT
+        value: 5000
+      - key: MONGODB_URI
+        value: "mongodb://samgl2024_db_user:qLLvNfFfb7wPoSCp@ac-fh9cryk-shard-00-00.v4l2d4i.mongodb.net:27017,ac-fh9cryk-shard-00-01.v4l2d4i.mongodb.net:27017,ac-fh9cryk-shard-00-02.v4l2d4i.mongodb.net:27017/palacio_db?ssl=true&replicaSet=atlas-8ln4ql-shard-0&authSource=admin"
+      - key: SPRING_DATA_MONGODB_URI
+        value: "mongodb://samgl2024_db_user:qLLvNfFfb7wPoSCp@ac-fh9cryk-shard-00-00.v4l2d4i.mongodb.net:27017,ac-fh9cryk-shard-00-01.v4l2d4i.mongodb.net:27017,ac-fh9cryk-shard-00-02.v4l2d4i.mongodb.net:27017/palacio_db?ssl=true&replicaSet=atlas-8ln4ql-shard-0&authSource=admin"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION
+        value: "604800000"
+      - key: PAYMENTS_WEBHOOK_SECRET
+        generateValue: true
+      - key: PALACIO_PROXY_TOKEN
+        generateValue: true
+      - key: SEED_DEMO_DATA
+        value: "true"
+      - key: SPRING_CACHE_TYPE
+        value: "none"
+
+  # --- Frontend Web + Flutter iOS App + APK Download ---
+  - type: web
+    name: palacio-web
+    runtime: docker
+    dockerfilePath: frontend-angular/Dockerfile
+    dockerContext: frontend-angular
+    plan: free
+    region: oregon
+    envVars:
+      - key: PALACIO_PROXY_TOKEN
+        fromService:
+          type: web
+          name: palacio-backend
+          envVarKey: PALACIO_PROXY_TOKEN
