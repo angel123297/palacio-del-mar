@@ -1,5 +1,26 @@
 [{"type":"text","text":"successfully downloaded text file (SHA: b4526d48bdde91b08d386613a15cd377470a871e)"},{"type":"resource","resource":{"uri":"repo://angel123297/palacio-del-mar/sha/74741e473ddde751e678c754e8d66ef70dd69fb5/contents/docs/QA_REPORTE.md","mimeType":"text/plain; charset=utf-8","text":"## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-11-02 — Revisión diaria de Vibe: sin cambios en el día
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** El único commit en la ventana es el propio reporte de QA de ayer: [docs(qa): reporte diario 2026-11-01](https://github.com/angel123297/palacio-del-mar/commit/7f903a9702dfdf3042781d06bcded40f73addc79) (1 nov 14:07 UTC). Sin actividad de los agentes (Antigravity/Jules) ni commits funcionales.
+
+**Pull requests: 2 PRs abiertos, sin actividad en el día:**
+- [#25 — Add System Audit Report](https://github.com/angel123297/palacio-del-mar/pull/25) (draft, base `plan/marketplace-webhooks`, sin cambios desde el 29 oct 12:19 UTC). Pendiente de decisión: mover `REPORT.md` a `docs/` o cerrar antes de fusionar.
+- [#23 — Cleanup unused frontend code and dependencies](https://github.com/angel123297/palacio-del-mar/pull/23) (draft, sin actividad desde el 26 oct). ⚠️ Base `proyecto-angular-java` (rama original protegida): NO fusionar sin decisión explícita del usuario.
+
+**Fase en curso:** Fase 5 del PLAN_MARKETPLACE.md (CI/CD, Swagger, Actuator y automaciones) funcionalmente implementada pero **sin avance medible**. Fases 0-4 completadas (plan fusionado vía #20 el 21 oct). Última actividad funcional: remediación de auditoría del 28 oct (2ad52bc + 0c9df4c).
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`). Los 10 hallazgos de la auditoría de seguridad permanecen cerrados.
+
+**Tests esperados en verde:** **446 de backend y 43 de frontend** (cifras heredadas del reporte de PR #25 y README; sin commits de código en el día no hay riesgo de regresión nueva). ⚠️ Cifra reportada por agente, no verificada por Vibe en CI sobre el HEAD actual (7f903a9).
+
+**Riesgos / problemas detectados:**
+- ⚠️ Estancamiento prolongado: **cinco días consecutivos sin commits funcionales** de los agentes (Antigravity/Jules); la Fase 5 no registra avance desde el 28 oct.
+- ⚠️ Cifras de tests (446/43) siguen sin verificación local/CI por Vibe.
+- ⚠️ PR #25 (`REPORT.md` en la raíz, duplica `docs/QA_REPORTE.md`) y PR #23 (base protegida) pendientes de decisión del usuario.
+- ⚠️ Docs eliminados por 0ff7a9e (`docs/PLAN_MARKETPLACE.md`, `docs/AUDITORIA_SEGURIDAD.md`, `docs/CORRECCIONES.md`, etc.) siguen sin restaurarse (recuperables del commit fd81791).
+- ⚠️ Commit 4ddecea ("Actualización de credencial de Gmail"): sigue pendiente verificar secretos en historial y rotar la credencial si se expuso.
+
 ### 📅 2026-11-01 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** Ningún commit nuevo en la ventana (desde el 31 oct 14:05 UTC); el último commit de la rama sigue siendo el reporte de QA de ayer: [docs(qa): reporte diario 2026-10-31](https://github.com/angel123297/palacio-del-mar/commit/74741e473ddde751e678c754e8d66ef70dd69fb5) (31 oct 14:05 UTC). Sin actividad de los agentes (Antigravity/Jules).
