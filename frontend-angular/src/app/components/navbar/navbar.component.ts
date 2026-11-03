@@ -40,7 +40,7 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
         </div>
 
         <div class="nav-right" style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
-          <ng-container *ngIf="auth.currentUser() as user; else notLogged">
+          <ng-container *ngIf="auth.isLoggedIn() && auth.currentUser() as user; else notLogged">
             <div class="nav-user-menu" style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;">
               <a *ngIf="isGuest()" routerLink="/mis-reservas" class="btn-outline nav-user-btn desktop-only-btn" style="min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; text-decoration: none; white-space: nowrap;">
                 Mis Reservas
@@ -98,7 +98,7 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
           </div>
 
           <!-- Authenticated Links for Mobile -->
-          <ng-container *ngIf="auth.currentUser() as user; else mobileNotLogged">
+          <ng-container *ngIf="auth.isLoggedIn() && auth.currentUser() as user; else mobileNotLogged">
             <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
               <a *ngIf="isGuest()" routerLink="/mis-reservas" (click)="closeMobileMenu()" class="btn-primary" style="text-align: center; padding: 12px; text-decoration: none; min-height: 44px; display: flex; align-items: center; justify-content: center;">
                 Mis Reservas
@@ -204,22 +204,25 @@ export class NavbarComponent implements OnInit {
   }
 
   isCorporate(): boolean {
+    if (!this.auth.isLoggedIn()) return false;
     const role = (this.auth.currentUser()?.role || '').trim().toLowerCase();
     return role === 'host' || role === 'anfitrion' || role === 'admin';
   }
 
   isAdmin(): boolean {
+    if (!this.auth.isLoggedIn()) return false;
     const role = (this.auth.currentUser()?.role || '').trim().toLowerCase();
     return role === 'admin';
   }
 
   isHost(): boolean {
+    if (!this.auth.isLoggedIn()) return false;
     const role = (this.auth.currentUser()?.role || '').trim().toLowerCase();
     return role === 'host' || role === 'anfitrion';
   }
 
   isGuest(): boolean {
-    return !this.isCorporate();
+    return this.auth.isLoggedIn() && !this.isCorporate();
   }
 
   getHomeLink(): string {
