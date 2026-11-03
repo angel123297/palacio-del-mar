@@ -137,7 +137,7 @@ const DEFAULT_FALLBACK_BRANCHES: Branch[] = [
 export class RoomsSectionComponent implements OnInit {
   private searchState = inject(SearchStateService);
   suites: Suite[] = [];
-  branches: Branch[] = [];
+  branches: Branch[] = [...DEFAULT_FALLBACK_BRANCHES];
   types: any[] = [];
   selectedType: string = '';
   loading = true;

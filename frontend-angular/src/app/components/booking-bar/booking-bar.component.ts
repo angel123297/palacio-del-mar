@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, effect } from '@angular/core';
+import { Component, OnInit, inject, effect, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -29,7 +29,7 @@ import { DateRangePickerComponent } from '../date-range-picker/date-range-picker
         </div>
 
         <!-- Sucursal -->
-        <div class="flex-1 min-w-[140px] p-4 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center" *ngIf="branches.length > 0">
+        <div class="flex-1 min-w-[140px] p-4 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center">
           <label for="booking-branch" class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1">Sucursal</label>
           <select id="booking-branch" [ngModel]="searchState.filters().branchSlug" (ngModelChange)="searchState.updateBranch($event)" name="branch" aria-label="Seleccionar sucursal de destino" class="bg-transparent border-none text-[#f5f0e8] font-serif text-lg md:text-xl font-medium outline-none cursor-pointer appearance-none">
             <option value="" class="bg-[#161311] text-[#f5f0e8]">Todas</option>
@@ -80,8 +80,7 @@ export class BookingBarComponent implements OnInit {
   api = inject(ApiService);
   router = inject(Router);
   searchState = inject(SearchStateService);
-
-  branches: Branch[] = [];
+  private cdr = inject(ChangeDetectorRef);
 
   private defaultBranches: Branch[] = [
     { id: 'b-bocagrande', name: 'Palacio Bocagrande', slug: 'bocagrande', zone: 'Bocagrande · Mar Caribe' } as Branch,
@@ -89,6 +88,8 @@ export class BookingBarComponent implements OnInit {
     { id: 'b-centro', name: 'Palacio Imperial San Diego', slug: 'centro-historico', zone: 'Ciudad Amurallada' } as Branch,
     { id: 'b-boquilla', name: 'Reserva Manglares & Sol', slug: 'la-boquilla', zone: 'La Boquilla · Privacidad' } as Branch
   ];
+
+  branches: Branch[] = [...this.defaultBranches];
 
   ngOnInit(): void {
     this.api.get<ApiResponse<Branch[]> | Branch[]>('/branches').subscribe({
@@ -99,9 +100,11 @@ export class BookingBarComponent implements OnInit {
           return n.length > 2;
         });
         this.branches = filtered.length > 0 ? filtered : this.defaultBranches;
+        this.cdr.markForCheck();
       },
       error: () => {
         this.branches = this.defaultBranches;
+        this.cdr.markForCheck();
       }
     });
   }
@@ -133,4 +136,3 @@ export class BookingBarComponent implements OnInit {
     this.router.navigate(['/buscar']);
   }
 }
-
