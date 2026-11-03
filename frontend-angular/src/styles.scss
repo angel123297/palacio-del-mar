@@ -380,7 +380,7 @@ nav {
 #booking-bar {
   background: var(--warm);
   border-bottom: 2px solid rgba(201, 169, 110, 0.2);
-  padding: 0 48px;
+  padding: 0;
   display: flex;
   align-items: stretch;
   position: sticky;
@@ -2432,4 +2432,5 @@ select::placeholder {
   color: rgba(245, 240, 232, 0.65) !important;
   opacity: 1;
 }
+
 

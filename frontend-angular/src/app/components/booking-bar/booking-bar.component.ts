@@ -12,7 +12,7 @@ import { DateRangePickerComponent } from '../date-range-picker/date-range-picker
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, DateRangePickerComponent],
   template: `
-    <div id="booking-bar" role="search" aria-label="Buscador de suites y disponibilidad" class="bg-[#161311] border-b-2 border-[rgba(201,169,110,0.3)] shadow-2xl sticky top-[57px] z-[190] px-4 md:px-12 relative w-full">
+    <div id="booking-bar" role="search" aria-label="Buscador de suites y disponibilidad" class="bg-[#161311] border-b-2 border-[rgba(201,169,110,0.3)] shadow-2xl sticky top-[57px] z-[190] px-0 relative w-full">
       
       <form class="flex flex-col md:flex-row items-stretch w-full" (ngSubmit)="submit()" aria-label="Filtros de búsqueda de disponibilidad">
         
@@ -136,3 +136,4 @@ export class BookingBarComponent implements OnInit {
     this.router.navigate(['/buscar']);
   }
 }
+
