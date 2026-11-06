@@ -2,6 +2,7 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { Booking } from '../../models/types';
@@ -303,7 +304,7 @@ import { Booking } from '../../models/types';
             </div>
             
             <div style="border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; overflow: hidden; height: 300px;">
-              <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-75.56846141815187%2C10.420601934399738%2C-75.53816318511964%2C10.434417758994511&amp;layer=mapnik" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+              <iframe [src]="getSafeEmbedMapUrl()" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
             </div>
           </div>
 
@@ -451,6 +452,7 @@ export class BookingDetailComponent implements OnInit {
   minDate = new Date().toISOString().substring(0, 10);
 
   constructor(
+    private sanitizer: DomSanitizer,
     private route: ActivatedRoute,
     private api: ApiService,
     private auth: AuthService,
@@ -704,6 +706,12 @@ export class BookingDetailComponent implements OnInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  getSafeEmbedMapUrl(): SafeResourceUrl {
+    const query = (this.booking?.branch?.name || this.booking?.suite?.branch?.name || 'Cartagena de Indias') + ', Colombia';
+    const url = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
 
   getMapsLink(): string {
