@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'dart:convert';
+import '../../core/providers/auth_provider.dart';
 import '../payment/payment_screen.dart';
 
 class BookingStepperScreen extends StatefulWidget {
@@ -45,8 +47,18 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
 
   // Paso 4: Huésped titular
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      if (auth.currentUserName != null && auth.currentUserName!.trim().isNotEmpty) {
+        _nameController.text = auth.currentUserName!.trim();
+      }
+    });
+  }
 
   int get _nights {
     final diff = _checkOut.difference(_checkIn).inDays;
@@ -66,6 +78,9 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
   Future<void> _submitBooking() async {
     setState(() => _isLoading = true);
 
+    final auth = context.read<AuthProvider>();
+    final guestEmail = auth.currentUserEmail ?? '';
+
     final payload = {
       'suiteId': widget.suiteId,
       'checkIn': _checkIn.toIso8601String().split('T')[0],
@@ -76,7 +91,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
       'petFriendly': _petFriendly,
       'airportPickup': _airportPickup,
       'guestName': _nameController.text.trim(),
-      'guestEmail': _emailController.text.trim(),
+      'guestEmail': guestEmail,
       'guestPhone': _phoneController.text.trim(),
       'foodOrders': _breakfastIncluded ? [{'item': 'Desayuno Buffet Ruta del Sabor', 'quantity': _guests * _nights}] : [],
     };
@@ -286,13 +301,9 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                   decoration: const InputDecoration(labelText: 'Nombre Completo', labelStyle: TextStyle(color: Colors.grey)),
                 ),
                 TextField(
-                  controller: _emailController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(labelText: 'Correo Electrónico', labelStyle: TextStyle(color: Colors.grey)),
-                ),
-                TextField(
                   controller: _phoneController,
                   style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(labelText: 'Teléfono de Contacto', labelStyle: TextStyle(color: Colors.grey)),
                 ),
                 const SizedBox(height: 16),
