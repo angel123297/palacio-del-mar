@@ -5,6 +5,7 @@ import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { BookingStreamService } from '../../services/booking-stream.service';
+import { CurrencyService } from '../../services/currency.service';
 import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property, WebhookSubscription, WebhookDelivery, ApiKeyItem } from '../../models/types';
 import { environment } from '../../../environments/environment';
 
@@ -94,7 +95,7 @@ export interface HostPromotionItem {
             </div>
             <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
               <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Ingresos Generados</p>
-              <p class="font-serif text-4xl text-[#f5f0e8]">$ {{ metrics()?.totalRevenue || 0 | number:'1.0-0' }}</p>
+              <p class="font-serif text-4xl text-[#f5f0e8]">{{ currency.formatPrice(metrics()?.totalRevenue || 0) }}</p>
             </div>
           </div>
 
@@ -552,7 +553,7 @@ export interface HostPromotionItem {
                         <p class="text-[10px] text-[#f5f0e8] opacity-60">{{ s.type }} &bull; Máx {{ s.maxGuests }} huéspedes &bull; {{ s.size || 30 }} m²</p>
                       </div>
                       <div class="text-right">
-                        <p class="text-xs font-bold text-[#c9a96e]">$ {{ s.basePrice | number:'1.0-0' }} <span class="text-[10px] font-normal text-white/50">/ noche</span></p>
+                        <p class="text-xs font-bold text-[#c9a96e]">{{ currency.formatPrice(s.basePrice || 0) }} <span class="text-[10px] font-normal text-white/50">/ noche</span></p>
                         <span class="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#2ecc71]/20 text-[#2ecc71]">● Activa</span>
                       </div>
                     </div>
@@ -989,12 +990,12 @@ export interface HostPromotionItem {
                 </div>
                 <div class="p-3 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg">
                   <p class="text-[10px] uppercase tracking-wider text-[#c9a96e] mb-0.5">Total Cobrado al Huésped</p>
-                  <p class="font-serif text-lg text-[#f5f0e8] font-semibold">$ {{ (calcRate * calcNights) | number:'1.0-0' }} COP</p>
-                  <p class="text-[10px] text-[#e74c3c] mt-0.5">Comisión 8%: -$ {{ (calcRate * calcNights * 0.08) | number:'1.0-0' }}</p>
+                  <p class="font-serif text-lg text-[#f5f0e8] font-semibold">{{ currency.formatPrice(calcRate * calcNights) }}</p>
+                  <p class="text-[10px] text-[#e74c3c] mt-0.5">Comisión 8%: -{{ currency.formatPrice(calcRate * calcNights * 0.08) }}</p>
                 </div>
                 <div class="p-3 bg-[rgba(46,204,113,0.08)] border border-[rgba(46,204,113,0.3)] rounded-lg">
                   <p class="text-[10px] uppercase tracking-wider text-[#2ecc71] font-bold mb-0.5">Tu Desembolso Neto (92%)</p>
-                  <p class="font-serif text-2xl text-[#2ecc71] font-bold">$ {{ (calcRate * calcNights * 0.92) | number:'1.0-0' }} COP</p>
+                  <p class="font-serif text-2xl text-[#2ecc71] font-bold">{{ currency.formatPrice(calcRate * calcNights * 0.92) }}</p>
                   <p class="text-[10px] text-[#f5f0e8] opacity-75 mt-0.5">Garantizado a tu cuenta ACH</p>
                 </div>
               </div>
@@ -1081,9 +1082,9 @@ export interface HostPromotionItem {
                       <td class="p-4 font-semibold">{{ p.propertyName || p.propertyId }}</td>
                       <td class="p-4 text-xs opacity-75">{{ p.periodStart }} — {{ p.periodEnd }}</td>
                       <td class="p-4 text-center font-bold">{{ p.totalBookings }}</td>
-                      <td class="p-4 text-right">$ {{ (p.grossTotal || 0) | number:'1.0-0' }}</td>
-                      <td class="p-4 text-right text-[#e74c3c]">-$ {{ (p.platformFee || 0) | number:'1.0-0' }}</td>
-                      <td class="p-4 text-right font-bold text-[#2ecc71] text-sm">$ {{ (p.netAmount || 0) | number:'1.0-0' }}</td>
+                      <td class="p-4 text-right">{{ currency.formatPrice(p.grossTotal || 0) }}</td>
+                      <td class="p-4 text-right text-[#e74c3c]">-{{ currency.formatPrice(p.platformFee || 0) }}</td>
+                      <td class="p-4 text-right font-bold text-[#2ecc71] text-sm">{{ currency.formatPrice(p.netAmount || 0) }}</td>
                       <td class="p-4 text-xs font-mono text-[#c9a96e]">{{ p.destinationBank ? (p.destinationBank + ' ' + (p.destinationAccountMasked || '')) : 'ACH Bancario' }}</td>
                       <td class="p-4 text-center">
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border border-[rgba(46,204,113,0.3)]">
@@ -1157,6 +1158,7 @@ export class HostDashboardComponent implements OnInit {
   auth = inject(AuthService);
   router = inject(Router);
   bookingStream = inject(BookingStreamService);
+  currency = inject(CurrencyService);
 
   constructor() {
     effect(() => {

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { CurrencyService } from '../../services/currency.service';
 import { Booking } from '../../models/types';
 import { finalize } from 'rxjs';
 
@@ -55,7 +56,7 @@ import { finalize } from 'rxjs';
           </div>
 
           <div style="text-align: right;">
-            <div style="font-size: 1.4rem; font-weight: 700; color: var(--gold); margin-bottom: 6px;">$ {{ booking.totalPrice | number:'1.0-0' }}</div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: var(--gold); margin-bottom: 6px;">{{ currency.formatPrice(booking.totalPrice || 0) }}</div>
             <div style="display: flex; gap: 10px; align-items: center; justify-content: flex-end;">
               <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase;"
                     [style.background]="booking.status === 'confirmed' ? 'rgba(46, 204, 113, 0.2)' : 'rgba(241, 196, 15, 0.2)'"
@@ -82,7 +83,7 @@ import { finalize } from 'rxjs';
               <p style="margin: 0 0 8px 0; color: #ddd;">{{ cancelRefundInfo }}</p>
               <div style="display: flex; justify-content: space-between; font-size: 1rem; font-weight: 700; color: #fff; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
                 <span>Monto a Reembolsar:</span>
-                <span style="color: #2ecc71;">$ {{ cancelRefundAmount | number:'1.0-0' }} COP</span>
+                <span style="color: #2ecc71;">{{ currency.formatPrice(cancelRefundAmount) }}</span>
               </div>
             </div>
             <p *ngIf="cancelError" style="color: #ff4d4d; font-size: 0.85rem; margin-bottom: 1rem; background: rgba(231,76,60,0.1); padding: 8px; border-radius: 6px;">{{ cancelError }}</p>
@@ -112,7 +113,8 @@ export class MyBookingsComponent implements OnInit {
     private api: ApiService,
     private auth: AuthService,
     private cdr: ChangeDetectorRef,
-    private router: Router
+    private router: Router,
+    public currency: CurrencyService
   ) {}
 
   /** L8: una reserva pending con TTL vencido ya no debe ofrecer pago ni cancelación. */

@@ -5,6 +5,7 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { CurrencyService } from '../../services/currency.service';
 import { Booking } from '../../models/types';
 
 @Component({
@@ -101,7 +102,7 @@ import { Booking } from '../../models/types';
               <div>🕒 <strong>Check-in automático:</strong> 15:00 hrs (hora local) del día de llegada. El PIN se activará para la cerradura.</div>
               <div>🕒 <strong>Check-out automático:</strong> 12:00 hrs (hora local) del día de salida. El PIN se desactiva y se libera el depósito.</div>
               <div *ngIf="booking.guaranteeDeposit">
-                🛡️ <strong>Depósito de Garantía:</strong> $ {{ booking.guaranteeDeposit | number:'1.0-0' }} COP
+                🛡️ <strong>Depósito de Garantía:</strong> {{ currency.formatPrice(booking.guaranteeDeposit || 150000) }}
                 <span *ngIf="booking.guaranteeRefunded" style="color: #2ecc71; font-weight: bold;">(Reembolsado automáticamente)</span>
                 <span *ngIf="!booking.guaranteeRefunded" style="color: #f1c40f;">(Reembolso automático tras check-out a las 12:00)</span>
               </div>
@@ -117,7 +118,7 @@ import { Booking } from '../../models/types';
               Check-out procesado exitosamente. La cerradura inteligente ha sido deshabilitada.
             </p>
             <p style="color: #2ecc71; margin: 0.3rem 0; font-size: 0.9rem;" *ngIf="booking.guaranteeRefunded">
-              🛡️ {{ isGuestOwner ? 'Tu depósito de garantía de $' : 'Depósito de garantía de $' }} {{ (booking.guaranteeDeposit || 150000) | number:'1.0-0' }} COP {{ isGuestOwner ? 'fue liberado y reembolsado sin novedades.' : 'fue liberado y reembolsado al huésped.' }}
+              🛡️ {{ isGuestOwner ? 'Tu depósito de garantía de ' : 'Depósito de garantía de ' }} {{ currency.formatPrice(booking.guaranteeDeposit || 150000) }} {{ isGuestOwner ? 'fue liberado y reembolsado sin novedades.' : 'fue liberado y reembolsado al huésped.' }}
             </p>
           </div>
 
@@ -259,12 +260,12 @@ import { Booking } from '../../models/types';
             <!-- Resumen Financiero / Liquidación -->
             <div class="bd-section">
               <h3 class="bd-section-title">{{ isHostOrAdmin && !isGuestOwner ? 'Liquidación de la Reserva' : 'Resumen de Pago' }}</h3>
-              <p><strong>Total Reserva:</strong>&nbsp;<span style="color: var(--gold); font-weight: bold; font-size: 1.15rem;">$ {{ booking.totalPrice | number:'1.0-0' }} COP</span></p>
+              <p><strong>Total Reserva:</strong>&nbsp;<span style="color: var(--gold); font-weight: bold; font-size: 1.15rem;">{{ currency.formatPrice(booking.totalPrice || 0) }}</span></p>
               
               <!-- Para Anfitrión / Admin: desglose de comisión y pago neto -->
               <div *ngIf="isHostOrAdmin && !isGuestOwner" style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem;">
-                <p style="margin: 0;"><strong>Comisión Plataforma (8%):</strong>&nbsp;<span style="color: #ff9f43;">- $ {{ (booking.platformFee || (booking.totalPrice * 0.08)) | number:'1.0-0' }} COP</span></p>
-                <p style="margin: 0;"><strong>Pago Neto al Anfitrión:</strong>&nbsp;<span style="color: #2ecc71; font-weight: bold; font-size: 1.1rem;">$ {{ (booking.hostPayout || (booking.totalPrice * 0.92)) | number:'1.0-0' }} COP</span></p>
+                <p style="margin: 0;"><strong>Comisión Plataforma (8%):</strong>&nbsp;<span style="color: #ff9f43;">- {{ currency.formatPrice(booking.platformFee || (booking.totalPrice * 0.08)) }}</span></p>
+                <p style="margin: 0;"><strong>Pago Neto al Anfitrión:</strong>&nbsp;<span style="color: #2ecc71; font-weight: bold; font-size: 1.1rem;">{{ currency.formatPrice(booking.hostPayout || (booking.totalPrice * 0.92)) }}</span></p>
                 <p style="margin: 0.4rem 0 0;"><strong>Estado del Pago:</strong>&nbsp;<span class="status-badge" [ngClass]="booking.paymentStatus || 'pending'" style="font-size: 0.75rem; padding: 3px 10px;">{{ getPaymentStatusLabel(booking.paymentStatus) }}</span></p>
               </div>
 
@@ -456,7 +457,8 @@ export class BookingDetailComponent implements OnInit {
     private route: ActivatedRoute,
     private api: ApiService,
     private auth: AuthService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    public currency: CurrencyService
   ) {}
 
   ngOnInit(): void {
