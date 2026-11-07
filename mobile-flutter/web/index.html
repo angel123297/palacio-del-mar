@@ -19,6 +19,20 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
   <title>Palacio del Mar</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        for (var i = 0; i < regs.length; i++) {
+          regs[i].unregister();
+        }
+      });
+      if (window.caches) {
+        caches.keys().then(function(keys) {
+          keys.forEach(function(k) { caches.delete(k); });
+        });
+      }
+    }
+  </script>
 </head>
 <body style="background-color: #0B0C10; margin: 0; padding: 0; overflow: hidden;">
   <script src="flutter_bootstrap.js" async></script>
