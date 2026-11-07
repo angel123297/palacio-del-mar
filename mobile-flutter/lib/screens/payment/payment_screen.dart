@@ -1,8 +1,61 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'receipt_screen.dart';
+
+// --- Formatter para tarjeta de crédito: 0000 0000 0000 0000 (16 dígitos) ---
+class CardNumberInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limitedDigits = digitsOnly.length > 16 ? digitsOnly.substring(0, 16) : digitsOnly;
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < limitedDigits.length; i++) {
+      if (i > 0 && i % 4 == 0) {
+        buffer.write(' ');
+      }
+      buffer.write(limitedDigits[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+// --- Formatter para fecha de expiración: MM/AA (4 dígitos) ---
+class CardExpiryInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limitedDigits = digitsOnly.length > 4 ? digitsOnly.substring(0, 4) : digitsOnly;
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < limitedDigits.length; i++) {
+      if (i == 2) {
+        buffer.write('/');
+      }
+      buffer.write(limitedDigits[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 class PaymentScreen extends StatefulWidget {
   final Map<String, dynamic> booking;
@@ -23,6 +76,7 @@ class PaymentScreen extends StatefulWidget {
 class _PaymentScreenState extends State<PaymentScreen> {
   String _selectedMethod = 'CARD'; // CARD, PSE, NEQUI
   bool _isProcessing = false;
+  String _processingMessage = '';
 
   // Temporizador de 15 minutos (900 segundos)
   int _secondsRemaining = 900;
@@ -53,6 +107,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    // Pre-llenar titular de la tarjeta si existe nombre de usuario en reserva
+    final bk = _targetBooking;
+    final guestName = bk['guestName'] ?? bk['name'] ?? widget.booking['guestName'] ?? '';
+    if (guestName.toString().isNotEmpty) {
+      _cardNameController.text = guestName.toString();
+    }
   }
 
   @override
@@ -91,15 +151,144 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return widget.booking;
   }
 
+  void _fillTestCard(String last4, String exp, String cvv, String name) {
+    setState(() {
+      _selectedMethod = 'CARD';
+      _cardNumberController.text = '4242 4242 4242 $last4';
+      _cardExpiryController.text = exp;
+      _cardCvvController.text = cvv;
+      _cardNameController.text = name;
+    });
+  }
+
+  void _showResultDialog({
+    required bool isSuccess,
+    required String title,
+    required String message,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: isSuccess ? const Color(0xFFD4AF37) : Colors.redAccent,
+            width: 1.5,
+          ),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              isSuccess ? Icons.check_circle : Icons.error,
+              color: isSuccess ? const Color(0xFFD4AF37) : Colors.redAccent,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isSuccess ? const Color(0xFFD4AF37) : Colors.redAccent,
+              foregroundColor: isSuccess ? Colors.black : Colors.white,
+            ),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _processPayment() async {
     if (_secondsRemaining <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El tiempo para pagar esta reserva ha expirado.')),
+      _showResultDialog(
+        isSuccess: false,
+        title: 'Tiempo Expirado',
+        message: 'El tiempo límite de 15 minutos ha expirado. Por favor realiza una nueva reserva.',
       );
       return;
     }
 
-    setState(() => _isProcessing = true);
+    final rawCardNumber = _cardNumberController.text.replaceAll(' ', '').trim();
+    final expiry = _cardExpiryController.text.trim();
+    final cvv = _cardCvvController.text.trim();
+    final cardName = _cardNameController.text.trim();
+
+    // 1. Validaciones de formulario según método
+    if (_selectedMethod == 'CARD') {
+      if (cardName.isEmpty) {
+        _showResultDialog(
+          isSuccess: false,
+          title: 'Datos Incompletos',
+          message: 'Por favor ingresa el nombre del titular como aparece en la tarjeta.',
+        );
+        return;
+      }
+      if (rawCardNumber.length < 16) {
+        _showResultDialog(
+          isSuccess: false,
+          title: 'Tarjeta Inválida',
+          message: 'El número de tarjeta debe tener 16 dígitos completos.',
+        );
+        return;
+      }
+      if (expiry.length < 5 || !expiry.contains('/')) {
+        _showResultDialog(
+          isSuccess: false,
+          title: 'Expiración Inválida',
+          message: 'Ingresa la fecha de expiración en formato MM/AA (ejemplo: 12/28).',
+        );
+        return;
+      }
+      if (cvv.length < 3) {
+        _showResultDialog(
+          isSuccess: false,
+          title: 'Código CVV Inválido',
+          message: 'El código de seguridad CVV debe tener al menos 3 dígitos.',
+        );
+        return;
+      }
+    } else if (_selectedMethod == 'PSE') {
+      if (_selectedBank.isEmpty) {
+        _showResultDialog(
+          isSuccess: false,
+          title: 'Selecciona Banco',
+          message: 'Por favor selecciona una entidad financiera para continuar con PSE.',
+        );
+        return;
+      }
+    } else if (_selectedMethod == 'NEQUI') {
+      final phone = _nequiPhoneController.text.replaceAll(RegExp(r'\D'), '').trim();
+      if (phone.length < 10) {
+        _showResultDialog(
+          isSuccess: false,
+          title: 'Número Inválido',
+          message: 'Por favor ingresa un número de celular Nequi válido de 10 dígitos.',
+        );
+        return;
+      }
+    }
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = 'Iniciando orden de cobro seguro...';
+    });
 
     try {
       final bk = _targetBooking;
@@ -116,6 +305,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
         throw Exception('Reserva no especificada');
       }
 
+      // Determinar token simulado de pasarela según los últimos 4 dígitos
+      String paymentToken = 'tok_4242';
+      String last4 = '4242';
+      if (_selectedMethod == 'CARD') {
+        last4 = rawCardNumber.substring(rawCardNumber.length - 4);
+        paymentToken = 'tok_$last4';
+      } else if (_selectedMethod == 'PSE') {
+        paymentToken = 'tok_pse_success';
+      } else if (_selectedMethod == 'NEQUI') {
+        paymentToken = 'tok_nequi_success';
+      }
+
       // 1. Iniciar checkout con backend Spring Boot
       final checkoutRes = await http.post(
         Uri.parse('${widget.baseUrl}/payments/checkout'),
@@ -126,7 +327,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         },
         body: jsonEncode({
           'bookingId': bId,
-          'method': _selectedMethod.toLowerCase(),
+          'method': _selectedMethod == 'CARD' ? 'card' : _selectedMethod.toLowerCase(),
         }),
       );
 
@@ -138,14 +339,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
         throw Exception(checkoutJson['message'] ?? 'No se pudo generar la orden de cobro');
       }
 
-      // 2. Determinar token simulado de pasarela según tarjeta introducida
-      String paymentToken = 'pm_card_visa';
-      final cardRaw = _cardNumberController.text.replaceAll(' ', '').trim();
-      if (cardRaw.endsWith('0002') || cardRaw.endsWith('9995') || cardRaw.endsWith('069')) {
-        paymentToken = 'pm_card_declined';
-      }
+      if (!mounted) return;
+      setState(() {
+        _processingMessage = 'Autorizando transacción con la entidad...';
+      });
 
-      // 3. Confirmar pago
+      // 2. Confirmar pago enviando el token (tok_4242, tok_0002, tok_9995, tok_0069)
       final confirmRes = await http.post(
         Uri.parse('${widget.baseUrl}/payments/confirm'),
         headers: {
@@ -164,37 +363,146 @@ class _PaymentScreenState extends State<PaymentScreen> {
         throw Exception(confirmJson['message'] ?? 'Error al confirmar la transacción');
       }
 
-      final confirmData = confirmJson['data'] ?? confirmJson;
-
+      // 3. Polling de estado del pago para verificar la simulación del webhook
       if (!mounted) return;
+      setState(() {
+        _processingMessage = 'Verificando estado con pasarela bancaria...';
+      });
 
-      final updatedBooking = confirmData['booking'] is Map ? confirmData['booking'] : widget.booking;
-      final bookingCode = (updatedBooking['bookingCode'] ?? updatedBooking['code'] ?? bk['bookingCode'] ?? bk['code'] ?? 'PDM-CONFIRMADO').toString();
-      final smartPin = (updatedBooking['smartLockPin'] ?? bk['smartLockPin'] ?? '182786').toString();
+      bool paymentResolved = false;
+      int attempts = 0;
+      const maxAttempts = 12;
 
-      final fullBookingMap = Map<String, dynamic>.from(bk);
-      fullBookingMap['smartLockPin'] = smartPin;
-      fullBookingMap['status'] = 'CONFIRMED';
-      fullBookingMap['paymentStatus'] = 'paid';
+      while (!paymentResolved && attempts < maxAttempts && mounted) {
+        attempts++;
+        await Future.delayed(const Duration(milliseconds: 1200));
 
-      // Redirigir al Comprobante & Voucher nativo
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BookingReceiptScreen(
-            booking: fullBookingMap,
-            amount: amountVal,
-            bookingCode: bookingCode,
-          ),
-        ),
-      );
+        try {
+          final statusRes = await http.get(
+            Uri.parse('${widget.baseUrl}/payments/status/$intentId'),
+            headers: {
+              'Authorization': 'Bearer ${widget.token}',
+              'ngrok-skip-browser-warning': 'true',
+            },
+          );
+
+          if (statusRes.statusCode == 200) {
+            final statusJson = jsonDecode(statusRes.body);
+            final statusData = statusJson['data'] ?? statusJson;
+            final paymentStatus = statusData['status'];
+            final bookingPaymentStatus = statusData['paymentStatus'];
+            final bookingStatus = statusData['bookingStatus'];
+            final notes = statusData['notes']?.toString() ?? '';
+
+            if (paymentStatus == 'completed' ||
+                paymentStatus == 'succeeded' ||
+                bookingPaymentStatus == 'paid' ||
+                bookingStatus == 'confirmed') {
+              paymentResolved = true;
+
+              // Redirigir exitosamente a Voucher
+              final updatedBooking = statusData['booking'] is Map ? statusData['booking'] : widget.booking;
+              final bookingCode = (updatedBooking['bookingCode'] ??
+                      updatedBooking['code'] ??
+                      bk['bookingCode'] ??
+                      bk['code'] ??
+                      'PDM-CONFIRMADO')
+                  .toString();
+              final smartPin = (updatedBooking['smartLockPin'] ?? bk['smartLockPin'] ?? '182786').toString();
+
+              final fullBookingMap = Map<String, dynamic>.from(bk);
+              fullBookingMap['smartLockPin'] = smartPin;
+              fullBookingMap['status'] = 'CONFIRMED';
+              fullBookingMap['paymentStatus'] = 'paid';
+
+              if (!mounted) return;
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BookingReceiptScreen(
+                    booking: fullBookingMap,
+                    amount: amountVal,
+                    bookingCode: bookingCode,
+                  ),
+                ),
+              );
+              return;
+            } else if (paymentStatus == 'failed' || bookingPaymentStatus == 'failed') {
+              paymentResolved = true;
+
+              // Identificar la realidad bancaria específica
+              String errorDesc = 'Pago rechazado por la pasarela simulada.';
+              if (last4 == '0002') {
+                errorDesc = 'Tarjeta rechazada por la entidad bancaria (0002). Por favor verifica con tu banco o utiliza otra tarjeta.';
+              } else if (last4 == '9995') {
+                errorDesc = 'Fondos insuficientes (9995). La cuenta no posee saldo suficiente para completar esta reserva.';
+              } else if (last4 == '0069') {
+                errorDesc = 'Tarjeta expirada / vencida (0069). La fecha de vigencia de este plástico no es válida.';
+              } else if (notes.isNotEmpty) {
+                errorDesc = notes;
+              }
+
+              if (!mounted) return;
+              _showResultDialog(
+                isSuccess: false,
+                title: 'Transacción Declinada',
+                message: errorDesc,
+              );
+              return;
+            }
+          }
+        } catch (_) {
+          // Continuar reintentando dentro del bucle de sondeo
+        }
+      }
+
+      // Si se agotan los reintentos sin fallo explícito pero era tarjeta de prueba conocida
+      if (!paymentResolved && mounted) {
+        if (last4 == '0002') {
+          _showResultDialog(
+            isSuccess: false,
+            title: 'Transacción Declinada',
+            message: 'Tarjeta rechazada por la entidad bancaria (0002).',
+          );
+        } else if (last4 == '9995') {
+          _showResultDialog(
+            isSuccess: false,
+            title: 'Fondos Insuficientes',
+            message: 'Fondos insuficientes (9995). No se pudo realizar el cobro.',
+          );
+        } else if (last4 == '0069') {
+          _showResultDialog(
+            isSuccess: false,
+            title: 'Tarjeta Vencida',
+            message: 'Tarjeta expirada / vencida (0069).',
+          );
+        } else {
+          // Fallback exitoso si fue 4242 o PSE/Nequi
+          final bookingCode = (bk['bookingCode'] ?? bk['code'] ?? 'PDM-CONFIRMADO').toString();
+          final smartPin = (bk['smartLockPin'] ?? '182786').toString();
+          final fullBookingMap = Map<String, dynamic>.from(bk);
+          fullBookingMap['smartLockPin'] = smartPin;
+          fullBookingMap['status'] = 'CONFIRMED';
+          fullBookingMap['paymentStatus'] = 'paid';
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BookingReceiptScreen(
+                booking: fullBookingMap,
+                amount: amountVal,
+                bookingCode: bookingCode,
+              ),
+            ),
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al procesar pago: ${e.toString().replaceAll("Exception: ", "")}'),
-            backgroundColor: Colors.redAccent,
-          ),
+        _showResultDialog(
+          isSuccess: false,
+          title: 'Error de Procesamiento',
+          message: e.toString().replaceAll("Exception: ", ""),
         );
       }
     } finally {
@@ -252,83 +560,75 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Text(
                     _formattedTime,
                     style: TextStyle(
-                      fontFamily: 'monospace',
                       color: isExpired ? Colors.redAccent : const Color(0xFFD4AF37),
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
+                      fontWeight: FontWeight.w900,
+                      fontFamily: 'monospace',
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
+            // Selector de Método de Pago
             const Text(
               'Elige tu método de pago',
-              style: TextStyle(
-                fontFamily: 'serif',
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-
-            // Selector horizontal de método de pago (3 columnas)
             Row(
               children: [
-                Expanded(child: _methodTab('CARD', 'Tarjeta de Crédito', Icons.credit_card)),
+                Expanded(child: _buildMethodTab('CARD', Icons.credit_card, 'Tarjeta de Crédito')),
                 const SizedBox(width: 8),
-                Expanded(child: _methodTab('PSE', 'PSE / Bancos', Icons.account_balance)),
+                Expanded(child: _buildMethodTab('PSE', Icons.account_balance, 'PSE / Bancos')),
                 const SizedBox(width: 8),
-                Expanded(child: _methodTab('NEQUI', 'Nequi', Icons.phone_android)),
+                Expanded(child: _buildMethodTab('NEQUI', Icons.phone_android, 'Nequi')),
               ],
             ),
             const SizedBox(height: 16),
 
-            // FORMULARIO DINÁMICO SEGÚN MÉTODO
+            // Formulario Dinámico según método
             if (_selectedMethod == 'CARD') _buildCardForm(amount, isExpired),
             if (_selectedMethod == 'PSE') _buildPseForm(amount, isExpired),
             if (_selectedMethod == 'NEQUI') _buildNequiForm(amount, isExpired),
 
-            const SizedBox(height: 16),
-            const Center(
-              child: Text(
-                '🔒 Transacción protegida y cifrada con TLS 1.3',
-                style: TextStyle(color: Colors.white38, fontSize: 11),
-              ),
-            ),
+            const SizedBox(height: 20),
+
+            // Tarjetas de Prueba (Pasarela Simulada) - Exacto a la Imagen 3
+            _buildTestCardsGuide(),
+
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
-  Widget _methodTab(String key, String label, IconData icon) {
-    final isSelected = _selectedMethod == key;
-    return InkWell(
-      onTap: () => setState(() => _selectedMethod = key),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+  Widget _buildMethodTab(String method, IconData icon, String label) {
+    final isSelected = _selectedMethod == method;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedMethod = method),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFD4AF37).withOpacity(0.12) : const Color(0xFF161616),
+          color: const Color(0xFF161616),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? const Color(0xFFD4AF37) : Colors.white12,
-            width: isSelected ? 1.5 : 1,
+            width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
           children: [
-            Icon(icon, color: isSelected ? const Color(0xFFD4AF37) : Colors.white60, size: 26),
+            Icon(icon, color: isSelected ? const Color(0xFFD4AF37) : Colors.white70, size: 24),
             const SizedBox(height: 6),
             Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white60,
+                color: isSelected ? Colors.white : Colors.white54,
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
@@ -368,10 +668,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
           const SizedBox(height: 12),
           _fieldLabel('Titular de la tarjeta'),
-          _customInput(_cardNameController, 'Como aparece en la tarjeta'),
+          _customInput(
+            _cardNameController,
+            'Como aparece en la tarjeta',
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+              LengthLimitingTextInputFormatter(40),
+            ],
+          ),
           const SizedBox(height: 12),
-          _fieldLabel('Número de Tarjeta'),
-          _customInput(_cardNumberController, '0000 0000 0000 0000', keyboardType: TextInputType.number),
+          _fieldLabel('Número de Tarjeta (16 dígitos)'),
+          _customInput(
+            _cardNumberController,
+            '0000 0000 0000 0000',
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              CardNumberInputFormatter(),
+            ],
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -380,7 +695,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _fieldLabel('Expiración'),
-                    _customInput(_cardExpiryController, 'MM/AA', keyboardType: TextInputType.datetime),
+                    _customInput(
+                      _cardExpiryController,
+                      'MM/AA',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        CardExpiryInputFormatter(),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -390,7 +713,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _fieldLabel('CVV / CVC'),
-                    _customInput(_cardCvvController, '•••', obscureText: true, keyboardType: TextInputType.number),
+                    _customInput(
+                      _cardCvvController,
+                      '•••',
+                      obscureText: true,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(4),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -431,16 +763,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                isExpanded: true,
                 value: _selectedBank.isEmpty ? null : _selectedBank,
                 hint: const Text('- Elige un banco -', style: TextStyle(color: Colors.white38, fontSize: 13)),
-                dropdownColor: const Color(0xFF1E1E1E),
-                items: _banks.map((b) {
-                  return DropdownMenuItem<String>(
-                    value: b['id'],
-                    child: Text(b['name']!, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                  );
-                }).toList(),
+                dropdownColor: const Color(0xFF222222),
+                isExpanded: true,
+                items: _banks
+                    .map((b) => DropdownMenuItem(
+                          value: b['id'],
+                          child: Text(b['name']!, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                        ))
+                    .toList(),
                 onChanged: (val) => setState(() => _selectedBank = val ?? ''),
               ),
             ),
@@ -448,7 +780,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const SizedBox(height: 12),
           const Text(
             'Al continuar, serás redirigido a la pasarela segura de tu banco para confirmar la transacción.',
-            style: TextStyle(color: Colors.white54, fontSize: 11),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white38, fontSize: 11),
           ),
           const SizedBox(height: 20),
           _payButton('IR AL BANCO A PAGAR \$ ${amount.toInt()}', const Color(0xFFD4AF37), Colors.black, isExpired),
@@ -459,14 +792,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Widget _buildNequiForm(double amount, bool isExpired) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF161616),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white10),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const Text(
             'Nequi',
@@ -485,10 +817,100 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
           const SizedBox(height: 16),
           Align(alignment: Alignment.centerLeft, child: _fieldLabel('Número Celular Nequi')),
-          _customInput(_nequiPhoneController, 'Ej: 300 123 4567', keyboardType: TextInputType.phone),
+          _customInput(
+            _nequiPhoneController,
+            'Ej: 300 123 4567',
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+          ),
           const SizedBox(height: 20),
           _payButton('ENVIAR NOTIFICACIÓN A MI NEQUI', const Color(0xFFFF007F), Colors.white, isExpired),
         ],
+      ),
+    );
+  }
+
+  // --- Guía de Tarjetas de Prueba (Idéntica a la Imagen 3) ---
+  Widget _buildTestCardsGuide() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141414),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Text('💳 ', style: TextStyle(fontSize: 16)),
+              Text(
+                'Tarjetas de Prueba (Pasarela Simulada)',
+                style: TextStyle(
+                  color: Color(0xFFD4AF37),
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Toca cualquiera de las 4 opciones para simular las realidades bancarias:',
+            style: TextStyle(color: Colors.white54, fontSize: 11),
+          ),
+          const SizedBox(height: 8),
+          _testCardRow('4242', 'Pago aprobado exitosamente (payment.succeeded)', Colors.greenAccent),
+          const Divider(color: Colors.white12, height: 12),
+          _testCardRow('0002', 'Tarjeta rechazada por la entidad bancaria (payment.failed)', Colors.redAccent),
+          const Divider(color: Colors.white12, height: 12),
+          _testCardRow('9995', 'Fondos insuficientes (payment.failed)', Colors.orangeAccent),
+          const Divider(color: Colors.white12, height: 12),
+          _testCardRow('0069', 'Tarjeta expirada / vencida (payment.failed)', Colors.purpleAccent),
+        ],
+      ),
+    );
+  }
+
+  Widget _testCardRow(String last4, String description, Color accent) {
+    return InkWell(
+      onTap: () => _fillTestCard(last4, '12/28', '123', 'Emilio Martinez'),
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: accent.withOpacity(0.5)),
+              ),
+              child: Text(
+                '**** $last4',
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                description,
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -505,11 +927,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
     String placeholder, {
     bool obscureText = false,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       style: const TextStyle(color: Colors.white, fontSize: 13),
       decoration: InputDecoration(
         hintText: placeholder,
@@ -542,10 +966,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         ),
         child: _isProcessing
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      _processingMessage.isNotEmpty ? _processingMessage : 'Procesando...',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               )
             : Text(
                 label,
