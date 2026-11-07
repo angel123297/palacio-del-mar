@@ -4,6 +4,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/services/api_service.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/booking_provider.dart';
+import '../../core/config/api_config.dart';
+import '../../screens/booking/booking_stepper_screen.dart';
 import 'suite_zone_filter.dart';
 
 class SuitesCatalogView extends StatefulWidget {
@@ -722,7 +724,39 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
                                   side: const BorderSide(color: AppTheme.gold),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                                 ),
-                                onPressed: () => _openBookingModal(suite),
+                                onPressed: () {
+                                  final auth = context.read<AuthProvider>();
+                                  if (!auth.isAuthenticated) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Inicia sesión en LLAVE DIGITAL para reservar y pagar'),
+                                        backgroundColor: Colors.orangeAccent,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  final rawPrice = suite['pricePerNight'] ?? suite['price'] ?? 250000;
+                                  double priceVal = 250000;
+                                  if (rawPrice is num) {
+                                    priceVal = rawPrice.toDouble();
+                                  } else if (rawPrice is String) {
+                                    final cleaned = rawPrice.replaceAll(RegExp(r'[^0-9]'), '');
+                                    priceVal = double.tryParse(cleaned) ?? 250000;
+                                  }
+
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => BookingStepperScreen(
+                                        suiteId: (suite['id'] ?? suite['_id'] ?? '').toString(),
+                                        suiteName: (suite['title'] ?? suite['name'] ?? 'Suite Palacio del Mar').toString(),
+                                        pricePerNightCOP: priceVal,
+                                        token: auth.token ?? '',
+                                        baseUrl: ApiConfig.baseUrl,
+                                      ),
+                                    ),
+                                  );
+                                },
                                 child: const Text('RESERVAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               ),
                             ],
