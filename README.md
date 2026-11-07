@@ -164,30 +164,29 @@ Instala la aplicación de **Palacio del Mar** en tu dispositivo móvil en menos 
 
 ---
 
-### 🤖 1. En Dispositivos Android (Descarga e Instalación de APK)
+### 🤖 1. En Dispositivos Android (APK Palacio Del Mar)
 
-La aplicación para Android se instala descargando directamente el paquete **APK oficial** desde tu celular:
+Instala directamente la aplicación en tu celular Android descargando el paquete oficial:
 
-- 📥 **Link directo de descarga del APK:**
-  👉 **[https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)**
-- 📦 **Descarga desde GitHub Releases (Tag v1.0.0):**
-  👉 **[https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)**
+- 📲 **Descargar APK Palacio Del Mar:**
+  👉 **[Descargar APK Palacio Del Mar (v1.0.0 Oficial)](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)**
+- 📦 **Repositorio GitHub Releases (Tag v1.0.0):**
+  👉 **[APK Palacio Del Mar en GitHub](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)**
 
 #### Pasos para instalar en Android:
-1. **Descarga el APK:** Toca el link de arriba desde tu celular.
-2. **Instala el archivo:** Abre la notificación de descarga finalizada (`palacio-del-mar-release.apk`). Si Android te pide confirmación, presiona **Ajustes** y marca *"Permitir desde esta fuente"*, luego toca **Instalar**.
-3. **Listo para usar:** Abre la app desde el cajón de aplicaciones. Todas las reservas, pasarela de pago y llaves digitales se comunican en vivo con el servidor.
+1. **Descarga el APK:** Toca el enlace **[Descargar APK Palacio Del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)** desde tu celular.
+2. **Instala el archivo:** Abre la notificación de descarga finalizada (`palacio-del-mar-release.apk`). Si Android solicita permisos, presiona **Ajustes** y activa *"Permitir desde esta fuente"*, luego pulsa **Instalar**.
+3. **Listo para usar:** Abre la app **Palacio del Mar**. Puedes explorar suites, reservar con cuenta regresiva de 15 minutos, pagar con tu tarjeta o PSE/Nequi y obtener tu llave digital y comprobante en tiempo real.
 
 ---
 
-### 🍏 2. En Dispositivos iOS (iPhone & iPad vía Enlace Web App / PWA)
+### 🍏 2. En Dispositivos iOS (iPhone & iPad)
 
-En iPhone y iPad no se requiere descargar archivos APK. La aplicación corre directamente como **Web App Nativa (PWA)** a través del enlace oficial del hotel:
+En iPhone y iPad no se requiere descargar archivos. Accede directamente a la aplicación nativa desde el enlace oficial:
 
-- 🔗 **Link oficial de la aplicación para iOS:**
-  👉 **[https://unbroke-unsized-zandra.ngrok-free.dev/app/](https://unbroke-unsized-zandra.ngrok-free.dev/app/)**
+👉 **[https://unbroke-unsized-zandra.ngrok-free.dev/app/](https://unbroke-unsized-zandra.ngrok-free.dev/app/)**
 
 #### Pasos para instalar en iPhone / iPad:
-1. **Abre el link en Safari:** Entra en tu iPhone a [https://unbroke-unsized-zandra.ngrok-free.dev/app/](https://unbroke-unsized-zandra.ngrok-free.dev/app/) usando exclusivamente **Safari**.
-2. **Agrégala a tu pantalla de inicio:** Toca el botón **Compartir** de Safari (icono del cuadrado con flecha hacia arriba `⎋`), selecciona **"Agregar al inicio"** (o *"Add to Home Screen"*), y pulsa **Agregar**.
-3. **Experiencia de App Nativa:** Se creará el icono dorado oficial de **Palacio del Mar** en la pantalla de tu iPhone. Al abrirlo, funcionará a pantalla completa sin barras de navegador, con soporte offline, pasarela de pagos y sincronización en tiempo real.
+1. Abre el enlace anterior en tu navegador **Safari**.
+2. Presiona el botón de **Compartir** `⎋` y selecciona **"Agregar al inicio"** (*Add to Home Screen*).
+3. Se agregará el icono oficial de **Palacio del Mar** en tu pantalla de inicio, funcionando como app nativa a pantalla completa con soporte de pagos y llave digital.
