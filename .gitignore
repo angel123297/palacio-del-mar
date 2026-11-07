@@ -4,9 +4,35 @@
 node_modules/
 dist/
 .idea/
+.vscode/
 .DS_Store
 logs/
+*.log
 *.patch
 
+# Testing artifacts
 frontend/playwright-report/
 frontend/test-results/
+jmeter/
+
+# Backend
+backend-java/target/
+*.class
+
+# Frontend
+frontend-angular/.angular/
+frontend-angular/.vite/
+frontend-angular/dist/
+
+# Analysis, agent scratches and diagram working directories
+.archify/
+graphify-out/
+scratch/
+.agents/
+.claude/
+skills-lock.json
+AGENTS.md
+README-AUDITORIA-LOCAL.md
+*.delivery.json
+docs/*.delivery.json
+docs/*.md

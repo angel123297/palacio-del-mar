@@ -1,0 +1,252 @@
+import { Component, OnInit, Output, EventEmitter, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ApiService } from '../../services/api.service';
+import { SearchStateService } from '../../services/search-state.service';
+import { Branch } from '../../models/types';
+
+const LUXURY_DEFAULT_BRANCHES: Branch[] = [
+  {
+    id: 'b-bocagrande',
+    name: 'Palacio Bocagrande',
+    slug: 'bocagrande',
+    zone: 'Bocagrande · Mar Caribe',
+    tagline: 'Vanguardia arquitectónica con acceso directo a playa y vista panorámica al mar.',
+    vibe: ['romantico', 'relax'],
+    mainImage: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800',
+    address: 'Cra. 1 # 5-40, Bocagrande',
+    city: 'Cartagena de Indias'
+  } as Branch,
+  {
+    id: 'b-getsemani',
+    name: 'Casona Colonial Getsemaní',
+    slug: 'getsemani',
+    zone: 'Getsemaní · Histórico',
+    tagline: 'Auténtico encanto colonial del siglo XVIII con patio andaluz y piscina privada.',
+    vibe: ['romantico', 'aventura'],
+    mainImage: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
+    address: 'Calle de la Sierpe # 29-11',
+    city: 'Cartagena de Indias'
+  } as Branch,
+  {
+    id: 'b-centro',
+    name: 'Palacio Imperial San Diego',
+    slug: 'centro-historico',
+    zone: 'Ciudad Amurallada',
+    tagline: 'Exclusividad amurallada entre plazas coloniales y restaurantes de alta cocina.',
+    vibe: ['relax', 'romantico'],
+    mainImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+    address: 'Calle del Curato # 38-99',
+    city: 'Cartagena de Indias'
+  } as Branch,
+  {
+    id: 'b-boquilla',
+    name: 'Reserva Manglares & Sol',
+    slug: 'la-boquilla',
+    zone: 'La Boquilla · Privacidad',
+    tagline: 'Desconexión total, brisa marina y villas exclusivas frente al horizonte caribeño.',
+    vibe: ['relax', 'aventura'],
+    mainImage: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800',
+    address: 'Anillo Vial Km 7',
+    city: 'Cartagena de Indias'
+  } as Branch
+];
+
+@Component({
+  selector: 'app-branch-selector',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    <section id="location" class="branches-section">
+      <div class="container">
+        <div class="section-title">
+          <p class="subtitle">NUESTRAS UBICACIONES EXCLUSIVAS</p>
+          <h2>Elige tu Palacio en Cartagena</h2>
+        </div>
+
+        <div class="branches-grid">
+          <div 
+            *ngFor="let branch of branches" 
+            class="branch-card"
+            role="button"
+            tabindex="0"
+            [attr.aria-pressed]="activeSlug === branch.slug"
+            [class.active]="activeSlug === branch.slug"
+            (click)="selectBranch(branch.slug)"
+            (keydown.enter)="selectBranch(branch.slug)"
+            (keydown.space)="selectBranch(branch.slug); $event.preventDefault()"
+          >
+            <div class="branch-image-wrapper">
+              <img [src]="branch.mainImage || getFallbackImage(branch.slug)" (error)="onImageError($event, branch.slug)" [alt]="branch.name" loading="lazy" decoding="async" />
+              <div class="branch-overlay"></div>
+              <span class="branch-badge">{{ branch.zone }}</span>
+            </div>
+            <div class="branch-content">
+              <h3>{{ branch.name }}</h3>
+              <p class="branch-tagline">{{ branch.tagline }}</p>
+              <div class="branch-vibes">
+                <span *ngFor="let v of branch.vibe" class="vibe-tag">#{{ v }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  `,
+  styles: [`
+    .branches-section {
+      padding: 4rem 1.5rem;
+      background: #0d0d0d;
+      border-bottom: 1px solid rgba(201, 169, 110, 0.15);
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .section-title {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    .subtitle {
+      color: var(--gold);
+      letter-spacing: 0.28em;
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .section-title h2 {
+      color: var(--cream);
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      font-weight: 300;
+      font-family: var(--font-title);
+    }
+    .branches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+    }
+    .branch-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .branch-card:hover, .branch-card.active {
+      border-color: #d4af37;
+      transform: translateY(-4px);
+      box-shadow: 0 10px 30px rgba(212, 175, 55, 0.15);
+    }
+    .branch-image-wrapper {
+      height: 180px;
+      position: relative;
+      overflow: hidden;
+    }
+    .branch-image-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s ease;
+    }
+    .branch-card:hover .branch-image-wrapper img {
+      transform: scale(1.08);
+    }
+    .branch-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 40%, rgba(13,13,13,0.8) 100%);
+    }
+    .branch-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(13, 13, 13, 0.8);
+      color: #d4af37;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid rgba(212, 175, 55, 0.3);
+    }
+    .branch-content {
+      padding: 1.25rem;
+    }
+    .branch-content h3 {
+      color: #ffffff;
+      font-size: 1.15rem;
+      margin: 0 0 6px 0;
+    }
+    .branch-tagline {
+      color: #aaaaaa;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      margin-bottom: 1rem;
+    }
+    .branch-vibes {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .vibe-tag {
+      color: #d4af37;
+      font-size: 0.75rem;
+      background: rgba(212, 175, 55, 0.08);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+  `]
+})
+export class BranchSelectorComponent implements OnInit {
+  private searchState = inject(SearchStateService);
+  branches: Branch[] = [];
+
+  @Output() branchSelected = new EventEmitter<string>();
+
+  constructor(private api: ApiService) {}
+
+  get activeSlug(): string {
+    return this.searchState.filters().branchSlug;
+  }
+
+  ngOnInit(): void {
+    this.api.get<any>('/branches').subscribe({
+      next: (res) => {
+        const list: Branch[] = res.data || res || [];
+        const filtered = list.filter(b => {
+          const n = (b?.name || '').trim();
+          const s = (b?.slug || '').trim();
+          return n.length > 2 && s.length > 2;
+        });
+        this.branches = filtered.length > 0 ? filtered : LUXURY_DEFAULT_BRANCHES;
+      },
+      error: () => {
+        this.branches = LUXURY_DEFAULT_BRANCHES;
+      }
+    });
+  }
+
+  onImageError(event: Event, slug: string): void {
+    const img = event.target as HTMLImageElement;
+    if (img && !img.dataset['fallbackApplied']) {
+      img.dataset['fallbackApplied'] = 'true';
+      img.src = this.getFallbackImage(slug);
+    }
+  }
+
+  selectBranch(slug: string): void {
+    const next = this.activeSlug === slug ? '' : slug;
+    this.searchState.updateBranch(next);
+    this.branchSelected.emit(next);
+    document.querySelector('#habitaciones')?.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  getFallbackImage(slug: string): string {
+    const images: Record<string, string> = {
+      'centro-historico': 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+      'getsemani': 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
+      'bocagrande': 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800',
+      'la-boquilla': 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'
+    };
+    return images[slug] || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800';
+  }
+}
