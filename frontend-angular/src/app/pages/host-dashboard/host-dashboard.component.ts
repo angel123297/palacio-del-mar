@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { BookingStreamService } from '../../services/booking-stream.service';
 import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property, WebhookSubscription, WebhookDelivery, ApiKeyItem } from '../../models/types';
 import { environment } from '../../../environments/environment';
 
@@ -1155,6 +1156,7 @@ export class HostDashboardComponent implements OnInit {
   api = inject(ApiService);
   auth = inject(AuthService);
   router = inject(Router);
+  bookingStream = inject(BookingStreamService);
 
   constructor() {
     effect(() => {
@@ -1445,6 +1447,24 @@ export class HostDashboardComponent implements OnInit {
     this.fetchDemoFailureStatus();
     this.fetchApiKeys();
     this.fetchHostReviews();
+
+    // Actualización en tiempo real vía SSE sin necesidad de recargar la página
+    this.bookingStream.getBookingUpdates().subscribe({
+      next: (updatedBooking) => {
+        if (!updatedBooking) return;
+        const bId = updatedBooking.id || (updatedBooking as any)._id;
+        this.bookings.update(list => {
+          const idx = list.findIndex(b => (b.id || (b as any)._id) === bId);
+          if (idx >= 0) {
+            const copy = [...list];
+            copy[idx] = { ...copy[idx], ...updatedBooking };
+            return copy;
+          }
+          return [updatedBooking, ...list];
+        });
+        this.fetchMetrics();
+      }
+    });
   }
 
   fetchApiKeys() {

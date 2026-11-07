@@ -6,6 +6,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/booking_stream_client.dart';
+import '../../core/config/api_config.dart';
+import '../../screens/payment/payment_screen.dart';
 import 'dart:async';
 
 class DigitalKeyView extends StatefulWidget {
@@ -617,6 +619,63 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                                     child: Text(
                                       'Incluye ${foodOrders.length} platillos ordenados',
                                       style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
+                          if (status == 'PENDING' || status == 'PENDIENTE') ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.gold.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppTheme.gold),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.payment, color: AppTheme.gold, size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Pendiente de pago: \$ ${totalPrice ?? "250000"} COP',
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 42,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.gold,
+                                        foregroundColor: Colors.black,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                      ),
+                                      icon: const Icon(Icons.credit_card, size: 18),
+                                      label: const Text('PAGAR RESERVA AHORA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1)),
+                                      onPressed: () async {
+                                        final auth = context.read<AuthProvider>();
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => PaymentScreen(
+                                              booking: Map<String, dynamic>.from(bookingMap),
+                                              token: auth.token ?? '',
+                                              baseUrl: ApiConfig.baseUrl,
+                                            ),
+                                          ),
+                                        );
+                                        _loadBookings();
+                                      },
                                     ),
                                   ),
                                 ],

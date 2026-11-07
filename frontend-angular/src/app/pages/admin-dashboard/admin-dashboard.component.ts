@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { BookingStreamService } from '../../services/booking-stream.service';
 import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property } from '../../models/types';
 
 export interface PromotionItem {
@@ -715,6 +716,7 @@ export class AdminDashboardComponent implements OnInit {
   api = inject(ApiService);
   auth = inject(AuthService);
   router = inject(Router);
+  bookingStream = inject(BookingStreamService);
 
   constructor() {
     effect(() => {
@@ -800,6 +802,24 @@ export class AdminDashboardComponent implements OnInit {
     this.fetchPromotions();
     this.fetchProperties();
     this.fetchRefunds();
+
+    // Actualización en tiempo real vía SSE para el panel de administración
+    this.bookingStream.getBookingUpdates().subscribe({
+      next: (updatedBooking) => {
+        if (!updatedBooking) return;
+        const bId = updatedBooking.id || (updatedBooking as any)._id;
+        this.bookings.update(list => {
+          const idx = list.findIndex(b => (b.id || (b as any)._id) === bId);
+          if (idx >= 0) {
+            const copy = [...list];
+            copy[idx] = { ...copy[idx], ...updatedBooking };
+            return copy;
+          }
+          return [updatedBooking, ...list];
+        });
+        this.fetchMetrics();
+      }
+    });
   }
 
   fetchMetrics() {

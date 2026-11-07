@@ -26,8 +26,10 @@ public class BookingSseService {
     private final Map<String, List<SseEmitter>> userEmitters = new ConcurrentHashMap<>();
 
     public SseEmitter subscribe(String userId) {
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
+        return subscribe(userId, new SseEmitter(SSE_TIMEOUT));
+    }
 
+    public SseEmitter subscribe(String userId, SseEmitter emitter) {
         userEmitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
         Runnable cleanup = () -> removeEmitter(userId, emitter);
@@ -47,6 +49,9 @@ public class BookingSseService {
             log.warn("Error enviando handshake SSE a usuario {}: {}", userId, e.getMessage());
             cleanup.run();
         }
+
+        return emitter;
+    }
 
         return emitter;
     }

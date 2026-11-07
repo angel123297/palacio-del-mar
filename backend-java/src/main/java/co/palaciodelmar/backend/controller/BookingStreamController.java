@@ -32,11 +32,22 @@ public class BookingStreamController {
         }
 
         String email = authentication.getName();
-        String userId = userRepository.findByEmail(email)
-                .map(User::getId)
-                .orElse(email);
+        User user = userRepository.findByEmail(email).orElse(null);
+        String userId = user != null ? user.getId() : email;
 
         log.info("Usuario {} ({}) suscrito a canal SSE de reservas", email, userId);
-        return bookingSseService.subscribe(userId);
+        SseEmitter emitter = bookingSseService.subscribe(userId);
+        
+        // Si el usuario es ADMIN o HOST, suscribir también al canal broadcast de gestión
+        if (user != null && user.getRole() != null) {
+            String roleLower = user.getRole().toLowerCase();
+            if ("admin".equals(roleLower)) {
+                bookingSseService.subscribe("admin", emitter);
+            } else if ("host".equals(roleLower)) {
+                bookingSseService.subscribe("host", emitter);
+            }
+        }
+
+        return emitter;
     }
 }
