@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../payment/payment_screen.dart';
 
 class BookingStepperScreen extends StatefulWidget {
   final String suiteId;
@@ -94,7 +95,16 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final booking = jsonDecode(response.body);
-        Navigator.pushReplacementNamed(context, '/payment', arguments: booking);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PaymentScreen(
+              booking: booking is Map<String, dynamic> ? booking : {'id': booking.toString()},
+              token: widget.token,
+              baseUrl: widget.baseUrl,
+            ),
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al crear reserva: ${response.body}')),

@@ -9,11 +9,14 @@ class AuthProvider extends ChangeNotifier {
   String? _currentUserName;
   String? _currentUserId;
 
+  String? _token;
+
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   String? get currentUserEmail => _currentUserEmail;
   String? get currentUserName => _currentUserName;
   String? get currentUserId => _currentUserId;
+  String? get token => _token;
 
   String get displayName {
     if (_currentUserName != null && _currentUserName!.trim().isNotEmpty) {
@@ -27,6 +30,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> checkAuthStatus() async {
     final token = await SecureStorage.getToken();
+    _token = token;
     _isAuthenticated = token != null;
     if (_isAuthenticated) {
       await fetchUserProfile();
@@ -59,6 +63,7 @@ class AuthProvider extends ChangeNotifier {
     if (res['success'] == true) {
       _isAuthenticated = true;
       _currentUserEmail = email.trim().toLowerCase();
+      _token = await SecureStorage.getToken();
       final data = res['data'];
       final user = data?['user'] ?? data?['data']?['user'];
       if (user is Map) {
@@ -83,6 +88,7 @@ class AuthProvider extends ChangeNotifier {
     if (res['success'] == true) {
       if (res['data']?['token'] != null) {
         _isAuthenticated = true;
+        _token = await SecureStorage.getToken();
         _currentUserEmail = email.trim().toLowerCase();
         _currentUserName = name.trim();
         await fetchUserProfile();
@@ -98,6 +104,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     await ApiService.logout();
+    _token = null;
     _isAuthenticated = false;
     _currentUserEmail = null;
     _currentUserName = null;
