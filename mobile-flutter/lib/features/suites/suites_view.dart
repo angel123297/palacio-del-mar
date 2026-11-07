@@ -132,6 +132,8 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
           ? s['mainImage'].toString().trim()
           : null;
 
+      final isSuiteAvailable = s['available'] != false && s['active'] != false;
+
       mapped.add({
         'id': id.toString(),
         'title': name.toString(),
@@ -141,6 +143,7 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
         'price': priceStr,
         'image': mainImage,
         'amenities': amenitiesList,
+        'isAvailable': isSuiteAvailable,
       });
     }
 
@@ -416,7 +419,8 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
     return SuiteZoneFilter.filterSuites(
       suites: _catalogSuites,
       selectedZone: _selectedZone,
-      availableSuiteIds: _availableSuiteIds,
+      // No ocultamos las suites ocupadas si no hay filtro de fechas; las mostramos con su estado de disponibilidad real
+      availableSuiteIds: null,
     );
   }
 
@@ -637,6 +641,10 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
                 if (zone != null && zone.toString().isNotEmpty) zone.toString(),
               ].join(' • ');
 
+              final suiteId = suite['id']?.toString();
+              final isOccupiedByDate = _availableSuiteIds != null && suiteId != null && !_availableSuiteIds!.contains(suiteId);
+              final isAvailable = suite['isAvailable'] == true && !isOccupiedByDate;
+
               return Container(
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
@@ -679,14 +687,54 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
                             ),
                             const SizedBox(height: 4),
                           ],
-                          Text(
-                            suite['title'],
-                            style: const TextStyle(
-                              fontFamily: 'serif',
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  suite['title'],
+                                  style: const TextStyle(
+                                    fontFamily: 'serif',
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isAvailable ? const Color(0xFF2ECC71).withValues(alpha: 0.15) : Colors.redAccent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: isAvailable ? const Color(0xFF2ECC71) : Colors.redAccent,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: isAvailable ? const Color(0xFF2ECC71) : Colors.redAccent,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isAvailable ? 'DISPONIBLE' : 'NO DISPONIBLE / OCUPADA',
+                                      style: TextStyle(
+                                        color: isAvailable ? const Color(0xFF2ECC71) : Colors.redAccent,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                           if (amenities.isNotEmpty) ...[
                             const SizedBox(height: 10),
@@ -719,12 +767,12 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
                               ),
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  foregroundColor: AppTheme.gold,
-                                  side: const BorderSide(color: AppTheme.gold),
+                                  backgroundColor: isAvailable ? Colors.transparent : Colors.grey.withValues(alpha: 0.1),
+                                  foregroundColor: isAvailable ? AppTheme.gold : Colors.white38,
+                                  side: BorderSide(color: isAvailable ? AppTheme.gold : Colors.white24),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                                 ),
-                                onPressed: () {
+                                onPressed: !isAvailable ? null : () {
                                   final auth = context.read<AuthProvider>();
                                   if (!auth.isAuthenticated) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -757,7 +805,7 @@ class _SuitesCatalogViewState extends State<SuitesCatalogView> {
                                     ),
                                   );
                                 },
-                                child: const Text('RESERVAR', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                child: Text(isAvailable ? 'RESERVAR' : 'AGOTADA', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               ),
                             ],
                           ),
