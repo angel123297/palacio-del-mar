@@ -8,6 +8,7 @@ import '../../core/services/api_service.dart';
 import '../../core/services/booking_stream_client.dart';
 import '../../core/config/api_config.dart';
 import '../../screens/payment/payment_screen.dart';
+import '../../screens/auth/email_verification_screen.dart';
 import 'dart:async';
 
 class DigitalKeyView extends StatefulWidget {
@@ -21,6 +22,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _isRegister = false;
@@ -94,25 +96,37 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text.trim();
     final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
 
     final authProvider = context.read<AuthProvider>();
 
     if (_isRegister) {
-      final res = await authProvider.register(name, email, password);
+      final res = await authProvider.register(name, email, password, phone: phone);
       if (!mounted) return;
 
       if (res['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res['message'] ?? 'Revisa tu correo para verificar tu cuenta antes de iniciar sesión'),
-            backgroundColor: AppTheme.gold,
-            behavior: SnackBarBehavior.floating,
+        // Abrir la pantalla de verificación de correo exactamente igual que la web
+        final verified = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EmailVerificationScreen(
+              email: email,
+              onVerified: () {
+                _loadBookings();
+              },
+            ),
           ),
         );
-        setState(() {
-          _isRegister = false;
-          _passwordController.clear();
-        });
+
+        if (!mounted) return;
+        if (verified == true) {
+          _loadBookings();
+        } else {
+          setState(() {
+            _isRegister = false;
+            _passwordController.clear();
+          });
+        }
       } else {
         final errorMsg = res['statusCode'] == 409
             ? (res['message'] ?? 'El correo ya está registrado')
@@ -132,14 +146,27 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
       if (res['success'] == true) {
         _loadBookings();
       } else {
-        final errorMsg = res['message'] ?? 'Credenciales incorrectas o error de conexión';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final errorMsg = (res['message'] ?? '').toString();
+        // Si el usuario no ha verificado su correo, abrir la pantalla de verificación
+        if (errorMsg.toLowerCase().contains('verificar tu correo') || errorMsg.toLowerCase().contains('verificación')) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EmailVerificationScreen(
+                email: email,
+                onVerified: () => _loadBookings(),
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMsg.isNotEmpty ? errorMsg : 'Credenciales incorrectas o error de conexión'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     }
   }
@@ -856,6 +883,23 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
                         return 'Ingresa tu nombre';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Teléfono de Contacto',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.phone_outlined, color: AppTheme.gold),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Ingresa tu teléfono';
                       }
                       return null;
                     },
