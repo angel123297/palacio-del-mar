@@ -593,11 +593,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
             if (_selectedMethod == 'PSE') _buildPseForm(amount, isExpired),
             if (_selectedMethod == 'NEQUI') _buildNequiForm(amount, isExpired),
 
-            const SizedBox(height: 20),
-
-            // Tarjetas de Prueba (Pasarela Simulada) - Exacto a la Imagen 3
-            _buildTestCardsGuide(),
-
             const SizedBox(height: 24),
           ],
         ),
