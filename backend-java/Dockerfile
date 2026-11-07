@@ -2,7 +2,8 @@
 FROM maven:3.9-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 COPY pom.xml .
-RUN mvn dependency:go-offline -B || true
+# Configurar reintentos en Maven para descargas resilientes ante fluctuaciones de red
+RUN mvn dependency:go-offline -B -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.requestSentRetryEnabled=true || true
 COPY src ./src
 RUN mvn clean package -DskipTests
 

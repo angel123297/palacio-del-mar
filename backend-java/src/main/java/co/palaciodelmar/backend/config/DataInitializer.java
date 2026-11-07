@@ -2,7 +2,8 @@ package co.palaciodelmar.backend.config;
 
 import co.palaciodelmar.backend.model.*;
 import co.palaciodelmar.backend.repository.*;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -12,7 +13,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
+@Slf4j
 public class DataInitializer implements CommandLineRunner {
 
     private final BranchRepository branchRepository;
@@ -20,13 +21,32 @@ public class DataInitializer implements CommandLineRunner {
     private final ExperienceRepository experienceRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
-    private final PaymentRepository paymentRepository;
-    private final SuiteNightRepository suiteNightRepository;
     private final PropertyRepository propertyRepository;
     private final PasswordEncoder passwordEncoder;
+    private final String adminPassword;
+    private final boolean seedDemoData;
 
-    @org.springframework.beans.factory.annotation.Value("${admin.default.password:Admin123456!}")
-    private String adminPassword;
+    public DataInitializer(
+            BranchRepository branchRepository,
+            SuiteRepository suiteRepository,
+            ExperienceRepository experienceRepository,
+            UserRepository userRepository,
+            BookingRepository bookingRepository,
+            PropertyRepository propertyRepository,
+            PasswordEncoder passwordEncoder,
+            @Value("${admin.default.password:Admin123456!}") String adminPassword,
+            @Value("${app.seed-demo-data:false}") boolean seedDemoData
+    ) {
+        this.branchRepository = branchRepository;
+        this.suiteRepository = suiteRepository;
+        this.experienceRepository = experienceRepository;
+        this.userRepository = userRepository;
+        this.bookingRepository = bookingRepository;
+        this.propertyRepository = propertyRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.adminPassword = adminPassword;
+        this.seedDemoData = seedDemoData;
+    }
 
     @Override
     public void run(String... args) {
@@ -579,50 +599,60 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         if (userRepository.findByEmail("admin@palaciodelmar.co").isEmpty()) {
-            User admin = User.builder()
-                    .name("Admin")
-                    .lastName("Palacio")
-                    .email("admin@palaciodelmar.co")
-                    .password(passwordEncoder.encode(adminPassword))
-                    .role("admin")
-                    .status("active")
-                    .emailVerified(true)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
-            userRepository.save(admin);
+            boolean isDefaultInsecurePassword = "Admin123456!".equals(adminPassword);
+            if (seedDemoData || (!isDefaultInsecurePassword && adminPassword != null && !adminPassword.isBlank())) {
+                User admin = User.builder()
+                        .name("Admin")
+                        .lastName("Palacio")
+                        .email("admin@palaciodelmar.co")
+                        .password(passwordEncoder.encode(adminPassword))
+                        .role("admin")
+                        .status("active")
+                        .emailVerified(true)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                userRepository.save(admin);
+                log.info("Usuario administrador inicializado exitosamente: admin@palaciodelmar.co");
+            } else {
+                log.warn("Omitiendo creación de admin semilla: app.seed-demo-data=false y admin.default.password no fue configurado con una contraseña personalizada segura.");
+            }
         }
 
-        if (userRepository.findByEmail("anfitrion@palaciodelmar.co").isEmpty()) {
-            List<String> branchIds = branchRepository.findAll().stream().map(Branch::getId).toList();
-            User host = User.builder()
-                    .name("Anfitrión")
-                    .lastName("Palacio")
-                    .email("anfitrion@palaciodelmar.co")
-                    .password(passwordEncoder.encode("Host123456!"))
-                    .role("host")
-                    .status("active")
-                    .branches(branchIds)
-                    .emailVerified(true)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
-            userRepository.save(host);
-        }
+        if (seedDemoData) {
+            if (userRepository.findByEmail("anfitrion@palaciodelmar.co").isEmpty()) {
+                List<String> branchIds = branchRepository.findAll().stream().map(Branch::getId).toList();
+                User host = User.builder()
+                        .name("Anfitrión")
+                        .lastName("Palacio")
+                        .email("anfitrion@palaciodelmar.co")
+                        .password(passwordEncoder.encode("Host123456!"))
+                        .role("host")
+                        .status("active")
+                        .branches(branchIds)
+                        .emailVerified(true)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                userRepository.save(host);
+                log.info("Usuario anfitrión semilla inicializado: anfitrion@palaciodelmar.co");
+            }
 
-        if (userRepository.findByEmail("huesped@palaciodelmar.co").isEmpty()) {
-            User guest = User.builder()
-                    .name("Huésped")
-                    .lastName("Verificado")
-                    .email("huesped@palaciodelmar.co")
-                    .password(passwordEncoder.encode("User123456!"))
-                    .role("user")
-                    .status("active")
-                    .emailVerified(true)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
-            userRepository.save(guest);
+            if (userRepository.findByEmail("huesped@palaciodelmar.co").isEmpty()) {
+                User guest = User.builder()
+                        .name("Huésped")
+                        .lastName("Verificado")
+                        .email("huesped@palaciodelmar.co")
+                        .password(passwordEncoder.encode("User123456!"))
+                        .role("user")
+                        .status("active")
+                        .emailVerified(true)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                userRepository.save(guest);
+                log.info("Usuario huésped semilla inicializado: huesped@palaciodelmar.co");
+            }
         }
 
         // Migración/Seed de Sedes a Propiedades en el Marketplace
@@ -657,6 +687,78 @@ public class DataInitializer implements CommandLineRunner {
                         suiteRepository.save(s);
                     }
                 }
+            }
+        }
+
+        if (bookingRepository.findById("bk-adm-01").isEmpty() && bookingRepository.findByBookingCode("BK-2026-001").isEmpty()) {
+            User guestUser = userRepository.findByEmail("huesped@palaciodelmar.co").orElse(null);
+            Suite suite1 = suiteRepository.findBySlug("penthouse-bocagrande").orElse(null);
+            if (suite1 == null) {
+                suite1 = suiteRepository.findAll().stream().findFirst().orElse(null);
+            }
+
+            if (guestUser != null && suite1 != null) {
+                Booking sampleBooking1 = Booking.builder()
+                        .id("bk-adm-01")
+                        .bookingCode("BK-2026-001")
+                        .user(guestUser.getId())
+                        .suite(suite1.getId())
+                        .propertyId(suite1.getPropertyId())
+                        .branch(suite1.getBranch())
+                        .checkIn(java.time.LocalDate.now().plusDays(2))
+                        .checkOut(java.time.LocalDate.now().plusDays(5))
+                        .nights(3)
+                        .guests(2)
+                        .totalPrice(new BigDecimal("2550000"))
+                        .paidAmount(new BigDecimal("2550000"))
+                        .status("confirmed")
+                        .paymentStatus("paid")
+                        .smartLockPin("849201")
+                        .guestDetails(Booking.GuestDetails.builder()
+                                .fullName("Valentina Restrepo")
+                                .email("valentina.r@ejemplo.co")
+                                .phone("+57 300 123 4567")
+                                .build())
+                        .createdAt(Instant.now().minusSeconds(86400))
+                        .updatedAt(Instant.now().minusSeconds(86400))
+                        .build();
+                bookingRepository.save(sampleBooking1);
+            }
+        }
+
+        if (bookingRepository.findById("bk-adm-02").isEmpty() && bookingRepository.findByBookingCode("BK-2026-002").isEmpty()) {
+            User guestUser = userRepository.findByEmail("huesped@palaciodelmar.co").orElse(null);
+            Suite suite2 = suiteRepository.findBySlug("suite-presidencial-mar").orElse(null);
+            if (suite2 == null) {
+                suite2 = suiteRepository.findAll().stream().findFirst().orElse(null);
+            }
+
+            if (guestUser != null && suite2 != null) {
+                Booking sampleBooking2 = Booking.builder()
+                        .id("bk-adm-02")
+                        .bookingCode("BK-2026-002")
+                        .user(guestUser.getId())
+                        .suite(suite2.getId())
+                        .propertyId(suite2.getPropertyId())
+                        .branch(suite2.getBranch())
+                        .checkIn(java.time.LocalDate.now().plusDays(4))
+                        .checkOut(java.time.LocalDate.now().plusDays(8))
+                        .nights(4)
+                        .guests(2)
+                        .totalPrice(new BigDecimal("1890000"))
+                        .paidAmount(BigDecimal.ZERO)
+                        .status("pending")
+                        .paymentStatus("pending")
+                        .expiresAt(Instant.now().plus(java.time.Duration.ofDays(2)))
+                        .guestDetails(Booking.GuestDetails.builder()
+                                .fullName("Carlos Mario Mendoza")
+                                .email("carlos.m@ejemplo.com")
+                                .phone("+57 311 987 6543")
+                                .build())
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+                bookingRepository.save(sampleBooking2);
             }
         }
     }

@@ -13,6 +13,7 @@ import co.palaciodelmar.backend.repository.WebhookDeliveryRepository;
 import co.palaciodelmar.backend.repository.WebhookSubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -20,13 +21,37 @@ import java.util.*;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class HostWebhookService {
 
     private final WebhookSubscriptionRepository subscriptionRepository;
     private final WebhookDeliveryRepository deliveryRepository;
     private final PropertyRepository propertyRepository;
     private final WebhookDispatcher webhookDispatcher;
+    private final SsrfProtectionValidator ssrfProtectionValidator;
+
+    @Autowired
+    public HostWebhookService(
+            WebhookSubscriptionRepository subscriptionRepository,
+            WebhookDeliveryRepository deliveryRepository,
+            PropertyRepository propertyRepository,
+            WebhookDispatcher webhookDispatcher,
+            @Autowired(required = false) SsrfProtectionValidator ssrfProtectionValidator
+    ) {
+        this.subscriptionRepository = subscriptionRepository;
+        this.deliveryRepository = deliveryRepository;
+        this.propertyRepository = propertyRepository;
+        this.webhookDispatcher = webhookDispatcher;
+        this.ssrfProtectionValidator = ssrfProtectionValidator != null ? ssrfProtectionValidator : new SsrfProtectionValidator();
+    }
+
+    public HostWebhookService(
+            WebhookSubscriptionRepository subscriptionRepository,
+            WebhookDeliveryRepository deliveryRepository,
+            PropertyRepository propertyRepository,
+            WebhookDispatcher webhookDispatcher
+    ) {
+        this(subscriptionRepository, deliveryRepository, propertyRepository, webhookDispatcher, new SsrfProtectionValidator());
+    }
 
     public List<WebhookSubscriptionDTO> getSubscriptions(User currentUser, String propertyId) {
         if (propertyId != null && !propertyId.isBlank()) {
@@ -99,36 +124,7 @@ public class HostWebhookService {
     }
 
     private String validateWebhookUrl(String rawUrl) {
-        if (rawUrl == null || rawUrl.isBlank()) {
-            throw new IllegalArgumentException("La URL del webhook es obligatoria");
-        }
-        String trimmed = rawUrl.trim();
-        java.net.URI uri;
-        try {
-            uri = java.net.URI.create(trimmed);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Formato de URL de webhook inválido");
-        }
-        String scheme = uri.getScheme() != null ? uri.getScheme().toLowerCase() : "";
-        if (!"http".equals(scheme) && !"https".equals(scheme)) {
-            throw new IllegalArgumentException("La URL del webhook debe usar protocolo http o https");
-        }
-        String host = uri.getHost() != null ? uri.getHost().toLowerCase() : "";
-        if (host.isBlank()) {
-            throw new IllegalArgumentException("La URL del webhook debe incluir un host válido");
-        }
-        Set<String> forbiddenHosts = Set.of(
-                "169.254.169.254", "metadata.google.internal", "0.0.0.0",
-                "mongo", "palacio-mongo", "redis", "palacio-redis", "mailpit", "palacio-mailpit"
-        );
-        if (forbiddenHosts.contains(host)) {
-            throw new IllegalArgumentException("URL de webhook no permitida: apunta a un servicio interno restringido");
-        }
-        int port = uri.getPort();
-        if (port == 27017 || port == 6379 || port == 1025) {
-            throw new IllegalArgumentException("Puerto de destino no permitido para webhooks");
-        }
-        return trimmed;
+        return ssrfProtectionValidator.validateUrl(rawUrl);
     }
 
     public void deleteSubscription(User currentUser, String subscriptionId) {

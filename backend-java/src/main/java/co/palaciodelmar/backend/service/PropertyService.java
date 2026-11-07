@@ -21,12 +21,42 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PropertyService {
 
     private final PropertyRepository propertyRepository;
     private final SuiteRepository suiteRepository;
+
+    @Autowired(required = false)
+    private EmailService emailService;
+
+    @Autowired(required = false)
+    private AvailabilityCacheEvictor availabilityCacheEvictor;
+
+    @Autowired(required = false)
+    private GeoSearchService geoSearchService;
+
+    public void setEmailService(EmailService emailService) {
+        this.emailService = emailService;
+    }
+
+    private void syncCachesAndGeo() {
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
+        if (geoSearchService != null) {
+            try {
+                geoSearchService.refreshCatalogIndex();
+            } catch (Exception e) {
+                log.debug("No se pudo refrescar índice geo tras mutación de propiedad: {}", e.getMessage());
+            }
+        }
+    }
 
     private static final Pattern NONLATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]");
@@ -59,6 +89,7 @@ public class PropertyService {
                 .build();
 
         Property saved = propertyRepository.save(property);
+        syncCachesAndGeo();
         return toDTO(saved);
     }
 
@@ -93,6 +124,11 @@ public class PropertyService {
     /**
      * Actualiza una propiedad del anfitrión autenticado (Anti-IDOR).
      */
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public PropertyDTO updateProperty(String propertyId, String ownerId, PropertyRequest req, boolean isAdmin) {
         Property property = getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
 
@@ -128,7 +164,9 @@ public class PropertyService {
         }
         property.setUpdatedAt(Instant.now());
 
-        return toDTO(propertyRepository.save(property));
+        Property saved = propertyRepository.save(property);
+        syncCachesAndGeo();
+        return toDTO(saved);
     }
 
     /**
@@ -144,7 +182,16 @@ public class PropertyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Propiedad no encontrada"));
         property.setStatus(status.toUpperCase());
         property.setUpdatedAt(Instant.now());
-        return toDTO(propertyRepository.save(property));
+        Property saved = propertyRepository.save(property);
+        syncCachesAndGeo();
+        if (emailService != null) {
+            try {
+                emailService.sendPropertyStatusNotification(saved, status);
+            } catch (Exception e) {
+                log.warn("Error al enviar notificación de estado para propiedad {}: {}", propertyId, e.getMessage());
+            }
+        }
+        return toDTO(saved);
     }
 
     public List<PropertyDTO> getAllPropertiesForAdmin(String status) {
@@ -198,10 +245,21 @@ public class PropertyService {
         return suiteRepository.findByPropertyIdAndActiveTrue(propertyId);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public Suite createSuiteForProperty(String propertyId, String ownerId, HostSuiteRequest req, boolean isAdmin) {
         Property property = getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
 
         String suiteSlug = ensureUniqueSuiteSlug(toSlug(property.getName() + " " + req.getName()));
+
+        String mainImage = (req.getMainImage() != null && !req.getMainImage().isBlank())
+                ? req.getMainImage().trim()
+                : (property.getMainImage() != null && !property.getMainImage().isBlank()
+                    ? property.getMainImage()
+                    : "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800");
 
         Suite suite = Suite.builder()
                 .propertyId(property.getId())
@@ -214,7 +272,7 @@ public class PropertyService {
                 .shortDescription(req.getShortDescription())
                 .basePrice(req.getBasePrice())
                 .originalPrice(req.getOriginalPrice() != null ? req.getOriginalPrice() : req.getBasePrice())
-                .mainImage(req.getMainImage() != null ? req.getMainImage() : property.getMainImage())
+                .mainImage(mainImage)
                 .images(req.getImages() != null ? req.getImages() : List.of())
                 .maxGuests(req.getMaxGuests() != null ? req.getMaxGuests() : 2)
                 .maxOccupancy(req.getMaxGuests() != null ? req.getMaxGuests() : 2)
@@ -228,9 +286,18 @@ public class PropertyService {
                 .updatedAt(Instant.now())
                 .build();
 
-        return suiteRepository.save(suite);
+        Suite saved = suiteRepository.save(suite);
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
+        return saved;
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public Suite updateSuiteForProperty(String propertyId, String suiteId, String ownerId, HostSuiteRequest req, boolean isAdmin) {
         getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
 
@@ -247,7 +314,7 @@ public class PropertyService {
         if (req.getShortDescription() != null) suite.setShortDescription(req.getShortDescription());
         if (req.getBasePrice() != null) suite.setBasePrice(req.getBasePrice());
         if (req.getOriginalPrice() != null) suite.setOriginalPrice(req.getOriginalPrice());
-        if (req.getMainImage() != null) suite.setMainImage(req.getMainImage());
+        if (req.getMainImage() != null && !req.getMainImage().isBlank()) suite.setMainImage(req.getMainImage().trim());
         if (req.getImages() != null) suite.setImages(req.getImages());
         if (req.getMaxGuests() != null) {
             suite.setMaxGuests(req.getMaxGuests());
@@ -262,9 +329,18 @@ public class PropertyService {
         if (req.getActive() != null) suite.setActive(req.getActive());
         suite.setUpdatedAt(Instant.now());
 
-        return suiteRepository.save(suite);
+        Suite saved = suiteRepository.save(suite);
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
+        return saved;
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
     public void deleteSuiteForProperty(String propertyId, String suiteId, String ownerId, boolean isAdmin) {
         getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
 
@@ -279,6 +355,9 @@ public class PropertyService {
         suite.setAvailable(false);
         suite.setUpdatedAt(Instant.now());
         suiteRepository.save(suite);
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
     }
 
     // --- Helpers y Mappers ---
@@ -305,6 +384,7 @@ public class PropertyService {
                 .phone(p.getPhone())
                 .active(p.getActive())
                 .suitesCount(count)
+                .icalUrl(p.getId() != null ? "/api/properties/" + p.getId() + "/calendar.ics" : null)
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
                 .build();

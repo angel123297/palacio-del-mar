@@ -6,10 +6,13 @@ import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
@@ -54,13 +57,18 @@ public class DynamicPricingService {
         this.clock = clock;
     }
 
-    public record Adjustment(LocalDate date, BigDecimal factor, String reason, int occupancyPercent) {}
+    public record Adjustment(LocalDate date, BigDecimal factor, String reason, int occupancyPercent) implements Serializable {}
 
     /**
      * Calcula los ajustes de la estancia [checkIn, checkOut). Solo devuelve noches con factor distinto de 1.
      *
      * @param excludeBookingId reserva a ignorar al medir la ocupación (al modificar una reserva existente).
      */
+    @Cacheable(
+            value = "dynamic_pricing",
+            key = "(#suite != null ? #suite.id : 'null') + ':' + #checkIn + ':' + #checkOut + ':' + (#excludeBookingId != null ? #excludeBookingId : 'none')",
+            condition = "#suite != null && #suite.id != null && #checkIn != null && #checkOut != null"
+    )
     public Map<LocalDate, Adjustment> adjustmentsFor(Suite suite, LocalDate checkIn, LocalDate checkOut, String excludeBookingId) {
         Map<LocalDate, Adjustment> result = new TreeMap<>();
         if (!enabled || suite == null || checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
@@ -73,14 +81,20 @@ public class DynamicPricingService {
                 .sum();
         if (totalUnits <= 0) return result;
 
+        Instant now = Instant.now(clock);
         LocalDate lastNight = checkOut.minusDays(1);
         Map<LocalDate, Integer> occupied = new HashMap<>();
         for (Suite s : propertySuites) {
-            for (SuiteNight sn : suiteNightRepository.findBySuiteAndDatesBetween(s.getId(), checkIn, lastNight)) {
+            List<SuiteNight> suiteNights = suiteNightRepository.findBySuiteAndDatesBetween(s.getId(), checkIn, lastNight);
+            if (suiteNights == null) continue;
+            for (SuiteNight sn : suiteNights) {
+                if (sn == null) continue;
+                if ("cancelled".equalsIgnoreCase(sn.getStatus())) continue;
+                if (sn.getExpiresAt() != null && !sn.getExpiresAt().isAfter(now)) continue;
                 if (excludeBookingId != null && excludeBookingId.equals(sn.getBooking())) continue;
                 if (sn.getDates() == null) continue;
                 for (LocalDate d : sn.getDates()) {
-                    if (!d.isBefore(checkIn) && !d.isAfter(lastNight)) {
+                    if (d != null && !d.isBefore(checkIn) && !d.isAfter(lastNight)) {
                         occupied.merge(d, 1, Integer::sum);
                     }
                 }

@@ -171,4 +171,59 @@ class ReviewAndMaintenanceAutomationTest {
         assertNotNull(booking.getReviewRequestSentAt());
         verify(bookingRepository, times(1)).save(booking);
     }
+
+    @Test
+    @DisplayName("Anti-Fraude: Anfitrión no puede calificar su propia propiedad")
+    void testHostCannotSelfReviewOwnSuite() {
+        co.palaciodelmar.backend.model.Suite suite = co.palaciodelmar.backend.model.Suite.builder().id("suite-own").propertyId("prop-own").build();
+        when(suiteRepository.findById("suite-own")).thenReturn(Optional.of(suite));
+
+        co.palaciodelmar.backend.model.Property property = co.palaciodelmar.backend.model.Property.builder().id("prop-own").ownerId("host-1").build();
+        when(propertyRepository.findById("prop-own")).thenReturn(Optional.of(property));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                reviewService.addReview("suite-own", "host-1", "Host 1", 5, "Mi propia suite es fantástica")
+        );
+    }
+
+    @Test
+    @DisplayName("Consulta de reseña por reserva: huésped y host de la propiedad tienen acceso autorizado")
+    void testGetReviewByBookingId() {
+        Booking booking = Booking.builder()
+                .id("bk-rev-1")
+                .user("guest-1")
+                .propertyId("prop-1")
+                .build();
+        when(bookingRepository.findById("bk-rev-1")).thenReturn(Optional.of(booking));
+
+        Review review = Review.builder()
+                .id("rev-10")
+                .bookingId("bk-rev-1")
+                .rating(5)
+                .comment("Inmejorable")
+                .build();
+        when(reviewRepository.findByBookingId("bk-rev-1")).thenReturn(Optional.of(review));
+
+        co.palaciodelmar.backend.model.Property property = co.palaciodelmar.backend.model.Property.builder()
+                .id("prop-1")
+                .ownerId("host-1")
+                .build();
+        when(propertyRepository.findById("prop-1")).thenReturn(Optional.of(property));
+
+        // Huésped legítimo
+        co.palaciodelmar.backend.model.User guestUser = co.palaciodelmar.backend.model.User.builder().id("guest-1").role("USER").build();
+        ReviewDTO guestDto = reviewService.getReviewByBookingId("bk-rev-1", guestUser);
+        assertNotNull(guestDto);
+        assertEquals("Inmejorable", guestDto.getComment());
+
+        // Host legítimo
+        co.palaciodelmar.backend.model.User hostUser = co.palaciodelmar.backend.model.User.builder().id("host-1").role("HOST").build();
+        ReviewDTO hostDto = reviewService.getReviewByBookingId("bk-rev-1", hostUser);
+        assertNotNull(hostDto);
+
+        // Host ajeno (IDOR)
+        co.palaciodelmar.backend.model.User otherHost = co.palaciodelmar.backend.model.User.builder().id("host-attacker").role("HOST").build();
+        ReviewDTO otherDto = reviewService.getReviewByBookingId("bk-rev-1", otherHost);
+        assertNull(otherDto);
+    }
 }

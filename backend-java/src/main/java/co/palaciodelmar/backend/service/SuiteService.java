@@ -126,8 +126,13 @@ public class SuiteService {
 
     @Cacheable(value = "suite_detail", key = "#idOrSlug.toLowerCase()")
     public SuiteResponseDTO getSuiteByIdOrSlug(String idOrSlug) {
+        String lower = idOrSlug.trim().toLowerCase();
         Suite suite = suiteRepository.findById(idOrSlug)
-                .or(() -> suiteRepository.findBySlug(idOrSlug.toLowerCase()))
+                .or(() -> suiteRepository.findBySlug(lower))
+                .or(() -> {
+                    String alias = AvailabilityService.SLUG_ALIASES.get(lower);
+                    return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
+                })
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada con identificador: " + idOrSlug));
         if (suite.getPropertyId() != null) {
             Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
@@ -194,8 +199,14 @@ public class SuiteService {
             throw new IllegalArgumentException("Se requieren suiteId, checkIn y checkOut");
         }
 
-        Suite suite = suiteRepository.findById(request.getSuiteId())
-                .or(() -> suiteRepository.findBySlug(request.getSuiteId().toLowerCase()))
+        String rawSuiteId = request.getSuiteId().trim();
+        String lowerSuiteId = rawSuiteId.toLowerCase();
+        Suite suite = suiteRepository.findById(rawSuiteId)
+                .or(() -> suiteRepository.findBySlug(lowerSuiteId))
+                .or(() -> {
+                    String alias = AvailabilityService.SLUG_ALIASES.get(lowerSuiteId);
+                    return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
+                })
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: " + request.getSuiteId()));
 
         if (suite.getPropertyId() != null) {
@@ -232,7 +243,16 @@ public class SuiteService {
             }
         }
 
-        BigDecimal total = result.total().add(experiencesTotal);
+        BigDecimal extraGuestsFee = BigDecimal.ZERO;
+        if (request.getGuests() != null && request.getGuests() > 2) {
+            extraGuestsFee = new BigDecimal("120000")
+                    .multiply(BigDecimal.valueOf(request.getGuests() - 2))
+                    .multiply(BigDecimal.valueOf(nights));
+        }
+
+        BigDecimal roomTotal = result.total();
+        BigDecimal guaranteeDeposit = new BigDecimal("100000");
+        BigDecimal total = roomTotal.add(experiencesTotal).add(extraGuestsFee);
 
         CalculatePriceResponseDTO.DatesInfo datesInfo = CalculatePriceResponseDTO.DatesInfo.builder()
                 .checkIn(request.getCheckIn())
@@ -252,6 +272,9 @@ public class SuiteService {
                 .dates(datesInfo)
                 .nightlyPrice(suite.getBasePrice())
                 .subtotal(subtotal)
+                .roomTotal(roomTotal)
+                .extraGuestsFee(extraGuestsFee)
+                .guaranteeDeposit(guaranteeDeposit)
                 .experiencesTotal(experiencesTotal)
                 .discount(result.discount())
                 .discountReason(result.discount().compareTo(BigDecimal.ZERO) > 0 ? "Promoción / Larga estadía" : null)

@@ -51,6 +51,7 @@ public class SuiteResponseDTO implements Serializable {
     private Boolean available;
     private Boolean featured;
     private Integer order;
+    private String icalUrl;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -87,6 +88,7 @@ public class SuiteResponseDTO implements Serializable {
                 .available(suite.getAvailable())
                 .featured(suite.getFeatured())
                 .order(suite.getOrder())
+                .icalUrl(suite.getId() != null ? "/api/suites/" + suite.getId() + "/calendar.ics" : null)
                 .createdAt(suite.getCreatedAt())
                 .updatedAt(suite.getUpdatedAt())
                 .build();

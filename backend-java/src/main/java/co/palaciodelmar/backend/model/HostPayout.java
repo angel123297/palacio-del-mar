@@ -35,6 +35,7 @@ public class HostPayout {
     @Indexed
     private String ownerId;
 
+    @Indexed
     @Builder.Default
     private List<String> bookingIds = new ArrayList<>();
 
@@ -52,6 +53,14 @@ public class HostPayout {
     private LocalDate periodStart;
 
     private LocalDate periodEnd;
+
+    private String destinationBank;
+
+    private String destinationAccountType;
+
+    private String destinationAccountMasked;
+
+    private String destinationHolder;
 
     @Builder.Default
     private Instant processedAt = Instant.now();

@@ -32,6 +32,7 @@ public class PropertyDTO {
     private String phone;
     private Boolean active;
     private Long suitesCount;
+    private String icalUrl;
     private Instant createdAt;
     private Instant updatedAt;
 }

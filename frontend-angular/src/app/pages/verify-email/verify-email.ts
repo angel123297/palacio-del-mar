@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { CommonModule } from '@angular/common';
 
@@ -8,18 +8,25 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule, RouterLink],
   templateUrl: './verify-email.html',
-  styleUrl: './verify-email.css',
+  styleUrl: './verify-email.scss',
 })
 export class VerifyEmail implements OnInit {
   status = signal<'loading' | 'success' | 'error'>('loading');
   message = signal<string>('Verificando tu correo electrónico...');
+  returnUrl = signal<string>('/');
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private authService: AuthService
   ) {}
 
   ngOnInit() {
+    const rawReturn = this.route.snapshot.queryParamMap.get('returnUrl');
+    if (rawReturn && rawReturn.startsWith('/')) {
+      this.returnUrl.set(rawReturn);
+    }
+
     const token = this.route.snapshot.paramMap.get('token');
     if (!token) {
       this.status.set('error');
@@ -30,7 +37,10 @@ export class VerifyEmail implements OnInit {
     this.authService.verifyEmail(token).subscribe({
       next: (res) => {
         this.status.set('success');
-        this.message.set('Éxito: Tu correo ha sido verificado. Ya puedes disfrutar de la experiencia Palacio del Mar.');
+        this.message.set('¡Tu correo ha sido verificado con éxito! Hemos iniciado tu sesión automáticamente.');
+        setTimeout(() => {
+          this.router.navigateByUrl(this.returnUrl());
+        }, 2000);
       },
       error: (err) => {
         this.status.set('error');

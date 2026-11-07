@@ -392,4 +392,45 @@ class RoleAndIdorSecurityTest {
                 .andExpect(jsonPath("$.data.branch").value("all"))
                 .andExpect(jsonPath("$.data.isSample").value(false));
     }
+
+    @Test
+    @DisplayName("Host iCal Sync: Propietario legítimo obtiene feeds e instrucciones, anfitrión ajeno recibe 404 (Anti-IDOR)")
+    void hostIcalSyncAntiIdorProtection() throws Exception {
+        authenticateUser("host-legit", "legit@palacio.co", "HOST");
+
+        PropertyDTO myProp = PropertyDTO.builder()
+                .id("prop-mine")
+                .name("Villa Privada")
+                .active(true)
+                .build();
+
+        Suite suiteA = Suite.builder()
+                .id("suite-a")
+                .name("Master Suite")
+                .propertyId("prop-mine")
+                .build();
+
+        when(propertyService.getPropertyByOwner("prop-mine", "host-legit", false)).thenReturn(myProp);
+        when(propertyService.getPropertySuitesForHost("prop-mine", "host-legit", false)).thenReturn(List.of(suiteA));
+
+        // 1. Host legítimo accede con éxito
+        hostMockMvc.perform(get("/api/host/properties/prop-mine/sync/ical"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.propertyId").value("prop-mine"))
+                .andExpect(jsonPath("$.data.propertyIcalUrl").value("/api/properties/prop-mine/calendar.ics"))
+                .andExpect(jsonPath("$.data.suiteFeeds[0].suiteId").value("suite-a"))
+                .andExpect(jsonPath("$.data.suiteFeeds[0].icalUrl").value("/api/suites/suite-a/calendar.ics"))
+                .andExpect(jsonPath("$.data.instructions.airbnb").exists())
+                .andExpect(jsonPath("$.data.instructions.booking").exists());
+
+        // 2. Anfitrión ajeno intenta acceder -> 404 No encontrado (Anti-IDOR)
+        authenticateUser("host-attacker", "attacker@palacio.co", "HOST");
+        when(propertyService.getPropertyByOwner("prop-mine", "host-attacker", false))
+                .thenThrow(new ResourceNotFoundException("Propiedad no encontrada"));
+
+        hostMockMvc.perform(get("/api/host/properties/prop-mine/sync/ical"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
 }

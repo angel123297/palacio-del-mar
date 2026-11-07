@@ -37,7 +37,7 @@ import static org.mockito.Mockito.when;
 /**
  * Tests intensivos de integridad de precios en createBooking.
  * Verifican que el CLIENTE no pueda manipular precios/cantidades de experiencias ni de órdenes de comida.
- * Generados por la auditoría de seguridad del 2026-10-15 (ver /AUDITORIA_SEGURIDAD.md).
+ * Generados por la auditoría de seguridad del 2026-10-15 (ver docs/AUDITORIA_SEGURIDAD.md).
  *
  * Regla de oro: todo precio usado para calcular el total debe venir del backend (BD),
  * nunca del body de la petición.

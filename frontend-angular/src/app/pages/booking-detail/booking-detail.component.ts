@@ -1,14 +1,16 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
 import { Booking } from '../../models/types';
 
 @Component({
   selector: 'app-booking-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, DatePipe],
   template: `
     <div style="min-height: 80vh; background: #0d0d0d; color: #ffffff; padding: 3rem 1.5rem;">
       <div style="max-width: 900px; margin: 0 auto;">
@@ -20,18 +22,18 @@ import { Booking } from '../../models/types';
 
         <div *ngIf="!loading && !booking" style="text-align: center; color: #ff4d4d; padding: 4rem;">
           <h3>Reserva no encontrada</h3>
-          <a routerLink="/mis-reservas" style="color: var(--gold); text-decoration: none; margin-top: 1rem; display: inline-block;">← Volver a Mis Reservas</a>
+          <a [routerLink]="backLink.url" style="color: var(--gold); text-decoration: none; margin-top: 1rem; display: inline-block;">{{ backLink.label }}</a>
         </div>
 
         <div *ngIf="!loading && booking" class="bd-card">
           <div class="bd-header">
             <div>
-              <a routerLink="/mis-reservas" class="bd-back">← Mis Reservas</a>
+              <a [routerLink]="backLink.url" class="bd-back">{{ backLink.label }}</a>
               <h1 style="font-family: var(--font-title); font-size: 2.2rem; margin: 1rem 0 0.5rem 0;">Detalles de la Reserva</h1>
               <p style="color: var(--gold); font-size: 1.1rem; letter-spacing: 1px;">Código: {{ booking.bookingCode || booking._id?.substring(0,8) | uppercase }}</p>
             </div>
             <div>
-              <span class="status-badge" [ngClass]="booking.status">{{ booking.status | uppercase }}</span>
+              <span class="status-badge" [ngClass]="booking.status">{{ getStatusLabel(booking.status) }}</span>
             </div>
           </div>
 
@@ -39,27 +41,65 @@ import { Booking } from '../../models/types';
           <div class="bd-section digital-key-box" style="margin-top: 1.5rem;" *ngIf="booking.status === 'confirmed' || booking.status === 'checked_in'">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.8rem;">
               <h3 class="bd-section-title" style="margin: 0; border: none; padding: 0; display: flex; align-items: center; gap: 0.5rem;">
-                <span>🔑</span> Llave Digital & Self Check-in
+                <svg style="width: 20px; height: 20px; color: var(--gold);" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                {{ isGuestOwner ? 'Llave Digital & Self Check-in' : 'Control de Acceso Digital' }}
               </h3>
               <span class="status-badge" [ngClass]="booking.status === 'checked_in' ? 'checked_in' : 'confirmed'">
-                {{ booking.status === 'checked_in' ? '🟢 CHECK-IN ACTIVO' : '⏰ PROGRAMADO 15:00 COP' }}
+                {{ booking.status === 'checked_in' ? 'EN ESTANCIA ACTIVA' : 'PROGRAMADO 15:00 HRS' }}
               </span>
             </div>
+
+            <!-- Estado de Pre-check-in -->
+            <div *ngIf="booking.preCheckInCompleted" style="background: rgba(46,204,113,0.1); border: 1px solid rgba(46,204,113,0.3); border-radius: 6px; padding: 8px 12px; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; color: #2ecc71; font-size: 0.88rem;">
+              <svg style="width: 18px; height: 18px; flex-shrink: 0;" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              <span><strong>Pre-check-in completado:</strong> Documento {{ booking.documentNumber || 'registrado' }}. Tu cerradura inteligente está vinculada.</span>
+            </div>
+
+            <!-- Formulario de Pre-check-in si no ha sido completado -->
+            <div *ngIf="!booking.preCheckInCompleted && isGuestOwner" style="background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.35); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem;">
+              <h4 style="color: var(--gold); margin: 0 0 6px 0; font-size: 1.05rem; display: flex; align-items: center; gap: 6px;">
+                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+                Registro Turístico Obligatorio (Pre-Check-in)
+              </h4>
+              <p style="color: #ccc; font-size: 0.88rem; margin: 0 0 1rem 0; line-height: 1.4;">
+                Por disposición legal hotelera en Colombia, ingresa tu número de documento para formalizar tu registro de llegada y activar tu llave digital inteligente.
+              </p>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 1rem;">
+                <div>
+                  <label for="precheckin-doc" style="display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 4px;">Cédula de Ciudadanía o Pasaporte *</label>
+                  <input id="precheckin-doc" type="text" [(ngModel)]="preCheckInDoc" placeholder="Ej: CC 1020304050 o Pasaporte" style="width: 100%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 10px; color: #fff; font-size: 0.95rem; box-sizing: border-box;" />
+                </div>
+                <div>
+                  <label for="precheckin-comp" style="display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 4px;">Huéspedes acompañantes (opcional)</label>
+                  <input id="precheckin-comp" type="text" [(ngModel)]="preCheckInCompanions" placeholder="Nombres de acompañantes" style="width: 100%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 10px; color: #fff; font-size: 0.95rem; box-sizing: border-box;" />
+                </div>
+              </div>
+
+              <div *ngIf="preCheckInError" role="alert" style="color: #ff6b6b; font-size: 0.85rem; margin-bottom: 10px;">
+                {{ preCheckInError }}
+              </div>
+
+              <button type="button" (click)="submitPreCheckIn()" [disabled]="preCheckInLoading || !preCheckInDoc.trim()" class="btn-primary" style="padding: 10px 22px; font-weight: 600; cursor: pointer; min-height: 44px;">
+                {{ preCheckInLoading ? 'Registrando...' : 'Confirmar Pre-check-in y Activar Llave' }}
+              </button>
+            </div>
+
             <p style="font-size: 0.95rem; color: #ddd; margin: 0.4rem 0;">
-              Tu estancia cuenta con <strong>ingreso 100% automatizado</strong> mediante cerradura inteligente.
+              {{ isGuestOwner ? 'Tu estancia cuenta con ingreso 100% automatizado mediante cerradura inteligente.' : 'Acceso automatizado asignado a la estancia del huésped.' }}
             </p>
 
             <div class="pin-display">
               <div>
                 <div style="font-size: 0.75rem; letter-spacing: 1.5px; color: #aaa; margin-bottom: 2px;">PIN DE ACCESO INTELIGENTE:</div>
-                <div class="pin-code">{{ booking.smartLockPin || 'GENERANDO...' }}</div>
+                <div class="pin-code">{{ booking.smartLockPin || 'PENDIENTE DE ACTIVACIÓN' }}</div>
               </div>
-              <button *ngIf="booking.smartLockPin" class="btn-copy" (click)="copyPin(booking.smartLockPin)">📋 Copiar PIN</button>
+              <button *ngIf="booking.smartLockPin" class="btn-copy" (click)="copyPin(booking.smartLockPin)" [attr.aria-label]="'Copiar PIN ' + booking.smartLockPin">{{ pinCopied ? 'PIN copiado' : 'Copiar PIN' }}</button>
             </div>
 
             <div style="margin-top: 1rem; font-size: 0.85rem; color: #bbb; background: rgba(0,0,0,0.3); padding: 0.9rem; border-radius: 6px; display: flex; flex-direction: column; gap: 0.4rem;">
-              <div>🕒 <strong>Check-in automático:</strong> 15:00 COP del día de llegada. El PIN se activará para la cerradura.</div>
-              <div>🕒 <strong>Check-out automático:</strong> 12:00 COP del día de salida. El PIN se desactiva y se libera el depósito.</div>
+              <div>🕒 <strong>Check-in automático:</strong> 15:00 hrs (hora local) del día de llegada. El PIN se activará para la cerradura.</div>
+              <div>🕒 <strong>Check-out automático:</strong> 12:00 hrs (hora local) del día de salida. El PIN se desactiva y se libera el depósito.</div>
               <div *ngIf="booking.guaranteeDeposit">
                 🛡️ <strong>Depósito de Garantía:</strong> $ {{ booking.guaranteeDeposit | number:'1.0-0' }} COP
                 <span *ngIf="booking.guaranteeRefunded" style="color: #2ecc71; font-weight: bold;">(Reembolsado automáticamente)</span>
@@ -74,36 +114,49 @@ import { Booking } from '../../models/types';
               <span>🏁</span> Estancia Concluida
             </h3>
             <p style="color: #ddd; margin: 0.3rem 0; font-size: 0.95rem;">
-              Check-out automático procesado exitosamente. La cerradura inteligente ha sido deshabilitada.
+              Check-out procesado exitosamente. La cerradura inteligente ha sido deshabilitada.
             </p>
             <p style="color: #2ecc71; margin: 0.3rem 0; font-size: 0.9rem;" *ngIf="booking.guaranteeRefunded">
-              🛡️ Tu depósito de garantía de $ {{ (booking.guaranteeDeposit || 150000) | number:'1.0-0' }} COP fue liberado y reembolsado sin novedades.
+              🛡️ {{ isGuestOwner ? 'Tu depósito de garantía de $' : 'Depósito de garantía de $' }} {{ (booking.guaranteeDeposit || 150000) | number:'1.0-0' }} COP {{ isGuestOwner ? 'fue liberado y reembolsado sin novedades.' : 'fue liberado y reembolsado al huésped.' }}
             </p>
           </div>
 
-          <!-- Sección de Reseña Verificada si ya hizo check-out -->
-          <div class="bd-section" style="margin-top: 1.5rem;" *ngIf="booking.status === 'checked_out' || booking.status === 'completed'">
+          <!-- Sección de Reseña Verificada para el HUÉSPED TITULAR -->
+          <div class="bd-section" style="margin-top: 1.5rem;" *ngIf="isGuestOwner && (booking.status === 'checked_out' || booking.status === 'completed')">
             <h3 class="bd-section-title" style="display: flex; align-items: center; gap: 0.5rem;">
               <span>⭐</span> Calificación Verificada de tu Estancia
             </h3>
 
-            <div *ngIf="reviewSuccess" style="background: rgba(46,204,113,0.15); border: 1px solid #2ecc71; padding: 1rem; border-radius: 8px; color: #2ecc71;">
+            <div *ngIf="reviewSuccess || existingReview" style="background: rgba(46,204,113,0.15); border: 1px solid #2ecc71; padding: 1.2rem; border-radius: 8px; color: #2ecc71;">
               <p style="margin: 0; font-weight: bold;">¡Muchas gracias por tu reseña verificada!</p>
-              <p style="margin: 0.3rem 0 0; font-size: 0.85rem; color: #ddd;">
+              <div *ngIf="existingReview" style="margin-top: 0.6rem; color: #fff;">
+                <span style="color: var(--gold); font-size: 1.2rem;">{{ '★'.repeat(existingReview.rating || 5) }}</span>
+                <span *ngIf="existingReview.rating < 5" style="color: #444; font-size: 1.2rem;">{{ '★'.repeat(5 - (existingReview.rating || 5)) }}</span>
+                <p *ngIf="existingReview.comment" style="margin: 0.4rem 0 0; font-size: 0.9rem; color: #ddd; font-style: italic;">
+                  "{{ existingReview.comment }}"
+                </p>
+              </div>
+              <p *ngIf="!existingReview" style="margin: 0.3rem 0 0; font-size: 0.85rem; color: #ddd;">
                 Tu calificación fue registrada y ayuda al anfitrión a seguir brindando un servicio de alta calidad.
               </p>
             </div>
 
-            <div *ngIf="!reviewSuccess">
+            <div *ngIf="!reviewSuccess && !existingReview">
               <p style="color: #ccc; font-size: 0.9rem; margin-bottom: 1rem;">
                 Tu opinión es 100% verificada con tu estadía. Si reportas alguna novedad de mantenimiento, nuestro sistema notificará automáticamente al anfitrión.
               </p>
 
               <div style="margin-bottom: 1rem;">
                 <label style="display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 0.4rem;">Calificación:</label>
-                <div style="display: flex; gap: 0.6rem; font-size: 1.8rem; cursor: pointer; user-select: none;">
+                <div role="radiogroup" aria-label="Calificación con estrellas" style="display: flex; gap: 0.6rem; font-size: 1.8rem; cursor: pointer; user-select: none;">
                   <span *ngFor="let star of [1,2,3,4,5]" 
+                        role="radio"
+                        tabindex="0"
+                        [attr.aria-label]="star + ' estrellas'"
+                        [attr.aria-checked]="reviewRating === star"
                         (click)="reviewRating = star"
+                        (keydown.enter)="reviewRating = star"
+                        (keydown.space)="reviewRating = star; $event.preventDefault()"
                         [style.color]="star <= reviewRating ? 'var(--gold)' : '#444'">
                     ★
                   </span>
@@ -132,39 +185,100 @@ import { Booking } from '../../models/types';
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
-            <!-- Info principal -->
+          <!-- Sección de Reseña del Huésped vista por el ANFITRIÓN o ADMIN (modo solo lectura informativo) -->
+          <div class="bd-section" style="margin-top: 1.5rem;" *ngIf="!isGuestOwner && (booking.status === 'checked_out' || booking.status === 'completed')">
+            <h3 class="bd-section-title" style="display: flex; align-items: center; gap: 0.5rem;">
+              <span>⭐</span> Reseña de la Estancia
+            </h3>
+
+            <div *ngIf="existingReview" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(212,175,55,0.3); padding: 1.2rem; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <div style="font-size: 1.2rem;">
+                  <span style="color: var(--gold);">{{ '★'.repeat(existingReview.rating || 5) }}</span>
+                  <span *ngIf="existingReview.rating < 5" style="color: #444;">{{ '★'.repeat(5 - (existingReview.rating || 5)) }}</span>
+                  <span style="font-size: 0.9rem; color: #aaa; margin-left: 0.6rem;">({{ existingReview.rating }}/5)</span>
+                </div>
+                <span *ngIf="existingReview.createdAt" style="font-size: 0.8rem; color: #888;">{{ existingReview.createdAt | date:'mediumDate' }}</span>
+              </div>
+              <p *ngIf="existingReview.comment" style="color: #ddd; font-size: 0.95rem; font-style: italic; margin: 0.6rem 0 0 0; line-height: 1.5;">
+                "{{ existingReview.comment }}"
+              </p>
+              <div *ngIf="existingReview.maintenanceAlert" style="margin-top: 0.8rem; padding: 0.6rem 0.8rem; background: rgba(231,76,60,0.15); border: 1px solid #e74c3c; border-radius: 6px; color: #ff6b6b; font-size: 0.85rem;">
+                ⚠️ <strong>Alerta de Mantenimiento detectada:</strong> {{ existingReview.maintenanceAlert }}
+              </div>
+            </div>
+
+            <div *ngIf="!existingReview" style="padding: 1rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
+              <p style="color: #888; font-size: 0.9rem; margin: 0; font-style: italic;">
+                El huésped aún no ha dejado una calificación para esta estancia.
+              </p>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 2rem;">
+            <!-- Info de la estancia -->
             <div class="bd-section">
-              <h3 class="bd-section-title">Estancia</h3>
-              <p><strong>Suite:</strong> {{ suiteName }}</p>
-              <p><strong>Check-in:</strong> {{ booking.checkIn | date:'longDate' }}</p>
-              <p><strong>Check-out:</strong> {{ booking.checkOut | date:'longDate' }}</p>
-              <p><strong>Huéspedes:</strong> {{ booking.guests }}</p>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 8px;">
+                <h3 class="bd-section-title" style="margin: 0; padding: 0; border: none;">Estancia</h3>
+                <button *ngIf="booking.isModifiable && (isGuestOwner || isHostOrAdmin)"
+                        type="button"
+                        (click)="openModifyModal()"
+                        style="background: transparent; border: 1px solid var(--gold); color: var(--gold); padding: 5px 12px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
+                  <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  Cambiar fechas
+                </button>
+              </div>
+              <p><strong>Suite:</strong>&nbsp;{{ suiteName }}</p>
+              <p *ngIf="booking.propertyId || booking.branch"><strong>Alojamiento:</strong>&nbsp;{{ booking.branch?.name || 'Sede Principal' }}</p>
+              <p><strong>Llegada:</strong>&nbsp;{{ booking.checkIn | date:'dd/MM/yyyy' }}</p>
+              <p><strong>Salida:</strong>&nbsp;{{ booking.checkOut | date:'dd/MM/yyyy' }}</p>
+              <p><strong>Noches:</strong>&nbsp;{{ booking.nights || 1 }}</p>
+            </div>
+
+            <!-- Información del Huésped (operativo para Anfitrión / Admin) -->
+            <div class="bd-section" *ngIf="isHostOrAdmin">
+              <h3 class="bd-section-title">Datos del Huésped</h3>
+              <p><strong>Huésped:</strong>&nbsp;{{ guestNameDisplay }}</p>
+              <p *ngIf="guestEmailDisplay"><strong>Email:</strong>&nbsp;<a [href]="'mailto:' + guestEmailDisplay" style="color: var(--gold); text-decoration: none;">{{ guestEmailDisplay }}</a></p>
+              <p *ngIf="guestPhoneDisplay"><strong>Teléfono:</strong>&nbsp;<a [href]="'tel:' + guestPhoneDisplay" style="color: var(--gold); text-decoration: none;">{{ guestPhoneDisplay }}</a></p>
+              <p><strong>Capacidad:</strong>&nbsp;{{ booking.guests || 1 }} adulto(s)<span *ngIf="booking.children">, {{ booking.children }} niño(s)</span></p>
+              <p *ngIf="booking.needsCrib"><strong>Cuna para bebé:</strong>&nbsp;<span style="color: #2ecc71;">Solicitada</span></p>
             </div>
 
             <!-- Servicios Adicionales -->
             <div class="bd-section" *ngIf="hasExtraServices()">
               <h3 class="bd-section-title">Servicios Adicionales</h3>
               <ul style="list-style: none; padding: 0; margin: 0; color: #ccc; font-size: 0.95rem; display: flex; flex-direction: column; gap: 0.8rem;">
-                <li *ngIf="booking.airportPickup" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">🚗</span> <span>Recogida VIP en aeropuerto</span></li>
+                <li *ngIf="booking.airportPickup" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">🚗</span> <span>{{ isGuestOwner ? 'Recogida VIP en aeropuerto' : 'Huésped solicitó traslado VIP en aeropuerto' }}</span></li>
+                <li *ngIf="booking.petFriendly" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">🐾</span> <span>Estancia Pet Friendly</span></li>
                 <li *ngFor="let exp of booking.experiences" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">✨</span> <span>{{ exp.name }} (x{{ exp.quantity }})</span></li>
-                <li *ngFor="let food of booking.foodOrders" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">🍽️</span> <span>Desayuno Flotante / Cena (x1)</span></li>
+                <li *ngFor="let food of booking.foodOrders" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">🍽️</span> <span>{{ food.dishName || food.foodName || 'Pedido de comida' }}</span></li>
               </ul>
             </div>
 
-            <!-- Detalles del pago -->
+            <!-- Resumen Financiero / Liquidación -->
             <div class="bd-section">
-              <h3 class="bd-section-title">Resumen de Pago</h3>
-              <p><strong>Precio Total:</strong>&nbsp;<span style="color: var(--gold); font-weight: bold; font-size: 1.2rem;">$ {{ booking.totalPrice | number:'1.0-0' }}</span></p>
+              <h3 class="bd-section-title">{{ isHostOrAdmin && !isGuestOwner ? 'Liquidación de la Reserva' : 'Resumen de Pago' }}</h3>
+              <p><strong>Total Reserva:</strong>&nbsp;<span style="color: var(--gold); font-weight: bold; font-size: 1.15rem;">$ {{ booking.totalPrice | number:'1.0-0' }} COP</span></p>
               
-              <div *ngIf="booking.status === 'pending'" style="margin-top: 1.5rem;">
-                <p style="color: #ff9f43; margin-bottom: 1rem; font-size: 0.9rem;">⚠️ Tu reserva está pendiente de pago. Para confirmar tu estancia, realiza el pago ahora.</p>
-                <a [routerLink]="['/checkout', booking._id || booking.id]" class="btn-primary" style="display: block; text-align: center; padding: 12px; text-decoration: none;">Ir al Centro de Pagos</a>
+              <!-- Para Anfitrión / Admin: desglose de comisión y pago neto -->
+              <div *ngIf="isHostOrAdmin && !isGuestOwner" style="margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem;">
+                <p style="margin: 0;"><strong>Comisión Plataforma (8%):</strong>&nbsp;<span style="color: #ff9f43;">- $ {{ (booking.platformFee || (booking.totalPrice * 0.08)) | number:'1.0-0' }} COP</span></p>
+                <p style="margin: 0;"><strong>Pago Neto al Anfitrión:</strong>&nbsp;<span style="color: #2ecc71; font-weight: bold; font-size: 1.1rem;">$ {{ (booking.hostPayout || (booking.totalPrice * 0.92)) | number:'1.0-0' }} COP</span></p>
+                <p style="margin: 0.4rem 0 0;"><strong>Estado del Pago:</strong>&nbsp;<span class="status-badge" [ngClass]="booking.paymentStatus || 'pending'" style="font-size: 0.75rem; padding: 3px 10px;">{{ getPaymentStatusLabel(booking.paymentStatus) }}</span></p>
               </div>
-              
-              <div *ngIf="booking.status === 'confirmed' || booking.status === 'completed' || booking.status === 'paid' || booking.status === 'checked_in' || booking.status === 'checked_out'" style="margin-top: 1.5rem;">
-                <p style="color: #2ecc71; margin-bottom: 1rem; font-size: 0.9rem;">✅ Reserva pagada y confirmada.</p>
-                <a [routerLink]="['/reservas', booking._id || booking.id, 'comprobante']" class="btn-outline" style="display: block; text-align: center; padding: 12px; text-decoration: none;">Ver Factura / Comprobante</a>
+
+              <!-- Para Huésped: acciones de pago y factura -->
+              <div *ngIf="isGuestOwner">
+                <div *ngIf="booking.status === 'pending'" style="margin-top: 1.5rem;">
+                  <p style="color: #ff9f43; margin-bottom: 1rem; font-size: 0.9rem;">⚠️ Tu reserva está pendiente de pago. Para confirmar tu estancia, realiza el pago ahora.</p>
+                  <a [routerLink]="['/checkout', booking._id || booking.id]" class="btn-primary" style="display: block; text-align: center; padding: 12px; text-decoration: none;">Ir al Centro de Pagos</a>
+                </div>
+                
+                <div *ngIf="booking.status === 'confirmed' || booking.status === 'completed' || booking.status === 'paid' || booking.status === 'checked_in' || booking.status === 'checked_out'" style="margin-top: 1.5rem;">
+                  <p style="color: #2ecc71; margin-bottom: 1rem; font-size: 0.9rem;">✅ Reserva pagada y confirmada.</p>
+                  <a [routerLink]="['/reservas', booking._id || booking.id, 'comprobante']" class="btn-outline" style="display: block; text-align: center; padding: 12px; text-decoration: none;">Ver Factura / Comprobante</a>
+                </div>
               </div>
             </div>
           </div>
@@ -174,7 +288,8 @@ import { Booking } from '../../models/types';
             <p style="color: #ddd; font-style: italic; background: rgba(0,0,0,0.3); padding: 1rem; border-left: 3px solid var(--gold);">{{ booking.notes }}</p>
           </div>
 
-          <div class="bd-section" style="margin-top: 2rem;">
+          <!-- Ubicación y Llegada: ÚNICAMENTE visible para el HUÉSPED -->
+          <div class="bd-section" style="margin-top: 2rem;" *ngIf="isGuestOwner">
             <h3 class="bd-section-title">Ubicación y Llegada</h3>
             <div *ngIf="booking.airportPickup" style="background: rgba(46,204,113,0.1); padding: 1rem; border-radius: 8px; border: 1px solid rgba(46,204,113,0.3); margin-bottom: 1.5rem;">
               <p style="color: #2ecc71; margin: 0; font-weight: bold; display: flex; align-items: center; gap: 0.5rem;"><span style="font-size: 1.2rem;">🚗</span> Tienes recogida VIP en el aeropuerto incluida.</p>
@@ -189,7 +304,51 @@ import { Booking } from '../../models/types';
             </div>
             
             <div style="border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; overflow: hidden; height: 300px;">
-              <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-75.56846141815187%2C10.420601934399738%2C-75.53816318511964%2C10.434417758994511&amp;layer=mapnik" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+              <iframe [src]="getSafeEmbedMapUrl()" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            </div>
+          </div>
+
+          <!-- Modal para Cambiar Fechas -->
+          <div *ngIf="showModifyModal" 
+               style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1.5rem;"
+               role="dialog" 
+               aria-modal="true" 
+               aria-labelledby="modify-dates-title">
+            <div style="background: #141414; border: 1px solid var(--gold); border-radius: 10px; max-width: 480px; width: 100%; padding: 2rem; box-shadow: 0 10px 40px rgba(0,0,0,0.8); box-sizing: border-box;">
+              <h3 id="modify-dates-title" style="color: var(--gold); margin: 0 0 0.5rem 0; font-family: var(--font-title); font-size: 1.5rem;">
+                Cambiar Fechas de Reserva
+              </h3>
+              <p style="color: #aaa; font-size: 0.88rem; margin: 0 0 1.5rem 0; line-height: 1.4;">
+                Ajusta las fechas de tu estancia en <strong>{{ suiteName }}</strong>. El valor total y balance pendiente se actualizarán automáticamente.
+              </p>
+
+              <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
+                <div>
+                  <label for="modify-checkin" style="display: block; font-size: 0.8rem; color: #ccc; margin-bottom: 4px;">Nueva Fecha de Llegada (Check-in)</label>
+                  <input id="modify-checkin" type="date" [(ngModel)]="modifyCheckIn" [min]="minDate" class="luxury-input" style="width: 100%; box-sizing: border-box;" />
+                </div>
+                <div>
+                  <label for="modify-checkout" style="display: block; font-size: 0.8rem; color: #ccc; margin-bottom: 4px;">Nueva Fecha de Salida (Check-out)</label>
+                  <input id="modify-checkout" type="date" [(ngModel)]="modifyCheckOut" [min]="modifyCheckIn || minDate" class="luxury-input" style="width: 100%; box-sizing: border-box;" />
+                </div>
+              </div>
+
+              <div *ngIf="modifyError" role="alert" style="background: rgba(231,76,60,0.15); border: 1px solid #e74c3c; border-radius: 6px; padding: 8px 12px; color: #ff6b6b; font-size: 0.85rem; margin-bottom: 1rem;">
+                {{ modifyError }}
+              </div>
+
+              <div *ngIf="modifySuccess" role="status" style="background: rgba(46,204,113,0.15); border: 1px solid #2ecc71; border-radius: 6px; padding: 8px 12px; color: #2ecc71; font-size: 0.85rem; margin-bottom: 1rem;">
+                {{ modifySuccess }}
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" (click)="closeModifyModal()" [disabled]="modifyLoading" class="btn-secondary" style="padding: 10px 18px; font-size: 0.85rem; border: 1px solid #555; color: #ccc; background: transparent; border-radius: 6px; cursor: pointer;">
+                  Cancelar
+                </button>
+                <button type="button" (click)="submitModifyDates()" [disabled]="modifyLoading || !modifyCheckIn || !modifyCheckOut" class="btn-primary" style="padding: 10px 20px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                  {{ modifyLoading ? 'Guardando...' : 'Confirmar Cambio' }}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -267,17 +426,36 @@ import { Booking } from '../../models/types';
 export class BookingDetailComponent implements OnInit {
   booking: any = null;
   loading = true;
+  pinCopied = false;
 
   // Reseña
+  existingReview: any = null;
   reviewRating = 5;
   reviewComment = '';
   isSubmittingReview = false;
   reviewSuccess = false;
   reviewError = '';
 
+  // Pre-check-in
+  preCheckInDoc = '';
+  preCheckInCompanions = '';
+  preCheckInLoading = false;
+  preCheckInError = '';
+
+  // Modificar fechas
+  showModifyModal = false;
+  modifyCheckIn = '';
+  modifyCheckOut = '';
+  modifyLoading = false;
+  modifyError = '';
+  modifySuccess = '';
+  minDate = new Date().toISOString().substring(0, 10);
+
   constructor(
+    private sanitizer: DomSanitizer,
     private route: ActivatedRoute,
     private api: ApiService,
+    private auth: AuthService,
     private cdr: ChangeDetectorRef
   ) {}
 
@@ -288,6 +466,15 @@ export class BookingDetailComponent implements OnInit {
         next: (res) => {
           this.booking = res.data || res;
           this.loading = false;
+          if (this.booking?.documentNumber) {
+            this.preCheckInDoc = this.booking.documentNumber;
+          }
+          if (this.booking?.companionGuests) {
+            this.preCheckInCompanions = this.booking.companionGuests;
+          }
+          if (this.booking?.status === 'checked_out' || this.booking?.status === 'completed') {
+            this.fetchBookingReview(this.booking._id || this.booking.id || id);
+          }
           this.cdr.detectChanges();
         },
         error: () => {
@@ -301,28 +488,148 @@ export class BookingDetailComponent implements OnInit {
     }
   }
 
+  fetchBookingReview(bookingId: string): void {
+    if (!bookingId) return;
+    this.api.get<any>(`/reviews/booking/${bookingId}`).subscribe({
+      next: (res) => {
+        if (res?.data) {
+          this.existingReview = res.data;
+          this.reviewSuccess = true;
+          this.cdr.detectChanges();
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  get currentUser() {
+    return this.auth.currentUserValue;
+  }
+
+  get isGuestOwner(): boolean {
+    if (!this.booking) return false;
+    const user = this.currentUser;
+    if (!user) return false;
+    const currentUserId = user.id || user._id;
+    const bookingUserId = typeof this.booking.user === 'object'
+      ? (this.booking.user?.id || this.booking.user?._id)
+      : (this.booking.user || this.booking.userId);
+
+    if (currentUserId && bookingUserId && currentUserId === bookingUserId) {
+      return true;
+    }
+    if (user.email && this.booking.guestEmail && user.email.toLowerCase() === this.booking.guestEmail.toLowerCase()) {
+      return true;
+    }
+    return false;
+  }
+
+  get isHostOrAdmin(): boolean {
+    const user = this.currentUser;
+    if (!user) return false;
+    const role = (user.role || '').toLowerCase();
+    return role === 'host' || role === 'anfitrion' || role === 'admin';
+  }
+
+  get backLink(): { url: string; label: string } {
+    const role = (this.currentUser?.role || '').toLowerCase();
+    if (role === 'host' || role === 'anfitrion') {
+      return { url: '/anfitrion', label: '← Volver al Panel de Anfitrión' };
+    }
+    if (role === 'admin') {
+      return { url: '/admin', label: '← Volver al Panel de Administración' };
+    }
+    return { url: '/mis-reservas', label: '← Mis Reservas' };
+  }
+
+  get guestNameDisplay(): string {
+    return this.booking?.guestDetails?.fullName || this.booking?.guestName || (typeof this.booking?.user === 'object' ? this.booking.user?.name : '') || 'Huésped registrado';
+  }
+
+  get guestEmailDisplay(): string {
+    return this.booking?.guestDetails?.email || this.booking?.guestEmail || (typeof this.booking?.user === 'object' ? this.booking.user?.email : '') || '';
+  }
+
+  get guestPhoneDisplay(): string {
+    return this.booking?.guestDetails?.phone || this.booking?.guestPhone || '';
+  }
+
   get suiteName(): string {
     if (!this.booking?.suite) return 'Suite Desconocida';
     return typeof this.booking.suite === 'string' ? this.booking.suite : this.booking.suite.name;
+  }
+
+  getStatusLabel(status?: string): string {
+    switch ((status || '').toLowerCase()) {
+      case 'confirmed': return 'Confirmada';
+      case 'pending': return 'Pendiente de Pago';
+      case 'checked_in': return 'Hospedado';
+      case 'checked_out': return 'Estancia Finalizada';
+      case 'completed': return 'Completada';
+      case 'cancelled': return 'Cancelada';
+      case 'expired': return 'Expirada';
+      default: return status || 'Pendiente';
+    }
+  }
+
+  getPaymentStatusLabel(status?: string): string {
+    switch ((status || '').toLowerCase()) {
+      case 'paid': return 'Pagado';
+      case 'pending': return 'Pendiente';
+      case 'refunded': return 'Reembolsado';
+      case 'requires_refund': return 'Reembolso Pendiente';
+      case 'failed': return 'Fallido';
+      default: return status || 'Pendiente';
+    }
   }
 
   hasExtraServices(): boolean {
     if (!this.booking) return false;
     const hasExperiences = this.booking.experiences && this.booking.experiences.length > 0;
     const hasFood = this.booking.foodOrders && this.booking.foodOrders.length > 0;
-    return !!(this.booking.airportPickup || hasExperiences || hasFood);
+    return !!(this.booking.airportPickup || this.booking.petFriendly || hasExperiences || hasFood);
   }
 
   copyPin(pin: string): void {
     if (pin && navigator.clipboard) {
       navigator.clipboard.writeText(pin).then(() => {
-        alert('PIN de la cerradura copiado al portapapeles');
+        this.pinCopied = true;
+        setTimeout(() => this.pinCopied = false, 2500);
+        this.cdr.detectChanges();
       });
     }
   }
 
+  submitPreCheckIn(): void {
+    if (!this.booking || !this.preCheckInDoc.trim()) return;
+    this.preCheckInLoading = true;
+    this.preCheckInError = '';
+    const id = this.booking._id || this.booking.id;
+
+    this.api.post<any>(`/bookings/${id}/pre-checkin`, {
+      documentNumber: this.preCheckInDoc.trim(),
+      companionGuests: this.preCheckInCompanions.trim()
+    }).subscribe({
+      next: (res) => {
+        this.preCheckInLoading = false;
+        if (res && res.data) {
+          this.booking = res.data;
+        } else {
+          this.booking.preCheckInCompleted = true;
+          this.booking.documentNumber = this.preCheckInDoc.trim();
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.preCheckInLoading = false;
+        this.preCheckInError = err.error?.message || 'Error al procesar el pre-check-in. Verifica tus datos.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
   submitReview(): void {
-    if (!this.booking) return;
+    if (!this.booking || !this.isGuestOwner) return;
     this.isSubmittingReview = true;
     this.reviewError = '';
 
@@ -333,9 +640,10 @@ export class BookingDetailComponent implements OnInit {
     };
 
     this.api.post<any>('/reviews/verified', payload).subscribe({
-      next: () => {
+      next: (res) => {
         this.isSubmittingReview = false;
         this.reviewSuccess = true;
+        this.existingReview = res.data || payload;
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -344,6 +652,66 @@ export class BookingDetailComponent implements OnInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  openModifyModal(): void {
+    if (!this.booking) return;
+    this.modifyCheckIn = this.booking.checkIn ? String(this.booking.checkIn).substring(0, 10) : '';
+    this.modifyCheckOut = this.booking.checkOut ? String(this.booking.checkOut).substring(0, 10) : '';
+    this.modifyError = '';
+    this.modifySuccess = '';
+    this.showModifyModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeModifyModal(): void {
+    this.showModifyModal = false;
+    this.modifyError = '';
+    this.cdr.detectChanges();
+  }
+
+  submitModifyDates(): void {
+    if (!this.booking) return;
+    if (!this.modifyCheckIn || !this.modifyCheckOut) {
+      this.modifyError = 'Por favor selecciona ambas fechas (check-in y check-out)';
+      return;
+    }
+    if (this.modifyCheckOut <= this.modifyCheckIn) {
+      this.modifyError = 'La fecha de salida debe ser posterior a la fecha de llegada';
+      return;
+    }
+    this.modifyLoading = true;
+    this.modifyError = '';
+    this.modifySuccess = '';
+
+    const id = this.booking._id || this.booking.id;
+    this.api.put<any>(`/bookings/${id}/modify`, {
+      checkIn: this.modifyCheckIn,
+      checkOut: this.modifyCheckOut
+    }).subscribe({
+      next: (res) => {
+        this.modifyLoading = false;
+        if (res && res.data) {
+          this.booking = res.data;
+        }
+        this.modifySuccess = '¡Fechas modificadas exitosamente!';
+        this.cdr.detectChanges();
+        setTimeout(() => {
+          this.closeModifyModal();
+        }, 1500);
+      },
+      error: (err) => {
+        this.modifyLoading = false;
+        this.modifyError = err.error?.message || 'No fue posible modificar las fechas. Verifica que la suite esté disponible.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  getSafeEmbedMapUrl(): SafeResourceUrl {
+    const query = (this.booking?.branch?.name || this.booking?.suite?.branch?.name || 'Cartagena de Indias') + ', Colombia';
+    const url = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
 
   getMapsLink(): string {
@@ -357,4 +725,3 @@ export class BookingDetailComponent implements OnInit {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
   }
 }
-

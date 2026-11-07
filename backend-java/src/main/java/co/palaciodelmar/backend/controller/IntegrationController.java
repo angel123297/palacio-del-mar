@@ -30,10 +30,11 @@ public class IntegrationController {
     @PostMapping("/rooms")
     public ResponseEntity<ApiResponse<SuiteResponseDTO>> upsertRoom(
             @RequestHeader(value = "X-Palacio-Api-Key", required = false) String apiKeyHeader,
+            @RequestHeader(value = "X-API-KEY", required = false) String xApiKeyHeader,
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @Valid @RequestBody IntegrationRoomRequest request
     ) {
-        ApiKey apiKey = authenticate(apiKeyHeader, authHeader);
+        ApiKey apiKey = authenticate(apiKeyHeader, xApiKeyHeader, authHeader);
         Suite suite = integrationService.upsertRoom(apiKey, request);
         return ResponseEntity.ok(ApiResponse.success(SuiteResponseDTO.from(suite, null)));
     }
@@ -41,17 +42,22 @@ public class IntegrationController {
     @PutMapping("/availability")
     public ResponseEntity<ApiResponse<Map<String, Object>>> manageAvailability(
             @RequestHeader(value = "X-Palacio-Api-Key", required = false) String apiKeyHeader,
+            @RequestHeader(value = "X-API-KEY", required = false) String xApiKeyHeader,
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @Valid @RequestBody IntegrationAvailabilityRequest request
     ) {
-        ApiKey apiKey = authenticate(apiKeyHeader, authHeader);
+        ApiKey apiKey = authenticate(apiKeyHeader, xApiKeyHeader, authHeader);
         Map<String, Object> result = integrationService.manageAvailability(apiKey, request);
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
-    private ApiKey authenticate(String apiKeyHeader, String authHeader) {
-        String token = (apiKeyHeader != null && !apiKeyHeader.isBlank()) ? apiKeyHeader : authHeader;
-        return apiKeyService.authenticateApiKey(token)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "API Key inválida o revocada"));
+    private ApiKey authenticate(String... tokens) {
+        for (String token : tokens) {
+            if (token != null && !token.isBlank()) {
+                return apiKeyService.authenticateApiKey(token)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "API Key inválida o revocada"));
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "API Key inválida o revocada");
     }
 }

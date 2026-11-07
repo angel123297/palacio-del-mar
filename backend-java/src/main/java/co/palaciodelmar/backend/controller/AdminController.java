@@ -26,6 +26,9 @@ public class AdminController {
     private final BookingService bookingService;
     private final co.palaciodelmar.backend.service.PropertyService propertyService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.service.HostPayoutService hostPayoutService;
+
     @GetMapping("/properties")
     public ResponseEntity<ApiResponse<List<co.palaciodelmar.backend.dto.PropertyDTO>>> getAdminProperties(
             @RequestParam(required = false) String status) {
@@ -99,6 +102,48 @@ public class AdminController {
     public ResponseEntity<ApiResponse<AdminService.AdminDashboardStats>> getStats() {
         AdminService.AdminDashboardStats stats = adminService.getDashboardStats();
         return ResponseEntity.ok(ApiResponse.ok(stats));
+    }
+
+    @GetMapping("/payments/refunds")
+    public ResponseEntity<ApiResponse<List<co.palaciodelmar.backend.dto.PaymentDTO>>> getPendingRefunds() {
+        List<co.palaciodelmar.backend.dto.PaymentDTO> list = adminService.getPendingRefunds().stream()
+                .map(this::toPaymentDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(ApiResponse.ok(list));
+    }
+
+    @PutMapping("/payments/{id}/resolve-refund")
+    public ResponseEntity<ApiResponse<co.palaciodelmar.backend.dto.PaymentDTO>> resolveRefund(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        String action = body.getOrDefault("action", "mark_refunded");
+        String notes = body.get("notes");
+        co.palaciodelmar.backend.model.Payment p = adminService.resolveRefund(id, action, notes);
+        return ResponseEntity.ok(ApiResponse.ok("Reembolso resuelto exitosamente", toPaymentDTO(p)));
+    }
+
+    @PostMapping("/payouts/process")
+    public ResponseEntity<ApiResponse<List<co.palaciodelmar.backend.dto.HostPayoutDTO>>> triggerPayoutProcess() {
+        List<co.palaciodelmar.backend.dto.HostPayoutDTO> payouts = hostPayoutService != null
+                ? hostPayoutService.processAutomatedPayouts()
+                : List.of();
+        return ResponseEntity.ok(ApiResponse.ok("Proceso de liquidación ejecutado exitosamente", payouts));
+    }
+
+    private co.palaciodelmar.backend.dto.PaymentDTO toPaymentDTO(co.palaciodelmar.backend.model.Payment p) {
+        if (p == null) return null;
+        return co.palaciodelmar.backend.dto.PaymentDTO.builder()
+                .id(p.getId())
+                .bookingId(p.getBooking())
+                .amount(p.getAmount())
+                .currency(p.getCurrency())
+                .status(p.getStatus())
+                .provider(p.getProvider())
+                .transactionId(p.getTransactionId())
+                .paymentMethod(p.getPaymentMethod())
+                .notes(p.getNotes())
+                .createdAt(p.getCreatedAt())
+                .build();
     }
 
     private PromotionDTO toPromotionDTO(Promotion promotion) {

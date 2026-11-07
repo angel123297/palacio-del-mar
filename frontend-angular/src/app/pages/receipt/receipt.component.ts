@@ -1,12 +1,17 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, Optional } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ApiService } from '../../services/api.service';
+import { AuthService } from '../../services/auth.service';
+// @ts-ignore
+import { renderSVG } from '../../utils/qr';
 
 @Component({
   selector: 'app-receipt',
   standalone: true,
-  imports: [CommonModule, RouterModule, DatePipe],
+  imports: [CommonModule, RouterModule, DatePipe, FormsModule],
   template: `
     <div style="min-height: 100vh; background: #fff; color: #333; padding: 2rem; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
       
@@ -35,13 +40,39 @@ import { ApiService } from '../../services/api.service';
             <p style="margin: 0; color: #666; font-size: 0.9rem;">contacto@palaciodelmar.com</p>
           </div>
           <div style="text-align: right;">
-            <h2 style="margin: 0; font-size: 2.5rem; color: #d4af37; text-transform: uppercase;">Factura</h2>
-            <p style="margin: 5px 0; font-weight: bold;">N° {{ booking.bookingCode || booking._id?.substring(0,8) | uppercase }}</p>
+            <h2 style="margin: 0; font-size: 2.5rem; color: #d4af37; text-transform: uppercase;">Factura & Voucher</h2>
+            <p style="margin: 5px 0; font-weight: bold;">N° {{ bookingCodeDisplay | uppercase }}</p>
             <p style="margin: 0; color: #555;">Fecha de emisión: {{ today | date:'mediumDate' }}</p>
           </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; margin-top: 3rem; border-top: 2px solid #eee; padding-top: 2rem;">
+        <!-- Tarjeta de Acceso Inteligente / Pase de Cerradura Digital -->
+        <div class="access-pass" style="margin-top: 2rem; background: #faf9f6; border: 2px solid #d4af37; border-radius: 8px; padding: 1.5rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1.5rem;">
+          <div style="flex: 1; min-width: 260px;">
+            <span style="display: inline-block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #8c7329; font-weight: 700;">Pase de Acceso Inteligente</span>
+            <h3 style="margin: 4px 0 10px 0; font-size: 1.25rem; color: #111;">{{ suiteName }}</h3>
+            
+            <div style="margin-bottom: 12px;">
+              <span style="font-size: 0.85rem; color: #666; display: block;">PIN de Entrada (Cerradura Inteligente):</span>
+              <div style="display: inline-block; font-family: monospace; font-size: 1.6rem; font-weight: bold; letter-spacing: 4px; color: #0d0d0d; background: #fff; border: 1px dashed #d4af37; padding: 4px 14px; border-radius: 4px; margin-top: 4px;">
+                {{ smartLockPinDisplay }}
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 1.5rem; font-size: 0.85rem; color: #444;">
+              <div><strong>Llegada:</strong> {{ booking.checkIn | date:'mediumDate' }} <span style="color:#d4af37; font-weight:bold;">(15:00)</span></div>
+              <div><strong>Salida:</strong> {{ booking.checkOut | date:'mediumDate' }} <span style="color:#d4af37; font-weight:bold;">(13:00)</span></div>
+            </div>
+            <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: #777;">Presenta este comprobante en recepción o digita el PIN directamente en la cerradura electrónica.</p>
+          </div>
+
+          <div style="text-align: center; background: #fff; padding: 12px; border-radius: 6px; border: 1px solid #e5e5e5; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+            <div [innerHTML]="qrSvgSafe" style="width: 140px; height: 140px; margin: 0 auto; display: flex; align-items: center; justify-content: center;"></div>
+            <span style="display: block; font-size: 0.7rem; color: #666; margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Escanear para Check-in</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; margin-top: 2rem; border-top: 2px solid #eee; padding-top: 1.5rem;">
           <div>
             <h3 style="margin-top: 0; color: #444; font-size: 1.1rem; text-transform: uppercase;">Facturado a:</h3>
             <p style="margin: 5px 0; font-weight: bold; font-size: 1.1rem;">{{ guestName }}</p>
@@ -50,13 +81,13 @@ import { ApiService } from '../../services/api.service';
           <div style="text-align: right;">
             <h3 style="margin-top: 0; color: #444; font-size: 1.1rem; text-transform: uppercase;">Estado de Pago:</h3>
             <div style="display: inline-block; padding: 5px 15px; border-radius: 4px; font-weight: bold; border: 2px solid; margin-top: 5px;" 
-                 [ngStyle]="{'color': booking.status === 'confirmed' ? '#2ecc71' : (booking.status === 'pending' ? '#e67e22' : '#e74c3c'), 'border-color': booking.status === 'confirmed' ? '#2ecc71' : (booking.status === 'pending' ? '#e67e22' : '#e74c3c')}">
-              {{ booking.status === 'confirmed' ? 'PAGADO' : (booking.status === 'pending' ? 'PENDIENTE' : 'CANCELADO') }}
+                 [ngStyle]="{'color': isPaid ? '#2ecc71' : (booking.status === 'pending' ? '#e67e22' : '#e74c3c'), 'border-color': isPaid ? '#2ecc71' : (booking.status === 'pending' ? '#e67e22' : '#e74c3c')}">
+              {{ isPaid ? 'PAGADO' : (booking.status === 'pending' ? 'PENDIENTE' : 'CANCELADO') }}
             </div>
           </div>
         </div>
 
-        <table style="width: 100%; margin-top: 3rem; border-collapse: collapse;">
+        <table style="width: 100%; margin-top: 2rem; border-collapse: collapse;">
           <thead>
             <tr style="background: #f8f9fa; border-bottom: 2px solid #ddd;">
               <th style="padding: 12px; text-align: left; color: #333;">Descripción del Servicio</th>
@@ -101,9 +132,20 @@ import { ApiService } from '../../services/api.service';
           </div>
         </div>
 
-        <div style="margin-top: 5rem; text-align: center; color: #888; font-size: 0.85rem; border-top: 1px solid #eee; padding-top: 2rem;">
+        <!-- Módulo Informativo de Reseña (el formulario activo vive en booking-detail) -->
+        <div *ngIf="canLeaveReview" class="no-print" style="margin-top: 2.5rem; background: #fdfbf7; border: 1px solid #e8dfc8; border-radius: 8px; padding: 1.5rem; text-align: center;">
+          <h4 style="margin: 0 0 6px 0; color: #8c7329; font-size: 1.1rem;">Tu Opinión como Huésped Verificado</h4>
+          <p style="margin: 0 0 14px 0; font-size: 0.88rem; color: #555;">
+            Ya puedes calificar tu estancia, limpieza y atención desde el panel detallado de tu reserva.
+          </p>
+          <a [routerLink]="['/reservas', bookingId]" style="display: inline-flex; align-items: center; gap: 8px; background: #0d0d0d; color: #d4af37; border: 1px solid #d4af37; padding: 10px 20px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; text-decoration: none; cursor: pointer;">
+            Calificar en Detalle de Reserva →
+          </a>
+        </div>
+
+        <div style="margin-top: 4rem; text-align: center; color: #888; font-size: 0.85rem; border-top: 1px solid #eee; padding-top: 2rem;">
           <p>Gracias por elegir Palacio del Mar. Esperamos que disfrute su estancia con nosotros.</p>
-          <p>Este documento es un comprobante de pago electrónico. Para soporte contáctenos a reservas@palaciodelmar.com</p>
+          <p>Este documento es un comprobante de reserva y pago electrónico con validez digital. Soporte: reservas@palaciodelmar.com</p>
         </div>
 
       </div>
@@ -136,11 +178,14 @@ export class ReceiptComponent implements OnInit {
   booking: any = null;
   loading = true;
   today = new Date();
+  qrSvgSafe: SafeHtml = '';
 
   constructor(
     private route: ActivatedRoute,
     private api: ApiService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private sanitizer: DomSanitizer,
+    @Optional() private auth?: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -149,6 +194,7 @@ export class ReceiptComponent implements OnInit {
       this.api.get<any>(`/bookings/${this.bookingId}`).subscribe({
         next: (res) => {
           this.booking = res.data || res;
+          this.generateQr();
           this.loading = false;
           this.cdr.detectChanges();
         },
@@ -163,20 +209,71 @@ export class ReceiptComponent implements OnInit {
     }
   }
 
+  generateQr(): void {
+    if (!this.booking) return;
+    try {
+      const rawCode = String(this.booking.bookingCode || this.booking.id || this.booking._id || 'RESERVA');
+      const rawPin = String(this.booking.smartLockPin || 'PENDIENTE');
+      const code = rawCode.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'RESERVA';
+      const pin = rawPin.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 16) || 'PENDIENTE';
+      const payload = `PDM:BK:${code}:PIN:${pin}`;
+      const svg = renderSVG(payload, { border: 1 });
+      this.qrSvgSafe = this.sanitizer.bypassSecurityTrustHtml(svg);
+    } catch (e) {
+      this.qrSvgSafe = '';
+    }
+  }
+
   print(): void {
     window.print();
   }
 
+  get isLoggedIn(): boolean {
+    return !this.auth || !!this.auth.currentUserValue;
+  }
+
+  get isPaid(): boolean {
+    const s = this.booking?.status?.toLowerCase();
+    return s === 'confirmed' || s === 'checked_in' || s === 'checked_out' || s === 'completed';
+  }
+
+  get bookingCodeDisplay(): string {
+    return this.booking?.bookingCode || this.booking?._id?.substring(0, 8) || this.booking?.id?.substring(0, 8) || '';
+  }
+
+  get smartLockPinDisplay(): string {
+    return this.booking?.smartLockPin || 'Pendiente de asignación';
+  }
+
   get suiteName(): string {
     if (!this.booking?.suite) return 'Suite';
-    return typeof this.booking.suite === 'string' ? this.booking.suite : this.booking.suite.name;
+    return typeof this.booking.suite === 'string' ? this.booking.suite : (this.booking.suite.name || 'Suite');
   }
 
   get guestName(): string {
-    return this.booking?.guestName || this.booking?.user?.name || 'Huésped';
+    return this.booking?.guestDetails?.fullName || this.booking?.guestName || this.booking?.user?.name || 'Huésped';
   }
 
   get guestEmail(): string {
-    return this.booking?.guestEmail || this.booking?.user?.email || '';
+    return this.booking?.guestDetails?.email || this.booking?.guestEmail || this.booking?.user?.email || '';
+  }
+
+  get canLeaveReview(): boolean {
+    const s = this.booking?.status?.toLowerCase();
+    const isCompleted = s === 'checked_out' || s === 'completed';
+    if (!isCompleted) return false;
+    const user = this.auth?.currentUserValue;
+    if (user) {
+      const role = (user.role || '').toLowerCase();
+      if (role === 'host' || role === 'anfitrion' || role === 'admin') {
+        const uId = user.id || user._id;
+        const bUser = typeof this.booking?.user === 'object' ? (this.booking.user?.id || this.booking.user?._id) : (this.booking?.user || this.booking?.userId);
+        if (uId && bUser && uId !== bUser) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 }
+

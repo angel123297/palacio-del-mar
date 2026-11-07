@@ -147,6 +147,30 @@ public class HostPropertyController {
         return ResponseEntity.ok(ApiResponse.ok("Proceso de liquidación ejecutado exitosamente", payouts));
     }
 
+    @GetMapping("/reviews")
+    public ResponseEntity<ApiResponse<List<ReviewDTO>>> getHostReviews(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        String userId = principal.getUser().getId();
+        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        List<PropertyDTO> properties = isAdmin ? propertyService.getAllPropertiesForAdmin(null) : propertyService.getPropertiesByOwner(userId);
+        List<ReviewDTO> hostReviews = new java.util.ArrayList<>();
+        if (reviewService != null && properties != null) {
+            for (PropertyDTO prop : properties) {
+                String pId = prop.getId() != null ? prop.getId() : prop.get_id();
+                List<Suite> suites = propertyService.getPropertySuitesForHost(pId, userId, isAdmin);
+                if (suites != null) {
+                    for (Suite suite : suites) {
+                        List<ReviewDTO> suiteReviews = reviewService.getSuiteReviews(suite.getId());
+                        if (suiteReviews != null) {
+                            hostReviews.addAll(suiteReviews);
+                        }
+                    }
+                }
+            }
+        }
+        return ResponseEntity.ok(ApiResponse.ok(hostReviews));
+    }
+
     @PutMapping("/reviews/{reviewId}/resolve-maintenance")
     public ResponseEntity<ApiResponse<ReviewDTO>> resolveMaintenance(
             @AuthenticationPrincipal UserPrincipal principal,
@@ -154,5 +178,37 @@ public class HostPropertyController {
         String userId = principal.getUser().getId();
         ReviewDTO dto = reviewService != null ? reviewService.resolveMaintenanceAlert(reviewId, userId) : null;
         return ResponseEntity.ok(ApiResponse.ok("Alerta de mantenimiento marcada como resuelta", dto));
+    }
+
+    @GetMapping("/{id}/sync/ical")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getPropertyIcalSyncInfo(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String id) {
+        String userId = principal.getUser().getId();
+        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        PropertyDTO property = propertyService.getPropertyByOwner(id, userId, isAdmin);
+
+        java.util.Map<String, Object> syncInfo = new java.util.LinkedHashMap<>();
+        syncInfo.put("propertyId", property.getId());
+        syncInfo.put("propertyName", property.getName());
+        syncInfo.put("propertyIcalUrl", "/api/properties/" + property.getId() + "/calendar.ics");
+
+        List<Suite> suites = propertyService.getPropertySuitesForHost(id, userId, isAdmin);
+        List<java.util.Map<String, String>> suiteFeeds = suites.stream().map(s -> {
+            String suiteId = s.getId() != null ? s.getId().trim() : "";
+            String icalUrl = suiteId.isEmpty() ? "" : "/api/suites/" + suiteId + "/calendar.ics";
+            return java.util.Map.of(
+                    "suiteId", suiteId,
+                    "suiteName", s.getName() != null ? s.getName() : "Suite",
+                    "icalUrl", icalUrl
+            );
+        }).toList();
+        syncInfo.put("suiteFeeds", suiteFeeds);
+        syncInfo.put("instructions", java.util.Map.of(
+                "airbnb", "En Airbnb: Anuncios > Precios y disponibilidad > Sincronización del calendario > Exportar calendario.",
+                "booking", "En Booking.com Extranet: Calendario > Sincronizar calendarios > Añadir conexión y pega el enlace del feed."
+        ));
+
+        return ResponseEntity.ok(ApiResponse.ok(syncInfo));
     }
 }

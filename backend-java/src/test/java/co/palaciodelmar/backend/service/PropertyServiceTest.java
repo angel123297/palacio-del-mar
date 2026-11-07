@@ -144,4 +144,57 @@ class PropertyServiceTest {
         assertEquals(1, result.size());
         assertEquals("APPROVED", result.get(0).getStatus());
     }
+
+    @Test
+    @DisplayName("Crear suite con imagen vacía usa la imagen de la propiedad o fallback")
+    void createSuiteWithBlankImageUsesPropertyImageOrFallback() {
+        Property prop = Property.builder()
+                .id("prop-img")
+                .ownerId("host-1")
+                .name("Hotel Vista Mar")
+                .mainImage("https://example.com/hotel.jpg")
+                .build();
+
+        when(propertyRepository.findById("prop-img")).thenReturn(Optional.of(prop));
+        when(suiteRepository.findBySlug(any())).thenReturn(Optional.empty());
+        when(suiteRepository.save(any(Suite.class))).thenAnswer(i -> i.getArgument(0));
+
+        HostSuiteRequest req = HostSuiteRequest.builder()
+                .name("Habitacion 101")
+                .basePrice(new BigDecimal("200000"))
+                .mainImage("") // vacío
+                .build();
+
+        Suite created = propertyService.createSuiteForProperty("prop-img", "host-1", req, false);
+
+        assertNotNull(created);
+        assertEquals("https://example.com/hotel.jpg", created.getMainImage());
+        assertTrue(created.getActive());
+        assertTrue(created.getAvailable());
+    }
+
+    @Test
+    @DisplayName("Desactivar suite marca active=false y available=false")
+    void deleteSuiteSetsActiveAndAvailableFalse() {
+        Property prop = Property.builder()
+                .id("prop-del")
+                .ownerId("host-1")
+                .build();
+
+        Suite suite = Suite.builder()
+                .id("suite-1")
+                .propertyId("prop-del")
+                .active(true)
+                .available(true)
+                .build();
+
+        when(propertyRepository.findById("prop-del")).thenReturn(Optional.of(prop));
+        when(suiteRepository.findById("suite-1")).thenReturn(Optional.of(suite));
+
+        propertyService.deleteSuiteForProperty("prop-del", "suite-1", "host-1", false);
+
+        assertFalse(suite.getActive());
+        assertFalse(suite.getAvailable());
+        verify(suiteRepository).save(suite);
+    }
 }

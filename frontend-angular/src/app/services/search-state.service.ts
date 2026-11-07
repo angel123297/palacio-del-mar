@@ -48,9 +48,10 @@ export class SearchStateService {
     const start = this.parseToMidday(this.filters().checkIn);
     const end = this.parseToMidday(this.filters().checkOut);
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return 1;
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)); 
-    return diffDays > 0 ? diffDays : 1;
+    // Sin Math.abs: un rango invertido (salida antes que llegada) no cuenta noches positivas.
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
   });
 
   updateDates(checkIn: Date, checkOut: Date) {

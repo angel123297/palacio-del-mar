@@ -71,6 +71,8 @@ public class BookingDTO {
     private BigDecimal appliedPromotionDiscountPercent;
     private String smartLockPin;
     private Boolean preCheckInCompleted;
+    private String documentNumber;
+    private String companionGuests;
     private List<String> dynamicPricingNotes;
     private String payoutId;
     private Instant reviewRequestSentAt;

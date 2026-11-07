@@ -46,7 +46,7 @@ public class SuiteNight {
     @Indexed
     private String status; // "blocked", "held", "maintenance"
 
-    @Indexed(expireAfterSeconds = 0)
+    @Indexed(expireAfter = "0s")
     private Instant expiresAt;
 
     @Builder.Default

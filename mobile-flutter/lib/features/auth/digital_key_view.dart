@@ -299,9 +299,6 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
     final authProvider = context.watch<AuthProvider>();
 
     if (authProvider.isAuthenticated) {
-      if (_userBookings.isEmpty && !_isLoadingBookings) {
-        _loadBookings();
-      }
 
       final activeBookings = _userBookings.where((b) {
         final status = (b is Map ? b['status'] : null)?.toString().toLowerCase();

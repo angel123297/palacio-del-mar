@@ -30,10 +30,16 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         if (!isAuthEndpoint && authService.isLoggedIn()) {
           authService.clearLocalData();
           const currentUrl = router.url;
-          const isProtectedPage = ['/mis-reservas', '/admin', '/anfitrion', '/perfil'].some(p => currentUrl.startsWith(p));
+          const isProtectedPage = ['/mis-reservas', '/reservas', '/checkout', '/admin', '/anfitrion', '/perfil'].some(p => currentUrl.startsWith(p));
           if (isProtectedPage) {
-            router.navigate(['/']);
+            router.navigate(['/'], { queryParams: { returnUrl: currentUrl, sessionExpired: 'true' } });
           }
+        }
+      } else if (error.status === 429) {
+        const retryAfter = error.error?.retryAfterSeconds || error.headers?.get('Retry-After') || 60;
+        const msg = `Demasiadas solicitudes consecutivas. Por favor espera ${retryAfter} segundos antes de volver a intentarlo.`;
+        if (error.error && typeof error.error === 'object') {
+          error.error.message = error.error.message || msg;
         }
       }
       return throwError(() => error);

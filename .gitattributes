@@ -7,3 +7,8 @@ docker-compose.yml text eol=lf
 
 # Los scripts de shell deben conservar saltos de línea LF (si no, fallan en bash)
 *.sh              text eol=lf
+
+# GitHub Linguist: evitar detección de herramientas o configuraciones como lenguajes de código fuente
+*.config.*        linguist-vendored
+*.lock            linguist-vendored
+

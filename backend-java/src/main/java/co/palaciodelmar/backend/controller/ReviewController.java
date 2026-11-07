@@ -62,6 +62,18 @@ public class ReviewController {
     }
 
     /**
+     * Endpoint para consultar la reseña asociada a una reserva.
+     */
+    @GetMapping("/reviews/booking/{bookingId}")
+    public ResponseEntity<ApiResponse<ReviewDTO>> getReviewByBooking(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String bookingId
+    ) {
+        ReviewDTO review = reviewService.getReviewByBookingId(bookingId, principal != null ? principal.getUser() : null);
+        return ResponseEntity.ok(ApiResponse.ok(review));
+    }
+
+    /**
      * Endpoint administrativo con métricas de sentimiento y alertas de mantenimiento.
      */
     @GetMapping("/admin/reviews/metrics")

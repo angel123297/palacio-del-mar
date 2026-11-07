@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { tap, timeout } from 'rxjs';
 import { User, AuthResponse, LoginDTO, RegisterDTO } from '../models/types';
 import { environment } from '../../environments/environment';
@@ -17,10 +18,15 @@ export class AuthService {
 
   isLoggedIn(): boolean {
     const user = this.currentUserSignal();
-    return !!user && user.emailVerified !== false;
+    return !!user && user.emailVerified === true;
   }
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private router: Router) {
+    this.loadCachedUser();
+    this.fetchMe();
+  }
+
+  loadCachedUser() {
     const cachedUser = localStorage.getItem('user');
     if (cachedUser) {
       try {
@@ -28,8 +34,9 @@ export class AuthService {
       } catch (e) {
         localStorage.removeItem('user');
       }
+    } else {
+      this.currentUserSignal.set(null);
     }
-    this.fetchMe();
   }
 
   private fetchMe() {
@@ -96,26 +103,59 @@ export class AuthService {
   }
 
   verifyEmail(token: string) {
-    return this.http.post<{success?: boolean, message?: string}>(`${this.apiUrl}/verify-email`, { token }).pipe(
+    return this.http.post<AuthResponse>(`${this.apiUrl}/verify-email`, { token }).pipe(
+      timeout(this.TIMEOUT_MS),
+      tap(res => {
+        const tokenVal = (res as any).token || (res as any).data?.token;
+        if (tokenVal) {
+          localStorage.setItem('token', tokenVal);
+        }
+        const user = res.user || (res as any).data?.user;
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+          this.currentUserSignal.set(user);
+        }
+      })
+    );
+  }
+
+  resendVerification(email: string) {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/resend-verification`, { email }).pipe(
       timeout(this.TIMEOUT_MS)
     );
   }
 
-  forceVerify(email: string) {
-    return this.http.post<{success?: boolean, message?: string}>(`${this.apiUrl}/force-verify`, { email }).pipe(
+  forgotPassword(email: string) {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/forgot-password`, { email }).pipe(
+      timeout(this.TIMEOUT_MS)
+    );
+  }
+
+  resetPassword(token: string, newPassword: string) {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/reset-password`, { token, newPassword }).pipe(
       timeout(this.TIMEOUT_MS)
     );
   }
 
   logout() {
-    return this.http.post(`${this.apiUrl}/logout`, {}).pipe(
+    const token = localStorage.getItem('token');
+    this.clearLocalData();
+    this.router.navigate(['/']);
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    return this.http.post(`${this.apiUrl}/logout`, {}, { headers }).pipe(
+      timeout(this.TIMEOUT_MS)
+    ).subscribe({
+      next: () => {},
+      error: () => {}
+    });
+  }
+
+  logoutAllDevices() {
+    return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/logout-all`, {}).pipe(
+      timeout(this.TIMEOUT_MS),
       tap(() => {
         this.clearLocalData();
       })
-    ).subscribe({
-      error: () => {
-        this.clearLocalData();
-      }
-    });
+    );
   }
 }

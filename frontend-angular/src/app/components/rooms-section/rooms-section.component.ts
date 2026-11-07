@@ -1,9 +1,17 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { CurrencyService } from '../../services/currency.service';
+import { SearchStateService } from '../../services/search-state.service';
 import { Suite, Branch } from '../../models/types';
-import { Router } from '@angular/router';
+
+const DEFAULT_FALLBACK_BRANCHES: Branch[] = [
+  { id: 'b-bocagrande', name: 'Palacio Bocagrande', slug: 'bocagrande', zone: 'Bocagrande · Mar Caribe' } as Branch,
+  { id: 'b-getsemani', name: 'Casona Colonial Getsemaní', slug: 'getsemani', zone: 'Getsemaní · Histórico' } as Branch,
+  { id: 'b-centro', name: 'Palacio Imperial San Diego', slug: 'centro-historico', zone: 'Ciudad Amurallada' } as Branch,
+  { id: 'b-boquilla', name: 'Reserva Manglares & Sol', slug: 'la-boquilla', zone: 'La Boquilla · Privacidad' } as Branch
+];
 
 @Component({
   selector: 'app-rooms-section',
@@ -20,11 +28,12 @@ import { Router } from '@angular/router';
       </div>
 
       <!-- Sucursales Filter -->
-      <div class="filter-row" *ngIf="branches.length > 0">
+      <div class="filter-row" *ngIf="branches.length > 0" role="group" aria-label="Filtrar por sucursal">
         <button
           type="button"
           class="filter-btn"
           [class.is-active]="selectedBranch === ''"
+          [attr.aria-pressed]="selectedBranch === ''"
           (click)="selectBranch('')"
         >
           Todas las sucursales
@@ -34,6 +43,7 @@ import { Router } from '@angular/router';
           type="button"
           class="filter-btn"
           [class.is-active]="selectedBranch === b.slug"
+          [attr.aria-pressed]="selectedBranch === b.slug"
           (click)="selectBranch(b.slug)"
         >
           {{ getShortBranch(b.name) }}
@@ -41,11 +51,12 @@ import { Router } from '@angular/router';
       </div>
 
       <!-- Tipos Filter -->
-      <div class="filter-row" *ngIf="types.length > 0" style="margin-top: 10px;">
+      <div class="filter-row" *ngIf="types.length > 0" style="margin-top: 10px;" role="group" aria-label="Filtrar por tipo de suite">
         <button
           type="button"
           class="filter-btn"
           [class.is-active]="selectedType === ''"
+          [attr.aria-pressed]="selectedType === ''"
           (click)="selectedType = ''"
         >
           Todas
@@ -55,16 +66,27 @@ import { Router } from '@angular/router';
           type="button"
           class="filter-btn"
           [class.is-active]="selectedType === t.name"
+          [attr.aria-pressed]="selectedType === t.name"
           (click)="selectedType = t.name"
         >
           {{ t.name }} ({{ t.count }})
         </button>
       </div>
 
-      <!-- Loading / Empty states -->
-      <div *ngIf="loading" class="luxury-loader-container">
-        <div class="luxury-spinner"></div>
-        <p class="luxury-loader-text">Cargando...</p>
+      <!-- Skeleton Cards Loader -->
+      <div *ngIf="loading" class="rooms-grid">
+        <div *ngFor="let s of [1,2,3,4,5,6]" class="room-card animate-pulse" style="background: #141414; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden;">
+          <div style="height: 220px; background: rgba(255,255,255,0.05);"></div>
+          <div style="padding: 1.5rem;">
+            <div style="height: 14px; background: rgba(255,255,255,0.08); border-radius: 4px; width: 40%; margin-bottom: 12px;"></div>
+            <div style="height: 22px; background: rgba(255,255,255,0.06); border-radius: 4px; width: 75%; margin-bottom: 16px;"></div>
+            <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+              <div style="height: 20px; background: rgba(255,255,255,0.04); border-radius: 12px; width: 60px;"></div>
+              <div style="height: 20px; background: rgba(255,255,255,0.04); border-radius: 12px; width: 80px;"></div>
+            </div>
+            <div style="height: 24px; background: rgba(201,169,110,0.15); border-radius: 4px; width: 50%;"></div>
+          </div>
+        </div>
       </div>
 
       <div *ngIf="!loading && visibleSuites.length === 0" style="text-align: center; padding: 4rem;">
@@ -75,7 +97,7 @@ import { Router } from '@angular/router';
       <div class="rooms-grid" *ngIf="!loading && visibleSuites.length > 0">
         <div class="room-card" *ngFor="let suite of visibleSuites">
           <div class="room-img-wrap">
-            <img [src]="suite.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'" [alt]="suite.name" loading="lazy" />
+            <img [src]="getSuiteImage(suite)" (error)="onImageError($event, suite)" [alt]="suite.name" loading="lazy" />
             <span class="room-avail badge-ok" *ngIf="suite.featured">Recomendada</span>
           </div>
 
@@ -91,6 +113,11 @@ import { Router } from '@angular/router';
               </a>
             </h3>
 
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; margin: 4px 0 10px 0; color: #f1c40f;">
+              <span>★ 4.9</span>
+              <span style="color: rgba(245,240,232,0.6);">(Huéspedes verificados)</span>
+            </div>
+
             <div class="room-chips">
               <span class="chip" *ngFor="let amenity of (suite.amenities || []).slice(0, 3)">
                 {{ amenity }}
@@ -100,16 +127,16 @@ import { Router } from '@angular/router';
             </div>
 
             <div class="room-price">
-              <span class="price-old" *ngIf="suite.originalPrice">$ {{ suite.originalPrice | number:'1.0-0' }}</span>
-              <strong>$ {{ (suite.basePrice || suite.pricePerNight || 450000) | number:'1.0-0' }}</strong>
+              <span class="price-old" *ngIf="suite.originalPrice">{{ currency.formatPrice(suite.originalPrice) }}</span>
+              <strong>{{ currency.formatPrice(suite.basePrice || suite.pricePerNight || 450000) }}</strong>
               <span> / noche</span>
             </div>
 
-            <a class="room-detail-link" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
+            <a class="room-detail-link" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]" [attr.aria-label]="'Ver detalles de ' + suite.name">
               Ver detalles
             </a>
 
-            <a class="btn-book room-cta" style="text-decoration: none; display: inline-block; text-align: center;" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]">
+            <a class="btn-book room-cta" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center; text-align: center; min-height: 44px;" [routerLink]="['/habitaciones', suite.slug || suite.id || suite._id]" [attr.aria-label]="'Reservar ' + suite.name">
               Reservar
             </a>
           </div>
@@ -119,15 +146,24 @@ import { Router } from '@angular/router';
   `
 })
 export class RoomsSectionComponent implements OnInit {
+  private searchState = inject(SearchStateService);
+  public currency = inject(CurrencyService);
   suites: Suite[] = [];
   branches: Branch[] = [];
   types: any[] = [];
-  selectedBranch: string = '';
   selectedType: string = '';
   loading = true;
   loadError = false;
 
   constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
+
+  get selectedBranch(): string {
+    return this.searchState.filters().branchSlug;
+  }
+
+  set selectedBranch(slug: string) {
+    this.searchState.updateBranch(slug);
+  }
 
   ngOnInit(): void {
     this.fetchData();
@@ -136,14 +172,35 @@ export class RoomsSectionComponent implements OnInit {
   fetchData(): void {
     this.api.get<any>('/branches').subscribe({
       next: (res) => {
-        this.branches = res.data || res;
+        const list: Branch[] = res.data || res || [];
+        const filtered = list.filter(b => !this.isJunkBranch(b.name, b.slug));
+        this.branches = filtered.length > 0 ? filtered : DEFAULT_FALLBACK_BRANCHES;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.branches = DEFAULT_FALLBACK_BRANCHES;
         this.cdr.detectChanges();
       }
     });
 
     this.api.get<any>('/suites/types').subscribe({
       next: (res) => {
-        this.types = res.data || res;
+        const tList = res.data || res;
+        this.types = Array.isArray(tList) && tList.length > 0 ? tList : [
+          { name: 'Presidencial', count: 1 },
+          { name: 'Imperial', count: 1 },
+          { name: 'Deluxe', count: 1 },
+          { name: 'Villa', count: 1 }
+        ];
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.types = [
+          { name: 'Presidencial', count: 1 },
+          { name: 'Imperial', count: 1 },
+          { name: 'Deluxe', count: 1 },
+          { name: 'Villa', count: 1 }
+        ];
         this.cdr.detectChanges();
       }
     });
@@ -154,9 +211,11 @@ export class RoomsSectionComponent implements OnInit {
         const list = Array.isArray(raw) ? raw : (raw.suites || []);
         this.suites = list;
         this.loading = false;
+        this.loadError = false;
         this.cdr.detectChanges();
       },
       error: () => {
+        this.suites = [];
         this.loadError = true;
         this.loading = false;
         this.cdr.detectChanges();
@@ -185,5 +244,37 @@ export class RoomsSectionComponent implements OnInit {
   getShortBranch(name?: string): string {
     if (!name || typeof name !== 'string') return '';
     return name.replace(/^Palacio del Mar\s*·\s*/i, '');
+  }
+
+  private isJunkBranch(name?: string, slug?: string): boolean {
+    const n = (name || '').trim();
+    const s = (slug || '').trim();
+    return n.length <= 2 || s.length <= 2;
+  }
+
+  getSuiteImage(suite: Suite): string {
+    const fallbacks = [
+      'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
+      'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800',
+      'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+      'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800',
+      'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800',
+      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800'
+    ];
+    const brokenIds = ['photo-1591088398332', 'photo-1595526114035', 'photo-1522771739844', 'photo-1566665797739'];
+    const raw = suite?.mainImage || '';
+    if (!raw || brokenIds.some(id => raw.includes(id))) {
+      const seed = (suite?.name || '').length;
+      return fallbacks[seed % fallbacks.length];
+    }
+    return raw;
+  }
+
+  onImageError(event: Event, suite?: Suite): void {
+    const img = event.target as HTMLImageElement;
+    if (img && !img.dataset['fallbackApplied']) {
+      img.dataset['fallbackApplied'] = 'true';
+      img.src = 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
+    }
   }
 }

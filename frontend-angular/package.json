@@ -6,7 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "NODE_PATH=./node_modules/@angular/build/node_modules ng test"
+    "test": "cross-env NODE_PATH=./node_modules/@angular/build/node_modules ng test"
   },
   "private": true,
   "dependencies": {
@@ -20,7 +20,9 @@
     "@angular/material-date-fns-adapter": "^22.2.2",
     "@angular/platform-browser": "^22.2.2",
     "@angular/router": "^22.2.2",
+    "cross-env": "^10.1.0",
     "date-fns": "^4.4.0",
+    "leaflet": "^1.9.4",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "^0.16.3"
@@ -29,6 +31,7 @@
     "@angular/build": "^22.2.2",
     "@angular/cli": "^22.2.2",
     "@angular/compiler-cli": "^22.2.2",
+    "@types/leaflet": "^1.9.22",
     "@vitest/browser": "^5.0.3",
     "autoprefixer": "^10.6.1",
     "jsdom": "^30.0.0",
