@@ -23,17 +23,29 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String _selectedMethod = 'CARD'; // CARD, PSE, NEQUI
   bool _isProcessing = false;
 
+  Map<String, dynamic> get _targetBooking {
+    if (widget.booking['data'] is Map<String, dynamic>) {
+      return widget.booking['data'] as Map<String, dynamic>;
+    }
+    return widget.booking;
+  }
+
   Future<void> _processPayment() async {
     setState(() => _isProcessing = true);
 
     try {
-      final bId = widget.booking['id'] ?? widget.booking['_id'] ?? widget.booking['bookingId'];
-      final rawAmount = widget.booking['totalPrice'] ?? widget.booking['totalAmount'] ?? widget.booking['balanceDue'];
+      final bk = _targetBooking;
+      final bId = bk['id'] ?? bk['_id'] ?? bk['bookingId'] ?? widget.booking['id'] ?? widget.booking['_id'];
+      final rawAmount = bk['totalPrice'] ?? bk['totalAmount'] ?? bk['balanceDue'] ?? widget.booking['totalPrice'];
       double amountVal = 250000;
       if (rawAmount is num) {
         amountVal = rawAmount.toDouble();
       } else if (rawAmount is String) {
         amountVal = double.tryParse(rawAmount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 250000;
+      }
+
+      if (bId == null || bId.toString().isEmpty) {
+        throw Exception('Reserva no especificada');
       }
 
       // 1. Iniciar checkout con contrato Spring Boot
@@ -113,7 +125,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final rawAmount = widget.booking['totalPrice'] ?? widget.booking['totalAmount'] ?? widget.booking['balanceDue'];
+    final bk = _targetBooking;
+    final rawAmount = bk['totalPrice'] ?? bk['totalAmount'] ?? bk['balanceDue'] ?? widget.booking['totalPrice'];
     double amount = 250000;
     if (rawAmount is num) {
       amount = rawAmount.toDouble();
@@ -121,7 +134,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       amount = double.tryParse(rawAmount.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 250000;
     }
 
-    final suiteTitle = (widget.booking['suiteName'] ?? widget.booking['title'] ?? 'Suite Palacio del Mar').toString();
+    final suiteTitle = (bk['suiteName'] ?? bk['suiteTitle'] ?? bk['title'] ?? widget.booking['suiteName'] ?? 'Suite Palacio del Mar').toString();
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),

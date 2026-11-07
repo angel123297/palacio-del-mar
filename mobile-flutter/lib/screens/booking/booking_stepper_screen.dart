@@ -109,12 +109,16 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
       if (!mounted) return;
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final booking = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final Map<String, dynamic> bookingMap = (decoded is Map<String, dynamic> && decoded['data'] is Map<String, dynamic>)
+            ? Map<String, dynamic>.from(decoded['data'])
+            : (decoded is Map<String, dynamic> ? decoded : {'id': decoded.toString()});
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => PaymentScreen(
-              booking: booking is Map<String, dynamic> ? booking : {'id': booking.toString()},
+              booking: bookingMap,
               token: widget.token,
               baseUrl: widget.baseUrl,
             ),
