@@ -1702,4 +1702,121 @@ class AuditRemediationFivePointsTest {
                 "El webhook nunca debe marcar como 'refunded' un pago con devolución parcial aunque la reserva esté cancelada");
         assertEquals(new BigDecimal("450000"), paymentViaWebhook.getRefundedAmount());
     }
+
+    @Test
+    @DisplayName("Ronda 6: Un webhook tardío de otro reembolso con el mismo monto NO borra el reembolso pendiente actual")
+    void testRound6_WebhookDoesNotClearDifferentPendingRefundWithSameAmount() {
+        String bookingId = "b_same_amount_r6";
+        String intentId = "pi_same_amount_r6";
+        String pendingSecondKey = "ref_mod_second_100k";
+        String earlierFirstKey = "ref_mod_first_100k";
+        String earlierRefundId = "re_first_100k_late";
+
+        // Reserva que tiene pendiente un segundo reembolso de $100.000 (pendingSecondKey),
+        // mientras el webhook del primer reembolso de $100.000 (earlierFirstKey / earlierRefundId) llega tarde
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .user("u_r6")
+                .suite("suite_1")
+                .status("confirmed")
+                .paymentStatus("requires_refund")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .pendingRefundIdempotencyKey(pendingSecondKey)
+                .pendingRefundAmount(new BigDecimal("100000"))
+                .processedRefundIds(new ArrayList<>())
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay_r6")
+                .intentId(intentId)
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("completed")
+                .transactionId("ch_r6")
+                .processedRefundIds(new ArrayList<>())
+                .build();
+
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByBooking(bookingId)).thenReturn(List.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProcessedWebhookEventRepository mockEventRepo = mock(ProcessedWebhookEventRepository.class);
+        when(mockEventRepo.existsByEventId(anyString())).thenReturn(false);
+
+        PaymentWebhookService realWebhookService = new PaymentWebhookService(
+                paymentRepository,
+                bookingRepository,
+                bookingService,
+                mockEventRepo,
+                emailService,
+                new ObjectMapper().findAndRegisterModules(),
+                paymentGateway
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(realWebhookService, "webhookSecret", "whsec_test_secret_r6_12345678901234567890");
+
+        // 1. Llega tarde el webhook de la PRIMERA devolución ($100.000, clave earlierFirstKey != pendingSecondKey)
+        String lateWebhookFirst = """
+                {
+                  "eventId": "evt_late_first_100k",
+                  "eventType": "refund.processed",
+                  "timestamp": "%s",
+                  "data": {
+                    "intentId": "%s",
+                    "bookingId": "%s",
+                    "amount": 100000,
+                    "currency": "COP",
+                    "status": "partially_refunded",
+                    "transactionId": "%s",
+                    "idempotencyKey": "%s"
+                  }
+                }
+                """.formatted(Instant.now().toString(), intentId, bookingId, earlierRefundId, earlierFirstKey);
+        String sig1 = co.palaciodelmar.backend.webhook.WebhookSigner.sign(lateWebhookFirst, "whsec_test_secret_r6_12345678901234567890");
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+
+        realWebhookService.processWebhook(lateWebhookFirst, sig1, "evt_late_first_100k", ts);
+
+        // El primer reembolso ($100.000) se contabiliza, pero NO debe borrar la operación pendiente (pendingSecondKey)
+        assertEquals(new BigDecimal("100000"), booking.getRefundedAmount());
+        assertEquals(pendingSecondKey, booking.getPendingRefundIdempotencyKey(),
+                "Un webhook de otra devolución con el mismo monto jamás debe borrar la clave pendiente actual");
+        assertEquals(new BigDecimal("100000"), booking.getPendingRefundAmount(),
+                "El monto pendiente de la segunda operación debe conservarse intacto");
+        assertEquals("requires_refund", booking.getPaymentStatus(),
+                "Mientras siga pendiente la segunda operación, debe mantenerse requires_refund");
+
+        // 2. Ahora el conciliador periódico (o el webhook de la segunda operación) sí la encuentra y la liquida
+        String secondRefundId = "re_second_100k_confirmed";
+        String webhookSecond = """
+                {
+                  "eventId": "evt_second_100k",
+                  "eventType": "refund.processed",
+                  "timestamp": "%s",
+                  "data": {
+                    "intentId": "%s",
+                    "bookingId": "%s",
+                    "amount": 100000,
+                    "currency": "COP",
+                    "status": "partially_refunded",
+                    "transactionId": "%s",
+                    "idempotencyKey": "%s"
+                  }
+                }
+                """.formatted(Instant.now().toString(), intentId, bookingId, secondRefundId, pendingSecondKey);
+        String sig2 = co.palaciodelmar.backend.webhook.WebhookSigner.sign(webhookSecond, "whsec_test_secret_r6_12345678901234567890");
+
+        realWebhookService.processWebhook(webhookSecond, sig2, "evt_second_100k", ts);
+
+        // Ahora sí: total devuelto = $200.000 y la operación pendiente que coincidió por clave y monto queda limpia
+        assertEquals(new BigDecimal("200000"), booking.getRefundedAmount());
+        assertEquals(new BigDecimal("200000"), payment.getRefundedAmount());
+        assertNull(booking.getPendingRefundIdempotencyKey(),
+                "Cuando llega el webhook correspondiente a la clave pendiente y monto, debe limpiar la operación pendiente");
+        assertEquals(BigDecimal.ZERO, booking.getPendingRefundAmount());
+    }
 }

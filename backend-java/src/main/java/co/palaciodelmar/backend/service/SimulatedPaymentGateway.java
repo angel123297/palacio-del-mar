@@ -732,6 +732,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                             .currency(intent.getCurrency())
                             .status(targetRecord.getStatus() != null ? targetRecord.getStatus() : intent.getStatus())
                             .transactionId(refundId)
+                            .idempotencyKey(targetRecord.getIdempotencyKey())
                             .failureMessage(null)
                             .build())
                     .build();

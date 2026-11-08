@@ -42,8 +42,15 @@ public class PaymentWebhookService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.repository.PaymentIntentRepository paymentIntentRepository;
+
     public void setMongoTemplate(org.springframework.data.mongodb.core.MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
+    }
+
+    public void setPaymentIntentRepository(co.palaciodelmar.backend.repository.PaymentIntentRepository paymentIntentRepository) {
+        this.paymentIntentRepository = paymentIntentRepository;
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -489,16 +496,23 @@ public class PaymentWebhookService {
             BigDecimal eventRefund = rawRefund.max(BigDecimal.ZERO);
 
             BigDecimal newRefunded;
-            if (isCancelled && currentRefunded.compareTo(BigDecimal.ZERO) > 0 && !hasUnsettledCancelRefund) {
+            if (isCancelled && currentRefunded.compareTo(BigDecimal.ZERO) > 0 && !hasUnsettledCancelRefund && refundId == null) {
                 // cancelBooking ya contabilizó el reembolso al cancelar; reconciliar sin sumar dos veces
                 newRefunded = currentRefunded.max(eventRefund).min(paidCap);
             } else {
                 newRefunded = currentRefunded.add(eventRefund).min(paidCap);
             }
 
+            boolean clearPending = matchesPendingRefundOperation(booking, data, eventId, eventRefund);
+            boolean stillHasOtherPendingRefund = !clearPending
+                    && booking.getPendingRefundIdempotencyKey() != null
+                    && !booking.getPendingRefundIdempotencyKey().isBlank();
+
             String nextBookingPaymentStatus = booking.getPaymentStatus();
             if (paidCap.compareTo(BigDecimal.ZERO) > 0 && newRefunded.compareTo(paidCap) >= 0) {
                 nextBookingPaymentStatus = "refunded";
+            } else if (stillHasOtherPendingRefund && "requires_refund".equalsIgnoreCase(booking.getPaymentStatus())) {
+                nextBookingPaymentStatus = "requires_refund";
             } else if (newRefunded.compareTo(BigDecimal.ZERO) > 0) {
                 nextBookingPaymentStatus = "partial";
             }
@@ -509,14 +523,6 @@ public class PaymentWebhookService {
             }
             if (refundId != null && !refundId.isBlank() && !bookingKeys.contains(refundId)) {
                 bookingKeys.add(refundId);
-            }
-
-            boolean clearPending = false;
-            if (booking.getPendingRefundIdempotencyKey() != null) {
-                BigDecimal pendingAmt = booking.getPendingRefundAmount() != null ? booking.getPendingRefundAmount() : BigDecimal.ZERO;
-                if (pendingAmt.compareTo(BigDecimal.ZERO) <= 0 || pendingAmt.compareTo(eventRefund) == 0) {
-                    clearPending = true;
-                }
             }
 
             if (mongoTemplate != null && booking.getId() != null && !bookingKeys.isEmpty()) {
@@ -590,6 +596,62 @@ public class PaymentWebhookService {
         } else {
             synchronizedRefundExecution.run();
         }
+    }
+
+    private boolean matchesPendingRefundOperation(
+            Booking booking,
+            PaymentWebhookPayload.PaymentWebhookData data,
+            String eventId,
+            BigDecimal eventRefund
+    ) {
+        if (booking == null || booking.getPendingRefundIdempotencyKey() == null || booking.getPendingRefundIdempotencyKey().isBlank()) {
+            return false;
+        }
+        String pendingKey = booking.getPendingRefundIdempotencyKey().trim();
+        BigDecimal pendingAmt = booking.getPendingRefundAmount() != null ? booking.getPendingRefundAmount() : BigDecimal.ZERO;
+
+        // Usar el monto como validación adicional: si existe un monto pendiente positivo, debe coincidir con el monto del evento
+        if (pendingAmt.compareTo(BigDecimal.ZERO) > 0 && eventRefund != null && pendingAmt.compareTo(eventRefund) != 0) {
+            return false;
+        }
+
+        // 1. Si el payload del webhook incluye explícitamente la clave de idempotencia de la operación, debe coincidir con pendingKey
+        if (data != null && data.getIdempotencyKey() != null && !data.getIdempotencyKey().isBlank()) {
+            return pendingKey.equals(data.getIdempotencyKey().trim());
+        }
+
+        String refundId = (data != null && data.getTransactionId() != null && !data.getTransactionId().isBlank())
+                ? data.getTransactionId().trim()
+                : null;
+        String normalizedEventId = (eventId != null && !eventId.isBlank()) ? eventId.trim() : null;
+
+        // 2. Coincidencia por identificador determinístico derivado de pendingKey o coincidencia directa de clave/ID
+        String deterministicRefundId = "re_" + java.util.UUID.nameUUIDFromBytes(
+                pendingKey.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        ).toString().replace("-", "").substring(0, 16);
+        String deterministicEventId = "evt_ref_" + deterministicRefundId.replace("re_", "");
+
+        if (pendingKey.equals(refundId) || pendingKey.equals(normalizedEventId)
+                || deterministicRefundId.equals(refundId) || deterministicEventId.equals(normalizedEventId)) {
+            return true;
+        }
+
+        // 3. Si existe registro en PaymentIntent, verificar si el RefundRecord correspondiente al refundId/eventId tiene esa idempotencyKey
+        if (paymentIntentRepository != null && data != null && data.getIntentId() != null && !data.getIntentId().isBlank()) {
+            co.palaciodelmar.backend.model.PaymentIntent intent = paymentIntentRepository.findById(data.getIntentId().trim()).orElse(null);
+            if (intent != null && intent.getRefundRecords() != null) {
+                for (co.palaciodelmar.backend.model.PaymentIntent.RefundRecord rec : intent.getRefundRecords()) {
+                    if (rec == null) continue;
+                    boolean recordMatchesEvent = (refundId != null && refundId.equals(rec.getRefundId()))
+                            || (normalizedEventId != null && normalizedEventId.equals(rec.getWebhookEventId()));
+                    if (recordMatchesEvent && rec.getIdempotencyKey() != null && !rec.getIdempotencyKey().isBlank()) {
+                        return pendingKey.equals(rec.getIdempotencyKey().trim());
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     private long parseTimestamp(String header) {
