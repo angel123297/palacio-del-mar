@@ -465,6 +465,7 @@ class AuditRemediationFivePointsTest {
         // 1. Primer reembolso
         PaymentGateway.PaymentRefundResponse firstResp = simulatedGateway.refund("ch_idem_refund", new BigDecimal("100000"), key);
         assertTrue(firstResp.success());
+        assertEquals("partially_refunded", firstResp.status());
         assertEquals(new BigDecimal("100000"), intent.getRefundedAmount());
         assertEquals(1, intent.getRefundRecords().size());
         String refundId = firstResp.refundId();
@@ -472,6 +473,7 @@ class AuditRemediationFivePointsTest {
         // 2. Segundo intento con MISMA idempotencyKey
         PaymentGateway.PaymentRefundResponse secondResp = simulatedGateway.refund("ch_idem_refund", new BigDecimal("100000"), key);
         assertTrue(secondResp.success());
+        assertEquals("partially_refunded", secondResp.status());
         // El refundId devuelto debe ser exactamente el mismo
         assertEquals(refundId, secondResp.refundId());
         // El monto acumulado NO debe duplicarse a 200.000, debe seguir en 100.000

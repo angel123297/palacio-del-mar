@@ -646,9 +646,13 @@ public class BookingService {
 
             if (refundDiff.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
                 String txId = resolveRefundTransactionId(resolvedBookingId);
-                String refundIdemKey = saved.getPendingRefundIdempotencyKey() != null
-                        ? saved.getPendingRefundIdempotencyKey()
-                        : "ref_mod_" + resolvedBookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                String refundIdemKey = saved.getPendingRefundIdempotencyKey();
+                if (refundIdemKey == null) {
+                    refundIdemKey = "ref_mod_" + resolvedBookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                    saved.setPendingRefundIdempotencyKey(refundIdemKey);
+                    saved.setPendingRefundAmount(refundDiff);
+                    saved = bookingRepository.save(saved);
+                }
                 try {
                     PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundDiff, refundIdemKey);
                     if (refundResp != null && refundResp.success()) {
@@ -1100,9 +1104,13 @@ public class BookingService {
 
             if (refundDiff.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
                 String txId = resolveRefundTransactionId(bookingId);
-                String refundIdemKey = saved.getPendingRefundIdempotencyKey() != null
-                        ? saved.getPendingRefundIdempotencyKey()
-                        : "ref_rmexp_" + bookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                String refundIdemKey = saved.getPendingRefundIdempotencyKey();
+                if (refundIdemKey == null) {
+                    refundIdemKey = "ref_rmexp_" + bookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                    saved.setPendingRefundIdempotencyKey(refundIdemKey);
+                    saved.setPendingRefundAmount(refundDiff);
+                    saved = bookingRepository.save(saved);
+                }
                 try {
                     PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundDiff, refundIdemKey);
                     if (refundResp != null && refundResp.success()) {

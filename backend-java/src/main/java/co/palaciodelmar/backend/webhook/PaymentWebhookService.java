@@ -382,6 +382,14 @@ public class PaymentWebhookService {
         Booking initialBooking = payment.getBooking() != null
                 ? bookingRepository.findById(payment.getBooking()).orElse(null)
                 : null;
+        String refundId = data.getTransactionId();
+        if (initialBooking != null && initialBooking.getProcessedRefundIds() != null) {
+            if ((eventId != null && initialBooking.getProcessedRefundIds().contains(eventId))
+                    || (refundId != null && initialBooking.getProcessedRefundIds().contains(refundId))) {
+                log.info("Evento de reembolso {} / {} ya aplicado previamente en reserva {}; omitiendo abono en payment", eventId, refundId, initialBooking.getId());
+                return;
+            }
+        }
         boolean isCancelled = initialBooking != null && "cancelled".equalsIgnoreCase(initialBooking.getStatus());
 
         BigDecimal newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
@@ -401,7 +409,6 @@ public class PaymentWebhookService {
             if (booking == null) {
                 return;
             }
-            String refundId = data.getTransactionId();
             if (booking.getProcessedRefundIds() != null) {
                 if ((eventId != null && booking.getProcessedRefundIds().contains(eventId))
                         || (refundId != null && booking.getProcessedRefundIds().contains(refundId))) {
