@@ -184,7 +184,7 @@ Instala directamente la aplicación en tu celular Android descargando el paquete
 
 En iPhone y iPad no se requiere descargar archivos. Accede directamente a la aplicación nativa desde el enlace oficial:
 
-👉 **[https://unbroke-unsized-zandra.ngrok-free.dev/app/](https://unbroke-unsized-zandra.ngrok-free.dev/app/)**
+👉 <a href="https://unbroke-unsized-zandra.ngrok-free.dev/app/" target="_blank" rel="noopener noreferrer"><strong>https://unbroke-unsized-zandra.ngrok-free.dev/app/</strong></a>
 
 #### Pasos para instalar en iPhone / iPad:
 1. Abre el enlace anterior en tu navegador **Safari**.
