@@ -450,7 +450,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                     .findFirst();
             if (existing.isPresent()) {
                 PaymentIntent.RefundRecord rec = existing.get();
-                if (amount != null && rec.getAmount() != null && rec.getAmount().compareTo(amount) != 0) {
+                if (amount == null || rec.getAmount() == null || rec.getAmount().compareTo(amount) != 0) {
                     log.warn("Clave de idempotencia {} reutilizada con monto inconsistente: registrado {} vs solicitado {}", idempotencyKey, rec.getAmount(), amount);
                     return new PaymentRefundResponse(false, null, "failed", "Clave de idempotencia ya utilizada con un monto diferente (" + rec.getAmount() + " vs " + amount + ")");
                 }

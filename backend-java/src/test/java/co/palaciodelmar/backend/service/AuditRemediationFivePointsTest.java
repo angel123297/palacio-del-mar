@@ -638,6 +638,11 @@ class AuditRemediationFivePointsTest {
         PaymentGateway.PaymentRefundResponse mismatchResp = simulatedGateway.refund("ch_idem_mismatch", new BigDecimal("200000"), key);
         assertFalse(mismatchResp.success());
         assertTrue(mismatchResp.errorMessage().contains("monto diferente"));
+
+        // Reintento con monto nulo
+        PaymentGateway.PaymentRefundResponse nullResp = simulatedGateway.refund("ch_idem_mismatch", null, key);
+        assertFalse(nullResp.success());
+        assertTrue(nullResp.errorMessage().contains("monto diferente"));
     }
 
     @Test
