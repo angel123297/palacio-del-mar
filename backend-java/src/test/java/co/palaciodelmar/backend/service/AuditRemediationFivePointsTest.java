@@ -278,13 +278,15 @@ class AuditRemediationFivePointsTest {
         // 1. Reembolso parcial de 100.000
         PaymentGateway.PaymentRefundResponse r1 = simulatedGateway.refund("ch_multi_refund", new BigDecimal("100000"));
         assertTrue(r1.success());
-        assertEquals("refunded", r1.status());
+        assertEquals("partially_refunded", r1.status());
+        assertEquals("partially_refunded", intent.getStatus());
         assertEquals(new BigDecimal("100000"), intent.getRefundedAmount());
 
         // 2. Segundo reembolso parcial de 200.000
         PaymentGateway.PaymentRefundResponse r2 = simulatedGateway.refund("ch_multi_refund", new BigDecimal("200000"));
         assertTrue(r2.success());
-        assertEquals("refunded", r2.status());
+        assertEquals("partially_refunded", r2.status());
+        assertEquals("partially_refunded", intent.getStatus());
         assertEquals(new BigDecimal("300000"), intent.getRefundedAmount());
 
         // 3. Intento de reembolsar más del remanente (remanente = 200.000, pide 250.000)
@@ -296,6 +298,7 @@ class AuditRemediationFivePointsTest {
         PaymentGateway.PaymentRefundResponse r4 = simulatedGateway.refund("ch_multi_refund", new BigDecimal("200000"));
         assertTrue(r4.success());
         assertEquals("refunded", r4.status());
+        assertEquals("refunded", intent.getStatus());
         assertEquals(new BigDecimal("500000"), intent.getRefundedAmount());
     }
 

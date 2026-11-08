@@ -269,8 +269,8 @@ class SimulatedPaymentGatewayTest {
 
         PaymentGateway.PaymentRefundResponse res = gateway.refund("tx_book_cancel_123", new BigDecimal("360000"));
         assertTrue(res.success());
-        assertEquals("refunded", res.status());
-        assertEquals("refunded", succeededAttempt.getStatus());
+        assertEquals("partially_refunded", res.status());
+        assertEquals("partially_refunded", succeededAttempt.getStatus());
     }
 
     @Test

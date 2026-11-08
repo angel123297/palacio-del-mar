@@ -370,8 +370,12 @@ public class PaymentWebhookService {
             return;
         }
 
-        if ("refunded".equalsIgnoreCase(payment.getStatus())) {
-            log.info("Payment {} ya se encontraba en estado refunded; omitiendo doble abono contable", payment.getId());
+        BigDecimal paymentTotal = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+        BigDecimal currentPaymentRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount() : BigDecimal.ZERO;
+        BigDecimal refundAmount = data.getAmount() != null ? data.getAmount() : paymentTotal;
+
+        if ("refunded".equalsIgnoreCase(payment.getStatus()) && currentPaymentRefunded.compareTo(paymentTotal) >= 0) {
+            log.info("Payment {} ya se encontraba totalmente reembolsado; omitiendo doble abono contable", payment.getId());
             return;
         }
 
@@ -380,16 +384,11 @@ public class PaymentWebhookService {
                 : null;
         boolean isCancelled = initialBooking != null && "cancelled".equalsIgnoreCase(initialBooking.getStatus());
 
-        BigDecimal paymentTotal = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
-        BigDecimal currentPaymentRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount() : BigDecimal.ZERO;
-        BigDecimal refundAmount = data.getAmount() != null ? data.getAmount() : paymentTotal;
-
         BigDecimal newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
         payment.setRefundedAmount(newPaymentRefunded);
 
         if ((paymentTotal.compareTo(BigDecimal.ZERO) > 0 && newPaymentRefunded.compareTo(paymentTotal) >= 0)
-                || isCancelled
-                || "refunded".equalsIgnoreCase(data.getStatus())) {
+                || isCancelled) {
             payment.setStatus("refunded");
         } else {
             payment.setStatus("partially_refunded");
@@ -425,9 +424,6 @@ public class PaymentWebhookService {
             BigDecimal newRefunded;
             if ("cancelled".equalsIgnoreCase(booking.getStatus()) && currentRefunded.compareTo(BigDecimal.ZERO) > 0) {
                 // cancelBooking ya contabilizó el reembolso al cancelar; reconciliar sin sumar dos veces
-                newRefunded = currentRefunded.max(eventRefund).min(paidCap);
-            } else if (booking.getProcessedRefundIds() != null && !booking.getProcessedRefundIds().isEmpty() && currentRefunded.compareTo(BigDecimal.ZERO) > 0) {
-                // Si la reserva ya contabilizó un reembolso síncrono previo
                 newRefunded = currentRefunded.max(eventRefund).min(paidCap);
             } else {
                 newRefunded = currentRefunded.add(eventRefund).min(paidCap);

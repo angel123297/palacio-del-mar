@@ -646,7 +646,9 @@ public class BookingService {
 
             if (refundDiff.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
                 String txId = resolveRefundTransactionId(resolvedBookingId);
-                String refundIdemKey = "ref_mod_" + resolvedBookingId + "_" + (saved.getVersion() != null ? saved.getVersion() : 0);
+                String refundIdemKey = saved.getPendingRefundIdempotencyKey() != null
+                        ? saved.getPendingRefundIdempotencyKey()
+                        : "ref_mod_" + resolvedBookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
                 try {
                     PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundDiff, refundIdemKey);
                     if (refundResp != null && refundResp.success()) {
@@ -659,6 +661,7 @@ public class BookingService {
                             saved.getProcessedRefundIds().add(refundResp.refundId());
                         }
                         saved.setPendingRefundAmount(BigDecimal.ZERO);
+                        saved.setPendingRefundIdempotencyKey(null);
                         if (paymentRepository != null) {
                             paymentRepository.findByBooking(resolvedBookingId).stream()
                                     .filter(p -> "completed".equalsIgnoreCase(p.getStatus()) || "partially_refunded".equalsIgnoreCase(p.getStatus()))
@@ -674,10 +677,12 @@ public class BookingService {
                     } else {
                         log.warn("Pasarela no pudo procesar reembolso inmediato para modificación de reserva {}: {}", resolvedBookingId, (refundResp != null ? refundResp.errorMessage() : "respuesta nula"));
                         saved.setPendingRefundAmount(refundDiff);
+                        saved.setPendingRefundIdempotencyKey(refundIdemKey);
                     }
                 } catch (Exception ex) {
                     log.error("Excepción al ejecutar reembolso en pasarela para modificación de reserva {}: {}", resolvedBookingId, ex.getMessage(), ex);
                     saved.setPendingRefundAmount(refundDiff);
+                    saved.setPendingRefundIdempotencyKey(refundIdemKey);
                 }
                 saved = bookingRepository.save(saved);
             }
@@ -1095,7 +1100,9 @@ public class BookingService {
 
             if (refundDiff.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
                 String txId = resolveRefundTransactionId(bookingId);
-                String refundIdemKey = "ref_rmexp_" + bookingId + "_" + (saved.getVersion() != null ? saved.getVersion() : 0);
+                String refundIdemKey = saved.getPendingRefundIdempotencyKey() != null
+                        ? saved.getPendingRefundIdempotencyKey()
+                        : "ref_rmexp_" + bookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
                 try {
                     PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundDiff, refundIdemKey);
                     if (refundResp != null && refundResp.success()) {
@@ -1108,6 +1115,7 @@ public class BookingService {
                             saved.getProcessedRefundIds().add(refundResp.refundId());
                         }
                         saved.setPendingRefundAmount(BigDecimal.ZERO);
+                        saved.setPendingRefundIdempotencyKey(null);
                         if (paymentRepository != null) {
                             paymentRepository.findByBooking(bookingId).stream()
                                     .filter(p -> "completed".equalsIgnoreCase(p.getStatus()) || "partially_refunded".equalsIgnoreCase(p.getStatus()))
@@ -1123,10 +1131,12 @@ public class BookingService {
                     } else {
                         log.warn("Pasarela no pudo procesar reembolso por remoción de experiencia en reserva {}: {}", bookingId, (refundResp != null ? refundResp.errorMessage() : "respuesta nula"));
                         saved.setPendingRefundAmount(refundDiff);
+                        saved.setPendingRefundIdempotencyKey(refundIdemKey);
                     }
                 } catch (Exception ex) {
                     log.error("Excepción al ejecutar reembolso por remoción de experiencia en reserva {}: {}", bookingId, ex.getMessage(), ex);
                     saved.setPendingRefundAmount(refundDiff);
+                    saved.setPendingRefundIdempotencyKey(refundIdemKey);
                 }
                 saved = bookingRepository.save(saved);
             }

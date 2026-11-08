@@ -369,7 +369,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     }
 
     @Override
-    public PaymentRefundResponse refund(String transactionId, BigDecimal amount, String idempotencyKey) {
+    public synchronized PaymentRefundResponse refund(String transactionId, BigDecimal amount, String idempotencyKey) {
         if (transactionId == null || transactionId.isBlank()) {
             return new PaymentRefundResponse(false, null, "failed", "ID de transacción requerido");
         }
@@ -423,8 +423,9 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                 : "re_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
 
         BigDecimal newRefunded = currentRefunded.add(amount);
+        boolean isFullRefund = newRefunded.compareTo(intent.getAmount()) >= 0;
         intent.setRefundedAmount(newRefunded);
-        intent.setStatus("refunded");
+        intent.setStatus(isFullRefund ? "refunded" : "partially_refunded");
 
         if (intent.getRefundRecords() == null) {
             intent.setRefundRecords(new java.util.ArrayList<>());
@@ -450,7 +451,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                         .bookingId(intent.getBookingId())
                         .amount(amount)
                         .currency(intent.getCurrency())
-                        .status("refunded")
+                        .status(isFullRefund ? "refunded" : "partially_refunded")
                         .transactionId(refundId)
                         .failureMessage(null)
                         .build())
@@ -458,7 +459,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
 
         scheduler.execute(() -> dispatchWebhook(payload, eventId));
 
-        return new PaymentRefundResponse(true, refundId, "refunded", null);
+        return new PaymentRefundResponse(true, refundId, isFullRefund ? "refunded" : "partially_refunded", null);
     }
 
     @PreDestroy

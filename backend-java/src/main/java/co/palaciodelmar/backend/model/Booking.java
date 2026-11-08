@@ -81,6 +81,8 @@ public class Booking {
     @Builder.Default
     private BigDecimal pendingRefundAmount = BigDecimal.ZERO;
 
+    private String pendingRefundIdempotencyKey;
+
     @Builder.Default
     private List<String> processedRefundIds = new ArrayList<>();
 
