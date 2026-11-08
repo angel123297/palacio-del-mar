@@ -573,4 +573,45 @@ class AuditRemediationFivePointsTest {
         // No hay reembolso que procesar
         verify(paymentGateway, never()).refund(anyString(), any(), anyString());
     }
+
+    @Test
+    @DisplayName("Copilot Edge 4: Reintento idempotente preserva el estado original de cada operación")
+    void testRefundIdempotencyKeyPreservesOriginalOperationStatusAcrossMultipleRefunds() {
+        PaymentIntent intent = PaymentIntent.builder()
+                .id("pi_idem_multi")
+                .transactionId("ch_idem_multi")
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("succeeded")
+                .refundRecords(new ArrayList<>())
+                .build();
+
+        when(paymentIntentRepository.findByTransactionId("ch_idem_multi")).thenReturn(Optional.of(intent));
+
+        String keyA = "idem_key_part_A";
+        String keyB = "idem_key_full_B";
+
+        // 1. Operación A: Reembolso parcial de 100.000
+        PaymentGateway.PaymentRefundResponse respA = simulatedGateway.refund("ch_idem_multi", new BigDecimal("100000"), keyA);
+        assertTrue(respA.success());
+        assertEquals("partially_refunded", respA.status());
+
+        // 2. Operación B: Reembolso restante de 400.000 (completa el 100% de la transacción)
+        PaymentGateway.PaymentRefundResponse respB = simulatedGateway.refund("ch_idem_multi", new BigDecimal("400000"), keyB);
+        assertTrue(respB.success());
+        assertEquals("refunded", respB.status());
+        assertEquals(new BigDecimal("500000"), intent.getRefundedAmount());
+
+        // 3. Reintento de la Clave A: debe devolver "partially_refunded" (su estado original), NO "refunded"
+        PaymentGateway.PaymentRefundResponse retryA = simulatedGateway.refund("ch_idem_multi", new BigDecimal("100000"), keyA);
+        assertTrue(retryA.success());
+        assertEquals("partially_refunded", retryA.status());
+        assertEquals(respA.refundId(), retryA.refundId());
+
+        // 4. Reintento de la Clave B: debe devolver "refunded"
+        PaymentGateway.PaymentRefundResponse retryB = simulatedGateway.refund("ch_idem_multi", new BigDecimal("400000"), keyB);
+        assertTrue(retryB.success());
+        assertEquals("refunded", retryB.status());
+        assertEquals(respB.refundId(), retryB.refundId());
+    }
 }

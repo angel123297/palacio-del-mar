@@ -407,8 +407,10 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                     .findFirst();
             if (existing.isPresent()) {
                 log.info("Reembolso con clave de idempotencia {} ya procesado previamente. Retornando registro existente.", idempotencyKey);
-                boolean isFull = intent.getRefundedAmount() != null && intent.getRefundedAmount().compareTo(intent.getAmount()) >= 0;
-                return new PaymentRefundResponse(true, existing.get().getRefundId(), isFull ? "refunded" : "partially_refunded", null);
+                String returnStatus = existing.get().getStatus() != null
+                        ? existing.get().getStatus()
+                        : (intent.getRefundedAmount() != null && intent.getRefundedAmount().compareTo(intent.getAmount()) >= 0 ? "refunded" : "partially_refunded");
+                return new PaymentRefundResponse(true, existing.get().getRefundId(), returnStatus, null);
             }
         }
 
@@ -435,6 +437,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                 .refundId(refundId)
                 .idempotencyKey(idempotencyKey)
                 .amount(amount)
+                .status(isFullRefund ? "refunded" : "partially_refunded")
                 .createdAt(Instant.now())
                 .build());
 

@@ -84,6 +84,7 @@ public class PaymentIntent {
         private String refundId;
         private String idempotencyKey;
         private BigDecimal amount;
+        private String status;
         @Builder.Default
         private Instant createdAt = Instant.now();
     }
