@@ -39,6 +39,13 @@ public class PaymentWebhookService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private co.palaciodelmar.backend.service.AvailabilityCacheEvictor availabilityCacheEvictor;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+
+    public void setMongoTemplate(org.springframework.data.mongodb.core.MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired
     public PaymentWebhookService(
             PaymentRepository paymentRepository,
@@ -250,6 +257,13 @@ public class PaymentWebhookService {
                         PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(data.getTransactionId(), payment.getAmount());
                         if (refundResp != null && refundResp.success()) {
                             refundSuccess = true;
+                            payment.setRefundedAmount(payment.getAmount());
+                            if (payment.getProcessedRefundIds() == null) {
+                                payment.setProcessedRefundIds(new java.util.ArrayList<>());
+                            }
+                            if (refundResp.refundId() != null && !payment.getProcessedRefundIds().contains(refundResp.refundId())) {
+                                payment.getProcessedRefundIds().add(refundResp.refundId());
+                            }
                             refundDetails = " Reembolso automático exitoso (ID: " + refundResp.refundId() + ").";
                         } else {
                             refundDetails = " Falló pasarela: " + (refundResp != null ? refundResp.errorMessage() : "respuesta nula");
@@ -409,24 +423,54 @@ public class PaymentWebhookService {
                 } else {
                     newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
                 }
-                payment.setRefundedAmount(newPaymentRefunded);
+                String nextPaymentStatus = (paymentTotal.compareTo(BigDecimal.ZERO) > 0 && newPaymentRefunded.compareTo(paymentTotal) >= 0)
+                        ? "refunded"
+                        : "partially_refunded";
 
-                if (paymentTotal.compareTo(BigDecimal.ZERO) > 0 && newPaymentRefunded.compareTo(paymentTotal) >= 0) {
-                    payment.setStatus("refunded");
+                java.util.List<String> keysToRegister = new java.util.ArrayList<>();
+                if (eventId != null && !eventId.isBlank()) {
+                    keysToRegister.add(eventId);
+                }
+                if (refundId != null && !refundId.isBlank() && !keysToRegister.contains(refundId)) {
+                    keysToRegister.add(refundId);
+                }
+
+                if (mongoTemplate != null && payment.getId() != null && !keysToRegister.isEmpty()) {
+                    org.springframework.data.mongodb.core.query.Query qPay = new org.springframework.data.mongodb.core.query.Query(
+                            org.springframework.data.mongodb.core.query.Criteria.where("id").is(payment.getId())
+                                    .and("processedRefundIds").nin(keysToRegister)
+                    );
+                    org.springframework.data.mongodb.core.query.Update uPay = new org.springframework.data.mongodb.core.query.Update()
+                            .set("refundedAmount", newPaymentRefunded)
+                            .set("status", nextPaymentStatus)
+                            .addToSet("processedRefundIds").each(keysToRegister.toArray())
+                            .set("updatedAt", Instant.now());
+                    Payment updatedPay = mongoTemplate.findAndModify(
+                            qPay, uPay,
+                            org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true),
+                            Payment.class
+                    );
+                    if (updatedPay != null) {
+                        payment.setRefundedAmount(updatedPay.getRefundedAmount());
+                        payment.setStatus(updatedPay.getStatus());
+                        payment.setProcessedRefundIds(updatedPay.getProcessedRefundIds());
+                        payment.setVersion(updatedPay.getVersion());
+                        payment.setUpdatedAt(updatedPay.getUpdatedAt());
+                    }
                 } else {
-                    payment.setStatus("partially_refunded");
+                    payment.setRefundedAmount(newPaymentRefunded);
+                    payment.setStatus(nextPaymentStatus);
+                    if (payment.getProcessedRefundIds() == null) {
+                        payment.setProcessedRefundIds(new java.util.ArrayList<>());
+                    }
+                    for (String k : keysToRegister) {
+                        if (!payment.getProcessedRefundIds().contains(k)) {
+                            payment.getProcessedRefundIds().add(k);
+                        }
+                    }
+                    payment.setUpdatedAt(Instant.now());
+                    paymentRepository.save(payment);
                 }
-                if (payment.getProcessedRefundIds() == null) {
-                    payment.setProcessedRefundIds(new java.util.ArrayList<>());
-                }
-                if (eventId != null && !payment.getProcessedRefundIds().contains(eventId)) {
-                    payment.getProcessedRefundIds().add(eventId);
-                }
-                if (refundId != null && !payment.getProcessedRefundIds().contains(refundId)) {
-                    payment.getProcessedRefundIds().add(refundId);
-                }
-                payment.setUpdatedAt(Instant.now());
-                paymentRepository.save(payment);
             }
 
             if (booking == null || bookingAlreadyProcessed) {
@@ -452,30 +496,74 @@ public class PaymentWebhookService {
                 newRefunded = currentRefunded.add(eventRefund).min(paidCap);
             }
 
-            if (booking.getProcessedRefundIds() == null) {
-                booking.setProcessedRefundIds(new java.util.ArrayList<>());
-            }
-            if (eventId != null && !booking.getProcessedRefundIds().contains(eventId)) {
-                booking.getProcessedRefundIds().add(eventId);
-            }
-            if (refundId != null && !booking.getProcessedRefundIds().contains(refundId)) {
-                booking.getProcessedRefundIds().add(refundId);
+            String nextBookingPaymentStatus = booking.getPaymentStatus();
+            if (paidCap.compareTo(BigDecimal.ZERO) > 0 && newRefunded.compareTo(paidCap) >= 0) {
+                nextBookingPaymentStatus = "refunded";
+            } else if (newRefunded.compareTo(BigDecimal.ZERO) > 0) {
+                nextBookingPaymentStatus = "partial";
             }
 
+            java.util.List<String> bookingKeys = new java.util.ArrayList<>();
+            if (eventId != null && !eventId.isBlank()) {
+                bookingKeys.add(eventId);
+            }
+            if (refundId != null && !refundId.isBlank() && !bookingKeys.contains(refundId)) {
+                bookingKeys.add(refundId);
+            }
+
+            boolean clearPending = false;
             if (booking.getPendingRefundIdempotencyKey() != null) {
                 BigDecimal pendingAmt = booking.getPendingRefundAmount() != null ? booking.getPendingRefundAmount() : BigDecimal.ZERO;
                 if (pendingAmt.compareTo(BigDecimal.ZERO) <= 0 || pendingAmt.compareTo(eventRefund) == 0) {
-                    booking.setPendingRefundAmount(BigDecimal.ZERO);
-                    booking.setPendingRefundIdempotencyKey(null);
+                    clearPending = true;
                 }
             }
 
-            booking.setRefundedAmount(newRefunded);
-            if (paidCap.compareTo(BigDecimal.ZERO) > 0 && newRefunded.compareTo(paidCap) >= 0) {
-                booking.setPaymentStatus("refunded");
-            } else if (newRefunded.compareTo(BigDecimal.ZERO) > 0) {
-                booking.setPaymentStatus("partial");
+            if (mongoTemplate != null && booking.getId() != null && !bookingKeys.isEmpty()) {
+                org.springframework.data.mongodb.core.query.Query qBook = new org.springframework.data.mongodb.core.query.Query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("id").is(booking.getId())
+                                .and("processedRefundIds").nin(bookingKeys)
+                );
+                org.springframework.data.mongodb.core.query.Update uBook = new org.springframework.data.mongodb.core.query.Update()
+                        .set("refundedAmount", newRefunded)
+                        .set("paymentStatus", nextBookingPaymentStatus)
+                        .addToSet("processedRefundIds").each(bookingKeys.toArray())
+                        .set("updatedAt", Instant.now());
+                if (clearPending) {
+                    uBook.set("pendingRefundAmount", BigDecimal.ZERO).set("pendingRefundIdempotencyKey", null);
+                }
+                Booking updatedBook = mongoTemplate.findAndModify(
+                        qBook, uBook,
+                        org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true),
+                        Booking.class
+                );
+                if (updatedBook != null) {
+                    booking.setRefundedAmount(updatedBook.getRefundedAmount());
+                    booking.setPaymentStatus(updatedBook.getPaymentStatus());
+                    booking.setProcessedRefundIds(updatedBook.getProcessedRefundIds());
+                    booking.setPendingRefundAmount(updatedBook.getPendingRefundAmount());
+                    booking.setPendingRefundIdempotencyKey(updatedBook.getPendingRefundIdempotencyKey());
+                    booking.setVersion(updatedBook.getVersion());
+                    booking.setUpdatedAt(updatedBook.getUpdatedAt());
+                }
+                return;
             }
+
+            if (booking.getProcessedRefundIds() == null) {
+                booking.setProcessedRefundIds(new java.util.ArrayList<>());
+            }
+            for (String k : bookingKeys) {
+                if (!booking.getProcessedRefundIds().contains(k)) {
+                    booking.getProcessedRefundIds().add(k);
+                }
+            }
+            if (clearPending) {
+                booking.setPendingRefundAmount(BigDecimal.ZERO);
+                booking.setPendingRefundIdempotencyKey(null);
+            }
+
+            booking.setRefundedAmount(newRefunded);
+            booking.setPaymentStatus(nextBookingPaymentStatus);
             bookingRepository.save(booking);
         };
 
