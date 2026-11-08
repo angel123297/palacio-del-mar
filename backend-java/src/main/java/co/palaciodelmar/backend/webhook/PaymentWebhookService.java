@@ -386,29 +386,46 @@ public class PaymentWebhookService {
                     ? bookingRepository.findById(payment.getBooking()).orElse(null)
                     : null;
             String refundId = data.getTransactionId();
-            if (booking != null && booking.getProcessedRefundIds() != null) {
-                if ((eventId != null && booking.getProcessedRefundIds().contains(eventId))
-                        || (refundId != null && booking.getProcessedRefundIds().contains(refundId))) {
-                    log.info("Evento de reembolso {} / {} ya aplicado previamente en reserva {}; omitiendo abono en payment y booking", eventId, refundId, booking.getId());
-                    return;
-                }
+            boolean paymentAlreadyProcessed = payment.getProcessedRefundIds() != null && (
+                    (eventId != null && payment.getProcessedRefundIds().contains(eventId))
+                    || (refundId != null && payment.getProcessedRefundIds().contains(refundId))
+            );
+            boolean bookingAlreadyProcessed = booking != null && booking.getProcessedRefundIds() != null && (
+                    (eventId != null && booking.getProcessedRefundIds().contains(eventId))
+                    || (refundId != null && booking.getProcessedRefundIds().contains(refundId))
+            );
+
+            if (paymentAlreadyProcessed && (booking == null || bookingAlreadyProcessed)) {
+                log.info("Evento de reembolso {} / {} ya aplicado previamente en payment {} y booking; omitiendo reprocesamiento", eventId, refundId, payment.getId());
+                return;
             }
 
             boolean isCancelled = booking != null && "cancelled".equalsIgnoreCase(booking.getStatus());
 
-            BigDecimal newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
-            payment.setRefundedAmount(newPaymentRefunded);
+            if (!paymentAlreadyProcessed) {
+                BigDecimal newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
+                payment.setRefundedAmount(newPaymentRefunded);
 
-            if ((paymentTotal.compareTo(BigDecimal.ZERO) > 0 && newPaymentRefunded.compareTo(paymentTotal) >= 0)
-                    || isCancelled) {
-                payment.setStatus("refunded");
-            } else {
-                payment.setStatus("partially_refunded");
+                if ((paymentTotal.compareTo(BigDecimal.ZERO) > 0 && newPaymentRefunded.compareTo(paymentTotal) >= 0)
+                        || isCancelled) {
+                    payment.setStatus("refunded");
+                } else {
+                    payment.setStatus("partially_refunded");
+                }
+                if (payment.getProcessedRefundIds() == null) {
+                    payment.setProcessedRefundIds(new java.util.ArrayList<>());
+                }
+                if (eventId != null && !payment.getProcessedRefundIds().contains(eventId)) {
+                    payment.getProcessedRefundIds().add(eventId);
+                }
+                if (refundId != null && !payment.getProcessedRefundIds().contains(refundId)) {
+                    payment.getProcessedRefundIds().add(refundId);
+                }
+                payment.setUpdatedAt(Instant.now());
+                paymentRepository.save(payment);
             }
-            payment.setUpdatedAt(Instant.now());
-            paymentRepository.save(payment);
 
-            if (booking == null) {
+            if (booking == null || bookingAlreadyProcessed) {
                 return;
             }
 

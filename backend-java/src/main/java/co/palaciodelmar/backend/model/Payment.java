@@ -58,4 +58,7 @@ public class Payment {
 
     @Builder.Default
     private Instant updatedAt = Instant.now();
+
+    @Builder.Default
+    private java.util.List<String> processedRefundIds = new java.util.ArrayList<>();
 }

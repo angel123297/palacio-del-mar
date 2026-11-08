@@ -888,11 +888,21 @@ public class BookingService {
             if (reason != null && !reason.isEmpty()) {
                 booking.setCancellationReason(reason);
             }
-            booking.setRefundedAmount(totalRefundedAfterCancel);
-            if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
-                booking.setPaymentStatus(totalRefundedAfterCancel.compareTo(paidAmount) >= 0 ? "refunded" : "partial");
-            }
+            booking.setRefundedAmount(alreadyRefunded);
             booking.setBalanceDue(BigDecimal.ZERO);
+
+            String cancelIdemKey = null;
+            if (netPaid.compareTo(BigDecimal.ZERO) > 0 && refundToProcess.compareTo(BigDecimal.ZERO) > 0) {
+                cancelIdemKey = booking.getPendingRefundIdempotencyKey();
+                if (cancelIdemKey == null || cancelIdemKey.isBlank()) {
+                    cancelIdemKey = "ref_canc_" + resolvedBookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                }
+                booking.setPendingRefundIdempotencyKey(cancelIdemKey);
+                booking.setPendingRefundAmount(refundToProcess);
+                booking.setPaymentStatus("requires_refund");
+            } else if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
+                booking.setPaymentStatus(alreadyRefunded.compareTo(paidAmount) >= 0 ? "refunded" : "partial");
+            }
 
             // A-2: Persistir CANCELLED con @Version ANTES de liberar inventario y emitir el reembolso en pasarela
             Booking savedBooking = bookingRepository.save(booking);
@@ -904,49 +914,56 @@ public class BookingService {
                 availabilityCacheEvictor.evictAvailability();
             }
 
-            if (netPaid.compareTo(BigDecimal.ZERO) > 0 && refundToProcess.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
+            if (cancelIdemKey != null && refundToProcess.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
                 String txId = resolveRefundTransactionId(resolvedBookingId);
                 try {
-                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundToProcess);
-                    if (refundResp != null) {
-                        if (refundResp.success()) {
-                            if (savedBooking.getProcessedRefundIds() == null) {
-                                savedBooking.setProcessedRefundIds(new java.util.ArrayList<>());
-                            }
-                            if (refundResp.refundId() != null && !savedBooking.getProcessedRefundIds().contains(refundResp.refundId())) {
-                                savedBooking.getProcessedRefundIds().add(refundResp.refundId());
-                            }
-                            if (paymentRepository != null) {
-                                paymentRepository.findByBooking(resolvedBookingId).stream()
-                                        .filter(p -> "completed".equalsIgnoreCase(p.getStatus()) || "partially_refunded".equalsIgnoreCase(p.getStatus()))
-                                        .findFirst()
-                                        .ifPresent(p -> {
-                                            BigDecimal pRefunded = (p.getRefundedAmount() != null ? p.getRefundedAmount() : BigDecimal.ZERO).add(refundToProcess);
-                                            p.setRefundedAmount(pRefunded);
-                                            p.setStatus(pRefunded.compareTo(p.getAmount()) >= 0 || totalRefundedAfterCancel.compareTo(paidAmount) >= 0 ? "refunded" : "partially_refunded");
-                                            p.setUpdatedAt(Instant.now());
-                                            paymentRepository.save(p);
-                                        });
-                            }
-                        } else {
-                            log.warn("Fallo en pasarela al reembolsar reserva {}. Marcando paymentStatus=requires_refund y preservando reembolso previo {}", resolvedBookingId, alreadyRefunded);
-                            savedBooking.setPaymentStatus("requires_refund");
-                            savedBooking.setRefundedAmount(alreadyRefunded);
-                            savedBooking.setPendingRefundAmount(refundToProcess);
-                            if (savedBooking.getPendingRefundIdempotencyKey() == null) {
-                                savedBooking.setPendingRefundIdempotencyKey("ref_canc_" + resolvedBookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12));
-                            }
-                            savedBooking = bookingRepository.save(savedBooking);
+                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundToProcess, cancelIdemKey);
+                    if (refundResp != null && refundResp.success()) {
+                        savedBooking.setRefundedAmount(totalRefundedAfterCancel);
+                        savedBooking.setPendingRefundAmount(BigDecimal.ZERO);
+                        savedBooking.setPendingRefundIdempotencyKey(null);
+                        savedBooking.setPaymentStatus(totalRefundedAfterCancel.compareTo(paidAmount) >= 0 ? "refunded" : "partial");
+                        if (savedBooking.getProcessedRefundIds() == null) {
+                            savedBooking.setProcessedRefundIds(new java.util.ArrayList<>());
                         }
+                        if (refundResp.refundId() != null && !savedBooking.getProcessedRefundIds().contains(refundResp.refundId())) {
+                            savedBooking.getProcessedRefundIds().add(refundResp.refundId());
+                        }
+                        if (paymentRepository != null) {
+                            paymentRepository.findByBooking(resolvedBookingId).stream()
+                                    .filter(p -> "completed".equalsIgnoreCase(p.getStatus()) || "partially_refunded".equalsIgnoreCase(p.getStatus()))
+                                    .findFirst()
+                                    .ifPresent(p -> {
+                                        BigDecimal pRefunded = (p.getRefundedAmount() != null ? p.getRefundedAmount() : BigDecimal.ZERO).add(refundToProcess);
+                                        p.setRefundedAmount(pRefunded);
+                                        p.setStatus(pRefunded.compareTo(p.getAmount()) >= 0 || totalRefundedAfterCancel.compareTo(paidAmount) >= 0 ? "refunded" : "partially_refunded");
+                                        if (p.getProcessedRefundIds() == null) {
+                                            p.setProcessedRefundIds(new java.util.ArrayList<>());
+                                        }
+                                        if (refundResp.refundId() != null && !p.getProcessedRefundIds().contains(refundResp.refundId())) {
+                                            p.getProcessedRefundIds().add(refundResp.refundId());
+                                        }
+                                        p.setUpdatedAt(Instant.now());
+                                        paymentRepository.save(p);
+                                    });
+                        }
+                        savedBooking = bookingRepository.save(savedBooking);
+                    } else {
+                        String failureMsg = refundResp != null ? refundResp.errorMessage() : "respuesta nula de pasarela";
+                        log.warn("Fallo o respuesta nula en pasarela al reembolsar reserva {}: {}. Marcando paymentStatus=requires_refund y preservando reembolso previo {}",
+                                resolvedBookingId, failureMsg, alreadyRefunded);
+                        savedBooking.setPaymentStatus("requires_refund");
+                        savedBooking.setRefundedAmount(alreadyRefunded);
+                        savedBooking.setPendingRefundAmount(refundToProcess);
+                        savedBooking.setPendingRefundIdempotencyKey(cancelIdemKey);
+                        savedBooking = bookingRepository.save(savedBooking);
                     }
                 } catch (Exception refundEx) {
                     log.error("Excepción al reembolsar reserva {} en pasarela (tx={}): {}", resolvedBookingId, txId, refundEx.getMessage());
                     savedBooking.setPaymentStatus("requires_refund");
                     savedBooking.setRefundedAmount(alreadyRefunded);
                     savedBooking.setPendingRefundAmount(refundToProcess);
-                    if (savedBooking.getPendingRefundIdempotencyKey() == null) {
-                        savedBooking.setPendingRefundIdempotencyKey("ref_canc_" + resolvedBookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12));
-                    }
+                    savedBooking.setPendingRefundIdempotencyKey(cancelIdemKey);
                     savedBooking = bookingRepository.save(savedBooking);
                 }
             }

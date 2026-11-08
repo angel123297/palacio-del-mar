@@ -71,6 +71,10 @@ class CancellationPolicyBoundaryTest {
         when(branchRepository.findById(anyString())).thenReturn(Optional.empty());
         when(bookingRepository.save(any(Booking.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+        when(paymentGateway.refund(anyString(), any(BigDecimal.class), anyString()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_bound_test", "refunded", null));
+        when(paymentGateway.refund(anyString(), any(BigDecimal.class)))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_bound_test", "refunded", null));
     }
 
     private Booking paidBooking(LocalDate checkIn) {
@@ -121,12 +125,12 @@ class CancellationPolicyBoundaryTest {
 
         // retention = 10% de 900000 = 90000; refund = 500000 - 90000 = 410000
         ArgumentCaptor<Booking> captor = ArgumentCaptor.forClass(Booking.class);
-        verify(bookingRepository).save(captor.capture());
+        verify(bookingRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
         Booking saved = captor.getValue();
 
         assertTrue(saved.getRefundedAmount().compareTo(new BigDecimal("410000")) == 0,
                 "Reembolso esperado: 410000 (500000 - 90000), fue: " + saved.getRefundedAmount());
-        verify(paymentGateway).refund(eq("tx_b1"), any());
+        verify(paymentGateway).refund(eq("tx_b1"), any(), any());
     }
 
     @Test
@@ -138,13 +142,13 @@ class CancellationPolicyBoundaryTest {
         bookingService.cancelBooking("b1", "u1", "cambio de planes");
 
         ArgumentCaptor<Booking> captor = ArgumentCaptor.forClass(Booking.class);
-        verify(bookingRepository).save(captor.capture());
+        verify(bookingRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
         Booking saved = captor.getValue();
 
         assertTrue(saved.getRefundedAmount().compareTo(new BigDecimal("500000")) == 0,
                 "Reembolso esperado: 500000 completo");
         assertEquals("refunded", saved.getPaymentStatus());
-        verify(paymentGateway).refund(eq("tx_b1"), any());
+        verify(paymentGateway).refund(eq("tx_b1"), any(), any());
     }
 
     @Test

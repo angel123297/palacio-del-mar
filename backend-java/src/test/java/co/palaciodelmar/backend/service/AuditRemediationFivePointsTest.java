@@ -839,14 +839,18 @@ class AuditRemediationFivePointsTest {
 
         when(bookingRepository.findById("b_cancel_partial_fail")).thenReturn(Optional.of(bookingFailCase));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
-        when(paymentGateway.refund(eq("tx_b_cancel_partial_fail"), any(BigDecimal.class)))
+        when(paymentGateway.refund(eq("tx_b_cancel_partial_fail"), eq(new BigDecimal("400000")), anyString()))
                 .thenReturn(new PaymentGateway.PaymentRefundResponse(false, null, "failed", "Error de red con banco"));
 
         BookingDTO cancelledFailDto = bookingService.cancelBooking("b_cancel_partial_fail", "u_cancel_1", "Viaje cancelado");
 
-        // Debe haber solicitado SOLO $400.000 (netPaid = 500.000 - 100.000), NO $500.000
-        verify(paymentGateway).refund("tx_b_cancel_partial_fail", new BigDecimal("400000"));
-        // Al fallar la pasarela, debe conservar los $100.000 ya reembolsados (JAMÁS borrarlos a 0)
+        // Debe haber solicitado SOLO $400.000 con la clave idempotente generada previamente
+        org.mockito.ArgumentCaptor<String> keyCaptorFail = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(paymentGateway).refund(eq("tx_b_cancel_partial_fail"), eq(new BigDecimal("400000")), keyCaptorFail.capture());
+        assertEquals(bookingFailCase.getPendingRefundIdempotencyKey(), keyCaptorFail.getValue(),
+                "La clave enviada a la pasarela en el primer intento debe ser exactamente la clave persistida como pendiente");
+
+        // Al fallar la pasarela, debe conservar los $100.000 ya reembolsados (JAMÁS borrarlos a 0 ni inventar 500.000)
         assertEquals(new BigDecimal("100000"), cancelledFailDto.getRefundedAmount());
         assertEquals(new BigDecimal("100000"), bookingFailCase.getRefundedAmount());
         assertEquals("requires_refund", cancelledFailDto.getPaymentStatus());
@@ -869,12 +873,12 @@ class AuditRemediationFivePointsTest {
                 .build();
 
         when(bookingRepository.findById("b_cancel_partial_ok")).thenReturn(Optional.of(bookingOkCase));
-        when(paymentGateway.refund("tx_b_cancel_partial_ok", new BigDecimal("400000")))
+        when(paymentGateway.refund(eq("tx_b_cancel_partial_ok"), eq(new BigDecimal("400000")), anyString()))
                 .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_canc_400k", "refunded", null));
 
         BookingDTO cancelledOkDto = bookingService.cancelBooking("b_cancel_partial_ok", "u_cancel_1", "Viaje cancelado");
 
-        verify(paymentGateway).refund("tx_b_cancel_partial_ok", new BigDecimal("400000"));
+        verify(paymentGateway).refund(eq("tx_b_cancel_partial_ok"), eq(new BigDecimal("400000")), anyString());
         assertEquals(new BigDecimal("500000"), cancelledOkDto.getRefundedAmount());
         assertEquals("refunded", cancelledOkDto.getPaymentStatus());
         assertTrue(bookingOkCase.getProcessedRefundIds().contains("re_canc_400k"));
@@ -1001,5 +1005,221 @@ class AuditRemediationFivePointsTest {
         assertEquals(BigDecimal.ZERO, booking.getPendingRefundAmount());
         assertTrue(booking.getProcessedRefundIds().contains("re_first_100k"));
         assertTrue(booking.getProcessedRefundIds().contains("re_second_100k"));
+    }
+
+    // =========================================================================
+    // NUEVOS 5 HALLAZGOS (TERCERA RONDA: CANCELACIONES Y CONCURRENCIA FINA)
+    // =========================================================================
+
+    @Test
+    @DisplayName("Ronda 3 - Hallazgo 1: cancelBooking no asume reembolso previo a respuesta y maneja respuesta nula sin mostrar dinero no devuelto")
+    void testRound3_CancelBookingHandlesNullGatewayResponseWithoutGhostRefund() {
+        LocalDate checkIn = LocalDate.now().plusDays(10);
+        Booking booking = Booking.builder()
+                .id("b_canc_null_resp")
+                .user("u_null_resp")
+                .suite("suite_1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .checkIn(checkIn)
+                .checkOut(checkIn.plusDays(2))
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .build();
+
+        when(bookingRepository.findById("b_canc_null_resp")).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        // Pasarela retorna NULL (ej. timeout de socket o cliente HTTP roto)
+        when(paymentGateway.refund(eq("tx_b_canc_null_resp"), any(BigDecimal.class), anyString()))
+                .thenReturn(null);
+
+        BookingDTO cancelledDto = bookingService.cancelBooking("b_canc_null_resp", "u_null_resp", "Cancelación por fuerza mayor");
+
+        // El estado de pago debe ser requires_refund y el refundedAmount debe seguir en CERO (sin reembolso fantasma)
+        assertEquals("cancelled", cancelledDto.getStatus());
+        assertEquals("requires_refund", cancelledDto.getPaymentStatus());
+        assertEquals(BigDecimal.ZERO, cancelledDto.getRefundedAmount());
+        assertEquals(new BigDecimal("500000"), booking.getPendingRefundAmount());
+        assertNotNull(booking.getPendingRefundIdempotencyKey());
+    }
+
+    @Test
+    @DisplayName("Ronda 3 - Hallazgo 2: cancelBooking genera y usa la clave de idempotencia desde la PRIMERA llamada a la pasarela")
+    void testRound3_CancelBookingUsesIdempotencyKeyFromFirstGatewayCall() {
+        LocalDate checkIn = LocalDate.now().plusDays(10);
+        Booking booking = Booking.builder()
+                .id("b_canc_idem_first")
+                .user("u_idem_first")
+                .suite("suite_1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .checkIn(checkIn)
+                .checkOut(checkIn.plusDays(2))
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .build();
+
+        when(bookingRepository.findById("b_canc_idem_first")).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        org.mockito.ArgumentCaptor<String> keyCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        when(paymentGateway.refund(eq("tx_b_canc_idem_first"), eq(new BigDecimal("500000")), keyCaptor.capture()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_canc_first_ok", "refunded", null));
+
+        BookingDTO result = bookingService.cancelBooking("b_canc_idem_first", "u_idem_first", "Cambio de planes");
+
+        assertEquals("refunded", result.getPaymentStatus());
+        assertEquals(new BigDecimal("500000"), result.getRefundedAmount());
+        // Se verificó que se pasó una clave idempotente válida desde la primera llamada
+        String usedKey = keyCaptor.getValue();
+        assertNotNull(usedKey);
+        assertTrue(usedKey.startsWith("ref_canc_b_canc_idem_first_"));
+    }
+
+    @Test
+    @DisplayName("Ronda 3 - Hallazgo 3: deliverRefundWebhook usa actualización posicional atómica y no sobrescribe reembolsos concurrentes")
+    void testRound3_DeliverRefundWebhookUsesAtomicPositionalUpdateWithoutOverwritingOtherRefunds() {
+        org.springframework.data.mongodb.core.MongoTemplate mockMongo =
+                mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+        simulatedGateway.setMongoTemplate(mockMongo);
+
+        PaymentIntent intent = PaymentIntent.builder()
+                .id("pi_webhook_pos")
+                .bookingId("b_pos")
+                .status("partially_refunded")
+                .amount(new BigDecimal("500000"))
+                .refundRecords(new ArrayList<>(List.of(
+                        PaymentIntent.RefundRecord.builder().refundId("re_1").amount(new BigDecimal("100000")).webhookDelivered(false).build(),
+                        PaymentIntent.RefundRecord.builder().refundId("re_2").amount(new BigDecimal("200000")).webhookDelivered(false).build()
+                )))
+                .build();
+
+        when(paymentIntentRepository.findById("pi_webhook_pos")).thenReturn(Optional.of(intent));
+
+        // Entregar webhook para re_1
+        simulatedGateway.deliverRefundWebhook("pi_webhook_pos", "re_1");
+
+        // Verificar que usó mongoTemplate.updateFirst con query posicional refundRecords.$.webhookDelivered
+        org.mockito.ArgumentCaptor<org.springframework.data.mongodb.core.query.Query> queryCaptor =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Query.class);
+        org.mockito.ArgumentCaptor<org.springframework.data.mongodb.core.query.Update> updateCaptor =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Update.class);
+
+        verify(mockMongo).updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(PaymentIntent.class));
+        String qStr = queryCaptor.getValue().getQueryObject().toString();
+        String uStr = updateCaptor.getValue().getUpdateObject().toString();
+
+        assertTrue(qStr.contains("refundRecords.refundId") && qStr.contains("re_1"),
+                "Debe apuntar exactamente al elemento del array en MongoDB: " + qStr);
+        assertTrue(uStr.contains("refundRecords.$.webhookDelivered"),
+                "Debe usar el operador posicional $ de MongoDB para no sobreescribir el documento completo: " + uStr);
+
+        // Limpiar MongoTemplate para tests posteriores
+        simulatedGateway.setMongoTemplate(null);
+    }
+
+    @Test
+    @DisplayName("Ronda 3 - Hallazgo 4: Deduplicación cruzada entre Payment y Booking protege ante caídas entre ambos guardados")
+    void testRound3_WebhookRefundProcessedDeduplicatesPaymentAndBookingIndependentlyAcrossCrashes() {
+        String eventId = "evt_crash_recovery_1";
+        String refundId = "re_crash_1";
+        String intentId = "pi_crash_test";
+        String bookingId = "b_crash_test";
+
+        // Simulamos que el Payment YA fue guardado con el refundId en una invocación anterior antes de que el servidor cayera
+        co.palaciodelmar.backend.model.Payment paymentAlreadySaved = co.palaciodelmar.backend.model.Payment.builder()
+                .id("pay_crash")
+                .intentId(intentId)
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(new BigDecimal("150000")) // Ya acreditado en Payment
+                .status("partially_refunded")
+                .processedRefundIds(new ArrayList<>(List.of(refundId))) // Ya lo tiene
+                .build();
+
+        // Pero la reserva aún NO lo tenía porque el servidor cayó antes de guardar la reserva
+        Booking bookingPendingCatchup = Booking.builder()
+                .id(bookingId)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO) // Aún en 0
+                .processedRefundIds(new ArrayList<>())
+                .build();
+
+        co.palaciodelmar.backend.repository.PaymentRepository mockPayRepo =
+                mock(co.palaciodelmar.backend.repository.PaymentRepository.class);
+        when(mockPayRepo.findByIntentId(intentId)).thenReturn(Optional.of(paymentAlreadySaved));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(bookingPendingCatchup));
+
+        ProcessedWebhookEventRepository mockEventRepo = mock(ProcessedWebhookEventRepository.class);
+        when(mockEventRepo.existsByEventId(eventId)).thenReturn(false);
+
+        PaymentWebhookService realWebhookService = new PaymentWebhookService(
+                mockPayRepo,
+                bookingRepository,
+                bookingService,
+                mockEventRepo,
+                emailService,
+                new ObjectMapper().findAndRegisterModules(),
+                paymentGateway
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(realWebhookService, "webhookSecret", "whsec_test_secret");
+
+        String rawBody = """
+                {
+                  "eventId": "%s",
+                  "eventType": "refund.processed",
+                  "timestamp": "%s",
+                  "data": {
+                    "intentId": "%s",
+                    "bookingId": "%s",
+                    "amount": 150000,
+                    "currency": "COP",
+                    "status": "partially_refunded",
+                    "transactionId": "%s"
+                  }
+                }
+                """.formatted(eventId, Instant.now().toString(), intentId, bookingId, refundId);
+
+        String sig = co.palaciodelmar.backend.webhook.WebhookSigner.sign(rawBody, "whsec_test_secret");
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+
+        realWebhookService.processWebhook(rawBody, sig, eventId, ts);
+
+        // Payment NO debe haberse incrementado a 300.000: debe mantenerse exactamente en 150.000
+        assertEquals(new BigDecimal("150000"), paymentAlreadySaved.getRefundedAmount());
+        // Booking debió alcanzar el estado y registrar los 150.000
+        assertEquals(new BigDecimal("150000"), bookingPendingCatchup.getRefundedAmount());
+        assertTrue(bookingPendingCatchup.getProcessedRefundIds().contains(refundId));
+    }
+
+    @Test
+    @DisplayName("Ronda 3 - Hallazgo 5: processIntentSimulation comprueba propiedad del claimLock y aborta si otra instancia tomó el bloqueo")
+    void testRound3_ProcessIntentSimulationAbortsIfClaimLockLostOrPreempted() {
+        PaymentIntent intentPreempted = PaymentIntent.builder()
+                .id("pi_preempted_node")
+                .bookingId("b_preempted")
+                .amount(new BigDecimal("300000"))
+                .currency("COP")
+                .status("processing")
+                .simulationOutcome("SUCCEEDED")
+                .claimLock("pdm_gw_other_instance_999") // Pertenece a otra instancia
+                .claimExpiresAt(Instant.now().plusSeconds(40)) // Bloqueo vigente de la otra
+                .build();
+
+        when(paymentIntentRepository.findById("pi_preempted_node")).thenReturn(Optional.of(intentPreempted));
+
+        simulatedGateway.processIntentSimulation("pi_preempted_node");
+
+        // La instancia actual no debe tocar ni alterar el intento ajeno
+        verify(paymentIntentRepository, never()).save(argThat(pi -> "succeeded".equals(pi.getStatus())));
+        assertEquals("processing", intentPreempted.getStatus());
+        assertNull(intentPreempted.getTransactionId());
     }
 }

@@ -303,19 +303,54 @@ public class SimulatedPaymentGateway implements PaymentGateway {
             String txId = null;
             String eventType;
             if (isFailure) {
-                intent.setStatus("failed");
                 eventType = "payment.failed";
             } else {
                 txId = "ch_" + UUID.randomUUID().toString().replace("-", "");
-                intent.setStatus("succeeded");
-                intent.setTransactionId(txId);
                 eventType = "payment.succeeded";
             }
 
-            intent.setClaimLock(null);
-            intent.setClaimExpiresAt(null);
-            intent.setUpdatedAt(Instant.now());
-            paymentIntentRepository.save(intent);
+            if (mongoTemplate != null) {
+                org.springframework.data.mongodb.core.query.Query q = new org.springframework.data.mongodb.core.query.Query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("id").is(intentId)
+                                .and("status").is("processing")
+                                .orOperator(
+                                        org.springframework.data.mongodb.core.query.Criteria.where("claimLock").is(instanceId),
+                                        org.springframework.data.mongodb.core.query.Criteria.where("claimLock").exists(false),
+                                        org.springframework.data.mongodb.core.query.Criteria.where("claimLock").is(null),
+                                        org.springframework.data.mongodb.core.query.Criteria.where("claimExpiresAt").exists(false),
+                                        org.springframework.data.mongodb.core.query.Criteria.where("claimExpiresAt").is(null),
+                                        org.springframework.data.mongodb.core.query.Criteria.where("claimExpiresAt").lte(Instant.now())
+                                )
+                );
+                org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
+                        .set("status", isFailure ? "failed" : "succeeded")
+                        .set("transactionId", txId)
+                        .set("failureMessage", errorMessage)
+                        .set("claimLock", null)
+                        .set("claimExpiresAt", null)
+                        .set("updatedAt", Instant.now());
+
+                PaymentIntent updated = mongoTemplate.findAndModify(q, u, PaymentIntent.class);
+                if (updated == null) {
+                    log.warn("Instancia {} no pudo sellar la transición final del intent {} (bloqueo caducado o tomado por otra instancia); abortando resolución duplicada", instanceId, intentId);
+                    return;
+                }
+                intent = updated;
+            } else {
+                Instant now = Instant.now();
+                if (intent.getClaimLock() != null && !instanceId.equals(intent.getClaimLock())
+                        && intent.getClaimExpiresAt() != null && intent.getClaimExpiresAt().isAfter(now)) {
+                    log.warn("Instancia {} no posee el bloqueo activo sobre intent {}; abortando resolución", instanceId, intentId);
+                    return;
+                }
+                intent.setStatus(isFailure ? "failed" : "succeeded");
+                intent.setTransactionId(txId);
+                intent.setFailureMessage(errorMessage);
+                intent.setClaimLock(null);
+                intent.setClaimExpiresAt(null);
+                intent.setUpdatedAt(now);
+                paymentIntentRepository.save(intent);
+            }
 
             // Generar y emitir el webhook
             String eventId = "evt_" + UUID.randomUUID().toString().replace("-", "");
@@ -335,8 +370,18 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                     .build();
 
             boolean delivered = dispatchWebhook(payload, eventId);
-            intent.setWebhookDelivered(delivered);
-            paymentIntentRepository.save(intent);
+            if (mongoTemplate != null) {
+                org.springframework.data.mongodb.core.query.Query qDelivered = new org.springframework.data.mongodb.core.query.Query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("id").is(intentId)
+                );
+                org.springframework.data.mongodb.core.query.Update uDelivered = new org.springframework.data.mongodb.core.query.Update()
+                        .set("webhookDelivered", delivered)
+                        .set("updatedAt", Instant.now());
+                mongoTemplate.updateFirst(qDelivered, uDelivered, PaymentIntent.class);
+            } else {
+                intent.setWebhookDelivered(delivered);
+                paymentIntentRepository.save(intent);
+            }
 
         } catch (Exception e) {
             log.error("Error durante simulación de pago para intent {}: {}", intentId, e.getMessage(), e);
@@ -668,18 +713,30 @@ public class SimulatedPaymentGateway implements PaymentGateway {
 
             boolean delivered = dispatchWebhook(payload, eventId);
             if (delivered) {
-                synchronized (localMonitor) {
-                    PaymentIntent fresh = paymentIntentRepository.findById(intentId).orElse(intent);
-                    if (fresh != null && fresh.getRefundRecords() != null) {
-                        for (PaymentIntent.RefundRecord r : fresh.getRefundRecords()) {
-                            if (refundId.equals(r.getRefundId())) {
-                                r.setWebhookEventId(eventId);
-                                r.setWebhookDelivered(true);
-                                break;
+                if (mongoTemplate != null) {
+                    org.springframework.data.mongodb.core.query.Query q = new org.springframework.data.mongodb.core.query.Query(
+                            org.springframework.data.mongodb.core.query.Criteria.where("id").is(intentId)
+                                    .and("refundRecords.refundId").is(refundId)
+                    );
+                    org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
+                            .set("refundRecords.$.webhookDelivered", true)
+                            .set("refundRecords.$.webhookEventId", eventId)
+                            .set("updatedAt", Instant.now());
+                    mongoTemplate.updateFirst(q, u, PaymentIntent.class);
+                } else {
+                    synchronized (localMonitor) {
+                        PaymentIntent fresh = paymentIntentRepository.findById(intentId).orElse(intent);
+                        if (fresh != null && fresh.getRefundRecords() != null) {
+                            for (PaymentIntent.RefundRecord r : fresh.getRefundRecords()) {
+                                if (refundId.equals(r.getRefundId())) {
+                                    r.setWebhookEventId(eventId);
+                                    r.setWebhookDelivered(true);
+                                    break;
+                                }
                             }
+                            fresh.setUpdatedAt(Instant.now());
+                            paymentIntentRepository.save(fresh);
                         }
-                        fresh.setUpdatedAt(Instant.now());
-                        paymentIntentRepository.save(fresh);
                     }
                 }
             }
