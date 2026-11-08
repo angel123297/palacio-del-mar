@@ -285,6 +285,12 @@ public class AdminService {
                     String errorMsg = (res != null && res.errorMessage() != null) ? res.errorMessage() : "Transacción rechazada por la pasarela";
                     throw new IllegalStateException("Fallo en pasarela al procesar reembolso: " + errorMsg);
                 }
+                if (payment.getProcessedRefundIds() == null) {
+                    payment.setProcessedRefundIds(new java.util.ArrayList<>());
+                }
+                if (res.refundId() != null && !payment.getProcessedRefundIds().contains(res.refundId())) {
+                    payment.getProcessedRefundIds().add(res.refundId());
+                }
                 refundDetails = " (id=" + res.refundId() + ")";
             }
             payment.setRefundedAmount(totalAmt);

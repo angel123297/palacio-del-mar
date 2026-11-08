@@ -1222,4 +1222,300 @@ class AuditRemediationFivePointsTest {
         assertEquals("processing", intentPreempted.getStatus());
         assertNull(intentPreempted.getTransactionId());
     }
+
+    // =========================================================================
+    // CUARTA RONDA: 4 HALLAZGOS FINALES + PROPIEDAD ESTRICTA DE LOCK VIGENTE
+    // =========================================================================
+
+    @Test
+    @DisplayName("Ronda 4 - Hallazgo 1: Modificar reserva registra refundId en Payment y evita doble conteo al llegar el webhook")
+    void testRound4_PartialRefundOnModifyRecordsRefundIdOnPaymentAndPreventsWebhookDoubleCount() {
+        String bookingId = "b_mod_r4_nodouble";
+        String userId = "u_mod_r4";
+        String intentId = "pi_mod_r4";
+        String refundId = "re_mod_r4_100k";
+        LocalDate today = LocalDate.now();
+
+        Suite suite = Suite.builder().id("suite_r4").branch("branch_1").basePrice(new BigDecimal("100000")).build();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .user(userId)
+                .suite("suite_r4")
+                .checkIn(today.plusDays(10))
+                .checkOut(today.plusDays(15))
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay_mod_r4")
+                .intentId(intentId)
+                .booking(bookingId)
+                .user(userId)
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("completed")
+                .transactionId("ch_mod_r4")
+                .build();
+
+        BookingRequest modReq = new BookingRequest();
+        modReq.setCheckIn(today.plusDays(10));
+        modReq.setCheckOut(today.plusDays(14));
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(suiteRepository.findById("suite_r4")).thenReturn(Optional.of(suite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(any(), any(), any())).thenReturn(Collections.emptyList());
+        when(suiteNightRepository.findByBooking(bookingId)).thenReturn(Collections.emptyList());
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.findByBooking(bookingId)).thenReturn(List.of(payment));
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        PricingService.PricingResult newPricing = new PricingService.PricingResult(
+                new BigDecimal("400000"), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("400000"), Collections.emptyList()
+        );
+        when(pricingService.calculatePrice(any(), any(), any(), any())).thenReturn(newPricing);
+        when(paymentGateway.refund(eq("ch_mod_r4"), eq(new BigDecimal("100000")), anyString()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, refundId, "partially_refunded", null));
+
+        // 1. Modificar reserva (genera reembolso parcial de $100.000)
+        bookingService.modifyBooking(bookingId, userId, modReq);
+
+        assertEquals(new BigDecimal("100000"), booking.getRefundedAmount());
+        assertEquals(new BigDecimal("100000"), payment.getRefundedAmount());
+        assertNotNull(payment.getProcessedRefundIds());
+        assertTrue(payment.getProcessedRefundIds().contains(refundId),
+                "Payment debe registrar el refundId inmediatamente al confirmar la modificación");
+
+        // 2. Ahora llega el webhook refund.processed para el mismo refundId
+        ProcessedWebhookEventRepository mockEventRepo = mock(ProcessedWebhookEventRepository.class);
+        when(mockEventRepo.existsByEventId("evt_mod_r4_wh")).thenReturn(false);
+
+        PaymentWebhookService realWebhookService = new PaymentWebhookService(
+                paymentRepository,
+                bookingRepository,
+                bookingService,
+                mockEventRepo,
+                emailService,
+                new ObjectMapper().findAndRegisterModules(),
+                paymentGateway
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(realWebhookService, "webhookSecret", "whsec_test_secret_r4_12345678901234567890");
+
+        String rawBody = """
+                {
+                  "eventId": "evt_mod_r4_wh",
+                  "eventType": "refund.processed",
+                  "timestamp": "%s",
+                  "data": {
+                    "intentId": "%s",
+                    "bookingId": "%s",
+                    "amount": 100000,
+                    "currency": "COP",
+                    "status": "partially_refunded",
+                    "transactionId": "%s"
+                  }
+                }
+                """.formatted(Instant.now().toString(), intentId, bookingId, refundId);
+        String sig = co.palaciodelmar.backend.webhook.WebhookSigner.sign(rawBody, "whsec_test_secret_r4_12345678901234567890");
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+
+        realWebhookService.processWebhook(rawBody, sig, "evt_mod_r4_wh", ts);
+
+        // Payment.refundedAmount JAMÁS debe duplicarse a 200.000; debe seguir en 100.000 igual que Booking
+        assertEquals(new BigDecimal("100000"), payment.getRefundedAmount(),
+                "El reembolso parcial no debe contarse dos veces en Payment cuando llega el webhook");
+        assertEquals(new BigDecimal("100000"), booking.getRefundedAmount());
+    }
+
+    @Test
+    @DisplayName("Ronda 4 - Hallazgo 2: Caída tras reembolso total en Payment no impide actualizar Booking al reintentar el webhook")
+    void testRound4_CrashAfterFullRefundOnPaymentStillUpdatesBookingOnWebhookRetry() {
+        String eventId = "evt_full_crash_r4";
+        String refundId = "re_full_crash_r4";
+        String intentId = "pi_full_crash_r4";
+        String bookingId = "b_full_crash_r4";
+
+        // Payment ya quedó totalmente reembolsado ("refunded", 500.000 de 500.000) antes de la caída
+        Payment paymentAlreadyFullyRefunded = Payment.builder()
+                .id("pay_full_crash")
+                .intentId(intentId)
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(new BigDecimal("500000"))
+                .status("refunded")
+                .processedRefundIds(new ArrayList<>(List.of(refundId)))
+                .build();
+
+        // Pero Booking quedó sin actualizar por la caída del servidor entre ambos guardados
+        Booking bookingUnupdated = Booking.builder()
+                .id(bookingId)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .processedRefundIds(new ArrayList<>())
+                .build();
+
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(paymentAlreadyFullyRefunded));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(bookingUnupdated));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        ProcessedWebhookEventRepository mockEventRepo = mock(ProcessedWebhookEventRepository.class);
+        when(mockEventRepo.existsByEventId(eventId)).thenReturn(false);
+
+        PaymentWebhookService realWebhookService = new PaymentWebhookService(
+                paymentRepository,
+                bookingRepository,
+                bookingService,
+                mockEventRepo,
+                emailService,
+                new ObjectMapper().findAndRegisterModules(),
+                paymentGateway
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(realWebhookService, "webhookSecret", "whsec_test_secret_r4_12345678901234567890");
+
+        String rawBody = """
+                {
+                  "eventId": "%s",
+                  "eventType": "refund.processed",
+                  "timestamp": "%s",
+                  "data": {
+                    "intentId": "%s",
+                    "bookingId": "%s",
+                    "amount": 500000,
+                    "currency": "COP",
+                    "status": "refunded",
+                    "transactionId": "%s"
+                  }
+                }
+                """.formatted(eventId, Instant.now().toString(), intentId, bookingId, refundId);
+        String sig = co.palaciodelmar.backend.webhook.WebhookSigner.sign(rawBody, "whsec_test_secret_r4_12345678901234567890");
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+
+        realWebhookService.processWebhook(rawBody, sig, eventId, ts);
+
+        // Payment se mantiene en 500.000 y Booking ahora SÍ se actualiza a 500.000 y paymentStatus="refunded"
+        assertEquals(new BigDecimal("500000"), paymentAlreadyFullyRefunded.getRefundedAmount());
+        assertEquals(new BigDecimal("500000"), bookingUnupdated.getRefundedAmount(),
+                "La reserva debe actualizarse en el reintento incluso si el Payment ya figuraba como totalmente reembolsado");
+        assertEquals("refunded", bookingUnupdated.getPaymentStatus());
+        assertTrue(bookingUnupdated.getProcessedRefundIds().contains(refundId));
+    }
+
+    @Test
+    @DisplayName("Ronda 4 - Hallazgo 3: Tarea periódica (@Scheduled) concilia reembolsos pendientes de reservas canceladas tras caída")
+    void testRound4_ScheduledReconcilePendingBookingRefundsRecoversCancelledBookingWithPendingRefund() throws Exception {
+        java.lang.reflect.Method schedMethod = BookingService.class.getMethod("reconcilePendingBookingRefunds");
+        assertNotNull(schedMethod.getAnnotation(org.springframework.scheduling.annotation.Scheduled.class),
+                "reconcilePendingBookingRefunds debe tener @Scheduled para reintentar reembolsos pendientes de cancelaciones");
+
+        String bookingId = "b_canc_pending_sched";
+        String cancelKey = "ref_canc_b_canc_pending_sched_abc123";
+
+        // Reserva que quedó en cancelled + requires_refund porque el servidor cayó antes de invocar la pasarela
+        Booking cancelledPendingRefund = Booking.builder()
+                .id(bookingId)
+                .user("u_sched")
+                .suite("suite_1")
+                .status("cancelled")
+                .paymentStatus("requires_refund")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(new BigDecimal("100000")) // Tenía un reembolso parcial previo de $100.000
+                .pendingRefundIdempotencyKey(cancelKey)
+                .pendingRefundAmount(new BigDecimal("400000")) // Faltaban $400.000 por devolver al cancelar
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay_canc_sched")
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(new BigDecimal("100000"))
+                .status("partially_refunded")
+                .transactionId("ch_canc_sched")
+                .processedRefundIds(new ArrayList<>(List.of("re_prev_100k")))
+                .build();
+
+        when(bookingRepository.findByPendingRefundIdempotencyKeyIsNotNull()).thenReturn(List.of(cancelledPendingRefund));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(cancelledPendingRefund));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.findByBooking(bookingId)).thenReturn(List.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        when(paymentGateway.refund("ch_canc_sched", new BigDecimal("400000"), cancelKey))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_canc_sched_400k", "refunded", null));
+
+        // Ejecutar el job periódico de conciliación
+        bookingService.reconcilePendingBookingRefunds();
+
+        verify(paymentGateway, times(1)).refund("ch_canc_sched", new BigDecimal("400000"), cancelKey);
+        assertEquals(new BigDecimal("500000"), cancelledPendingRefund.getRefundedAmount());
+        assertEquals("refunded", cancelledPendingRefund.getPaymentStatus());
+        assertNull(cancelledPendingRefund.getPendingRefundIdempotencyKey());
+        assertEquals(BigDecimal.ZERO, cancelledPendingRefund.getPendingRefundAmount());
+        assertTrue(cancelledPendingRefund.getProcessedRefundIds().contains("re_canc_sched_400k"));
+
+        assertEquals(new BigDecimal("500000"), payment.getRefundedAmount());
+        assertEquals("refunded", payment.getStatus());
+        assertTrue(payment.getProcessedRefundIds().contains("re_canc_sched_400k"));
+    }
+
+    @Test
+    @DisplayName("Ronda 4 - Hallazgo 4 y Lock Vigente: Recuperación de webhook de pago usa updateFirst atómico y bloqueo expirado propio aborta")
+    void testRound4_PaymentWebhookRecoveryUsesAtomicUpdateAndExpiredOwnLockAbortsSimulation() {
+        // Parte A: Reintento de webhook de pago usa mongoTemplate.updateFirst sin sobrescribir refundRecords
+        org.springframework.data.mongodb.core.MongoTemplate mockMongo =
+                mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+        simulatedGateway.setMongoTemplate(mockMongo);
+
+        PaymentIntent succeededUndelivered = PaymentIntent.builder()
+                .id("pi_wh_atomic_r4")
+                .bookingId("b_wh_atomic_r4")
+                .amount(new BigDecimal("400000"))
+                .currency("COP")
+                .status("succeeded")
+                .transactionId("ch_wh_atomic_r4")
+                .webhookDelivered(false)
+                .build();
+
+        when(paymentIntentRepository.findById("pi_wh_atomic_r4")).thenReturn(Optional.of(succeededUndelivered));
+
+        simulatedGateway.processIntentSimulation("pi_wh_atomic_r4");
+
+        org.mockito.ArgumentCaptor<org.springframework.data.mongodb.core.query.Update> updateCaptor =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.mongodb.core.query.Update.class);
+        verify(mockMongo).updateFirst(any(), updateCaptor.capture(), eq(PaymentIntent.class));
+        String updateDoc = updateCaptor.getValue().getUpdateObject().toString();
+        assertTrue(updateDoc.contains("webhookDelivered"), "Debe actualizar atómicamente webhookDelivered: " + updateDoc);
+        assertFalse(updateDoc.contains("refundRecords"), "No debe sobrescribir refundRecords al marcar webhookDelivered");
+
+        simulatedGateway.setMongoTemplate(null);
+
+        // Parte B: Si la propia instancia tenía el claimLock pero su claimExpiresAt ya expiró, aborta sin resolver
+        String ownInstanceId = (String) org.springframework.test.util.ReflectionTestUtils.getField(simulatedGateway, "instanceId");
+        PaymentIntent expiredOwnLockIntent = PaymentIntent.builder()
+                .id("pi_expired_own_lock")
+                .bookingId("b_expired_own")
+                .amount(new BigDecimal("300000"))
+                .currency("COP")
+                .status("processing")
+                .simulationOutcome("SUCCEEDED")
+                .claimLock(ownInstanceId)
+                .claimExpiresAt(Instant.now().minusSeconds(5)) // Expiró hace 5 segundos
+                .build();
+
+        when(paymentIntentRepository.findById("pi_expired_own_lock")).thenReturn(Optional.of(expiredOwnLockIntent));
+
+        simulatedGateway.processIntentSimulation("pi_expired_own_lock");
+
+        assertEquals("processing", expiredOwnLockIntent.getStatus(),
+                "Un bloqueo propio ya expirado no debe permitir finalizar la simulación sin reclamo vigente");
+        assertNull(expiredOwnLockIntent.getTransactionId());
+    }
 }

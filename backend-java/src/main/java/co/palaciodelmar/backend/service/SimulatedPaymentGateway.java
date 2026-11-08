@@ -284,10 +284,33 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                             .build();
 
                     boolean delivered = dispatchWebhook(payload, eventId);
-                    intent.setWebhookDelivered(delivered);
-                    paymentIntentRepository.save(intent);
+                    if (mongoTemplate != null) {
+                        org.springframework.data.mongodb.core.query.Query qDelivered = new org.springframework.data.mongodb.core.query.Query(
+                                org.springframework.data.mongodb.core.query.Criteria.where("id").is(intentId)
+                        );
+                        org.springframework.data.mongodb.core.query.Update uDelivered = new org.springframework.data.mongodb.core.query.Update()
+                                .set("webhookDelivered", delivered)
+                                .set("updatedAt", Instant.now());
+                        mongoTemplate.updateFirst(qDelivered, uDelivered, PaymentIntent.class);
+                    } else {
+                        Object monitor = INTENT_LOCKS.computeIfAbsent(intentId, k -> new Object());
+                        synchronized (monitor) {
+                            PaymentIntent fresh = paymentIntentRepository.findById(intentId).orElse(intent);
+                            fresh.setWebhookDelivered(delivered);
+                            fresh.setUpdatedAt(Instant.now());
+                            paymentIntentRepository.save(fresh);
+                        }
+                    }
                 }
                 return;
+            }
+
+            if (intent.getClaimLock() == null) {
+                if (!tryClaimProcessingIntent(intent)) {
+                    log.warn("Instancia {} no pudo reclamar bloqueo inicial para intent {}; abortando resolución", instanceId, intentId);
+                    return;
+                }
+                intent = paymentIntentRepository.findById(intentId).orElse(intent);
             }
 
             String errorMessage = intent.getFailureMessage();
@@ -310,17 +333,12 @@ public class SimulatedPaymentGateway implements PaymentGateway {
             }
 
             if (mongoTemplate != null) {
+                Instant now = Instant.now();
                 org.springframework.data.mongodb.core.query.Query q = new org.springframework.data.mongodb.core.query.Query(
                         org.springframework.data.mongodb.core.query.Criteria.where("id").is(intentId)
                                 .and("status").is("processing")
-                                .orOperator(
-                                        org.springframework.data.mongodb.core.query.Criteria.where("claimLock").is(instanceId),
-                                        org.springframework.data.mongodb.core.query.Criteria.where("claimLock").exists(false),
-                                        org.springframework.data.mongodb.core.query.Criteria.where("claimLock").is(null),
-                                        org.springframework.data.mongodb.core.query.Criteria.where("claimExpiresAt").exists(false),
-                                        org.springframework.data.mongodb.core.query.Criteria.where("claimExpiresAt").is(null),
-                                        org.springframework.data.mongodb.core.query.Criteria.where("claimExpiresAt").lte(Instant.now())
-                                )
+                                .and("claimLock").is(instanceId)
+                                .and("claimExpiresAt").gt(now)
                 );
                 org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
                         .set("status", isFailure ? "failed" : "succeeded")
@@ -328,7 +346,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                         .set("failureMessage", errorMessage)
                         .set("claimLock", null)
                         .set("claimExpiresAt", null)
-                        .set("updatedAt", Instant.now());
+                        .set("updatedAt", now);
 
                 PaymentIntent updated = mongoTemplate.findAndModify(q, u, PaymentIntent.class);
                 if (updated == null) {
@@ -338,9 +356,11 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                 intent = updated;
             } else {
                 Instant now = Instant.now();
-                if (intent.getClaimLock() != null && !instanceId.equals(intent.getClaimLock())
-                        && intent.getClaimExpiresAt() != null && intent.getClaimExpiresAt().isAfter(now)) {
-                    log.warn("Instancia {} no posee el bloqueo activo sobre intent {}; abortando resolución", instanceId, intentId);
+                if (!instanceId.equals(intent.getClaimLock())
+                        || intent.getClaimExpiresAt() == null
+                        || !intent.getClaimExpiresAt().isAfter(now)) {
+                    log.warn("Instancia {} no posee un bloqueo vigente sobre intent {} (owner={}, expiresAt={}); abortando resolución",
+                            instanceId, intentId, intent.getClaimLock(), intent.getClaimExpiresAt());
                     return;
                 }
                 intent.setStatus(isFailure ? "failed" : "succeeded");
@@ -379,8 +399,13 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                         .set("updatedAt", Instant.now());
                 mongoTemplate.updateFirst(qDelivered, uDelivered, PaymentIntent.class);
             } else {
-                intent.setWebhookDelivered(delivered);
-                paymentIntentRepository.save(intent);
+                Object monitor = INTENT_LOCKS.computeIfAbsent(intentId, k -> new Object());
+                synchronized (monitor) {
+                    PaymentIntent fresh = paymentIntentRepository.findById(intentId).orElse(intent);
+                    fresh.setWebhookDelivered(delivered);
+                    fresh.setUpdatedAt(Instant.now());
+                    paymentIntentRepository.save(fresh);
+                }
             }
 
         } catch (Exception e) {

@@ -377,11 +377,6 @@ public class PaymentWebhookService {
             BigDecimal currentPaymentRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount() : BigDecimal.ZERO;
             BigDecimal refundAmount = data.getAmount() != null ? data.getAmount() : paymentTotal;
 
-            if ("refunded".equalsIgnoreCase(payment.getStatus()) && currentPaymentRefunded.compareTo(paymentTotal) >= 0) {
-                log.info("Payment {} ya se encontraba totalmente reembolsado; omitiendo doble abono contable", payment.getId());
-                return;
-            }
-
             Booking booking = (payment.getBooking() != null && !payment.getBooking().isBlank())
                     ? bookingRepository.findById(payment.getBooking()).orElse(null)
                     : null;
@@ -390,19 +385,20 @@ public class PaymentWebhookService {
                     (eventId != null && payment.getProcessedRefundIds().contains(eventId))
                     || (refundId != null && payment.getProcessedRefundIds().contains(refundId))
             );
+            boolean paymentAlreadyFullyRefunded = "refunded".equalsIgnoreCase(payment.getStatus());
             boolean bookingAlreadyProcessed = booking != null && booking.getProcessedRefundIds() != null && (
                     (eventId != null && booking.getProcessedRefundIds().contains(eventId))
                     || (refundId != null && booking.getProcessedRefundIds().contains(refundId))
             );
 
-            if (paymentAlreadyProcessed && (booking == null || bookingAlreadyProcessed)) {
+            if ((paymentAlreadyProcessed || paymentAlreadyFullyRefunded) && (booking == null || bookingAlreadyProcessed)) {
                 log.info("Evento de reembolso {} / {} ya aplicado previamente en payment {} y booking; omitiendo reprocesamiento", eventId, refundId, payment.getId());
                 return;
             }
 
             boolean isCancelled = booking != null && "cancelled".equalsIgnoreCase(booking.getStatus());
 
-            if (!paymentAlreadyProcessed) {
+            if (!paymentAlreadyProcessed && !paymentAlreadyFullyRefunded) {
                 BigDecimal newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
                 payment.setRefundedAmount(newPaymentRefunded);
 
