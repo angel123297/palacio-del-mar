@@ -385,7 +385,9 @@ public class PaymentWebhookService {
                     (eventId != null && payment.getProcessedRefundIds().contains(eventId))
                     || (refundId != null && payment.getProcessedRefundIds().contains(refundId))
             );
-            boolean paymentAlreadyFullyRefunded = "refunded".equalsIgnoreCase(payment.getStatus());
+            boolean paymentAlreadyFullyRefunded = "refunded".equalsIgnoreCase(payment.getStatus())
+                    && paymentTotal.compareTo(BigDecimal.ZERO) > 0
+                    && currentPaymentRefunded.compareTo(paymentTotal) >= 0;
             boolean bookingAlreadyProcessed = booking != null && booking.getProcessedRefundIds() != null && (
                     (eventId != null && booking.getProcessedRefundIds().contains(eventId))
                     || (refundId != null && booking.getProcessedRefundIds().contains(refundId))
@@ -397,13 +399,19 @@ public class PaymentWebhookService {
             }
 
             boolean isCancelled = booking != null && "cancelled".equalsIgnoreCase(booking.getStatus());
+            boolean hasUnsettledCancelRefund = booking != null && ("requires_refund".equalsIgnoreCase(booking.getPaymentStatus())
+                    || (booking.getPendingRefundIdempotencyKey() != null && !booking.getPendingRefundIdempotencyKey().isBlank()));
 
             if (!paymentAlreadyProcessed && !paymentAlreadyFullyRefunded) {
-                BigDecimal newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
+                BigDecimal newPaymentRefunded;
+                if (isCancelled && currentPaymentRefunded.compareTo(BigDecimal.ZERO) > 0 && !hasUnsettledCancelRefund && refundId == null) {
+                    newPaymentRefunded = currentPaymentRefunded.max(refundAmount).min(paymentTotal);
+                } else {
+                    newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
+                }
                 payment.setRefundedAmount(newPaymentRefunded);
 
-                if ((paymentTotal.compareTo(BigDecimal.ZERO) > 0 && newPaymentRefunded.compareTo(paymentTotal) >= 0)
-                        || isCancelled) {
+                if (paymentTotal.compareTo(BigDecimal.ZERO) > 0 && newPaymentRefunded.compareTo(paymentTotal) >= 0) {
                     payment.setStatus("refunded");
                 } else {
                     payment.setStatus("partially_refunded");
@@ -436,8 +444,6 @@ public class PaymentWebhookService {
                     : (payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO);
             BigDecimal eventRefund = rawRefund.max(BigDecimal.ZERO);
 
-            boolean hasUnsettledCancelRefund = "requires_refund".equalsIgnoreCase(booking.getPaymentStatus())
-                    || (booking.getPendingRefundIdempotencyKey() != null && !booking.getPendingRefundIdempotencyKey().isBlank());
             BigDecimal newRefunded;
             if (isCancelled && currentRefunded.compareTo(BigDecimal.ZERO) > 0 && !hasUnsettledCancelRefund) {
                 // cancelBooking ya contabilizó el reembolso al cancelar; reconciliar sin sumar dos veces
@@ -473,18 +479,28 @@ public class PaymentWebhookService {
             bookingRepository.save(booking);
         };
 
+        Runnable synchronizedRefundExecution = () -> {
+            if (bookingId != null && !bookingId.isBlank()) {
+                synchronized (BookingService.getBookingMonitor(bookingId)) {
+                    handleRefundInLock.run();
+                }
+            } else {
+                handleRefundInLock.run();
+            }
+        };
+
         if (redisLockService != null && bookingId != null && !bookingId.isBlank()) {
             redisLockService.executeWithLock(
                     "booking:" + bookingId.trim(),
                     java.time.Duration.ofSeconds(15),
                     java.time.Duration.ofSeconds(5),
                     () -> {
-                        handleRefundInLock.run();
+                        synchronizedRefundExecution.run();
                         return null;
                     }
             );
         } else {
-            handleRefundInLock.run();
+            synchronizedRefundExecution.run();
         }
     }
 

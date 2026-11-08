@@ -1518,4 +1518,188 @@ class AuditRemediationFivePointsTest {
                 "Un bloqueo propio ya expirado no debe permitir finalizar la simulación sin reclamo vigente");
         assertNull(expiredOwnLockIntent.getTransactionId());
     }
+
+    // =========================================================================
+    // QUINTA RONDA: BLOQUEO COMÚN DE RESERVA CON ORDEN CONSISTENTE + PAGO PARCIAL EN CANCELACIÓN
+    // =========================================================================
+
+    @Test
+    @DisplayName("Ronda 5 - Hallazgo 1: modifyBooking y reconcilePendingBookingRefunds usan el bloqueo común de reserva y orden consistente (booking -> suite)")
+    void testRound5_ModifyBookingAndPeriodicReconciliationShareCommonBookingLockWithConsistentOrder() {
+        String bookingId = "b_lock_order_r5";
+        String userId = "u_lock_r5";
+        LocalDate today = LocalDate.now();
+
+        Suite suite = Suite.builder().id("suite_lock_r5").branch("branch_1").basePrice(new BigDecimal("100000")).build();
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .user(userId)
+                .suite("suite_lock_r5")
+                .checkIn(today.plusDays(10))
+                .checkOut(today.plusDays(15))
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .pendingRefundIdempotencyKey("ref_mod_r5_pending")
+                .pendingRefundAmount(new BigDecimal("100000"))
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay_lock_r5")
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("completed")
+                .transactionId("ch_lock_r5")
+                .build();
+
+        RedisLockService mockRedisLock = mock(RedisLockService.class);
+        java.util.List<String> acquiredLocksInOrder = new java.util.concurrent.CopyOnWriteArrayList<>();
+        when(mockRedisLock.executeWithLock(anyString(), any(), any(), any())).thenAnswer(inv -> {
+            String lockKey = inv.getArgument(0);
+            acquiredLocksInOrder.add(lockKey);
+            java.util.function.Supplier<?> supplier = inv.getArgument(3);
+            return supplier.get();
+        });
+        bookingService.setRedisLockService(mockRedisLock);
+
+        BookingRequest modReq = new BookingRequest();
+        modReq.setCheckIn(today.plusDays(10));
+        modReq.setCheckOut(today.plusDays(14));
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(suiteRepository.findById("suite_lock_r5")).thenReturn(Optional.of(suite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(any(), any(), any())).thenReturn(Collections.emptyList());
+        when(suiteNightRepository.findByBooking(bookingId)).thenReturn(Collections.emptyList());
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.findByBooking(bookingId)).thenReturn(List.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        PricingService.PricingResult newPricing = new PricingService.PricingResult(
+                new BigDecimal("400000"), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("400000"), Collections.emptyList()
+        );
+        when(pricingService.calculatePrice(any(), any(), any(), any())).thenReturn(newPricing);
+        when(paymentGateway.refund(eq("ch_lock_r5"), eq(new BigDecimal("100000")), eq("ref_mod_r5_pending")))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_r5_conciliated", "partially_refunded", null));
+
+        try {
+            bookingService.modifyBooking(bookingId, userId, modReq);
+
+            // 1. Verificar que modifyBooking adquirió PRIMERO "booking:b_lock_order_r5" y DESPUÉS "suite:suite_lock_r5"
+            assertTrue(acquiredLocksInOrder.size() >= 2, "Debe adquirir tanto el bloqueo de reserva como el de suite");
+            assertEquals("booking:" + bookingId, acquiredLocksInOrder.get(0),
+                    "El bloqueo común de reserva debe adquirirse siempre en primer lugar (orden consistente con cancelación y conciliación)");
+            assertEquals("suite:suite_lock_r5", acquiredLocksInOrder.get(1),
+                    "El bloqueo de suite debe adquirirse después del bloqueo de reserva");
+            assertEquals(new BigDecimal("100000"), booking.getRefundedAmount());
+            assertEquals(new BigDecimal("100000"), payment.getRefundedAmount());
+        } finally {
+            bookingService.setRedisLockService(null);
+        }
+    }
+
+    @Test
+    @DisplayName("Ronda 5 - Hallazgo 2: Cancelación con penalidad deja Payment en 'partially_refunded' (nunca 'refunded') tanto en servicio como en webhook")
+    void testRound5_CancelledBookingWithRetentionPenaltyKeepsPaymentPartiallyRefunded() {
+        String bookingId = "b_canc_penalty_r5";
+        String userId = "u_canc_r5";
+        String intentId = "pi_canc_penalty_r5";
+        LocalDate checkInFiveDays = LocalDate.now().plusDays(5); // < 7 días => 10% de retención ($50.000) y devolución de $450.000
+
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .user(userId)
+                .suite("suite_1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .checkIn(checkInFiveDays)
+                .checkOut(checkInFiveDays.plusDays(3))
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay_canc_penalty_r5")
+                .intentId(intentId)
+                .booking(bookingId)
+                .user(userId)
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("completed")
+                .transactionId("ch_canc_penalty_r5")
+                .build();
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.findByBooking(bookingId)).thenReturn(List.of(payment));
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentGateway.refund(eq("ch_canc_penalty_r5"), argThat(amt -> amt != null && amt.compareTo(new BigDecimal("450000")) == 0), anyString()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_penalty_450k", "partially_refunded", null));
+
+        // 1. Cancelar reserva con penalidad del 10%
+        BookingDTO cancelledDto = bookingService.cancelBooking(bookingId, userId, "Cambio de fecha con penalidad");
+
+        assertEquals("cancelled", cancelledDto.getStatus());
+        assertEquals("partial", cancelledDto.getPaymentStatus());
+        assertEquals(new BigDecimal("450000.00"), cancelledDto.getRefundedAmount());
+        // Payment NO puede quedar como "refunded" porque solo se devolvieron 450.000 de 500.000
+        assertEquals("partially_refunded", payment.getStatus(),
+                "Payment debe quedar en partially_refunded cuando existe penalidad de cancelación");
+        assertEquals(new BigDecimal("450000.00"), payment.getRefundedAmount());
+
+        // 2. Además, si el webhook refund.processed llega para un pago aún en "completed" de una reserva cancelada con penalidad:
+        Payment paymentViaWebhook = Payment.builder()
+                .id("pay_wh_penalty_r5")
+                .intentId("pi_wh_penalty_r5")
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("completed")
+                .build();
+        when(paymentRepository.findByIntentId("pi_wh_penalty_r5")).thenReturn(Optional.of(paymentViaWebhook));
+
+        ProcessedWebhookEventRepository mockEventRepo = mock(ProcessedWebhookEventRepository.class);
+        when(mockEventRepo.existsByEventId("evt_wh_penalty_r5")).thenReturn(false);
+
+        PaymentWebhookService realWebhookService = new PaymentWebhookService(
+                paymentRepository,
+                bookingRepository,
+                bookingService,
+                mockEventRepo,
+                emailService,
+                new ObjectMapper().findAndRegisterModules(),
+                paymentGateway
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(realWebhookService, "webhookSecret", "whsec_test_secret_r5_12345678901234567890");
+
+        String rawBody = """
+                {
+                  "eventId": "evt_wh_penalty_r5",
+                  "eventType": "refund.processed",
+                  "timestamp": "%s",
+                  "data": {
+                    "intentId": "pi_wh_penalty_r5",
+                    "bookingId": "%s",
+                    "amount": 450000,
+                    "currency": "COP",
+                    "status": "partially_refunded",
+                    "transactionId": "re_wh_penalty_450k"
+                  }
+                }
+                """.formatted(Instant.now().toString(), bookingId);
+        String sig = co.palaciodelmar.backend.webhook.WebhookSigner.sign(rawBody, "whsec_test_secret_r5_12345678901234567890");
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+
+        realWebhookService.processWebhook(rawBody, sig, "evt_wh_penalty_r5", ts);
+
+        assertEquals("partially_refunded", paymentViaWebhook.getStatus(),
+                "El webhook nunca debe marcar como 'refunded' un pago con devolución parcial aunque la reserva esté cancelada");
+        assertEquals(new BigDecimal("450000"), paymentViaWebhook.getRefundedAmount());
+    }
 }

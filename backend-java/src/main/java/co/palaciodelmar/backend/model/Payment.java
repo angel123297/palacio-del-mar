@@ -61,4 +61,7 @@ public class Payment {
 
     @Builder.Default
     private java.util.List<String> processedRefundIds = new java.util.ArrayList<>();
+
+    @org.springframework.data.annotation.Version
+    private Long version;
 }
