@@ -15,16 +15,16 @@ class BookingStepperScreen extends StatefulWidget {
   final String baseUrl;
 
   const BookingStepperScreen({
-    Key? key,
+    super.key,
     required this.suiteId,
     required this.suiteName,
     required this.pricePerNightCOP,
     required this.token,
     this.baseUrl = 'https://unbroke-unsized-zandra.ngrok-free.dev/api',
-  }) : super(key: key);
+  });
 
   @override
-  _BookingStepperScreenState createState() => _BookingStepperScreenState();
+  State<BookingStepperScreen> createState() => _BookingStepperScreenState();
 }
 
 class _BookingStepperScreenState extends State<BookingStepperScreen> {

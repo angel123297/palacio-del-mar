@@ -190,6 +190,7 @@ class _GastronomySpaViewState extends State<GastronomySpaView> with SingleTicker
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: const Color(0xFF141210),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
