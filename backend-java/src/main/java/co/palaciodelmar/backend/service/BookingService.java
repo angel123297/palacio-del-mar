@@ -480,6 +480,7 @@ public class BookingService {
                     && freshBooking.getExpiresAt().isBefore(now)) {
                 throw new IllegalArgumentException("No se puede modificar una reserva cuyo plazo de pago ha expirado");
             }
+            reconcilePendingRefundBeforeChange(freshBooking, resolvedBookingId);
 
             LocalDate innerOldCheckIn = freshBooking.getCheckIn();
             LocalDate innerOldCheckOut = freshBooking.getCheckOut();
@@ -856,14 +857,19 @@ public class BookingService {
             if (booking.getCheckIn() == null) {
                 throw new IllegalStateException("La reserva no tiene una fecha de check-in válida");
             }
-            if (booking.getTotalPrice() == null || booking.getTotalPrice().signum() < 0) {
+            if ( booking.getTotalPrice() == null || booking.getTotalPrice().signum() < 0) {
                 throw new IllegalStateException("La reserva no tiene un precio total válido para calcular la retención");
             }
+            reconcilePendingRefundBeforeChange(booking, resolvedBookingId);
 
             long daysUntilCheckIn = ChronoUnit.DAYS.between(LocalDate.now(BOGOTA_ZONE), booking.getCheckIn());
             BigDecimal paidAmount = booking.getPaidAmount() != null
                     ? booking.getPaidAmount().max(BigDecimal.ZERO)
                     : BigDecimal.ZERO;
+            BigDecimal alreadyRefunded = booking.getRefundedAmount() != null
+                    ? booking.getRefundedAmount().max(BigDecimal.ZERO)
+                    : BigDecimal.ZERO;
+            BigDecimal netPaid = paidAmount.subtract(alreadyRefunded).max(BigDecimal.ZERO);
             BigDecimal retention = BigDecimal.ZERO;
             // El depósito de garantía no es ingreso: la penalidad se calcula sobre el total sin él.
             BigDecimal cancelDeposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
@@ -875,15 +881,16 @@ public class BookingService {
                 // Penalidad del 10% si cancela dentro de los 7 días
                 retention = retentionBase.multiply(new BigDecimal("0.10")).setScale(2, RoundingMode.HALF_UP);
             }
-            BigDecimal refundAmount = paidAmount.subtract(retention).max(BigDecimal.ZERO).min(paidAmount);
+            BigDecimal refundToProcess = netPaid.subtract(retention).max(BigDecimal.ZERO).min(netPaid);
+            BigDecimal totalRefundedAfterCancel = alreadyRefunded.add(refundToProcess).min(paidAmount);
 
             changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CANCELLED, userId, reason);
             if (reason != null && !reason.isEmpty()) {
                 booking.setCancellationReason(reason);
             }
-            booking.setRefundedAmount(refundAmount);
+            booking.setRefundedAmount(totalRefundedAfterCancel);
             if (paidAmount.compareTo(BigDecimal.ZERO) > 0) {
-                booking.setPaymentStatus(refundAmount.compareTo(paidAmount) >= 0 ? "refunded" : "partial");
+                booking.setPaymentStatus(totalRefundedAfterCancel.compareTo(paidAmount) >= 0 ? "refunded" : "partial");
             }
             booking.setBalanceDue(BigDecimal.ZERO);
 
@@ -897,31 +904,49 @@ public class BookingService {
                 availabilityCacheEvictor.evictAvailability();
             }
 
-            if (paidAmount.compareTo(BigDecimal.ZERO) > 0 && refundAmount.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
+            if (netPaid.compareTo(BigDecimal.ZERO) > 0 && refundToProcess.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
                 String txId = resolveRefundTransactionId(resolvedBookingId);
                 try {
-                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundAmount);
+                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundToProcess);
                     if (refundResp != null) {
-                        if (refundResp.success() && paymentRepository != null && refundAmount.compareTo(paidAmount) >= 0) {
-                            paymentRepository.findByBooking(resolvedBookingId).stream()
-                                    .filter(p -> "completed".equalsIgnoreCase(p.getStatus()))
-                                    .findFirst()
-                                    .ifPresent(p -> {
-                                        p.setStatus("refunded");
-                                        p.setUpdatedAt(Instant.now());
-                                        paymentRepository.save(p);
-                                    });
-                        } else if (!refundResp.success()) {
-                            log.warn("Fallo en pasarela al reembolsar reserva {}. Marcando paymentStatus=requires_refund", resolvedBookingId);
+                        if (refundResp.success()) {
+                            if (savedBooking.getProcessedRefundIds() == null) {
+                                savedBooking.setProcessedRefundIds(new java.util.ArrayList<>());
+                            }
+                            if (refundResp.refundId() != null && !savedBooking.getProcessedRefundIds().contains(refundResp.refundId())) {
+                                savedBooking.getProcessedRefundIds().add(refundResp.refundId());
+                            }
+                            if (paymentRepository != null) {
+                                paymentRepository.findByBooking(resolvedBookingId).stream()
+                                        .filter(p -> "completed".equalsIgnoreCase(p.getStatus()) || "partially_refunded".equalsIgnoreCase(p.getStatus()))
+                                        .findFirst()
+                                        .ifPresent(p -> {
+                                            BigDecimal pRefunded = (p.getRefundedAmount() != null ? p.getRefundedAmount() : BigDecimal.ZERO).add(refundToProcess);
+                                            p.setRefundedAmount(pRefunded);
+                                            p.setStatus(pRefunded.compareTo(p.getAmount()) >= 0 || totalRefundedAfterCancel.compareTo(paidAmount) >= 0 ? "refunded" : "partially_refunded");
+                                            p.setUpdatedAt(Instant.now());
+                                            paymentRepository.save(p);
+                                        });
+                            }
+                        } else {
+                            log.warn("Fallo en pasarela al reembolsar reserva {}. Marcando paymentStatus=requires_refund y preservando reembolso previo {}", resolvedBookingId, alreadyRefunded);
                             savedBooking.setPaymentStatus("requires_refund");
-                            savedBooking.setRefundedAmount(BigDecimal.ZERO);
+                            savedBooking.setRefundedAmount(alreadyRefunded);
+                            savedBooking.setPendingRefundAmount(refundToProcess);
+                            if (savedBooking.getPendingRefundIdempotencyKey() == null) {
+                                savedBooking.setPendingRefundIdempotencyKey("ref_canc_" + resolvedBookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+                            }
                             savedBooking = bookingRepository.save(savedBooking);
                         }
                     }
                 } catch (Exception refundEx) {
                     log.error("Excepción al reembolsar reserva {} en pasarela (tx={}): {}", resolvedBookingId, txId, refundEx.getMessage());
                     savedBooking.setPaymentStatus("requires_refund");
-                    savedBooking.setRefundedAmount(BigDecimal.ZERO);
+                    savedBooking.setRefundedAmount(alreadyRefunded);
+                    savedBooking.setPendingRefundAmount(refundToProcess);
+                    if (savedBooking.getPendingRefundIdempotencyKey() == null) {
+                        savedBooking.setPendingRefundIdempotencyKey("ref_canc_" + resolvedBookingId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+                    }
                     savedBooking = bookingRepository.save(savedBooking);
                 }
             }
@@ -982,6 +1007,62 @@ public class BookingService {
         }
     }
 
+    private void reconcilePendingRefundBeforeChange(Booking booking, String resolvedBookingId) {
+        if (booking == null) {
+            return;
+        }
+        String pendingKey = booking.getPendingRefundIdempotencyKey();
+        BigDecimal pendingAmt = booking.getPendingRefundAmount();
+        if (pendingKey == null || pendingKey.isBlank() || pendingAmt == null || pendingAmt.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        if (paymentGateway == null) {
+            throw new IllegalStateException("Existe un reembolso previo pendiente de confirmación (" + pendingKey + ") y la pasarela no está disponible.");
+        }
+        String bId = (resolvedBookingId != null && !resolvedBookingId.isBlank()) ? resolvedBookingId : booking.getId();
+        String txId = resolveRefundTransactionId(bId);
+        try {
+            PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, pendingAmt, pendingKey);
+            if (refundResp != null && refundResp.success()) {
+                if (booking.getProcessedRefundIds() == null) {
+                    booking.setProcessedRefundIds(new java.util.ArrayList<>());
+                }
+                String rId = refundResp.refundId();
+                boolean alreadyCounted = rId != null && booking.getProcessedRefundIds().contains(rId);
+                if (!alreadyCounted) {
+                    BigDecimal currentRef = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+                    booking.setRefundedAmount(currentRef.add(pendingAmt));
+                    if (rId != null) {
+                        booking.getProcessedRefundIds().add(rId);
+                    }
+                    if (paymentRepository != null && bId != null) {
+                        paymentRepository.findByBooking(bId).stream()
+                                .filter(p -> "completed".equalsIgnoreCase(p.getStatus()) || "partially_refunded".equalsIgnoreCase(p.getStatus()))
+                                .findFirst()
+                                .ifPresent(p -> {
+                                    BigDecimal pRefunded = (p.getRefundedAmount() != null ? p.getRefundedAmount() : BigDecimal.ZERO).add(pendingAmt);
+                                    p.setRefundedAmount(pRefunded);
+                                    p.setStatus(pRefunded.compareTo(p.getAmount()) >= 0 ? "refunded" : "partially_refunded");
+                                    p.setUpdatedAt(Instant.now());
+                                    paymentRepository.save(p);
+                                });
+                    }
+                }
+                booking.setPendingRefundAmount(BigDecimal.ZERO);
+                booking.setPendingRefundIdempotencyKey(null);
+                booking.setUpdatedAt(Instant.now());
+                bookingRepository.save(booking);
+            } else {
+                String errMsg = refundResp != null && refundResp.errorMessage() != null ? refundResp.errorMessage() : "estado indeterminado";
+                throw new IllegalStateException("Existe un reembolso previo pendiente de confirmación con la pasarela (" + pendingKey + "): " + errMsg);
+            }
+        } catch (IllegalStateException ise) {
+            throw ise;
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo conciliar el reembolso previo pendiente (" + pendingKey + ") con la pasarela: " + ex.getMessage(), ex);
+        }
+    }
+
     public BookingDTO addExperienceToBooking(String bookingId, String userId, String experienceId) {
         return executeWithBookingLock(bookingId, () -> {
             Booking booking = getBookingEntityById(bookingId);
@@ -989,6 +1070,7 @@ public class BookingService {
                 throw new ForbiddenAccessException("No tienes permiso para modificar esta reserva");
             }
             assertBookingCanBeModified(booking);
+            reconcilePendingRefundBeforeChange(booking, booking.getId() != null ? booking.getId() : bookingId);
             Experience experience = experienceRepository.findById(experienceId)
                     .orElseThrow(() -> new IllegalArgumentException("Experiencia no encontrada"));
 
@@ -1058,6 +1140,7 @@ public class BookingService {
                 throw new ForbiddenAccessException("No tienes permiso para modificar esta reserva");
             }
             assertBookingCanBeModified(booking);
+            reconcilePendingRefundBeforeChange(booking, booking.getId() != null ? booking.getId() : bookingId);
             List<Booking.SelectedExperience> current = booking.getExperiences();
             if (current != null) {
                 current.removeIf(exp -> exp.getExperienceId() != null && exp.getExperienceId().equals(experienceId));

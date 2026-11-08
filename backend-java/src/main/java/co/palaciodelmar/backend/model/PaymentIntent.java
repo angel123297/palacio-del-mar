@@ -73,6 +73,9 @@ public class PaymentIntent {
     @Builder.Default
     private Instant updatedAt = Instant.now();
 
+    @org.springframework.data.annotation.Version
+    private Long version;
+
     @Builder.Default
     private List<RefundRecord> refundRecords = new ArrayList<>();
 
@@ -85,6 +88,9 @@ public class PaymentIntent {
         private String idempotencyKey;
         private BigDecimal amount;
         private String status;
+        private String webhookEventId;
+        @Builder.Default
+        private Boolean webhookDelivered = false;
         @Builder.Default
         private Instant createdAt = Instant.now();
     }

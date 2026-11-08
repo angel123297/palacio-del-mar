@@ -275,15 +275,19 @@ public class AdminService {
 
         if ("mark_refunded".equalsIgnoreCase(action) || "refund".equalsIgnoreCase(action)) {
             String refundDetails = "";
-            if (paymentGateway != null && payment.getTransactionId() != null) {
+            BigDecimal totalAmt = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+            BigDecimal currentRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount().max(BigDecimal.ZERO) : BigDecimal.ZERO;
+            BigDecimal refundable = totalAmt.subtract(currentRefunded).max(BigDecimal.ZERO);
+            if (paymentGateway != null && payment.getTransactionId() != null && refundable.compareTo(BigDecimal.ZERO) > 0) {
                 co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse res =
-                        paymentGateway.refund(payment.getTransactionId(), payment.getAmount());
+                        paymentGateway.refund(payment.getTransactionId(), refundable);
                 if (res == null || !res.success()) {
                     String errorMsg = (res != null && res.errorMessage() != null) ? res.errorMessage() : "Transacción rechazada por la pasarela";
                     throw new IllegalStateException("Fallo en pasarela al procesar reembolso: " + errorMsg);
                 }
                 refundDetails = " (id=" + res.refundId() + ")";
             }
+            payment.setRefundedAmount(totalAmt);
             payment.setStatus("refunded");
             payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
                     "Reembolso procesado por ADMIN" + refundDetails + ": " + (notes != null && !notes.isBlank() ? notes : "Aprobado manualmente"));

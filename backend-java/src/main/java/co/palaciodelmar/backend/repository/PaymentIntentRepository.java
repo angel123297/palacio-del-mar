@@ -15,4 +15,5 @@ public interface PaymentIntentRepository extends MongoRepository<PaymentIntent, 
     List<PaymentIntent> findAllByBookingId(String bookingId);
     List<PaymentIntent> findByStatus(String status);
     List<PaymentIntent> findByWebhookDeliveredFalse();
+    List<PaymentIntent> findByRefundRecordsWebhookDeliveredFalse();
 }

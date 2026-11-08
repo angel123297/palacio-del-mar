@@ -423,8 +423,10 @@ public class PaymentWebhookService {
                     : (payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO);
             BigDecimal eventRefund = rawRefund.max(BigDecimal.ZERO);
 
+            boolean hasUnsettledCancelRefund = "requires_refund".equalsIgnoreCase(booking.getPaymentStatus())
+                    || (booking.getPendingRefundIdempotencyKey() != null && !booking.getPendingRefundIdempotencyKey().isBlank());
             BigDecimal newRefunded;
-            if (isCancelled && currentRefunded.compareTo(BigDecimal.ZERO) > 0) {
+            if (isCancelled && currentRefunded.compareTo(BigDecimal.ZERO) > 0 && !hasUnsettledCancelRefund) {
                 // cancelBooking ya contabilizó el reembolso al cancelar; reconciliar sin sumar dos veces
                 newRefunded = currentRefunded.max(eventRefund).min(paidCap);
             } else {
@@ -439,6 +441,14 @@ public class PaymentWebhookService {
             }
             if (refundId != null && !booking.getProcessedRefundIds().contains(refundId)) {
                 booking.getProcessedRefundIds().add(refundId);
+            }
+
+            if (booking.getPendingRefundIdempotencyKey() != null) {
+                BigDecimal pendingAmt = booking.getPendingRefundAmount() != null ? booking.getPendingRefundAmount() : BigDecimal.ZERO;
+                if (pendingAmt.compareTo(BigDecimal.ZERO) <= 0 || pendingAmt.compareTo(eventRefund) == 0) {
+                    booking.setPendingRefundAmount(BigDecimal.ZERO);
+                    booking.setPendingRefundIdempotencyKey(null);
+                }
             }
 
             booking.setRefundedAmount(newRefunded);

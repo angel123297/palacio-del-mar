@@ -45,6 +45,10 @@ public class AutoStayLifecycleScheduler {
     @Autowired(required = false)
     private RedisLockService redisLockService;
 
+    @Setter
+    @Autowired(required = false)
+    private co.palaciodelmar.backend.service.PaymentGateway paymentGateway;
+
     @Value("${palacio.lifecycle.autocheckin.hour:15}")
     private int autoCheckInHour = 15;
 
@@ -172,9 +176,37 @@ public class AutoStayLifecycleScheduler {
                             BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
                             BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
                             BigDecimal refundable = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
-                            booking.setRefundedAmount(refunded.add(refundable));
-                            booking.setGuaranteeRefunded(true);
-                            booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto automáticamente: $" + refundable);
+                            boolean gatewayRefundOk = true;
+                            if (refundable.signum() > 0 && paymentGateway != null) {
+                                String depKey = "ref_dep_" + booking.getId();
+                                try {
+                                    co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse resp =
+                                            paymentGateway.refund("tx_" + booking.getId(), refundable, depKey);
+                                    if (resp == null || !resp.success()) {
+                                        gatewayRefundOk = false;
+                                        booking.setPendingRefundAmount(refundable);
+                                        booking.setPendingRefundIdempotencyKey(depKey);
+                                        booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Reembolso de depósito pendiente en pasarela: $" + refundable);
+                                    } else if (resp.refundId() != null) {
+                                        if (booking.getProcessedRefundIds() == null) {
+                                            booking.setProcessedRefundIds(new java.util.ArrayList<>());
+                                        }
+                                        if (!booking.getProcessedRefundIds().contains(resp.refundId())) {
+                                            booking.getProcessedRefundIds().add(resp.refundId());
+                                        }
+                                    }
+                                } catch (Exception ex) {
+                                    gatewayRefundOk = false;
+                                    booking.setPendingRefundAmount(refundable);
+                                    booking.setPendingRefundIdempotencyKey(depKey);
+                                    booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Reembolso de depósito pendiente en pasarela: $" + refundable);
+                                }
+                            }
+                            if (gatewayRefundOk) {
+                                booking.setRefundedAmount(refunded.add(refundable));
+                                booking.setGuaranteeRefunded(true);
+                                booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto automáticamente: $" + refundable);
+                            }
                         }
 
                         bookingService.changeBookingStatus(

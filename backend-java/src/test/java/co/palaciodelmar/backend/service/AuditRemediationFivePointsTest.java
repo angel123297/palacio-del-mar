@@ -668,4 +668,338 @@ class AuditRemediationFivePointsTest {
         assertTrue(unDeliveredIntent.getWebhookDelivered());
         verify(paymentIntentRepository, atLeastOnce()).save(unDeliveredIntent);
     }
+
+    // =========================================================================
+    // NUEVOS 6 HALLAZGOS PENDIENTES (SEGUNDA RONDA DE AUDITORÍA)
+    // =========================================================================
+
+    @Test
+    @DisplayName("Pendiente 1: Recuperación periódica (@Scheduled) rescata pagos en processing tras expirar su claimLock sin depender de confirmIntent")
+    void testPendingFinding1_PeriodicRecoveryRescuesLockedIntentAfterExpirationWithoutClientRetry() throws Exception {
+        // 1. Verificar que recoverProcessingIntents tiene @Scheduled para ejecutarse periódicamente sin intervención del cliente
+        java.lang.reflect.Method recoveryMethod = SimulatedPaymentGateway.class.getMethod("recoverProcessingIntents");
+        org.springframework.scheduling.annotation.Scheduled scheduledAnnotation =
+                recoveryMethod.getAnnotation(org.springframework.scheduling.annotation.Scheduled.class);
+        assertNotNull(scheduledAnnotation, "recoverProcessingIntents debe tener @Scheduled para rescate periódico");
+
+        // 2. Simular un intent creado por otra instancia ("pdm_gw_crashed") hace 10s cuyo lock vence en +50s
+        PaymentIntent lockedIntent = PaymentIntent.builder()
+                .id("pi_locked_restart")
+                .bookingId("b_locked_restart")
+                .amount(new BigDecimal("420000"))
+                .currency("COP")
+                .status("processing")
+                .simulationOutcome("SUCCEEDED")
+                .claimLock("pdm_gw_crashed_node")
+                .claimExpiresAt(Instant.now().plusSeconds(50))
+                .build();
+
+        when(paymentIntentRepository.findByStatus("processing")).thenReturn(List.of(lockedIntent));
+        when(paymentIntentRepository.findById("pi_locked_restart")).thenReturn(Optional.of(lockedIntent));
+        when(paymentIntentRepository.findByWebhookDeliveredFalse()).thenReturn(Collections.emptyList());
+        when(paymentIntentRepository.findByRefundRecordsWebhookDeliveredFalse()).thenReturn(Collections.emptyList());
+
+        // Al arrancar a los 10s, el lock aún no ha vencido: no debe romper el lock activo
+        simulatedGateway.recoverProcessingIntents();
+        assertEquals("processing", lockedIntent.getStatus());
+        assertNull(lockedIntent.getTransactionId());
+
+        // 3. El tiempo avanza y el lock expira (sin que el cliente vuelva a llamar a confirmIntent)
+        lockedIntent.setClaimExpiresAt(Instant.now().minusSeconds(1));
+
+        // La ejecución periódica de recoverProcessingIntents reclama el intent vencido y lo resuelve
+        simulatedGateway.recoverProcessingIntents();
+
+        assertEquals("succeeded", lockedIntent.getStatus());
+        assertNotNull(lockedIntent.getTransactionId());
+        assertTrue(lockedIntent.getWebhookDelivered());
+        assertNull(lockedIntent.getClaimLock());
+        assertNull(lockedIntent.getClaimExpiresAt());
+    }
+
+    @Test
+    @DisplayName("Pendiente 2: Intentos antiguos o corruptos con simulationOutcome nulo o desconocido NUNCA se aprueban por error")
+    void testPendingFinding2_LegacyOrNullSimulationOutcomeIsNeverAutoApproved() {
+        PaymentIntent legacyNullOutcome = PaymentIntent.builder()
+                .id("pi_legacy_null")
+                .bookingId("b_legacy_null")
+                .amount(new BigDecimal("600000"))
+                .currency("COP")
+                .status("processing")
+                .simulationOutcome(null) // Intento antiguo sin simulationOutcome
+                .claimExpiresAt(Instant.now().minusSeconds(5))
+                .build();
+
+        PaymentIntent unknownOutcome = PaymentIntent.builder()
+                .id("pi_unknown_outcome")
+                .bookingId("b_unknown_outcome")
+                .amount(new BigDecimal("300000"))
+                .currency("COP")
+                .status("processing")
+                .simulationOutcome("UNKNOWN_STATE")
+                .claimExpiresAt(Instant.now().minusSeconds(5))
+                .build();
+
+        when(paymentIntentRepository.findByStatus("processing")).thenReturn(List.of(legacyNullOutcome, unknownOutcome));
+        when(paymentIntentRepository.findById("pi_legacy_null")).thenReturn(Optional.of(legacyNullOutcome));
+        when(paymentIntentRepository.findById("pi_unknown_outcome")).thenReturn(Optional.of(unknownOutcome));
+        when(paymentIntentRepository.findByWebhookDeliveredFalse()).thenReturn(Collections.emptyList());
+        when(paymentIntentRepository.findByRefundRecordsWebhookDeliveredFalse()).thenReturn(Collections.emptyList());
+
+        simulatedGateway.recoverProcessingIntents();
+
+        // Ninguno de los dos puede aprobarse como succeeded
+        assertEquals("failed", legacyNullOutcome.getStatus());
+        assertNull(legacyNullOutcome.getTransactionId());
+        assertNotNull(legacyNullOutcome.getFailureMessage());
+        assertTrue(legacyNullOutcome.getFailureMessage().contains("requiere reconfirmación"));
+
+        assertEquals("failed", unknownOutcome.getStatus());
+        assertNull(unknownOutcome.getTransactionId());
+        assertNotNull(unknownOutcome.getFailureMessage());
+    }
+
+    @Test
+    @DisplayName("Pendiente 3: El webhook de reembolso (refund.processed) persiste su estado y se recupera con eventId estable tras una caída")
+    void testPendingFinding3_LostRefundWebhookIsPersistedAndRecoveredWithStableEventId() throws Exception {
+        PaymentIntent intent = PaymentIntent.builder()
+                .id("pi_ref_webhook_loss")
+                .bookingId("b_ref_webhook_loss")
+                .transactionId("ch_ref_webhook_loss")
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .currency("COP")
+                .status("succeeded")
+                .refundRecords(new ArrayList<>())
+                .build();
+
+        when(paymentIntentRepository.findByTransactionId("ch_ref_webhook_loss")).thenReturn(Optional.of(intent));
+        when(paymentIntentRepository.findById("pi_ref_webhook_loss")).thenReturn(Optional.of(intent));
+
+        // Simulamos que durante el refund inicial el servidor falla al despachar el webhook
+        java.util.concurrent.atomic.AtomicBoolean serverDown = new java.util.concurrent.atomic.AtomicBoolean(true);
+        java.util.List<String> capturedEventIds = new java.util.concurrent.CopyOnWriteArrayList<>();
+        org.mockito.Mockito.doAnswer(inv -> {
+            String evtId = inv.getArgument(2);
+            capturedEventIds.add(evtId);
+            if (serverDown.get()) {
+                throw new RuntimeException("Caída del servidor antes de entregar webhook de reembolso");
+            }
+            return java.util.Map.of("status", "processed");
+        }).when(paymentWebhookService).processWebhook(anyString(), anyString(), anyString(), anyString());
+
+        PaymentGateway.PaymentRefundResponse resp = simulatedGateway.refund(
+                "ch_ref_webhook_loss", new BigDecimal("150000"), "idem_ref_loss_1"
+        );
+        assertTrue(resp.success());
+        assertEquals(1, intent.getRefundRecords().size());
+
+        // Ejecutar de forma determinista el intento fallido inicial
+        simulatedGateway.deliverRefundWebhook("pi_ref_webhook_loss", resp.refundId());
+
+        PaymentIntent.RefundRecord recordAfterCrash = intent.getRefundRecords().get(0);
+        assertNotNull(recordAfterCrash.getWebhookEventId());
+        String stableEventId = recordAfterCrash.getWebhookEventId();
+        assertFalse(Boolean.TRUE.equals(recordAfterCrash.getWebhookDelivered()),
+                "Tras fallar el despacho inicial, webhookDelivered debe permanecer en false");
+
+        // Ahora el servidor se recupera y ejecuta recoverProcessingIntents()
+        serverDown.set(false);
+        when(paymentIntentRepository.findByStatus("processing")).thenReturn(Collections.emptyList());
+        when(paymentIntentRepository.findByWebhookDeliveredFalse()).thenReturn(Collections.emptyList());
+        when(paymentIntentRepository.findByRefundRecordsWebhookDeliveredFalse()).thenReturn(List.of(intent));
+
+        simulatedGateway.recoverProcessingIntents();
+
+        assertTrue(Boolean.TRUE.equals(recordAfterCrash.getWebhookDelivered()),
+                "La tarea de recuperación debe entregar el webhook de reembolso pendiente y marcarlo como entregado");
+        assertTrue(capturedEventIds.stream().allMatch(stableEventId::equals),
+                "Todos los intentos de entrega deben usar exactamente el mismo eventId estable: " + capturedEventIds);
+    }
+
+    @Test
+    @DisplayName("Pendiente 4: Cancelar tras un reembolso parcial calcula la devolución sobre netPaid y preserva reembolsos previos si la pasarela falla")
+    void testPendingFinding4_CancelAfterPartialRefundUsesNetPaidAndPreservesPriorRefundOnGatewayFailure() {
+        LocalDate checkIn = LocalDate.now().plusDays(10); // >= 7 días -> 0% retención
+
+        // Caso A: Reserva pagó $500.000, ya se reembolsaron $100.000, y al cancelar falla la pasarela
+        Booking bookingFailCase = Booking.builder()
+                .id("b_cancel_partial_fail")
+                .user("u_cancel_1")
+                .suite("suite_1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .checkIn(checkIn)
+                .checkOut(checkIn.plusDays(3))
+                .totalPrice(new BigDecimal("400000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(new BigDecimal("100000"))
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .build();
+
+        when(bookingRepository.findById("b_cancel_partial_fail")).thenReturn(Optional.of(bookingFailCase));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentGateway.refund(eq("tx_b_cancel_partial_fail"), any(BigDecimal.class)))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(false, null, "failed", "Error de red con banco"));
+
+        BookingDTO cancelledFailDto = bookingService.cancelBooking("b_cancel_partial_fail", "u_cancel_1", "Viaje cancelado");
+
+        // Debe haber solicitado SOLO $400.000 (netPaid = 500.000 - 100.000), NO $500.000
+        verify(paymentGateway).refund("tx_b_cancel_partial_fail", new BigDecimal("400000"));
+        // Al fallar la pasarela, debe conservar los $100.000 ya reembolsados (JAMÁS borrarlos a 0)
+        assertEquals(new BigDecimal("100000"), cancelledFailDto.getRefundedAmount());
+        assertEquals(new BigDecimal("100000"), bookingFailCase.getRefundedAmount());
+        assertEquals("requires_refund", cancelledFailDto.getPaymentStatus());
+        assertEquals(new BigDecimal("400000"), bookingFailCase.getPendingRefundAmount());
+        assertNotNull(bookingFailCase.getPendingRefundIdempotencyKey());
+
+        // Caso B: Reserva pagó $500.000, ya se reembolsaron $100.000, y al cancelar la pasarela aprueba los $400.000 restantes
+        Booking bookingOkCase = Booking.builder()
+                .id("b_cancel_partial_ok")
+                .user("u_cancel_1")
+                .suite("suite_1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .checkIn(checkIn)
+                .checkOut(checkIn.plusDays(3))
+                .totalPrice(new BigDecimal("400000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(new BigDecimal("100000"))
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .build();
+
+        when(bookingRepository.findById("b_cancel_partial_ok")).thenReturn(Optional.of(bookingOkCase));
+        when(paymentGateway.refund("tx_b_cancel_partial_ok", new BigDecimal("400000")))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_canc_400k", "refunded", null));
+
+        BookingDTO cancelledOkDto = bookingService.cancelBooking("b_cancel_partial_ok", "u_cancel_1", "Viaje cancelado");
+
+        verify(paymentGateway).refund("tx_b_cancel_partial_ok", new BigDecimal("400000"));
+        assertEquals(new BigDecimal("500000"), cancelledOkDto.getRefundedAmount());
+        assertEquals("refunded", cancelledOkDto.getPaymentStatus());
+        assertTrue(bookingOkCase.getProcessedRefundIds().contains("re_canc_400k"));
+    }
+
+    @Test
+    @DisplayName("Pendiente 5: Reembolsos simultáneos desde múltiples instancias de pasarela no pueden sobre-reembolsar el saldo")
+    void testPendingFinding5_ConcurrentRefundsAcrossTwoGatewayInstancesCannotOverRefund() throws Exception {
+        PaymentIntent sharedIntent = PaymentIntent.builder()
+                .id("pi_concurrent_nodes")
+                .transactionId("ch_concurrent_nodes")
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("succeeded")
+                .refundRecords(new ArrayList<>())
+                .build();
+
+        when(paymentIntentRepository.findByTransactionId("ch_concurrent_nodes")).thenReturn(Optional.of(sharedIntent));
+        when(paymentIntentRepository.findById("pi_concurrent_nodes")).thenReturn(Optional.of(sharedIntent));
+
+        // Dos instancias separadas de SimulatedPaymentGateway (simulando 2 nodos de backend)
+        SimulatedPaymentGateway nodeA = new SimulatedPaymentGateway(paymentIntentRepository, paymentWebhookService, new ObjectMapper());
+        SimulatedPaymentGateway nodeB = new SimulatedPaymentGateway(paymentIntentRepository, paymentWebhookService, new ObjectMapper());
+        org.springframework.test.util.ReflectionTestUtils.setField(nodeA, "webhookSecret", "f0e1d2c3b4a5968778695a4b3c2d1e0ff0e1d2c3b4a5968778695a4b3c2d1e0f");
+        org.springframework.test.util.ReflectionTestUtils.setField(nodeB, "webhookSecret", "f0e1d2c3b4a5968778695a4b3c2d1e0ff0e1d2c3b4a5968778695a4b3c2d1e0f");
+
+        java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Future<PaymentGateway.PaymentRefundResponse> futureA = pool.submit(() -> {
+                barrier.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                return nodeA.refund("ch_concurrent_nodes", new BigDecimal("350000"), "key_node_A");
+            });
+            java.util.concurrent.Future<PaymentGateway.PaymentRefundResponse> futureB = pool.submit(() -> {
+                barrier.await(5, java.util.concurrent.TimeUnit.SECONDS);
+                return nodeB.refund("ch_concurrent_nodes", new BigDecimal("350000"), "key_node_B");
+            });
+
+            PaymentGateway.PaymentRefundResponse resA = futureA.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            PaymentGateway.PaymentRefundResponse resB = futureB.get(5, java.util.concurrent.TimeUnit.SECONDS);
+
+            // Exactamente UNO debe tener éxito ($350.000) y el otro debe rechazarse porque solo quedan $150.000
+            assertTrue(resA.success() ^ resB.success(),
+                    "Exactamente una instancia debe lograr reembolsar $350.000 de $500.000; la otra debe fallar");
+            assertEquals(new BigDecimal("350000"), sharedIntent.getRefundedAmount());
+            assertEquals(1, sharedIntent.getRefundRecords().size());
+        } finally {
+            pool.shutdownNow();
+            nodeA.shutdown();
+            nodeB.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("Pendiente 6: Un reembolso pendiente nunca es sustituido por una clave nueva sin antes conciliar el primero con la pasarela")
+    void testPendingFinding6_PendingRefundKeyIsNeverReplacedWithoutReconciliation() {
+        String bookingId = "b_pending_reconcile";
+        String userId = "u_reconcile";
+        LocalDate today = LocalDate.now();
+
+        Suite suite = Suite.builder().id("suite_rec").branch("branch_1").basePrice(new BigDecimal("100000")).build();
+        // La reserva pagó $500.000. En una primera modificación bajó a $400.000 y quedó pendiente "ref_mod_first_key" por $100.000
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .user(userId)
+                .suite("suite_rec")
+                .checkIn(today.plusDays(10))
+                .checkOut(today.plusDays(14))
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("400000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .pendingRefundIdempotencyKey("ref_mod_first_key")
+                .pendingRefundAmount(new BigDecimal("100000"))
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .build();
+
+        BookingRequest secondModRequest = new BookingRequest();
+        secondModRequest.setCheckIn(today.plusDays(10));
+        secondModRequest.setCheckOut(today.plusDays(13)); // Nuevo precio será $300.000
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(suiteRepository.findById("suite_rec")).thenReturn(Optional.of(suite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(any(), any(), any())).thenReturn(Collections.emptyList());
+        when(suiteNightRepository.findByBooking(bookingId)).thenReturn(Collections.emptyList());
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        PricingService.PricingResult newPricing = new PricingService.PricingResult(
+                new BigDecimal("300000"), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("300000"), Collections.emptyList()
+        );
+        when(pricingService.calculatePrice(any(), any(), any(), any())).thenReturn(newPricing);
+
+        // Sub-caso A: Si la pasarela sigue sin poder conciliar "ref_mod_first_key", bloquea la nueva modificación y NO pisa la clave
+        when(paymentGateway.refund("tx_" + bookingId, new BigDecimal("100000"), "ref_mod_first_key"))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(false, null, "failed", "Timeout de red con pasarela"));
+
+        IllegalStateException blockedEx = assertThrows(IllegalStateException.class, () ->
+                bookingService.modifyBooking(bookingId, userId, secondModRequest)
+        );
+        assertTrue(blockedEx.getMessage().contains("ref_mod_first_key"));
+        assertEquals("ref_mod_first_key", booking.getPendingRefundIdempotencyKey(),
+                "La clave original pendiente jamás debe ser sobrescrita si no se pudo conciliar");
+        assertEquals(new BigDecimal("100000"), booking.getPendingRefundAmount());
+
+        // Sub-caso B: Ahora la pasarela confirma "ref_mod_first_key" ($100.000) y luego procesa solo los $100.000 adicionales
+        when(paymentGateway.refund(eq("tx_" + bookingId), eq(new BigDecimal("100000")), anyString()))
+                .thenAnswer(inv -> {
+                    String keyUsed = inv.getArgument(2);
+                    if ("ref_mod_first_key".equals(keyUsed)) {
+                        return new PaymentGateway.PaymentRefundResponse(true, "re_first_100k", "partially_refunded", null);
+                    }
+                    return new PaymentGateway.PaymentRefundResponse(true, "re_second_100k", "partially_refunded", null);
+                });
+
+        BookingDTO dtoAfterSecondMod = bookingService.modifyBooking(bookingId, userId, secondModRequest);
+
+        // 1. Primero concilió "ref_mod_first_key" por $100.000
+        verify(paymentGateway, atLeastOnce()).refund("tx_" + bookingId, new BigDecimal("100000"), "ref_mod_first_key");
+        // 2. El total reembolsado acumulado es $100.000 (primera) + $100.000 (segunda) = $200.000
+        assertEquals(new BigDecimal("200000"), dtoAfterSecondMod.getRefundedAmount());
+        assertEquals(new BigDecimal("300000"), dtoAfterSecondMod.getTotalPrice());
+        assertNull(booking.getPendingRefundIdempotencyKey());
+        assertEquals(BigDecimal.ZERO, booking.getPendingRefundAmount());
+        assertTrue(booking.getProcessedRefundIds().contains("re_first_100k"));
+        assertTrue(booking.getProcessedRefundIds().contains("re_second_100k"));
+    }
 }
