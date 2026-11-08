@@ -628,7 +628,39 @@ class _GastronomySpaViewState extends State<GastronomySpaView> with SingleTicker
                                       child: const Text('RESERVAR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                                     ),
                                     const SizedBox(width: 8),
-                                    // Botón para sumar a la reserva de suite
+                                    // Botón para sumar a la reserva de suite con control +/-
+                                    if (inCartQty > 0) ...[
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: AppTheme.gold.withValues(alpha: 0.5)),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: IconButton(
+                                          icon: const Icon(Icons.remove, color: AppTheme.gold, size: 16),
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                          padding: EdgeInsets.zero,
+                                          tooltip: 'Quitar de la reserva',
+                                          onPressed: () {
+                                            bookingProvider.removeExperience(id);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Se quitó "${exp['name']}" de la reserva'),
+                                                backgroundColor: Colors.white24,
+                                                duration: const Duration(seconds: 1),
+                                                behavior: SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        child: Text(
+                                          inCartQty.toString(),
+                                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
                                     ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: inCartQty > 0 ? AppTheme.gold : const Color(0xFF262626),
@@ -636,18 +668,18 @@ class _GastronomySpaViewState extends State<GastronomySpaView> with SingleTicker
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                                       ),
-                                      icon: Icon(inCartQty > 0 ? Icons.check : Icons.add, size: 14),
+                                      icon: Icon(Icons.add, size: 14, color: inCartQty > 0 ? Colors.black : AppTheme.gold),
                                       label: Text(
-                                        inCartQty > 0 ? 'EN RESERVA ($inCartQty)' : '+ SUITE',
+                                        inCartQty > 0 ? 'MÁS' : '+ SUITE',
                                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                                       ),
                                       onPressed: () {
                                         bookingProvider.addExperience(exp);
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
-                                            content: Text('¡"${exp['name']}" agregada para vincular a tu reserva!'),
+                                            content: Text('¡"${exp['name']}" agregada a la reserva!'),
                                             backgroundColor: AppTheme.gold,
-                                            duration: const Duration(seconds: 2),
+                                            duration: const Duration(seconds: 1),
                                             behavior: SnackBarBehavior.floating,
                                           ),
                                         );
