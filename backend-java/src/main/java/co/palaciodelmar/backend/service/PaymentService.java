@@ -34,6 +34,10 @@ public class PaymentService {
 
     @Setter
     @Autowired(required = false)
+    private co.palaciodelmar.backend.repository.PaymentIntentRepository paymentIntentRepository;
+
+    @Setter
+    @Autowired(required = false)
     private RedisLockService redisLockService;
 
     @Setter
@@ -77,12 +81,37 @@ public class PaymentService {
                         }
                     });
                 }
+                String realSecret = null;
+                String status = existingPayment.getStatus();
+                BigDecimal amount = existingPayment.getAmount();
+                String currency = existingPayment.getCurrency();
+
+                if (paymentIntentRepository != null) {
+                    co.palaciodelmar.backend.model.PaymentIntent intent = paymentIntentRepository.findById(existingPayment.getIntentId()).orElse(null);
+                    if (intent != null) {
+                        realSecret = intent.getClientSecret();
+                        status = intent.getStatus();
+                        amount = intent.getAmount();
+                        currency = intent.getCurrency();
+                    }
+                }
+                if (realSecret == null && existingPayment.getClientSecret() != null) {
+                    realSecret = existingPayment.getClientSecret();
+                }
+
+                if (realSecret == null || realSecret.isBlank()) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.CONFLICT,
+                            "Inconsistencia en clave de idempotencia: el intento de pago original no tiene secreto válido"
+                    );
+                }
+
                 return new PaymentGateway.PaymentIntentResponse(
                         existingPayment.getIntentId(),
-                        "secret_" + existingPayment.getIntentId(),
-                        existingPayment.getAmount(),
-                        existingPayment.getCurrency(),
-                        existingPayment.getStatus()
+                        realSecret,
+                        amount,
+                        currency,
+                        status
                 );
             }
         }
@@ -123,6 +152,7 @@ public class PaymentService {
                 .paymentMethod(method != null ? method : "card")
                 .idempotencyKey(idempotencyKey)
                 .intentId(intentResponse.intentId())
+                .clientSecret(intentResponse.clientSecret())
                 .notes("Intención de pago creada")
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())

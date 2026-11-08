@@ -53,9 +53,6 @@ public class BookingSseService {
         return emitter;
     }
 
-        return emitter;
-    }
-
     public void emitBookingUpdate(String userId, BookingDTO booking) {
         if (userId == null || booking == null) return;
 

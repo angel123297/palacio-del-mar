@@ -136,7 +136,7 @@ public class BookingService {
                 .guests(request.getGuests() != null ? request.getGuests() : 1)
                 .children(request.getChildren() != null ? request.getChildren() : 0)
                 .pricePerNight(BigDecimal.ZERO)
-                .subtotal(experiencesTotal)
+                .subtotal(BigDecimal.ZERO)
                 .discount(BigDecimal.ZERO)
                 .taxes(BigDecimal.ZERO)
                 .totalPrice(experiencesTotal)
@@ -566,13 +566,51 @@ public class BookingService {
             freshBooking.setHostPayout(pricingResult.total().subtract(modPlatformFee));
 
             BigDecimal paidAmt = freshBooking.getPaidAmount() != null ? freshBooking.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal currentRefunded = freshBooking.getRefundedAmount() != null ? freshBooking.getRefundedAmount() : BigDecimal.ZERO;
+            BigDecimal netPaid = paidAmt.subtract(currentRefunded);
+            BigDecimal refundDiff = netPaid.subtract(newTotalPrice).max(BigDecimal.ZERO);
+
             if (paidAmt.compareTo(newTotalPrice) >= 0) {
                 freshBooking.setBalanceDue(BigDecimal.ZERO);
-                freshBooking.setRefundedAmount(paidAmt.subtract(newTotalPrice));
                 freshBooking.setPaymentStatus("paid");
             } else {
                 freshBooking.setBalanceDue(newTotalPrice.subtract(paidAmt));
                 freshBooking.setPaymentStatus(paidAmt.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
+            }
+
+            if (refundDiff.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
+                String txId = resolveRefundTransactionId(resolvedBookingId);
+                String refundIdemKey = "ref_mod_" + resolvedBookingId + "_" + (freshBooking.getVersion() != null ? freshBooking.getVersion() : 0);
+                try {
+                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundDiff, refundIdemKey);
+                    if (refundResp != null && refundResp.success()) {
+                        BigDecimal newRefunded = currentRefunded.add(refundDiff);
+                        freshBooking.setRefundedAmount(newRefunded);
+                        if (freshBooking.getProcessedRefundIds() == null) {
+                            freshBooking.setProcessedRefundIds(new java.util.ArrayList<>());
+                        }
+                        if (refundResp.refundId() != null && !freshBooking.getProcessedRefundIds().contains(refundResp.refundId())) {
+                            freshBooking.getProcessedRefundIds().add(refundResp.refundId());
+                        }
+                        freshBooking.setPendingRefundAmount(BigDecimal.ZERO);
+                        if (paymentRepository != null && newRefunded.compareTo(paidAmt) >= 0) {
+                            paymentRepository.findByBooking(resolvedBookingId).stream()
+                                    .filter(p -> "completed".equalsIgnoreCase(p.getStatus()))
+                                    .findFirst()
+                                    .ifPresent(p -> {
+                                        p.setStatus("refunded");
+                                        p.setUpdatedAt(Instant.now());
+                                        paymentRepository.save(p);
+                                    });
+                        }
+                    } else {
+                        log.warn("Pasarela no pudo procesar reembolso inmediato para modificación de reserva {}: {}", resolvedBookingId, (refundResp != null ? refundResp.errorMessage() : "respuesta nula"));
+                        freshBooking.setPendingRefundAmount(refundDiff);
+                    }
+                } catch (Exception ex) {
+                    log.error("Excepción al ejecutar reembolso en pasarela para modificación de reserva {}: {}", resolvedBookingId, ex.getMessage(), ex);
+                    freshBooking.setPendingRefundAmount(refundDiff);
+                }
             }
 
             freshBooking.setUpdatedAt(Instant.now());
@@ -969,10 +1007,21 @@ public class BookingService {
                     }
                 }
             }
-            BigDecimal roomTotal = booking.getSubtotal() != null ? booking.getSubtotal().add(booking.getTaxes() != null ? booking.getTaxes() : BigDecimal.ZERO).subtract(booking.getDiscount() != null ? booking.getDiscount() : BigDecimal.ZERO) : BigDecimal.ZERO;
-            BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
-            BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal).add(fixedCharges(booking));
+            boolean isStandalone = "standalone-experience".equalsIgnoreCase(booking.getSuite()) || booking.getSuite() == null;
+            BigDecimal taxes = booking.getTaxes() != null ? booking.getTaxes() : BigDecimal.ZERO;
+            BigDecimal discount = booking.getDiscount() != null ? booking.getDiscount() : BigDecimal.ZERO;
+            BigDecimal subtotal = booking.getSubtotal() != null ? booking.getSubtotal() : BigDecimal.ZERO;
+            BigDecimal roomTotal = isStandalone ? BigDecimal.ZERO : subtotal.add(taxes).subtract(discount);
+            BigDecimal vipExtrasTotal = isStandalone ? BigDecimal.ZERO : calculateVipExtrasTotal(booking);
+            BigDecimal fixed = isStandalone ? BigDecimal.ZERO : fixedCharges(booking);
+            BigDecimal newTotal = isStandalone ? expTotal : roomTotal.add(expTotal).add(vipExtrasTotal).add(fixed);
             booking.setTotalPrice(newTotal);
+
+            if (isStandalone) {
+                booking.setPlatformFee(expTotal.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP));
+                booking.setHostPayout(expTotal.multiply(new BigDecimal("0.92")).setScale(2, RoundingMode.HALF_UP));
+            }
+
             BigDecimal paidAmt = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
             if (paidAmt.compareTo(newTotal) >= 0) {
                 booking.setBalanceDue(BigDecimal.ZERO);
@@ -1007,11 +1056,26 @@ public class BookingService {
                     }
                 }
             }
-            BigDecimal roomTotal = booking.getSubtotal() != null ? booking.getSubtotal().add(booking.getTaxes() != null ? booking.getTaxes() : BigDecimal.ZERO).subtract(booking.getDiscount() != null ? booking.getDiscount() : BigDecimal.ZERO) : BigDecimal.ZERO;
-            BigDecimal vipExtrasTotal = calculateVipExtrasTotal(booking);
-            BigDecimal newTotal = roomTotal.add(expTotal).add(vipExtrasTotal).add(fixedCharges(booking));
+            boolean isStandalone = "standalone-experience".equalsIgnoreCase(booking.getSuite()) || booking.getSuite() == null;
+            BigDecimal taxes = booking.getTaxes() != null ? booking.getTaxes() : BigDecimal.ZERO;
+            BigDecimal discount = booking.getDiscount() != null ? booking.getDiscount() : BigDecimal.ZERO;
+            BigDecimal subtotal = booking.getSubtotal() != null ? booking.getSubtotal() : BigDecimal.ZERO;
+            BigDecimal roomTotal = isStandalone ? BigDecimal.ZERO : subtotal.add(taxes).subtract(discount);
+            BigDecimal vipExtrasTotal = isStandalone ? BigDecimal.ZERO : calculateVipExtrasTotal(booking);
+            BigDecimal fixed = isStandalone ? BigDecimal.ZERO : fixedCharges(booking);
+            BigDecimal newTotal = isStandalone ? expTotal : roomTotal.add(expTotal).add(vipExtrasTotal).add(fixed);
             booking.setTotalPrice(newTotal);
+
+            if (isStandalone) {
+                booking.setPlatformFee(expTotal.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP));
+                booking.setHostPayout(expTotal.multiply(new BigDecimal("0.92")).setScale(2, RoundingMode.HALF_UP));
+            }
+
             BigDecimal paidAmt = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal currentRefunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+            BigDecimal netPaid = paidAmt.subtract(currentRefunded);
+            BigDecimal refundDiff = netPaid.subtract(newTotal).max(BigDecimal.ZERO);
+
             if (paidAmt.compareTo(newTotal) >= 0) {
                 booking.setBalanceDue(BigDecimal.ZERO);
                 booking.setPaymentStatus("paid");
@@ -1019,6 +1083,41 @@ public class BookingService {
                 booking.setBalanceDue(newTotal.subtract(paidAmt));
                 booking.setPaymentStatus(paidAmt.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending");
             }
+
+            if (refundDiff.compareTo(BigDecimal.ZERO) > 0 && paymentGateway != null) {
+                String txId = resolveRefundTransactionId(bookingId);
+                String refundIdemKey = "ref_rmexp_" + bookingId + "_" + (booking.getVersion() != null ? booking.getVersion() : 0);
+                try {
+                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(txId, refundDiff, refundIdemKey);
+                    if (refundResp != null && refundResp.success()) {
+                        BigDecimal newRefunded = currentRefunded.add(refundDiff);
+                        booking.setRefundedAmount(newRefunded);
+                        if (booking.getProcessedRefundIds() == null) {
+                            booking.setProcessedRefundIds(new java.util.ArrayList<>());
+                        }
+                        if (refundResp.refundId() != null && !booking.getProcessedRefundIds().contains(refundResp.refundId())) {
+                            booking.getProcessedRefundIds().add(refundResp.refundId());
+                        }
+                        booking.setPendingRefundAmount(BigDecimal.ZERO);
+                        if (paymentRepository != null && newRefunded.compareTo(paidAmt) >= 0) {
+                            paymentRepository.findByBooking(bookingId).stream()
+                                    .filter(p -> "completed".equalsIgnoreCase(p.getStatus()))
+                                    .findFirst()
+                                    .ifPresent(p -> {
+                                        p.setStatus("refunded");
+                                        p.setUpdatedAt(Instant.now());
+                                        paymentRepository.save(p);
+                                    });
+                        }
+                    } else {
+                        booking.setPendingRefundAmount(refundDiff);
+                    }
+                } catch (Exception ex) {
+                    log.error("Excepción al ejecutar reembolso por remoción de experiencia en reserva {}: {}", bookingId, ex.getMessage(), ex);
+                    booking.setPendingRefundAmount(refundDiff);
+                }
+            }
+
             booking.setUpdatedAt(Instant.now());
             return toDTO(bookingRepository.save(booking));
         });

@@ -355,16 +355,16 @@ public class PaymentWebhookService {
                     java.time.Duration.ofSeconds(15),
                     java.time.Duration.ofSeconds(5),
                     () -> {
-                        doHandleRefundProcessed(data);
+                        doHandleRefundProcessed(data, eventId);
                         return null;
                     }
             );
             return;
         }
-        doHandleRefundProcessed(data);
+        doHandleRefundProcessed(data, eventId);
     }
 
-    private void doHandleRefundProcessed(PaymentWebhookPayload.PaymentWebhookData data) {
+    private void doHandleRefundProcessed(PaymentWebhookPayload.PaymentWebhookData data, String eventId) {
         Payment payment = paymentRepository.findByIntentId(data.getIntentId()).orElse(null);
         if (payment == null) {
             return;
@@ -383,6 +383,11 @@ public class PaymentWebhookService {
             if (booking == null) {
                 return;
             }
+            if (booking.getProcessedRefundIds() != null && eventId != null && booking.getProcessedRefundIds().contains(eventId)) {
+                log.info("Evento de reembolso {} ya aplicado previamente en reserva {}", eventId, booking.getId());
+                return;
+            }
+
             BigDecimal paidCap = booking.getPaidAmount() != null
                     ? booking.getPaidAmount().max(BigDecimal.ZERO)
                     : (payment.getAmount() != null ? payment.getAmount().max(BigDecimal.ZERO) : BigDecimal.ZERO);
@@ -398,8 +403,18 @@ public class PaymentWebhookService {
             if ("cancelled".equalsIgnoreCase(booking.getStatus()) && currentRefunded.compareTo(BigDecimal.ZERO) > 0) {
                 // cancelBooking ya contabilizó el reembolso al cancelar; reconciliar sin sumar dos veces
                 newRefunded = currentRefunded.max(eventRefund).min(paidCap);
+            } else if (booking.getProcessedRefundIds() != null && !booking.getProcessedRefundIds().isEmpty() && currentRefunded.compareTo(BigDecimal.ZERO) > 0) {
+                // Si la reserva ya contabilizó un reembolso síncrono previo
+                newRefunded = currentRefunded.max(eventRefund).min(paidCap);
             } else {
                 newRefunded = currentRefunded.add(eventRefund).min(paidCap);
+            }
+
+            if (booking.getProcessedRefundIds() == null) {
+                booking.setProcessedRefundIds(new java.util.ArrayList<>());
+            }
+            if (eventId != null && !booking.getProcessedRefundIds().contains(eventId)) {
+                booking.getProcessedRefundIds().add(eventId);
             }
 
             booking.setRefundedAmount(newRefunded);

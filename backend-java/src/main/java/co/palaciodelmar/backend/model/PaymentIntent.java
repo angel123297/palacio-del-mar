@@ -43,6 +43,21 @@ public class PaymentIntent {
     @Indexed(sparse = true)
     private String idempotencyKey;
 
+    @Builder.Default
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
+
+    private String simulationOutcome;
+
+    private String claimLock;
+
+    private Instant claimExpiresAt;
+
+    @Builder.Default
+    private Boolean webhookDelivered = false;
+
+    private String maskedPaymentToken;
+
+    @org.springframework.data.annotation.Transient
     private String paymentToken;
 
     @Indexed(sparse = true)

@@ -79,6 +79,12 @@ public class Booking {
     private BigDecimal refundedAmount = BigDecimal.ZERO;
 
     @Builder.Default
+    private BigDecimal pendingRefundAmount = BigDecimal.ZERO;
+
+    @Builder.Default
+    private List<String> processedRefundIds = new ArrayList<>();
+
+    @Builder.Default
     private BigDecimal balanceDue = BigDecimal.ZERO;
 
     @Indexed
