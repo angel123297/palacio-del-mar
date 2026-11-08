@@ -4,6 +4,7 @@ import co.palaciodelmar.backend.dto.BookingDTO;
 import co.palaciodelmar.backend.dto.BookingRequest;
 import co.palaciodelmar.backend.model.*;
 import co.palaciodelmar.backend.repository.*;
+import co.palaciodelmar.backend.webhook.PaymentWebhookPayload;
 import co.palaciodelmar.backend.webhook.PaymentWebhookService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -613,5 +614,53 @@ class AuditRemediationFivePointsTest {
         assertTrue(retryB.success());
         assertEquals("refunded", retryB.status());
         assertEquals(respB.refundId(), retryB.refundId());
+    }
+
+    @Test
+    @DisplayName("Copilot Edge 5: Reutilizar misma clave de reembolso con monto distinto falla con error explícito")
+    void testRefundIdempotencyKeyWithMismatchedAmountFails() {
+        PaymentIntent intent = PaymentIntent.builder()
+                .id("pi_idem_mismatch")
+                .transactionId("ch_idem_mismatch")
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("succeeded")
+                .refundRecords(new ArrayList<>())
+                .build();
+
+        when(paymentIntentRepository.findByTransactionId("ch_idem_mismatch")).thenReturn(Optional.of(intent));
+
+        String key = "idem_key_same";
+        PaymentGateway.PaymentRefundResponse firstResp = simulatedGateway.refund("ch_idem_mismatch", new BigDecimal("100000"), key);
+        assertTrue(firstResp.success());
+
+        // Reintento con la misma clave pero diferente monto (200.000 vs 100.000)
+        PaymentGateway.PaymentRefundResponse mismatchResp = simulatedGateway.refund("ch_idem_mismatch", new BigDecimal("200000"), key);
+        assertFalse(mismatchResp.success());
+        assertTrue(mismatchResp.errorMessage().contains("monto diferente"));
+    }
+
+    @Test
+    @DisplayName("Copilot Edge 6: Intent con webhook no entregado es reintentado tras reinicio del servidor")
+    void testUndeliveredWebhookRecoveredOnApplicationReady() {
+        PaymentIntent unDeliveredIntent = PaymentIntent.builder()
+                .id("pi_undelivered_1")
+                .bookingId("b_undelivered_1")
+                .amount(new BigDecimal("350000"))
+                .currency("COP")
+                .status("succeeded")
+                .transactionId("ch_undelivered_1")
+                .webhookDelivered(false)
+                .build();
+
+        when(paymentIntentRepository.findByStatus("processing")).thenReturn(Collections.emptyList());
+        when(paymentIntentRepository.findByWebhookDeliveredFalse()).thenReturn(List.of(unDeliveredIntent));
+        when(paymentIntentRepository.findById("pi_undelivered_1")).thenReturn(Optional.of(unDeliveredIntent));
+
+        simulatedGateway.recoverProcessingIntents();
+
+        // Debe haber intentado la entrega y marcado webhookDelivered = true
+        assertTrue(unDeliveredIntent.getWebhookDelivered());
+        verify(paymentIntentRepository, atLeastOnce()).save(unDeliveredIntent);
     }
 }

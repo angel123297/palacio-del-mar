@@ -250,7 +250,35 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     public void processIntentSimulation(String intentId) {
         try {
             PaymentIntent intent = paymentIntentRepository.findById(intentId).orElse(null);
-            if (intent == null || !"processing".equalsIgnoreCase(intent.getStatus())) {
+            if (intent == null) {
+                return;
+            }
+
+            if (!"processing".equalsIgnoreCase(intent.getStatus())) {
+                if (("succeeded".equalsIgnoreCase(intent.getStatus()) || "failed".equalsIgnoreCase(intent.getStatus()))
+                        && !Boolean.TRUE.equals(intent.getWebhookDelivered())) {
+                    boolean isFailure = "failed".equalsIgnoreCase(intent.getStatus());
+                    String eventType = isFailure ? "payment.failed" : "payment.succeeded";
+                    String eventId = "evt_" + UUID.randomUUID().toString().replace("-", "");
+                    PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
+                            .eventId(eventId)
+                            .eventType(eventType)
+                            .timestamp(Instant.now().toString())
+                            .data(PaymentWebhookPayload.PaymentWebhookData.builder()
+                                    .intentId(intentId)
+                                    .bookingId(intent.getBookingId())
+                                    .amount(intent.getAmount())
+                                    .currency(intent.getCurrency())
+                                    .status(isFailure ? "failed" : "succeeded")
+                                    .transactionId(intent.getTransactionId())
+                                    .failureMessage(intent.getFailureMessage())
+                                    .build())
+                            .build();
+
+                    boolean delivered = dispatchWebhook(payload, eventId);
+                    intent.setWebhookDelivered(delivered);
+                    paymentIntentRepository.save(intent);
+                }
                 return;
             }
 
@@ -296,8 +324,8 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                             .build())
                     .build();
 
-            dispatchWebhook(payload, eventId);
-            intent.setWebhookDelivered(true);
+            boolean delivered = dispatchWebhook(payload, eventId);
+            intent.setWebhookDelivered(delivered);
             paymentIntentRepository.save(intent);
 
         } catch (Exception e) {
@@ -309,13 +337,23 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     public void recoverProcessingIntents() {
         try {
             List<PaymentIntent> pending = paymentIntentRepository.findByStatus("processing");
-            if (pending == null || pending.isEmpty()) return;
+            if (pending != null && !pending.isEmpty()) {
+                log.info("Recuperando {} intentos de pago en estado 'processing' tras arranque...", pending.size());
+                for (PaymentIntent intent : pending) {
+                    if (intent.getId() != null && tryClaimProcessingIntent(intent)) {
+                        log.info("Reclamado intent huérfano {} por instancia {}. Reanudando simulación...", intent.getId(), instanceId);
+                        scheduleSimulation(intent.getId());
+                    }
+                }
+            }
 
-            log.info("Recuperando {} intentos de pago en estado 'processing' tras arranque...", pending.size());
-            for (PaymentIntent intent : pending) {
-                if (intent.getId() != null && tryClaimProcessingIntent(intent)) {
-                    log.info("Reclamado intent huérfano {} por instancia {}. Reanudando simulación...", intent.getId(), instanceId);
-                    scheduleSimulation(intent.getId());
+            List<PaymentIntent> unDelivered = paymentIntentRepository.findByWebhookDeliveredFalse();
+            if (unDelivered != null && !unDelivered.isEmpty()) {
+                for (PaymentIntent intent : unDelivered) {
+                    if ("succeeded".equalsIgnoreCase(intent.getStatus()) || "failed".equalsIgnoreCase(intent.getStatus())) {
+                        log.info("Reintentando entrega de webhook pendiente tras arranque para intent {}", intent.getId());
+                        scheduleSimulation(intent.getId());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -323,7 +361,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         }
     }
 
-    private void dispatchWebhook(PaymentWebhookPayload payload, String eventId) {
+    private boolean dispatchWebhook(PaymentWebhookPayload payload, String eventId) {
         try {
             String rawJson = objectMapper.writeValueAsString(payload);
             String signature = WebhookSigner.sign(rawJson, webhookSecret);
@@ -347,7 +385,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                     if (response.statusCode() >= 200 && response.statusCode() < 300) {
                         log.info("Webhook {} entregado exitosamente (HTTP {})", eventId, response.statusCode());
-                        return;
+                        return true;
                     }
                     log.debug("Webhook respondió status {}. Ejecutando procesamiento interno...", response.statusCode());
                 } catch (Exception httpEx) {
@@ -356,10 +394,15 @@ public class SimulatedPaymentGateway implements PaymentGateway {
             }
 
             // Procesamiento interno garantizado (contrato idéntico: verifica firma HMAC, timestamp e idempotencia)
-            paymentWebhookService.processWebhook(rawJson, signature, eventId, timestamp);
+            if (paymentWebhookService != null) {
+                paymentWebhookService.processWebhook(rawJson, signature, eventId, timestamp);
+                return true;
+            }
+            return false;
 
         } catch (Exception e) {
             log.error("Error despachando webhook para evento {}: {}", eventId, e.getMessage(), e);
+            return false;
         }
     }
 
@@ -406,11 +449,16 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                     .filter(r -> idempotencyKey.equals(r.getIdempotencyKey()))
                     .findFirst();
             if (existing.isPresent()) {
+                PaymentIntent.RefundRecord rec = existing.get();
+                if (amount != null && rec.getAmount() != null && rec.getAmount().compareTo(amount) != 0) {
+                    log.warn("Clave de idempotencia {} reutilizada con monto inconsistente: registrado {} vs solicitado {}", idempotencyKey, rec.getAmount(), amount);
+                    return new PaymentRefundResponse(false, null, "failed", "Clave de idempotencia ya utilizada con un monto diferente (" + rec.getAmount() + " vs " + amount + ")");
+                }
                 log.info("Reembolso con clave de idempotencia {} ya procesado previamente. Retornando registro existente.", idempotencyKey);
-                String returnStatus = existing.get().getStatus() != null
-                        ? existing.get().getStatus()
+                String returnStatus = rec.getStatus() != null
+                        ? rec.getStatus()
                         : (intent.getRefundedAmount() != null && intent.getRefundedAmount().compareTo(intent.getAmount()) >= 0 ? "refunded" : "partially_refunded");
-                return new PaymentRefundResponse(true, existing.get().getRefundId(), returnStatus, null);
+                return new PaymentRefundResponse(true, rec.getRefundId(), returnStatus, null);
             }
         }
 
