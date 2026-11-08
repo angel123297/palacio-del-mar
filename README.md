@@ -170,8 +170,8 @@ Instala directamente la aplicación en tu celular Android descargando el paquete
 
 - 📲 **Descargar APK Palacio Del Mar:**
   👉 **[Descargar APK Palacio Del Mar (v1.0.0 Oficial)](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)**
-- 📦 **Repositorio GitHub Releases (Tag v1.0.0):**
-  👉 **[APK Palacio Del Mar en GitHub](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)**
+- 📦 **Releases (Tag v1.0.0):**
+  👉 **[APK Palacio Del Mar (Release v1.0.0)](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)**
 
 #### Pasos para instalar en Android:
 1. **Descarga el APK:** Toca el enlace **[Descargar APK Palacio Del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)** desde tu celular.
@@ -184,7 +184,7 @@ Instala directamente la aplicación en tu celular Android descargando el paquete
 
 En iPhone y iPad no se requiere descargar archivos. Accede directamente a la aplicación nativa desde el enlace oficial:
 
-👉 **[https://unbroke-unsized-zandra.ngrok-free.dev/app/](https://unbroke-unsized-zandra.ngrok-free.dev/app/)**
+👉 <a href="https://unbroke-unsized-zandra.ngrok-free.dev/app/" target="_blank" rel="noopener noreferrer"><strong>https://unbroke-unsized-zandra.ngrok-free.dev/app/</strong></a>
 
 #### Pasos para instalar en iPhone / iPad:
 1. Abre el enlace anterior en tu navegador **Safari**.

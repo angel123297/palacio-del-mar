@@ -46,6 +46,8 @@ jobs:
           JWT_SECRET: c2VjdXJlX2p3dF9zZWNyZXRfa2V5X3BhbGFjaW9fZGVsX21hcl9zdWl0ZXNfdG9rZW5fMjAyNg==
           MONGO_HOST: localhost
           REDIS_HOST: localhost
+          PALACIO_PROXY_TOKEN: palacio_proxy_secret_token_dev_auth_trusted_2026
+          PAYMENTS_WEBHOOK_SECRET: whsec_live_dev_secure_webhook_key_palacio_2026_ok
         run: ./mvnw -B verify
 
       - name: Upload JaCoCo Code Coverage Report
@@ -82,3 +84,4 @@ jobs:
       - name: Run Frontend Unit Tests
         working-directory: frontend-angular
         run: npm test -- --watch=false
+

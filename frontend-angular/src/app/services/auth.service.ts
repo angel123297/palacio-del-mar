@@ -28,15 +28,19 @@ export class AuthService {
 
   loadCachedUser() {
     const cachedUser = localStorage.getItem('user');
-    if (cachedUser) {
+    const token = localStorage.getItem('token');
+    if (cachedUser && token) {
       try {
-        this.currentUserSignal.set(JSON.parse(cachedUser));
+        const user = JSON.parse(cachedUser);
+        if (user && user.emailVerified === true) {
+          this.currentUserSignal.set(user);
+          return;
+        }
       } catch (e) {
-        localStorage.removeItem('user');
+        // Formato JSON invalido
       }
-    } else {
-      this.currentUserSignal.set(null);
     }
+    this.clearLocalData();
   }
 
   private fetchMe() {
@@ -90,13 +94,14 @@ export class AuthService {
       timeout(this.TIMEOUT_MS),
       tap(res => {
         const token = (res as any).token || (res as any).data?.token;
-        if (token) {
-          localStorage.setItem('token', token);
-        }
         const user = res.user || res.data?.user;
-        if (user) {
+        if (token && user?.emailVerified === true) {
+          localStorage.setItem('token', token);
           localStorage.setItem('user', JSON.stringify(user));
           this.currentUserSignal.set(user);
+        } else {
+          // El usuario aun no ha verificado su correo: limpiar cualquier residuo de sesion
+          this.clearLocalData();
         }
       })
     );

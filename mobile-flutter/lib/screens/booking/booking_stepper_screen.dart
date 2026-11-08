@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../../core/providers/auth_provider.dart';
+import '../../core/providers/booking_provider.dart';
+import '../../core/theme/app_theme.dart';
 import '../payment/payment_screen.dart';
 
 class BookingStepperScreen extends StatefulWidget {
@@ -66,20 +68,33 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
   }
 
   double get _baseTotal => _nights * widget.pricePerNightCOP;
-  double get _extraServicesTotal {
-    double total = 0;
-    if (_airportPickup) total += _airportPriceCOP;
-    if (_breakfastIncluded) total += (_breakfastPerNightCOP * _guests * _nights);
-    return total;
+
+  String _formatCOP(num amount) {
+    final str = amount.toInt().toString();
+    return str.replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
   }
-  double get _platformFee => (_baseTotal + _extraServicesTotal) * 0.08; // 8% comisión
-  double get _grandTotalCOP => _baseTotal + _extraServicesTotal + _platformFee;
 
   Future<void> _submitBooking() async {
     setState(() => _isLoading = true);
 
     final auth = context.read<AuthProvider>();
+    final bookingProvider = context.read<BookingProvider>();
     final guestEmail = auth.currentUserEmail ?? '';
+
+    // Preparar lista real de platillos de comida
+    final List<Map<String, dynamic>> finalFoodOrders = [];
+    if (_breakfastIncluded) {
+      finalFoodOrders.add({
+        'dishName': 'Desayuno Buffet Ruta del Sabor',
+        'type': 'buffet',
+        'price': _breakfastPerNightCOP,
+        'includesBreakfastCombo': true,
+      });
+    }
+    finalFoodOrders.addAll(bookingProvider.getFormattedFoodOrders());
+
+    // Preparar lista real de experiencias de lujo
+    final List<Map<String, dynamic>> finalExperiences = bookingProvider.getFormattedExperiences();
 
     final payload = {
       'suiteId': widget.suiteId,
@@ -93,7 +108,8 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
       'guestName': _nameController.text.trim(),
       'guestEmail': guestEmail,
       'guestPhone': _phoneController.text.trim(),
-      'foodOrders': _breakfastIncluded ? [{'item': 'Desayuno Buffet Ruta del Sabor', 'quantity': _guests * _nights}] : [],
+      'foodOrders': finalFoodOrders,
+      'experiences': finalExperiences,
     };
 
     try {
@@ -102,39 +118,43 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
+          'ngrok-skip-browser-warning': 'true',
         },
         body: jsonEncode(payload),
       );
 
-      if (!mounted) return;
+      final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final decoded = jsonDecode(response.body);
-        final Map<String, dynamic> bookingMap = (decoded is Map<String, dynamic> && decoded['data'] is Map<String, dynamic>)
-            ? Map<String, dynamic>.from(decoded['data'])
-            : (decoded is Map<String, dynamic> ? decoded : {'id': decoded.toString()});
+        final bookingData = data['data'] is Map ? (data['data'] as Map<String, dynamic>) : (data is Map<String, dynamic> ? data : <String, dynamic>{});
 
+        // Limpiar carrito temporal tras reserva exitosa
+        bookingProvider.clearFoodOrders();
+        bookingProvider.clearExperiences();
+
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => PaymentScreen(
-              booking: bookingMap,
+              booking: bookingData,
               token: widget.token,
               baseUrl: widget.baseUrl,
             ),
           ),
         );
       } else {
+        final msg = data['message'] ?? 'Error al procesar reserva (${response.statusCode})';
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al crear reserva: ${response.body}')),
+          SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error de conexión al procesar la reserva')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error de conexión al servidor'), backgroundColor: Colors.redAccent),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -142,6 +162,20 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bookingProvider = context.watch<BookingProvider>();
+
+    // Cálculos financieros dinámicos
+    double extraServicesTotal = 0;
+    if (_airportPickup) extraServicesTotal += _airportPriceCOP;
+    if (_breakfastIncluded) extraServicesTotal += (_breakfastPerNightCOP * _guests * _nights);
+
+    final foodTotal = bookingProvider.totalFoodPrice;
+    final experiencesTotal = bookingProvider.totalExperiencePrice;
+
+    final subtotalTotal = _baseTotal + extraServicesTotal + foodTotal + experiencesTotal;
+    final platformFee = subtotalTotal * 0.08; // 8% comisión
+    final grandTotalCOP = subtotalTotal + platformFee;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
@@ -268,11 +302,12 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
             ),
           ),
 
-          // PASO 3: SERVICIOS Y COMIDA
+          // PASO 3: SERVICIOS, GASTRONOMÍA Y EXPERIENCIAS
           Step(
-            title: const Text('Servicios y Traslado', style: TextStyle(color: Colors.white)),
+            title: const Text('Servicios, Comida y Experiencias', style: TextStyle(color: Colors.white)),
             isActive: _currentStep >= 2,
             content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SwitchListTile(
                   title: const Text('Traslado privado desde Aeropuerto', style: TextStyle(color: Colors.white)),
@@ -288,13 +323,107 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                   activeColor: const Color(0xFFD4AF37),
                   onChanged: (v) => setState(() => _breakfastIncluded = v),
                 ),
+
+                const Divider(color: Colors.white12, height: 24),
+
+                // Desglose de Platillos de Gastronomía seleccionados
+                const Text(
+                  'Platillos de Gastronomía vinculados:',
+                  style: TextStyle(color: AppTheme.gold, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                if (bookingProvider.foodQuantities.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(6)),
+                    child: const Text(
+                      'No tienes platillos agregados desde la sección Experiencias.',
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                    ),
+                  )
+                else
+                  ...bookingProvider.foodQuantities.entries.map((entry) {
+                    final item = bookingProvider.foodCatalog[entry.key];
+                    final rawPrice = (item?['priceRaw'] as num?)?.toDouble() ?? 80000.0;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(6)),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${entry.value}x ${entry.key}',
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ),
+                          Text(
+                            '\$ ${_formatCOP(rawPrice * entry.value)} COP',
+                            style: const TextStyle(color: AppTheme.gold, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+
+                const SizedBox(height: 14),
+
+                // Desglose de Experiencias de Lujo seleccionadas
+                const Text(
+                  'Experiencias de Lujo vinculadas:',
+                  style: TextStyle(color: AppTheme.gold, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                if (bookingProvider.experienceQuantities.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(6)),
+                    child: const Text(
+                      'No tienes experiencias de lujo agregadas para esta reserva.',
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
+                    ),
+                  )
+                else
+                  ...bookingProvider.experienceQuantities.entries.map((entry) {
+                    final exp = bookingProvider.experienceCatalog[entry.key];
+                    final name = exp?['name']?.toString() ?? 'Experiencia';
+                    final rawPrice = exp?['price'] ?? 0;
+                    double priceVal = 0;
+                    if (rawPrice is num) {
+                      priceVal = rawPrice.toDouble();
+                    } else if (rawPrice is String) {
+                      final cleaned = rawPrice.replaceAll(RegExp(r'[^0-9]'), '');
+                      priceVal = double.tryParse(cleaned) ?? 0;
+                    }
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(6)),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${entry.value}x $name',
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ),
+                          Text(
+                            '\$ ${_formatCOP(priceVal * entry.value)} COP',
+                            style: const TextStyle(color: AppTheme.gold, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
               ],
             ),
           ),
 
-          // PASO 4: DATOS DEL TITULAR Y RESUMEN
+          // PASO 4: DATOS DEL TITULAR Y RESUMEN GENERAL
           Step(
-            title: const Text('Datos y Resumen', style: TextStyle(color: Colors.white)),
+            title: const Text('Datos y Resumen Final', style: TextStyle(color: Colors.white)),
             isActive: _currentStep >= 3,
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,20 +447,31 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                     children: [
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         Text('Estadía ($_nights noches):', style: const TextStyle(color: Colors.grey)),
-                        Text('\$${_baseTotal.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
+                        Text('\$ ${_formatCOP(_baseTotal)} COP', style: const TextStyle(color: Colors.white)),
                       ]),
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        const Text('Servicios adicionales:', style: TextStyle(color: Colors.grey)),
-                        Text('\$${_extraServicesTotal.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
-                      ]),
+                      if (extraServicesTotal > 0)
+                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                          const Text('Servicios y traslados:', style: TextStyle(color: Colors.grey)),
+                          Text('\$ ${_formatCOP(extraServicesTotal)} COP', style: const TextStyle(color: Colors.white)),
+                        ]),
+                      if (foodTotal > 0)
+                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                          const Text('Platillos de gastronomía:', style: TextStyle(color: Colors.grey)),
+                          Text('\$ ${_formatCOP(foodTotal)} COP', style: const TextStyle(color: Colors.white)),
+                        ]),
+                      if (experiencesTotal > 0)
+                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                          const Text('Experiencias de lujo:', style: TextStyle(color: Colors.grey)),
+                          Text('\$ ${_formatCOP(experiencesTotal)} COP', style: const TextStyle(color: Colors.white)),
+                        ]),
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         const Text('Tarifa de servicio (8%):', style: TextStyle(color: Colors.grey)),
-                        Text('\$${_platformFee.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
+                        Text('\$ ${_formatCOP(platformFee)} COP', style: const TextStyle(color: Colors.white)),
                       ]),
                       const Divider(color: Colors.grey),
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         const Text('TOTAL RESERVA:', style: TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text('\$${_grandTotalCOP.toStringAsFixed(0)} COP', style: const TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('\$ ${_formatCOP(grandTotalCOP)} COP', style: const TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold, fontSize: 16)),
                       ]),
                     ],
                   ),
