@@ -5,9 +5,17 @@ class BookingProvider extends ChangeNotifier {
   final Map<String, int> _foodQuantities = {};
   final Map<String, Map<String, dynamic>> _foodCatalog = {};
 
+  // Experiencias de lujo seleccionadas para vincular a la reserva
+  final Map<String, int> _experienceQuantities = {};
+  final Map<String, Map<String, dynamic>> _experienceCatalog = {};
+
   Map<String, int> get foodQuantities => _foodQuantities;
+  Map<String, Map<String, dynamic>> get foodCatalog => _foodCatalog;
+  Map<String, int> get experienceQuantities => _experienceQuantities;
+  Map<String, Map<String, dynamic>> get experienceCatalog => _experienceCatalog;
 
   int getQuantity(String dishName) => _foodQuantities[dishName] ?? 0;
+  int getExperienceQuantity(String expId) => _experienceQuantities[expId] ?? 0;
 
   void registerFoodItem(Map<String, dynamic> item) {
     final name = item['name']?.toString() ?? '';
@@ -71,5 +79,83 @@ class BookingProvider extends ChangeNotifier {
       }
     });
     return orders;
+  }
+
+  // --- MÉTODOS PARA EXPERIENCIAS DE LUJO ---
+  void registerExperience(Map<String, dynamic> exp) {
+    final id = (exp['id'] ?? exp['_id'] ?? exp['name'] ?? '').toString();
+    if (id.isNotEmpty) {
+      _experienceCatalog[id] = exp;
+    }
+  }
+
+  void addExperience(Map<String, dynamic> exp) {
+    final id = (exp['id'] ?? exp['_id'] ?? exp['name'] ?? '').toString();
+    if (id.isEmpty) return;
+    registerExperience(exp);
+    _experienceQuantities[id] = (_experienceQuantities[id] ?? 0) + 1;
+    notifyListeners();
+  }
+
+  void removeExperience(String expId) {
+    if (!_experienceQuantities.containsKey(expId)) return;
+    final current = _experienceQuantities[expId]!;
+    if (current <= 1) {
+      _experienceQuantities.remove(expId);
+    } else {
+      _experienceQuantities[expId] = current - 1;
+    }
+    notifyListeners();
+  }
+
+  void clearExperiences() {
+    _experienceQuantities.clear();
+    notifyListeners();
+  }
+
+  int get totalExperienceCount {
+    return _experienceQuantities.values.fold(0, (sum, count) => sum + count);
+  }
+
+  double get totalExperiencePrice {
+    double total = 0.0;
+    _experienceQuantities.forEach((id, qty) {
+      final exp = _experienceCatalog[id];
+      if (exp != null) {
+        final rawPrice = exp['price'];
+        double price = 0.0;
+        if (rawPrice is num) {
+          price = rawPrice.toDouble();
+        } else if (rawPrice is String) {
+          final cleaned = rawPrice.replaceAll(RegExp(r'[^0-9]'), '');
+          price = double.tryParse(cleaned) ?? 0.0;
+        }
+        total += price * qty;
+      }
+    });
+    return total;
+  }
+
+  List<Map<String, dynamic>> getFormattedExperiences() {
+    final List<Map<String, dynamic>> list = [];
+    _experienceQuantities.forEach((id, qty) {
+      final exp = _experienceCatalog[id];
+      final rawPrice = exp?['price'] ?? 0;
+      double price = 0.0;
+      if (rawPrice is num) {
+        price = rawPrice.toDouble();
+      } else if (rawPrice is String) {
+        final cleaned = rawPrice.replaceAll(RegExp(r'[^0-9]'), '');
+        price = double.tryParse(cleaned) ?? 0.0;
+      }
+
+      list.add({
+        'experienceId': id,
+        'name': exp?['name'] ?? 'Experiencia de Lujo',
+        'price': price,
+        'quantity': qty,
+      });
+    });
+    return list;
   }
 }
