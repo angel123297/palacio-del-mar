@@ -1,4 +1,4 @@
-import { Component, OnInit, Output, EventEmitter, inject } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
 import { SearchStateService } from '../../services/search-state.service';
@@ -198,7 +198,7 @@ const LUXURY_DEFAULT_BRANCHES: Branch[] = [
 })
 export class BranchSelectorComponent implements OnInit {
   private searchState = inject(SearchStateService);
-  branches: Branch[] = [];
+  branches: Branch[] = [...LUXURY_DEFAULT_BRANCHES];
 
   @Output() branchSelected = new EventEmitter<string>();
 

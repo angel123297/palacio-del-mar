@@ -149,7 +149,7 @@ export class RoomsSectionComponent implements OnInit {
   private searchState = inject(SearchStateService);
   public currency = inject(CurrencyService);
   suites: Suite[] = [];
-  branches: Branch[] = [];
+  branches: Branch[] = [...DEFAULT_FALLBACK_BRANCHES];
   types: any[] = [];
   selectedType: string = '';
   loading = true;

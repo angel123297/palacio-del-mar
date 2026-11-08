@@ -1,4 +1,4 @@
-@charset "UTF-8";
+﻿@charset "UTF-8";
 @use 'styles/variables' as *;
 @use 'styles/mixins' as *;
 
@@ -380,7 +380,7 @@ nav {
 #booking-bar {
   background: var(--warm);
   border-bottom: 2px solid rgba(201, 169, 110, 0.2);
-  padding: 0 48px;
+  padding: 0;
   display: flex;
   align-items: stretch;
   position: sticky;
@@ -2481,3 +2481,53 @@ select::placeholder {
   opacity: 1;
 }
 
+
+
+/* ===== Modal de Autenticación - Inputs con alto contraste y visibilidad garantizada ===== */
+.modal-content input {
+  background: #181513 !important;
+  border: 1px solid rgba(201, 169, 110, 0.35) !important;
+  border-radius: 6px !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  padding: 10px 14px;
+  font-size: 0.95rem !important;
+  font-family: inherit !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.modal-content input[type="password"],
+.modal-content input[id*="password"],
+.modal-content input[id*="confirm"] {
+  padding-right: 42px !important;
+}
+
+.modal-content input:focus {
+  border-color: var(--gold, #c9a96e) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.25) !important;
+}
+
+.modal-content input::placeholder {
+  color: rgba(245, 240, 232, 0.45) !important;
+  -webkit-text-fill-color: rgba(245, 240, 232, 0.45) !important;
+  opacity: 1 !important;
+}
+
+.modal-content input:-webkit-autofill,
+.modal-content input:-webkit-autofill:hover, 
+.modal-content input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff !important;
+  -webkit-box-shadow: 0 0 0px 1000px #181513 inset !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+.modal-content .field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+  letter-spacing: 0.5px;
+  color: var(--cream, #f5f0e8);
+  font-weight: 500;
+}
