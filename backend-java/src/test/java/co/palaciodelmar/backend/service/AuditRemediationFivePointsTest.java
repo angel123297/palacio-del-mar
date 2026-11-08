@@ -440,4 +440,132 @@ class AuditRemediationFivePointsTest {
         assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
         assertTrue(ex.getReason().contains("Inconsistencia en clave de idempotencia"));
     }
+
+    // =========================================================================
+    // CASOS LÍMITE Y FORTALECIMIENTO ADICIONAL (Copilot Review Verification)
+    // =========================================================================
+    @Test
+    @DisplayName("Copilot Edge 1: SimulatedPaymentGateway.refund es idempotente con idempotencyKey repetida")
+    void testRefundIdempotencyKeyReturnsSameRefundIdWithoutDoubleCharging() {
+        PaymentIntent intent = PaymentIntent.builder()
+                .id("pi_idem_refund")
+                .transactionId("ch_idem_refund")
+                .amount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("succeeded")
+                .refundRecords(new ArrayList<>())
+                .build();
+
+        when(paymentIntentRepository.findByTransactionId("ch_idem_refund")).thenReturn(Optional.of(intent));
+
+        String key = "idem_key_ref_unique_123";
+        // 1. Primer reembolso
+        PaymentGateway.PaymentRefundResponse firstResp = simulatedGateway.refund("ch_idem_refund", new BigDecimal("100000"), key);
+        assertTrue(firstResp.success());
+        assertEquals(new BigDecimal("100000"), intent.getRefundedAmount());
+        assertEquals(1, intent.getRefundRecords().size());
+        String refundId = firstResp.refundId();
+
+        // 2. Segundo intento con MISMA idempotencyKey
+        PaymentGateway.PaymentRefundResponse secondResp = simulatedGateway.refund("ch_idem_refund", new BigDecimal("100000"), key);
+        assertTrue(secondResp.success());
+        // El refundId devuelto debe ser exactamente el mismo
+        assertEquals(refundId, secondResp.refundId());
+        // El monto acumulado NO debe duplicarse a 200.000, debe seguir en 100.000
+        assertEquals(new BigDecimal("100000"), intent.getRefundedAmount());
+        assertEquals(1, intent.getRefundRecords().size());
+    }
+
+    @Test
+    @DisplayName("Copilot Edge 2: modifyBooking NO ejecuta reembolso si colisión concurrente aborta la reserva")
+    void testModifyBookingDoesNotRefundWhenSlotCollisionOccurs() {
+        String bookingId = "b_mod_collision";
+        String userId = "user_collision";
+        LocalDate today = LocalDate.now();
+
+        Suite suite = Suite.builder().id("suite_col").branch("branch_1").basePrice(new BigDecimal("200000")).build();
+        Booking existing = Booking.builder()
+                .id(bookingId)
+                .user(userId)
+                .suite("suite_col")
+                .checkIn(today.plusDays(10))
+                .checkOut(today.plusDays(15))
+                .status("confirmed")
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .build();
+
+        BookingRequest request = new BookingRequest();
+        request.setCheckIn(today.plusDays(10));
+        request.setCheckOut(today.plusDays(12));
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(existing));
+        when(suiteRepository.findById("suite_col")).thenReturn(Optional.of(suite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(any(), any(), any())).thenReturn(Collections.emptyList());
+        when(suiteNightRepository.findByBooking(bookingId)).thenReturn(Collections.emptyList());
+
+        // Simulamos que al guardar los suiteNights, ocurre colisión de clave única en MongoDB
+        when(suiteNightRepository.save(any(SuiteNight.class)))
+                .thenThrow(new org.springframework.dao.DuplicateKeyException("Slot collision"));
+
+        PricingService.PricingResult pricingResult = new PricingService.PricingResult(
+                new BigDecimal("300000"), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("300000"), Collections.emptyList()
+        );
+        when(pricingService.calculatePrice(any(), any(), any(), any())).thenReturn(pricingResult);
+
+        // Debe fallar con IllegalStateException ante colisión
+        assertThrows(IllegalStateException.class, () ->
+                bookingService.modifyBooking(bookingId, userId, request)
+        );
+
+        // JAMÁS debe llamar a la pasarela para reembolsar dinero en una modificación abortada
+        verify(paymentGateway, never()).refund(anyString(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("Copilot Edge 3: netPaid evita marcar como 'paid' una reserva con saldo pendiente tras reembolso parcial previo")
+    void testNetPaidPreventsPrematurePaidStatusOnPartiallyRefundedBooking() {
+        String bookingId = "b_partial_netpaid";
+        String userId = "user_netpaid";
+        LocalDate today = LocalDate.now();
+
+        Suite suite = Suite.builder().id("suite_net").branch("branch_1").basePrice(new BigDecimal("200000")).build();
+        // Reserva pagó 500.000, pero ya se le reembolsaron 200.000 -> netPaid = 300.000
+        Booking existing = Booking.builder()
+                .id(bookingId)
+                .user(userId)
+                .suite("suite_net")
+                .checkIn(today.plusDays(10))
+                .checkOut(today.plusDays(15))
+                .status("confirmed")
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(new BigDecimal("200000"))
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .build();
+
+        BookingRequest request = new BookingRequest();
+        request.setCheckIn(today.plusDays(10));
+        request.setCheckOut(today.plusDays(14));
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(existing));
+        when(suiteRepository.findById("suite_net")).thenReturn(Optional.of(suite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(any(), any(), any())).thenReturn(Collections.emptyList());
+        when(suiteNightRepository.findByBooking(bookingId)).thenReturn(Collections.emptyList());
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        // Nuevo precio es 350.000. Si se comparara contra paidAmount (500.000), daría "paid".
+        // Pero netPaid es 300.000 < 350.000, por lo que falta pagar 50.000.
+        PricingService.PricingResult pricingResult = new PricingService.PricingResult(
+                new BigDecimal("350000"), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("350000"), Collections.emptyList()
+        );
+        when(pricingService.calculatePrice(any(), any(), any(), any())).thenReturn(pricingResult);
+
+        BookingDTO modified = bookingService.modifyBooking(bookingId, userId, request);
+
+        // paymentStatus debe ser "partial", NO "paid"
+        assertEquals("partial", modified.getPaymentStatus());
+        assertEquals(new BigDecimal("50000"), modified.getBalanceDue());
+        // No hay reembolso que procesar
+        verify(paymentGateway, never()).refund(anyString(), any(), anyString());
+    }
 }

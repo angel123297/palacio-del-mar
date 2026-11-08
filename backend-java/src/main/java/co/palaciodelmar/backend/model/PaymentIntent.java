@@ -10,6 +10,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @Builder
@@ -70,4 +72,19 @@ public class PaymentIntent {
 
     @Builder.Default
     private Instant updatedAt = Instant.now();
+
+    @Builder.Default
+    private List<RefundRecord> refundRecords = new ArrayList<>();
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RefundRecord {
+        private String refundId;
+        private String idempotencyKey;
+        private BigDecimal amount;
+        @Builder.Default
+        private Instant createdAt = Instant.now();
+    }
 }

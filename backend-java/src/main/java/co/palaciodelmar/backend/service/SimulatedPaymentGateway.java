@@ -401,6 +401,16 @@ public class SimulatedPaymentGateway implements PaymentGateway {
             return new PaymentRefundResponse(false, null, "failed", "La transacción no está en estado exitoso (estado actual: " + intent.getStatus() + ")");
         }
 
+        if (idempotencyKey != null && !idempotencyKey.isBlank() && intent.getRefundRecords() != null) {
+            Optional<PaymentIntent.RefundRecord> existing = intent.getRefundRecords().stream()
+                    .filter(r -> idempotencyKey.equals(r.getIdempotencyKey()))
+                    .findFirst();
+            if (existing.isPresent()) {
+                log.info("Reembolso con clave de idempotencia {} ya procesado previamente. Retornando registro existente.", idempotencyKey);
+                return new PaymentRefundResponse(true, existing.get().getRefundId(), "refunded", null);
+            }
+        }
+
         BigDecimal currentRefunded = intent.getRefundedAmount() != null ? intent.getRefundedAmount() : BigDecimal.ZERO;
         BigDecimal remaining = intent.getAmount().subtract(currentRefunded);
 
@@ -415,6 +425,17 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         BigDecimal newRefunded = currentRefunded.add(amount);
         intent.setRefundedAmount(newRefunded);
         intent.setStatus("refunded");
+
+        if (intent.getRefundRecords() == null) {
+            intent.setRefundRecords(new java.util.ArrayList<>());
+        }
+        intent.getRefundRecords().add(PaymentIntent.RefundRecord.builder()
+                .refundId(refundId)
+                .idempotencyKey(idempotencyKey)
+                .amount(amount)
+                .createdAt(Instant.now())
+                .build());
+
         intent.setUpdatedAt(Instant.now());
         paymentIntentRepository.save(intent);
 
@@ -430,7 +451,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                         .amount(amount)
                         .currency(intent.getCurrency())
                         .status("refunded")
-                        .transactionId(transactionId)
+                        .transactionId(refundId)
                         .failureMessage(null)
                         .build())
                 .build();

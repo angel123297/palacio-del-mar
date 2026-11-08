@@ -30,6 +30,9 @@ public class Payment {
     private BigDecimal amount;
     private String currency; // e.g., "COP", "USD"
 
+    @Builder.Default
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
+
     @Indexed
     @Builder.Default
     private String status = "pending"; // "pending", "completed", "failed", "refunded"

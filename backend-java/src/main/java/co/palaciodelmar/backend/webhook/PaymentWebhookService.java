@@ -369,12 +369,31 @@ public class PaymentWebhookService {
         if (payment == null) {
             return;
         }
+
         if ("refunded".equalsIgnoreCase(payment.getStatus())) {
             log.info("Payment {} ya se encontraba en estado refunded; omitiendo doble abono contable", payment.getId());
             return;
         }
 
-        payment.setStatus("refunded");
+        Booking initialBooking = payment.getBooking() != null
+                ? bookingRepository.findById(payment.getBooking()).orElse(null)
+                : null;
+        boolean isCancelled = initialBooking != null && "cancelled".equalsIgnoreCase(initialBooking.getStatus());
+
+        BigDecimal paymentTotal = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+        BigDecimal currentPaymentRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount() : BigDecimal.ZERO;
+        BigDecimal refundAmount = data.getAmount() != null ? data.getAmount() : paymentTotal;
+
+        BigDecimal newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
+        payment.setRefundedAmount(newPaymentRefunded);
+
+        if ((paymentTotal.compareTo(BigDecimal.ZERO) > 0 && newPaymentRefunded.compareTo(paymentTotal) >= 0)
+                || isCancelled
+                || "refunded".equalsIgnoreCase(data.getStatus())) {
+            payment.setStatus("refunded");
+        } else {
+            payment.setStatus("partially_refunded");
+        }
         payment.setUpdatedAt(Instant.now());
         paymentRepository.save(payment);
 
@@ -383,9 +402,13 @@ public class PaymentWebhookService {
             if (booking == null) {
                 return;
             }
-            if (booking.getProcessedRefundIds() != null && eventId != null && booking.getProcessedRefundIds().contains(eventId)) {
-                log.info("Evento de reembolso {} ya aplicado previamente en reserva {}", eventId, booking.getId());
-                return;
+            String refundId = data.getTransactionId();
+            if (booking.getProcessedRefundIds() != null) {
+                if ((eventId != null && booking.getProcessedRefundIds().contains(eventId))
+                        || (refundId != null && booking.getProcessedRefundIds().contains(refundId))) {
+                    log.info("Evento de reembolso {} / {} ya aplicado previamente en reserva {}", eventId, refundId, booking.getId());
+                    return;
+                }
             }
 
             BigDecimal paidCap = booking.getPaidAmount() != null
@@ -415,6 +438,9 @@ public class PaymentWebhookService {
             }
             if (eventId != null && !booking.getProcessedRefundIds().contains(eventId)) {
                 booking.getProcessedRefundIds().add(eventId);
+            }
+            if (refundId != null && !booking.getProcessedRefundIds().contains(refundId)) {
+                booking.getProcessedRefundIds().add(refundId);
             }
 
             booking.setRefundedAmount(newRefunded);
