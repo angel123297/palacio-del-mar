@@ -103,7 +103,11 @@ public class IntegrationService {
         }
 
         long nights = ChronoUnit.DAYS.between(start, end);
-        int slot = request.getUnitSlot() != null && request.getUnitSlot() > 0 ? request.getUnitSlot() : 1;
+        int totalUnits = suite.getTotalUnits() != null && suite.getTotalUnits() > 0 ? suite.getTotalUnits() : 1;
+        if (request.getUnitSlot() != null && (request.getUnitSlot() < 1 || request.getUnitSlot() > totalUnits)) {
+            throw new IllegalArgumentException("El unitSlot (" + request.getUnitSlot() + ") debe estar entre 1 y el total de unidades de la habitación (" + totalUnits + ")");
+        }
+        int slot = request.getUnitSlot() != null ? request.getUnitSlot() : 1;
         String action = request.getAction() != null ? request.getAction().toUpperCase() : "BLOCK";
 
         Map<String, Object> response = new LinkedHashMap<>();

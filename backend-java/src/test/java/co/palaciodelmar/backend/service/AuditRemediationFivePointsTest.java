@@ -1819,4 +1819,208 @@ class AuditRemediationFivePointsTest {
                 "Cuando llega el webhook correspondiente a la clave pendiente y monto, debe limpiar la operación pendiente");
         assertEquals(BigDecimal.ZERO, booking.getPendingRefundAmount());
     }
+
+    @Test
+    @DisplayName("Ronda 7.1 (#4): Reserva pendiente o sin pagar no puede completar pre-check-in ni exponer smartLockPin")
+    void testRound7_PendingBookingCannotPerformPreCheckInOrExposeSmartLockPin() {
+        String bookingId = "bk_r7_pending_pin";
+        Booking pendingBooking = Booking.builder()
+                .id(bookingId)
+                .user("user_guest_1")
+                .suite("suite_1")
+                .status("pending")
+                .paymentStatus("pending")
+                .smartLockPin("482910")
+                .preCheckInCompleted(true)
+                .build();
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(pendingBooking));
+
+        // 1. toDTO no expone el PIN mientras la reserva esté en pending, aunque preCheckInCompleted sea true
+        BookingDTO pendingDto = bookingService.toDTO(pendingBooking);
+        assertNull(pendingDto.getSmartLockPin(),
+                "Una reserva en estado pending jamás debe exponer el smartLockPin en el DTO");
+
+        // 2. performPreCheckIn rechaza una reserva en estado pending
+        assertThrows(IllegalStateException.class,
+                () -> bookingService.performPreCheckIn(bookingId, "user_guest_1", "CC12345678", "Acompañante 1"),
+                "performPreCheckIn debe rechazar reservas que sigan en estado pending");
+
+        // 3. Al pasar a confirmed y paid, sí permite pre-check-in y expone el PIN
+        pendingBooking.setStatus("confirmed");
+        pendingBooking.setPaymentStatus("paid");
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        BookingDTO confirmedDto = bookingService.performPreCheckIn(bookingId, "user_guest_1", "CC12345678", "Acompañante 1");
+        assertEquals("482910", confirmedDto.getSmartLockPin(),
+                "Una reserva confirmada y pagada sí debe devolver su smartLockPin tras el pre-check-in");
+    }
+
+    @Test
+    @DisplayName("Ronda 7.2 (#2, #3, #5, #6): Conteo de cunas por noche individual, exclusión de pendientes vencidas y persistencia en modifyBooking")
+    void testRound7_CribCountPerNightExcludesExpiredPendingHoldsAndUsesGlobalLock() {
+        LocalDate d1 = LocalDate.now().plusDays(10);
+        LocalDate d2 = d1.plusDays(1);
+        LocalDate d3 = d1.plusDays(2);
+
+        Suite suite = Suite.builder()
+                .id("suite_crib_1")
+                .slug("suite-crib-1")
+                .branch("branch_1")
+                .basePrice(new BigDecimal("400000"))
+                .maxGuests(4)
+                .totalUnits(3)
+                .active(true)
+                .available(true)
+                .build();
+        when(suiteRepository.findById("suite_crib_1")).thenReturn(Optional.of(suite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(anyString(), any(), any())).thenReturn(List.of());
+        when(promotionRepository.findByBranchAndActiveTrue(anyString())).thenReturn(List.of());
+        when(pricingService.calculatePrice(any(), any(), any(), any())).thenReturn(
+                new PricingService.PricingResult(
+                        new BigDecimal("800000"),
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        new BigDecimal("800000"),
+                        List.of()
+                )
+        );
+
+        // 3 reservas usan cuna en la noche 1 [d1, d2) y otras 2 reservas distintas usan cuna en la noche 2 [d2, d3),
+        // más 2 reservas pending vencidas en [d1, d3). Ninguna noche individual alcanza 5 cunas activas (máximo 3 en d1 y 2 en d2).
+        Booking b1 = Booking.builder().id("c1").status("confirmed").needsCrib(true).checkIn(d1).checkOut(d2).build();
+        Booking b2 = Booking.builder().id("c2").status("confirmed").needsCrib(true).checkIn(d1).checkOut(d2).build();
+        Booking b3 = Booking.builder().id("c3").status("confirmed").needsCrib(true).checkIn(d1).checkOut(d2).build();
+        Booking b4 = Booking.builder().id("c4").status("confirmed").needsCrib(true).checkIn(d2).checkOut(d3).build();
+        Booking b5 = Booking.builder().id("c5").status("confirmed").needsCrib(true).checkIn(d2).checkOut(d3).build();
+        Booking expiredPending1 = Booking.builder()
+                .id("exp1").status("pending").needsCrib(true).checkIn(d1).checkOut(d3)
+                .expiresAt(Instant.now().minusSeconds(60)).build();
+        Booking expiredPending2 = Booking.builder()
+                .id("exp2").status("pending").needsCrib(true).checkIn(d1).checkOut(d3)
+                .expiresAt(Instant.now().minusSeconds(120)).build();
+
+        when(bookingRepository.findByStatusInAndNeedsCribTrueAndCheckInBeforeAndCheckOutAfter(anyList(), any(), any()))
+                .thenReturn(List.of(b1, b2, b3, b4, b5, expiredPending1, expiredPending2));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
+            Booking b = inv.getArgument(0);
+            if (b.getId() == null) b.setId("bk_new_crib");
+            return b;
+        });
+        when(suiteNightRepository.save(any(SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        BookingRequest createReq = new BookingRequest();
+        createReq.setSuiteId("suite_crib_1");
+        createReq.setCheckIn(d1);
+        createReq.setCheckOut(d3);
+        createReq.setGuests(2);
+        createReq.setNeedsCrib(true);
+
+        // No debe lanzar excepción porque ninguna noche individual llega a 5 cunas y las pending vencidas se ignoran
+        BookingDTO created = bookingService.createBooking("guest_crib", createReq);
+        assertNotNull(created);
+
+        // Ahora verificamos modifyBooking (#2 y #3): si ya tenía needsCrib=true y cambia de fechas a una noche con 5 cunas ocupadas, debe validarlo
+        Booking existingWithCrib = Booking.builder()
+                .id("bk_mod_crib")
+                .user("guest_crib")
+                .suite("suite_crib_1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .checkIn(d1)
+                .checkOut(d2)
+                .nights(1)
+                .guests(2)
+                .needsCrib(true)
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .build();
+        when(bookingRepository.findById("bk_mod_crib")).thenReturn(Optional.of(existingWithCrib));
+
+        // Simulamos 5 cunas ocupadas en la noche d2..d3
+        Booking b6 = Booking.builder().id("c6").status("confirmed").needsCrib(true).checkIn(d2).checkOut(d3).build();
+        Booking b7 = Booking.builder().id("c7").status("confirmed").needsCrib(true).checkIn(d2).checkOut(d3).build();
+        Booking b8 = Booking.builder().id("c8").status("confirmed").needsCrib(true).checkIn(d2).checkOut(d3).build();
+        when(bookingRepository.findByStatusInAndNeedsCribTrueAndCheckInBeforeAndCheckOutAfter(anyList(), any(), any()))
+                .thenReturn(List.of(b4, b5, b6, b7, b8));
+
+        BookingRequest modReqKeepCribImplicit = new BookingRequest();
+        modReqKeepCribImplicit.setCheckIn(d2);
+        modReqKeepCribImplicit.setCheckOut(d3);
+        modReqKeepCribImplicit.setGuests(2);
+        modReqKeepCribImplicit.setNeedsCrib(null); // No envía needsCrib explícito, pero la reserva ya tenía needsCrib=true (#2)
+
+        assertThrows(IllegalArgumentException.class,
+                () -> bookingService.modifyBooking("bk_mod_crib", "guest_crib", modReqKeepCribImplicit),
+                "modifyBooking debe validar stock de cunas en las nuevas fechas cuando la reserva ya tenía needsCrib=true");
+
+        // Y si el usuario desactiva needsCrib=false en modifyBooking (#3), se guarda needsCrib=false y permite modificar
+        BookingRequest modReqDisableCrib = new BookingRequest();
+        modReqDisableCrib.setCheckIn(d2);
+        modReqDisableCrib.setCheckOut(d3);
+        modReqDisableCrib.setGuests(2);
+        modReqDisableCrib.setNeedsCrib(false);
+
+        BookingDTO modifiedDto = bookingService.modifyBooking("bk_mod_crib", "guest_crib", modReqDisableCrib);
+        assertNotNull(modifiedDto);
+        assertFalse(Boolean.TRUE.equals(existingWithCrib.getNeedsCrib()),
+                "modifyBooking debe persistir el cambio de needsCrib en la reserva");
+    }
+
+    @Test
+    @DisplayName("Ronda 7.3 (#7, #8/#58): Fechas nulas lanzan IllegalArgumentException e IntegrationService valida rango 1..totalUnits de unitSlot")
+    void testRound7_NullDatesThrowIllegalArgumentExceptionAndIntegrationRejectsInvalidUnitSlot() {
+        Suite suite = Suite.builder()
+                .id("suite_int_1")
+                .propertyId("prop_1")
+                .externalId("EXT-101")
+                .basePrice(new BigDecimal("350000"))
+                .maxGuests(2)
+                .totalUnits(2)
+                .active(true)
+                .available(true)
+                .build();
+        when(suiteRepository.findById("suite_int_1")).thenReturn(Optional.of(suite));
+        when(suiteRepository.findByPropertyIdAndExternalId("prop_1", "EXT-101")).thenReturn(Optional.of(suite));
+
+        BookingRequest nullDatesReq = new BookingRequest();
+        nullDatesReq.setSuiteId("suite_int_1");
+        nullDatesReq.setGuests(2);
+        nullDatesReq.setCheckIn(null);
+        nullDatesReq.setCheckOut(null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> bookingService.createBooking("guest_1", nullDatesReq),
+                "createBooking con fechas nulas debe lanzar IllegalArgumentException controlado y no NullPointerException");
+
+        IntegrationService integrationService = new IntegrationService(suiteRepository, suiteNightRepository);
+        co.palaciodelmar.backend.model.ApiKey apiKey = co.palaciodelmar.backend.model.ApiKey.builder()
+                .propertyId("prop_1")
+                .build();
+        co.palaciodelmar.backend.dto.IntegrationAvailabilityRequest invalidSlotHigh =
+                co.palaciodelmar.backend.dto.IntegrationAvailabilityRequest.builder()
+                        .externalId("EXT-101")
+                        .startDate(LocalDate.now().plusDays(5))
+                        .endDate(LocalDate.now().plusDays(7))
+                        .unitSlot(9) // Suite solo tiene totalUnits = 2
+                        .action("BLOCK")
+                        .build();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> integrationService.manageAvailability(apiKey, invalidSlotHigh),
+                "IntegrationService debe rechazar unitSlot mayor que totalUnits");
+
+        co.palaciodelmar.backend.dto.IntegrationAvailabilityRequest invalidSlotZero =
+                co.palaciodelmar.backend.dto.IntegrationAvailabilityRequest.builder()
+                        .externalId("EXT-101")
+                        .startDate(LocalDate.now().plusDays(5))
+                        .endDate(LocalDate.now().plusDays(7))
+                        .unitSlot(0)
+                        .action("BLOCK")
+                        .build();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> integrationService.manageAvailability(apiKey, invalidSlotZero),
+                "IntegrationService debe rechazar unitSlot <= 0 en lugar de convertirlo silenciosamente en 1");
+    }
 }
