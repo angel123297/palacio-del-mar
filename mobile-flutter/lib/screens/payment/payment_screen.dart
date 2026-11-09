@@ -151,16 +151,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return widget.booking;
   }
 
-  void _fillTestCard(String last4, String exp, String cvv, String name) {
-    setState(() {
-      _selectedMethod = 'CARD';
-      _cardNumberController.text = '4242 4242 4242 $last4';
-      _cardExpiryController.text = exp;
-      _cardCvvController.text = cvv;
-      _cardNameController.text = name;
-    });
-  }
-
   void _showResultDialog({
     required bool isSuccess,
     required String title,
@@ -723,8 +713,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildTestCardsGuide(),
           const SizedBox(height: 20),
           _payButton('PAGAR \$ ${amount.toInt()}', const Color(0xFFD4AF37), Colors.black, isExpired),
         ],
@@ -826,88 +814,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const SizedBox(height: 20),
           _payButton('ENVIAR NOTIFICACIÓN A MI NEQUI', const Color(0xFFFF007F), Colors.white, isExpired),
         ],
-      ),
-    );
-  }
-
-  // --- Guía de Tarjetas de Prueba (Idéntica a la Imagen 3) ---
-  Widget _buildTestCardsGuide() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141414),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Text('💳 ', style: TextStyle(fontSize: 16)),
-              Text(
-                'Tarjetas de Prueba (Pasarela Simulada)',
-                style: TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Toca cualquiera de las 4 opciones para simular las realidades bancarias:',
-            style: TextStyle(color: Colors.white54, fontSize: 11),
-          ),
-          const SizedBox(height: 8),
-          _testCardRow('4242', 'Pago aprobado exitosamente (payment.succeeded)', Colors.greenAccent),
-          const Divider(color: Colors.white12, height: 12),
-          _testCardRow('0002', 'Tarjeta rechazada por la entidad bancaria (payment.failed)', Colors.redAccent),
-          const Divider(color: Colors.white12, height: 12),
-          _testCardRow('9995', 'Fondos insuficientes (payment.failed)', Colors.orangeAccent),
-          const Divider(color: Colors.white12, height: 12),
-          _testCardRow('0069', 'Tarjeta expirada / vencida (payment.failed)', Colors.purpleAccent),
-        ],
-      ),
-    );
-  }
-
-  Widget _testCardRow(String last4, String description, Color accent) {
-    return InkWell(
-      onTap: () => _fillTestCard(last4, '12/28', '123', 'Emilio Martinez'),
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: accent.withValues(alpha: 0.5)),
-              ),
-              child: Text(
-                '**** $last4',
-                style: TextStyle(
-                  color: accent,
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                description,
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
