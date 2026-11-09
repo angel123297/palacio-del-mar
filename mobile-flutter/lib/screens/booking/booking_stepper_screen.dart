@@ -37,7 +37,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
 
   // Paso 2: Huéspedes y agregados
   int _guests = 2;
-  int _children = 0;
+  final int _children = 0;
   bool _needsCrib = false;
   bool _petFriendly = false;
 
@@ -234,7 +234,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                 Text('Noches seleccionadas: $_nights', style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 16)),
                 const SizedBox(height: 8),
                 ListTile(
-                  tileColor: Colors.white.withOpacity(0.05),
+                  tileColor: Colors.white.withValues(alpha: 0.05),
                   title: const Text('Check-in', style: TextStyle(color: Colors.white)),
                   subtitle: Text('${_checkIn.day}/${_checkIn.month}/${_checkIn.year}', style: const TextStyle(color: Colors.grey)),
                   trailing: const Icon(Icons.calendar_today, color: Color(0xFFD4AF37)),
@@ -250,7 +250,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                 ),
                 const SizedBox(height: 8),
                 ListTile(
-                  tileColor: Colors.white.withOpacity(0.05),
+                  tileColor: Colors.white.withValues(alpha: 0.05),
                   title: const Text('Check-out', style: TextStyle(color: Colors.white)),
                   subtitle: Text('${_checkOut.day}/${_checkOut.month}/${_checkOut.year}', style: const TextStyle(color: Colors.grey)),
                   trailing: const Icon(Icons.calendar_today, color: Color(0xFFD4AF37)),
@@ -289,13 +289,13 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                 SwitchListTile(
                   title: const Text('Requiere cuna para bebé', style: TextStyle(color: Colors.white)),
                   value: _needsCrib,
-                  activeColor: const Color(0xFFD4AF37),
+                  activeThumbColor: const Color(0xFFD4AF37),
                   onChanged: (v) => setState(() => _needsCrib = v),
                 ),
                 SwitchListTile(
                   title: const Text('Mascota / Pet-Friendly', style: TextStyle(color: Colors.white)),
                   value: _petFriendly,
-                  activeColor: const Color(0xFFD4AF37),
+                  activeThumbColor: const Color(0xFFD4AF37),
                   onChanged: (v) => setState(() => _petFriendly = v),
                 ),
               ],
@@ -313,14 +313,14 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                   title: const Text('Traslado privado desde Aeropuerto', style: TextStyle(color: Colors.white)),
                   subtitle: const Text('+\$60.000 COP tarifa fija', style: TextStyle(color: Colors.grey)),
                   value: _airportPickup,
-                  activeColor: const Color(0xFFD4AF37),
+                  activeThumbColor: const Color(0xFFD4AF37),
                   onChanged: (v) => setState(() => _airportPickup = v),
                 ),
                 SwitchListTile(
                   title: const Text('Desayuno Buffet Ruta del Sabor', style: TextStyle(color: Colors.white)),
                   subtitle: const Text('+\$35.000 COP por persona / noche', style: TextStyle(color: Colors.grey)),
                   value: _breakfastIncluded,
-                  activeColor: const Color(0xFFD4AF37),
+                  activeThumbColor: const Color(0xFFD4AF37),
                   onChanged: (v) => setState(() => _breakfastIncluded = v),
                 ),
 
@@ -335,7 +335,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                 if (bookingProvider.foodQuantities.isEmpty)
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(6)),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(6)),
                     child: const Text(
                       'No tienes platillos agregados desde la sección Experiencias.',
                       style: TextStyle(color: Colors.white38, fontSize: 11),
@@ -348,7 +348,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 6),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(6)),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(6)),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -378,7 +378,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                 if (bookingProvider.experienceQuantities.isEmpty)
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.04), borderRadius: BorderRadius.circular(6)),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(6)),
                     child: const Text(
                       'No tienes experiencias de lujo agregadas para esta reserva.',
                       style: TextStyle(color: Colors.white38, fontSize: 11),
@@ -399,7 +399,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 6),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(6)),
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(6)),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -442,7 +442,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
                   child: Column(
                     children: [
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [

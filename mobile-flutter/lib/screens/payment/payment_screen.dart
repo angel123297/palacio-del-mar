@@ -540,10 +540,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isExpired ? Colors.red.withOpacity(0.15) : const Color(0xFFD4AF37).withOpacity(0.1),
+                color: isExpired ? Colors.red.withValues(alpha: 0.15) : const Color(0xFFD4AF37).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isExpired ? Colors.redAccent : const Color(0xFFD4AF37).withOpacity(0.4),
+                  color: isExpired ? Colors.redAccent : const Color(0xFFD4AF37).withValues(alpha: 0.4),
                 ),
               ),
               child: Row(
@@ -723,6 +723,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          _buildTestCardsGuide(),
           const SizedBox(height: 20),
           _payButton('PAGAR \$ ${amount.toInt()}', const Color(0xFFD4AF37), Colors.black, isExpired),
         ],
@@ -752,7 +754,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: Colors.white24),
             ),
@@ -835,7 +837,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF141414),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -885,7 +887,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               decoration: BoxDecoration(
                 color: Colors.black,
                 borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: accent.withOpacity(0.5)),
+                border: Border.all(color: accent.withValues(alpha: 0.5)),
               ),
               child: Text(
                 '**** $last4',
@@ -934,7 +936,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         hintText: placeholder,
         hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
         filled: true,
-        fillColor: Colors.black.withOpacity(0.5),
+        fillColor: Colors.black.withValues(alpha: 0.5),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(6),
