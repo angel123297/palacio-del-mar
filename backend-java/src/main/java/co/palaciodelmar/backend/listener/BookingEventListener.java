@@ -27,9 +27,8 @@ public class BookingEventListener {
             bookingSseService.emitBookingUpdate(event.getBooking().getUser(), event.getBooking());
         }
 
-        // 2. Broadcast a los canales generales de monitorización en tiempo real (admin y anfitriones)
+        // 2. Broadcast a los canales de monitorización en tiempo real (admin y canal específico de la propiedad del anfitrión)
         bookingSseService.emitBookingUpdate("admin", event.getBooking());
-        bookingSseService.emitBookingUpdate("host", event.getBooking());
         if (event.getPropertyId() != null) {
             bookingSseService.emitBookingUpdate("prop_" + event.getPropertyId(), event.getBooking());
         }

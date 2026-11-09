@@ -397,8 +397,13 @@ public class BookingService {
 
             Booking persistedBooking = bookingRepository.save(booking);
 
+            // Clean up expired held nights for this suite in the date range before allocating slots
+            cleanExpiredHeldNights(suite.getId(), request.getCheckIn(), request.getCheckOut());
+
             // Block nights con reintento automático en el siguiente slot disponible si hay colisión concurrente
             boolean nightsLocked = false;
+            cleanExpiredHeldNights(suite.getId(), request.getCheckIn(), request.getCheckOut());
+
             for (int candidateSlot : availableSlots) {
                 List<SuiteNight> insertedNights = new java.util.ArrayList<>();
                 try {
@@ -442,9 +447,6 @@ public class BookingService {
             return persistedBooking;
         }));
 
-        if (socialProofService != null) {
-            socialProofService.recordBookingActivity(suite.getId(), suite.getSlug(), savedBooking.getId());
-        }
         if (availabilityCacheEvictor != null) {
             availabilityCacheEvictor.evictAvailability();
         }
@@ -632,6 +634,8 @@ public class BookingService {
                     ? (freshBooking.getExpiresAt() != null ? freshBooking.getExpiresAt() : now.plusSeconds(900))
                     : null;
 
+            cleanExpiredHeldNights(suite.getId(), request.getCheckIn(), request.getCheckOut());
+
             for (int candidateSlot : availableSlots) {
                 List<SuiteNight> insertedNights = new java.util.ArrayList<>();
                 try {
@@ -816,6 +820,23 @@ public class BookingService {
         suiteNightRepository.saveAll(originalNights);
     }
 
+    private void cleanExpiredHeldNights(String suiteId, LocalDate checkIn, LocalDate checkOut) {
+        if (suiteId == null || checkIn == null || checkOut == null) return;
+        try {
+            List<SuiteNight> candidates = suiteNightRepository.findBySuiteAndDatesBetween(suiteId, checkIn, checkOut.minusDays(1));
+            Instant now = Instant.now();
+            List<SuiteNight> expired = candidates.stream()
+                    .filter(sn -> "held".equalsIgnoreCase(sn.getStatus()) && sn.getExpiresAt() != null && sn.getExpiresAt().isBefore(now))
+                    .toList();
+            if (!expired.isEmpty()) {
+                suiteNightRepository.deleteAll(expired);
+                log.info("Eliminadas {} retenciones (held) expiradas para suite {} entre {} y {}", expired.size(), suiteId, checkIn, checkOut);
+            }
+        } catch (Exception e) {
+            log.warn("No se pudieron limpiar retenciones expiradas para suite {}: {}", suiteId, e.getMessage());
+        }
+    }
+
     private void maskAnonymousBookingPii(BookingDTO dto) {
         if (dto == null) return;
         dto.setSmartLockPin(null);
@@ -911,7 +932,7 @@ public class BookingService {
             BigDecimal refundToProcess = netPaid.subtract(retention).max(BigDecimal.ZERO).min(netPaid);
             BigDecimal totalRefundedAfterCancel = alreadyRefunded.add(refundToProcess).min(paidAmount);
 
-            changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CANCELLED, userId, reason);
+            changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CANCELLED, userId, reason, false);
             if (reason != null && !reason.isEmpty()) {
                 booking.setCancellationReason(reason);
             }
@@ -933,6 +954,7 @@ public class BookingService {
 
             // A-2: Persistir CANCELLED con @Version ANTES de liberar inventario y emitir el reembolso en pasarela
             Booking savedBooking = bookingRepository.save(booking);
+            publishBookingStatusEvent(savedBooking, co.palaciodelmar.backend.model.BookingStatus.CANCELLED);
             suiteNightRepository.deleteByBooking(resolvedBookingId);
             if (redisLockService != null) {
                 redisLockService.releaseSuiteHold(booking.getSuite(), booking.getUnitSlot(), booking.getCheckIn(), booking.getCheckOut(), resolvedBookingId);
@@ -1058,6 +1080,11 @@ public class BookingService {
         if (paidCap.compareTo(BigDecimal.ZERO) > 0 && nextRef.compareTo(paidCap) > 0) {
             nextRef = paidCap;
         }
+        boolean isDepositRefund = (booking.getPendingRefundIdempotencyKey() != null
+                && booking.getPendingRefundIdempotencyKey().startsWith("ref_dep_"));
+        if (isDepositRefund) {
+            booking.setGuaranteeRefunded(true);
+        }
         if (mongoTemplate != null && booking.getId() != null && refundId != null) {
             org.springframework.data.mongodb.core.query.Query q = new org.springframework.data.mongodb.core.query.Query(
                     org.springframework.data.mongodb.core.query.Criteria.where("id").is(booking.getId())
@@ -1069,6 +1096,9 @@ public class BookingService {
                     .set("pendingRefundAmount", BigDecimal.ZERO)
                     .set("pendingRefundIdempotencyKey", null)
                     .set("updatedAt", Instant.now());
+            if (isDepositRefund) {
+                u.set("guaranteeRefunded", true);
+            }
             Booking updated = mongoTemplate.findAndModify(
                     q, u,
                     org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true),
@@ -1080,9 +1110,15 @@ public class BookingService {
                 booking.setProcessedRefundIds(fresh.getProcessedRefundIds());
                 booking.setPendingRefundAmount(BigDecimal.ZERO);
                 booking.setPendingRefundIdempotencyKey(null);
+                if (isDepositRefund) {
+                    booking.setGuaranteeRefunded(true);
+                }
                 return false;
             }
             booking.setVersion(updated.getVersion());
+            if (isDepositRefund) {
+                booking.setGuaranteeRefunded(true);
+            }
         }
         booking.setRefundedAmount(nextRef);
         if (refundId != null) {
@@ -1090,6 +1126,9 @@ public class BookingService {
         }
         booking.setPendingRefundAmount(BigDecimal.ZERO);
         booking.setPendingRefundIdempotencyKey(null);
+        if (isDepositRefund) {
+            booking.setGuaranteeRefunded(true);
+        }
         return true;
     }
 
@@ -1245,6 +1284,9 @@ public class BookingService {
             reconcilePendingRefundBeforeChange(booking, resolvedBookingId);
             Experience experience = experienceRepository.findById(experienceId)
                     .orElseThrow(() -> new IllegalArgumentException("Experiencia no encontrada"));
+            if (Boolean.FALSE.equals(experience.getActive()) || Boolean.FALSE.equals(experience.getAvailable())) {
+                throw new IllegalArgumentException("La experiencia no está disponible para reserva");
+            }
 
             List<Booking.SelectedExperience> current = booking.getExperiences();
             if (current == null) current = new ArrayList<>();
@@ -1610,15 +1652,19 @@ public class BookingService {
                 }
             }
             if (expId != null) {
+                final String finalExpId = expId;
                 final int finalQty = quantity;
-                experienceRepository.findById(expId).ifPresent(exp -> {
-                    result.add(Booking.SelectedExperience.builder()
-                            .experienceId(exp.getId())
-                            .name(exp.getName())
-                            .price(exp.getPrice())
-                            .quantity(finalQty)
-                            .build());
-                });
+                Experience exp = experienceRepository.findById(finalExpId)
+                        .orElseThrow(() -> new IllegalArgumentException("Experiencia no encontrada: " + finalExpId));
+                if (Boolean.FALSE.equals(exp.getActive()) || Boolean.FALSE.equals(exp.getAvailable())) {
+                    throw new IllegalArgumentException("La experiencia '" + exp.getName() + "' no está disponible para reserva");
+                }
+                result.add(Booking.SelectedExperience.builder()
+                        .experienceId(exp.getId())
+                        .name(exp.getName())
+                        .price(exp.getPrice())
+                        .quantity(finalQty)
+                        .build());
             }
         }
         return result;
@@ -1646,6 +1692,10 @@ public class BookingService {
     }
 
     public void changeBookingStatus(Booking booking, co.palaciodelmar.backend.model.BookingStatus newStatus, String changedBy, String reason) {
+        changeBookingStatus(booking, newStatus, changedBy, reason, true);
+    }
+
+    public void changeBookingStatus(Booking booking, co.palaciodelmar.backend.model.BookingStatus newStatus, String changedBy, String reason, boolean persistAndPublish) {
         if (booking.getStatus() == null) {
             throw new IllegalStateException("El estado actual de la reserva es nulo");
         }
@@ -1685,58 +1735,38 @@ public class BookingService {
             if (socialProofService != null) {
                 socialProofService.recordBookingActivity(booking.getSuite(), null, booking.getId());
             }
-            if (eventPublisher != null) {
-                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
-                        "booking.confirmed",
-                        booking.getId(),
-                        booking.getPropertyId(),
-                        toDTO(booking),
-                        Instant.now()
-                ));
-            }
-        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
-            if (eventPublisher != null) {
-                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
-                        "booking.cancelled",
-                        booking.getId(),
-                        booking.getPropertyId(),
-                        toDTO(booking),
-                        Instant.now()
-                ));
-            }
-        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CHECKED_IN) {
-            if (eventPublisher != null) {
-                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
-                        "booking.checked_in",
-                        booking.getId(),
-                        booking.getPropertyId(),
-                        toDTO(booking),
-                        Instant.now()
-                ));
-            }
-        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT) {
-            if (eventPublisher != null) {
-                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
-                        "booking.checked_out",
-                        booking.getId(),
-                        booking.getPropertyId(),
-                        toDTO(booking),
-                        Instant.now()
-                ));
-            }
-        } else if (newStatus == co.palaciodelmar.backend.model.BookingStatus.NO_SHOW) {
-            if (eventPublisher != null) {
-                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
-                        "booking.no_show",
-                        booking.getId(),
-                        booking.getPropertyId(),
-                        toDTO(booking),
-                        Instant.now()
-                ));
-            }
         }
+
+        if (persistAndPublish) {
+            if (booking.getId() != null && bookingRepository != null) {
+                bookingRepository.save(booking);
+            }
+            publishBookingStatusEvent(booking, newStatus);
+        }
+
         if (availabilityCacheEvictor != null) {
             availabilityCacheEvictor.evictAvailability();
+        }
+    }
+
+    public void publishBookingStatusEvent(Booking booking, co.palaciodelmar.backend.model.BookingStatus newStatus) {
+        if (eventPublisher == null || booking == null) return;
+        String eventType = switch (newStatus) {
+            case CONFIRMED -> "booking.confirmed";
+            case CANCELLED -> "booking.cancelled";
+            case CHECKED_IN -> "booking.checked_in";
+            case CHECKED_OUT -> "booking.checked_out";
+            case NO_SHOW -> "booking.no_show";
+            default -> null;
+        };
+        if (eventType != null) {
+            eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                    eventType,
+                    booking.getId(),
+                    booking.getPropertyId(),
+                    toDTO(booking),
+                    Instant.now()
+            ));
         }
     }
 
@@ -1745,7 +1775,7 @@ public class BookingService {
         List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(branchId);
         return promotions.stream()
                 .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
-                .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut)) &&
+                .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut.minusDays(1))) &&
                              (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
                 .max(java.util.Comparator.comparing(Promotion::getDiscountPercent))
                 .orElse(null);

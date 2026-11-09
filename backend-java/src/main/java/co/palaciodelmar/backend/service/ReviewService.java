@@ -36,6 +36,34 @@ public class ReviewService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private co.palaciodelmar.backend.webhook.WebhookDispatcher webhookDispatcher;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RedisLockService redisLockService;
+
+    private static final java.util.concurrent.ConcurrentHashMap<String, Object> REVIEW_LOCKS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private <T> T executeWithReviewLock(String bookingId, java.util.function.Supplier<T> action) {
+        if (bookingId == null || bookingId.isBlank()) {
+            return action.get();
+        }
+        Object monitor = REVIEW_LOCKS.computeIfAbsent(bookingId, k -> new Object());
+        synchronized (monitor) {
+            try {
+                if (redisLockService != null) {
+                    return redisLockService.executeWithLock(
+                            "review:booking:" + bookingId,
+                            java.time.Duration.ofSeconds(10),
+                            java.time.Duration.ofSeconds(4),
+                            action
+                    );
+                }
+                return action.get();
+            } finally {
+                REVIEW_LOCKS.remove(bookingId, monitor);
+            }
+        }
+    }
+
     public List<ReviewDTO> getSuiteReviews(String suiteId) {
         return reviewRepository.findBySuiteAndApprovedTrueOrderByCreatedAtDesc(suiteId)
                 .stream()
@@ -92,72 +120,74 @@ public class ReviewService {
             throw new IllegalArgumentException("La calificación debe estar entre 1 y 5 estrellas");
         }
 
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
+        return executeWithReviewLock(bookingId, () -> {
+            Booking booking = bookingRepository.findById(bookingId)
+                    .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
 
-        if (userId != null && !userId.equals(booking.getUser())) {
-            throw new ForbiddenAccessException("Solo el huésped titular puede calificar esta reserva");
-        }
-
-        String st = booking.getStatus() != null ? booking.getStatus().toLowerCase() : "";
-        if ("cancelled".equals(st)) {
-            throw new IllegalStateException("No se pueden enviar reseñas para reservas canceladas");
-        }
-        if (!"checked_out".equals(st) && !"completed".equals(st)) {
-            throw new IllegalStateException("Solo puedes calificar tu estadía después del check-out");
-        }
-
-        if (reviewRepository.existsByBookingId(bookingId)) {
-            throw new IllegalStateException("Ya has enviado una reseña para esta reserva");
-        }
-
-        String userName = "Huésped Verificado";
-        if (userId != null) {
-            User user = userRepository.findById(userId).orElse(null);
-            if (user != null && user.getName() != null) userName = user.getName();
-        } else if (booking.getGuestDetails() != null && booking.getGuestDetails().getFullName() != null) {
-            userName = booking.getGuestDetails().getFullName();
-        }
-
-        AnalysisResult analysis = analyzeTextSentiment(comment, rating);
-
-        Review review = Review.builder()
-                .bookingId(bookingId)
-                .suite(booking.getSuite())
-                .user(userId != null ? userId : booking.getUser())
-                .userName(userName)
-                .rating(rating)
-                .comment(comment)
-                .verifiedStay(true)
-                .sentiment(analysis.sentiment())
-                .sentimentScore(analysis.score())
-                .keyHighlights(analysis.highlights())
-                .maintenanceAlert(analysis.maintenanceAlert())
-                .approved(true)
-                .createdAt(Instant.now())
-                .build();
-
-        log.info("Reseña verificada registrada con sentimiento {}: {}", analysis.sentiment(), analysis.highlights());
-        Review saved = reviewRepository.save(review);
-        ReviewDTO dto = toDTO(saved);
-
-        // Si se detectó alerta de mantenimiento, despachar webhook automático al anfitrión
-        if (analysis.maintenanceAlert() != null && webhookDispatcher != null) {
-            String propId = booking.getPropertyId() != null ? booking.getPropertyId() : booking.getBranch();
-            if (propId != null) {
-                Map<String, Object> alertPayload = new java.util.LinkedHashMap<>();
-                alertPayload.put("reviewId", saved.getId() != null ? saved.getId() : "");
-                alertPayload.put("bookingId", booking.getId() != null ? booking.getId() : bookingId);
-                alertPayload.put("suiteId", saved.getSuite() != null ? saved.getSuite() : "");
-                alertPayload.put("alert", analysis.maintenanceAlert());
-                alertPayload.put("comment", saved.getComment() != null ? saved.getComment() : "");
-                alertPayload.put("rating", saved.getRating());
-                alertPayload.put("createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : Instant.now().toString());
-                webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", alertPayload);
+            if (userId != null && !userId.equals(booking.getUser())) {
+                throw new ForbiddenAccessException("Solo el huésped titular puede calificar esta reserva");
             }
-        }
 
-        return dto;
+            String st = booking.getStatus() != null ? booking.getStatus().toLowerCase() : "";
+            if ("cancelled".equals(st)) {
+                throw new IllegalStateException("No se pueden enviar reseñas para reservas canceladas");
+            }
+            if (!"checked_out".equals(st) && !"completed".equals(st)) {
+                throw new IllegalStateException("Solo puedes calificar tu estadía después del check-out");
+            }
+
+            if (reviewRepository.existsByBookingId(bookingId)) {
+                throw new IllegalStateException("Ya has enviado una reseña para esta reserva");
+            }
+
+            String userName = "Huésped Verificado";
+            if (userId != null) {
+                User user = userRepository.findById(userId).orElse(null);
+                if (user != null && user.getName() != null) userName = user.getName();
+            } else if (booking.getGuestDetails() != null && booking.getGuestDetails().getFullName() != null) {
+                userName = booking.getGuestDetails().getFullName();
+            }
+
+            AnalysisResult analysis = analyzeTextSentiment(comment, rating);
+
+            Review review = Review.builder()
+                    .bookingId(bookingId)
+                    .suite(booking.getSuite())
+                    .user(userId != null ? userId : booking.getUser())
+                    .userName(userName)
+                    .rating(rating)
+                    .comment(comment)
+                    .verifiedStay(true)
+                    .sentiment(analysis.sentiment())
+                    .sentimentScore(analysis.score())
+                    .keyHighlights(analysis.highlights())
+                    .maintenanceAlert(analysis.maintenanceAlert())
+                    .approved(true)
+                    .createdAt(Instant.now())
+                    .build();
+
+            log.info("Reseña verificada registrada con sentimiento {}: {}", analysis.sentiment(), analysis.highlights());
+            Review saved = reviewRepository.save(review);
+            ReviewDTO dto = toDTO(saved);
+
+            // Si se detectó alerta de mantenimiento, despachar webhook automático al anfitrión
+            if (analysis.maintenanceAlert() != null && webhookDispatcher != null) {
+                String propId = booking.getPropertyId() != null ? booking.getPropertyId() : booking.getBranch();
+                if (propId != null) {
+                    Map<String, Object> alertPayload = new java.util.LinkedHashMap<>();
+                    alertPayload.put("reviewId", saved.getId() != null ? saved.getId() : "");
+                    alertPayload.put("bookingId", booking.getId() != null ? booking.getId() : bookingId);
+                    alertPayload.put("suiteId", saved.getSuite() != null ? saved.getSuite() : "");
+                    alertPayload.put("alert", analysis.maintenanceAlert());
+                    alertPayload.put("comment", saved.getComment() != null ? saved.getComment() : "");
+                    alertPayload.put("rating", saved.getRating());
+                    alertPayload.put("createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : Instant.now().toString());
+                    webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", alertPayload);
+                }
+            }
+
+            return dto;
+        });
     }
 
     /**
@@ -238,6 +268,7 @@ public class ReviewService {
         long positiveCount = allReviews.stream().filter(r -> "POSITIVE".equals(r.getSentiment())).count();
         double avgRating = allReviews.stream().mapToInt(Review::getRating).average().orElse(5.0);
         List<String> alerts = allReviews.stream()
+                .filter(r -> r.getMaintenanceResolvedAt() == null)
                 .map(Review::getMaintenanceAlert)
                 .filter(a -> a != null && !a.isBlank())
                 .toList();
@@ -267,7 +298,7 @@ public class ReviewService {
         String maintenanceAlert = null;
         if (lower.contains("aire") && (lower.contains("ruido") || lower.contains("calor") || lower.contains("suena") || lower.contains("fallo"))) {
             maintenanceAlert = "Revisión preventiva: Posible fallo o ruido en aire acondicionado";
-        } else if (lower.contains("ducha") || lower.contains("agua") && (lower.contains("fria") || lower.contains("fría") || lower.contains("presion"))) {
+        } else if ((lower.contains("ducha") || lower.contains("agua")) && (lower.contains("fria") || lower.contains("fría") || lower.contains("presion") || lower.contains("presión"))) {
             maintenanceAlert = "Revisión preventiva: Presión o temperatura de agua en ducha";
         } else if (lower.contains("olor") || lower.contains("humedad")) {
             maintenanceAlert = "Revisión preventiva: Alerta de humedad o ventilación";

@@ -278,6 +278,9 @@ public class AdminService {
             BigDecimal totalAmt = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
             BigDecimal currentRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount().max(BigDecimal.ZERO) : BigDecimal.ZERO;
             BigDecimal refundable = totalAmt.subtract(currentRefunded).max(BigDecimal.ZERO);
+            if ("refund".equalsIgnoreCase(action) && (payment.getTransactionId() == null || payment.getTransactionId().isBlank())) {
+                throw new IllegalStateException("No se puede procesar reembolso en pasarela sin ID de transacción. Usa 'mark_refunded' para conciliar manualmente.");
+            }
             if (paymentGateway != null && payment.getTransactionId() != null && refundable.compareTo(BigDecimal.ZERO) > 0) {
                 co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse res =
                         paymentGateway.refund(payment.getTransactionId(), refundable);
@@ -297,6 +300,18 @@ public class AdminService {
             payment.setStatus("refunded");
             payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
                     "Reembolso procesado por ADMIN" + refundDetails + ": " + (notes != null && !notes.isBlank() ? notes : "Aprobado manualmente"));
+
+            if (payment.getBooking() != null && bookingRepository != null) {
+                bookingRepository.findById(payment.getBooking()).ifPresent(b -> {
+                    BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
+                    b.setRefundedAmount(paid);
+                    b.setPaymentStatus("refunded");
+                    b.setPendingRefundAmount(BigDecimal.ZERO);
+                    b.setPendingRefundIdempotencyKey(null);
+                    b.setUpdatedAt(Instant.now());
+                    bookingRepository.save(b);
+                });
+            }
         } else if ("dismiss".equalsIgnoreCase(action) || "reject".equalsIgnoreCase(action)) {
             payment.setStatus("failed");
             payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +

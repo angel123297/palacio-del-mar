@@ -2023,4 +2023,138 @@ class AuditRemediationFivePointsTest {
                 () -> integrationService.manageAvailability(apiKey, invalidSlotZero),
                 "IntegrationService debe rechazar unitSlot <= 0 en lugar de convertirlo silenciosamente en 1");
     }
+
+    // =========================================================================
+    // RONDA 8: Experiencias, Limpieza de Retenciones Expiradas e Integraciones Seguras
+    // =========================================================================
+
+    @Test
+    @DisplayName("Ronda 8 - Experiencias: parseExperiences y addExperienceToBooking validan existencia y disponibilidad")
+    void testRound8_ParseExperiencesAndAddExperience_ValidateActiveAndExistence() {
+        Experience inactiveExp = Experience.builder()
+                .id("exp_inactive")
+                .name("Tour Nocturno")
+                .price(new BigDecimal("80000"))
+                .active(false)
+                .available(true)
+                .build();
+        Experience unavailableExp = Experience.builder()
+                .id("exp_unavail")
+                .name("Catamarán VIP")
+                .price(new BigDecimal("150000"))
+                .active(true)
+                .available(false)
+                .build();
+
+        when(experienceRepository.findById("exp_inactive")).thenReturn(Optional.of(inactiveExp));
+        when(experienceRepository.findById("exp_unavail")).thenReturn(Optional.of(unavailableExp));
+        when(experienceRepository.findById("exp_not_found")).thenReturn(Optional.empty());
+
+        Booking existingBooking = Booking.builder()
+                .id("bk_exp_1")
+                .user("usr_guest")
+                .status("confirmed")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .balanceDue(BigDecimal.ZERO)
+                .build();
+        when(bookingRepository.findById("bk_exp_1")).thenReturn(Optional.of(existingBooking));
+
+        // 1. Experiencia inexistente debe lanzar IllegalArgumentException
+        assertThrows(IllegalArgumentException.class, () ->
+                bookingService.addExperienceToBooking("bk_exp_1", "usr_guest", "exp_not_found"));
+
+        // 2. Experiencia inactiva debe ser rechazada
+        assertThrows(IllegalArgumentException.class, () ->
+                bookingService.addExperienceToBooking("bk_exp_1", "usr_guest", "exp_inactive"));
+
+        // 3. Experiencia no disponible debe ser rechazada
+        assertThrows(IllegalArgumentException.class, () ->
+                bookingService.addExperienceToBooking("bk_exp_1", "usr_guest", "exp_unavail"));
+    }
+
+    @Test
+    @DisplayName("Ronda 8 - Integraciones: upsertRoom valida capacidades y UNBLOCK preserva bloqueos internos")
+    void testRound8_IntegrationService_ValidateRoomCapacitiesAndUnblockSafeguards() {
+        IntegrationService integrationService = new IntegrationService(suiteRepository, suiteNightRepository);
+        co.palaciodelmar.backend.model.ApiKey apiKey = co.palaciodelmar.backend.model.ApiKey.builder()
+                .propertyId("prop_test_pms")
+                .build();
+
+        // 1. Rechazar maxGuests <= 0
+        co.palaciodelmar.backend.dto.IntegrationRoomRequest invalidGuests =
+                co.palaciodelmar.backend.dto.IntegrationRoomRequest.builder()
+                        .externalId("PMS-ROOM-1")
+                        .name("Suite Master")
+                        .basePrice(new BigDecimal("200000"))
+                        .maxGuests(0)
+                        .totalUnits(2)
+                        .build();
+        assertThrows(IllegalArgumentException.class, () ->
+                integrationService.upsertRoom(apiKey, invalidGuests));
+
+        // 2. Rechazar totalUnits <= 0
+        co.palaciodelmar.backend.dto.IntegrationRoomRequest invalidUnits =
+                co.palaciodelmar.backend.dto.IntegrationRoomRequest.builder()
+                        .externalId("PMS-ROOM-2")
+                        .name("Suite Junior")
+                        .basePrice(new BigDecimal("150000"))
+                        .maxGuests(2)
+                        .totalUnits(-1)
+                        .build();
+        assertThrows(IllegalArgumentException.class, () ->
+                integrationService.upsertRoom(apiKey, invalidUnits));
+
+        // 3. UNBLOCK solo debe eliminar bloques de integración externa (EXT_BLOCK_...), respetando mantenimientos internos
+        Suite suite = Suite.builder()
+                .id("suite_pms_1")
+                .propertyId("prop_test_pms")
+                .totalUnits(2)
+                .build();
+        when(suiteRepository.findByPropertyIdAndExternalId("prop_test_pms", "PMS-ROOM-101"))
+                .thenReturn(Optional.of(suite));
+
+        LocalDate start = LocalDate.now().plusDays(2);
+        LocalDate end = LocalDate.now().plusDays(4);
+
+        SuiteNight extBlock = SuiteNight.builder()
+                .id("sn_ext")
+                .suite("suite_pms_1")
+                .unitSlot(1)
+                .dates(List.of(start))
+                .status("blocked")
+                .booking("EXT_BLOCK_abc123")
+                .build();
+
+        SuiteNight internalMaintenance = SuiteNight.builder()
+                .id("sn_maint")
+                .suite("suite_pms_1")
+                .unitSlot(1)
+                .dates(List.of(start.plusDays(1)))
+                .status("blocked")
+                .booking(null) // Bloqueo de mantenimiento interno sin prefijo EXT_BLOCK_
+                .build();
+
+        when(suiteNightRepository.findBySuiteAndDatesBetween(eq("suite_pms_1"), eq(start), eq(end.minusDays(1))))
+                .thenReturn(List.of(extBlock, internalMaintenance));
+
+        co.palaciodelmar.backend.dto.IntegrationAvailabilityRequest unblockReq =
+                co.palaciodelmar.backend.dto.IntegrationAvailabilityRequest.builder()
+                        .externalId("PMS-ROOM-101")
+                        .startDate(start)
+                        .endDate(end)
+                        .unitSlot(1)
+                        .action("UNBLOCK")
+                        .build();
+
+        Map<String, Object> result = integrationService.manageAvailability(apiKey, unblockReq);
+        assertEquals("SUCCESS", result.get("status"));
+        assertEquals(1, result.get("recordsRemoved"), "Solo debe eliminar el bloqueo externo EXT_BLOCK_, preservando el mantenimiento interno");
+
+        ArgumentCaptor<List<SuiteNight>> deletedCaptor = ArgumentCaptor.forClass(List.class);
+        verify(suiteNightRepository).deleteAll(deletedCaptor.capture());
+        List<SuiteNight> deletedList = deletedCaptor.getValue();
+        assertEquals(1, deletedList.size());
+        assertEquals("sn_ext", deletedList.get(0).getId());
+    }
 }

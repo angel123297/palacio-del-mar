@@ -139,6 +139,10 @@ public class PaymentService {
         if ("cancelled".equalsIgnoreCase(booking.getStatus()) || "expired".equalsIgnoreCase(booking.getStatus())) {
             throw new IllegalArgumentException("No se puede pagar una reserva cancelada o vencida");
         }
+        if (booking.getBalanceDue() != null && booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0
+                && "paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+            throw new IllegalStateException("La reserva ya ha sido pagada en su totalidad.");
+        }
 
         PaymentGateway.PaymentIntentResponse intentResponse = paymentGateway.createIntent(booking, method, idempotencyKey);
 
@@ -224,11 +228,22 @@ public class PaymentService {
             throw new IllegalStateException("La reserva ya ha sido pagada en su totalidad.");
         }
 
-        if (!"pending".equalsIgnoreCase(booking.getStatus()) && !"confirmed".equalsIgnoreCase(booking.getStatus())) {
+        boolean isPayableStatus = "pending".equalsIgnoreCase(booking.getStatus())
+                || "confirmed".equalsIgnoreCase(booking.getStatus())
+                || "checked_in".equalsIgnoreCase(booking.getStatus())
+                || ("checked_out".equalsIgnoreCase(booking.getStatus()) && booking.getBalanceDue() != null && booking.getBalanceDue().compareTo(BigDecimal.ZERO) > 0);
+
+        if (!isPayableStatus) {
             throw new IllegalStateException("No se puede confirmar el pago para una reserva en estado " + booking.getStatus());
         }
         if ("pending".equalsIgnoreCase(booking.getStatus()) && booking.getExpiresAt() != null && booking.getExpiresAt().isBefore(java.time.Instant.now())) {
             throw new IllegalStateException("El tiempo para pagar esta reserva ha expirado");
+        }
+
+        if (booking.getBalanceDue() != null && payment.getAmount() != null
+                && !"pending".equalsIgnoreCase(booking.getStatus())
+                && payment.getAmount().compareTo(booking.getBalanceDue()) > 0) {
+            throw new IllegalStateException("El monto del intento de pago (" + payment.getAmount() + ") excede el saldo pendiente actual (" + booking.getBalanceDue() + ")");
         }
 
         PaymentGateway.PaymentConfirmResponse confirmResponse = paymentGateway.confirmIntent(intentId, paymentToken);
@@ -255,12 +270,16 @@ public class PaymentService {
 
         booking.setPaidAmount((booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO).add(payment.getAmount()));
 
-        BigDecimal balance = booking.getTotalPrice().subtract(booking.getPaidAmount());
+        BigDecimal refundedAmt = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+        BigDecimal netPaid = booking.getPaidAmount().subtract(refundedAmt).max(BigDecimal.ZERO);
+        BigDecimal balance = booking.getTotalPrice().subtract(netPaid);
         booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
              booking.setPaymentStatus("paid");
-             bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CONFIRMED, "System", "Pago completado");
+             if ("pending".equalsIgnoreCase(booking.getStatus())) {
+                 bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CONFIRMED, "System", "Pago completado");
+             }
         } else {
              booking.setPaymentStatus("partial");
         }

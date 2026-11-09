@@ -251,9 +251,15 @@ public class PaymentWebhookService {
             }
 
             boolean canConfirm = (currentStatus != null && currentStatus.canTransitionTo(BookingStatus.CONFIRMED));
-            boolean alreadyConfirmed = (currentStatus == BookingStatus.CONFIRMED);
+            boolean alreadyConfirmed = (currentStatus == BookingStatus.CONFIRMED
+                    || currentStatus == BookingStatus.CHECKED_IN
+                    || currentStatus == BookingStatus.CHECKED_OUT);
+            boolean alreadyProcessedPayment = booking.getProcessedPaymentIds() != null && booking.getProcessedPaymentIds().contains(payment.getId());
+            boolean isFullyPaid = alreadyConfirmed && !alreadyProcessedPayment
+                    && booking.getBalanceDue() != null && booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0
+                    && "paid".equalsIgnoreCase(booking.getPaymentStatus());
 
-            if (!canConfirm && !alreadyConfirmed) {
+            if (!alreadyProcessedPayment && ((!canConfirm && !alreadyConfirmed) || isFullyPaid)) {
                 payment.setTransactionId(data.getTransactionId());
                 payment.setUpdatedAt(Instant.now());
 
@@ -294,24 +300,33 @@ public class PaymentWebhookService {
                 return;
             }
 
-            BigDecimal currentPaid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
-            BigDecimal paymentAmount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
-            BigDecimal newPaid = currentPaid.add(paymentAmount);
-            booking.setPaidAmount(newPaid);
-
-            BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : newPaid;
-            BigDecimal balance = totalPrice.subtract(newPaid);
-            booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
-
             boolean confirmedNow = false;
-            if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
-                booking.setPaymentStatus("paid");
-                if (canConfirm) {
-                    bookingService.changeBookingStatus(booking, BookingStatus.CONFIRMED, "Webhook", "Pago completado via webhook");
-                    confirmedNow = true;
+            if (!alreadyProcessedPayment) {
+                BigDecimal currentPaid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+                BigDecimal paymentAmount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+                BigDecimal newPaid = currentPaid.add(paymentAmount);
+                booking.setPaidAmount(newPaid);
+
+                BigDecimal refundedAmt = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+                BigDecimal netPaid = newPaid.subtract(refundedAmt).max(BigDecimal.ZERO);
+                BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : newPaid;
+                BigDecimal balance = totalPrice.subtract(netPaid);
+                booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
+
+                if (booking.getProcessedPaymentIds() == null) {
+                    booking.setProcessedPaymentIds(new java.util.ArrayList<>());
                 }
-            } else {
-                booking.setPaymentStatus("partial");
+                booking.getProcessedPaymentIds().add(payment.getId());
+
+                if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
+                    booking.setPaymentStatus("paid");
+                    if (canConfirm) {
+                        bookingService.changeBookingStatus(booking, BookingStatus.CONFIRMED, "Webhook", "Pago completado via webhook");
+                        confirmedNow = true;
+                    }
+                } else {
+                    booking.setPaymentStatus("partial");
+                }
             }
 
             try {

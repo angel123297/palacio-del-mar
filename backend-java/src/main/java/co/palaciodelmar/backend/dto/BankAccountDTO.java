@@ -21,6 +21,7 @@ public class BankAccountDTO {
     @NotBlank(message = "El tipo de cuenta es obligatorio")
     private String accountType;
 
+    @NotBlank(message = "El número de cuenta es obligatorio")
     @Size(min = 4, max = 34, message = "El número de cuenta debe tener entre 4 y 34 caracteres")
     private String accountNumber;
 

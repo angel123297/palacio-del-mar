@@ -256,6 +256,17 @@ public class SocialProofService {
             return;
         }
         synchronized (map) {
+            // Fase 1: Eliminar entradas vacías o expiradas primero para proteger espectadores activos
+            var cleanupIt = map.entrySet().iterator();
+            while (map.size() > maxEntries && cleanupIt.hasNext()) {
+                var entry = cleanupIt.next();
+                if (!entry.getKey().equals(protectedKey)) {
+                    if (entry.getValue() instanceof ConcurrentHashMap<?, ?> nested && nested.isEmpty()) {
+                        cleanupIt.remove();
+                    }
+                }
+            }
+            // Fase 2: Si aún supera la capacidad, expulsar entradas no protegidas
             var it = map.keySet().iterator();
             while (map.size() > maxEntries && it.hasNext()) {
                 String k = it.next();

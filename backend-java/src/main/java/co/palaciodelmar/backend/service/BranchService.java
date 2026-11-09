@@ -44,7 +44,9 @@ public class BranchService {
                 .map(b -> b.getSlug().toLowerCase())
                 .collect(Collectors.toSet());
 
-        List<Property> approvedProperties = propertyRepository.findByStatus("APPROVED");
+        List<Property> approvedProperties = propertyRepository.findByStatus("APPROVED").stream()
+                .filter(p -> !Boolean.FALSE.equals(p.getActive()))
+                .toList();
         for (Property p : approvedProperties) {
             if (p.getSlug() != null && !existingSlugs.contains(p.getSlug().toLowerCase())) {
                 List<Suite> propSuites = activeSuites.stream()
@@ -75,7 +77,8 @@ public class BranchService {
 
     public BranchResponseDTO getBranchBySlug(String slug) {
         String lower = slug.toLowerCase();
-        Optional<Branch> branchOpt = branchRepository.findBySlug(lower);
+        Optional<Branch> branchOpt = branchRepository.findBySlug(lower)
+                .filter(b -> !Boolean.FALSE.equals(b.getActive()));
         if (branchOpt.isPresent()) {
             Branch branch = branchOpt.get();
             List<Suite> branchSuites = suiteRepository.findByBranchAndActiveTrue(branch.getId());
@@ -89,6 +92,7 @@ public class BranchService {
         }
 
         Property property = propertyRepository.findBySlug(lower)
+                .filter(p -> !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus()))
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal o alojamiento no encontrado: " + slug));
 
         List<Suite> propSuites = suiteRepository.findByPropertyId(property.getId()).stream()
@@ -116,16 +120,19 @@ public class BranchService {
 
     public Branch getBranchById(String id) {
         return branchRepository.findById(id)
-                .or(() -> propertyRepository.findById(id).map(p -> Branch.builder()
-                        .id(p.getId())
-                        .name(p.getName())
-                        .slug(p.getSlug())
-                        .zone(p.getCity())
-                        .address(p.getAddress())
-                        .mainImage(p.getMainImage())
-                        .active(true)
-                        .build()
-                ))
+                .filter(b -> !Boolean.FALSE.equals(b.getActive()))
+                .or(() -> propertyRepository.findById(id)
+                        .filter(p -> !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus()))
+                        .map(p -> Branch.builder()
+                                .id(p.getId())
+                                .name(p.getName())
+                                .slug(p.getSlug())
+                                .zone(p.getCity())
+                                .address(p.getAddress())
+                                .mainImage(p.getMainImage())
+                                .active(true)
+                                .build()
+                        ))
                 .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada con id: " + id));
     }
 }
