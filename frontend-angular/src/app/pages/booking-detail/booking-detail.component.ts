@@ -577,6 +577,8 @@ export class BookingDetailComponent implements OnInit {
   getPaymentStatusLabel(status?: string): string {
     switch ((status || '').toLowerCase()) {
       case 'paid': return 'Pagado';
+      case 'partial': return 'Pago Parcial';
+      case 'partially_refunded': return 'Reembolso Parcial';
       case 'pending': return 'Pendiente';
       case 'refunded': return 'Reembolsado';
       case 'requires_refund': return 'Reembolso Pendiente';

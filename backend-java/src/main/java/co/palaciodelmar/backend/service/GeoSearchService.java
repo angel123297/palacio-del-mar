@@ -87,6 +87,7 @@ public class GeoSearchService {
         addCuratedCartagenaLandmarks(fresh);
 
         // 2. Sedes oficiales (Branches) y sus highlights
+        boolean hadMongoError = false;
         if (branchRepository != null) {
             try {
                 for (Branch b : branchRepository.findAll()) {
@@ -126,7 +127,8 @@ public class GeoSearchService {
                     }
                 }
             } catch (Exception e) {
-                log.debug("No se pudieron leer sedes para índice geo: {}", e.getMessage());
+                hadMongoError = true;
+                log.warn("No se pudieron leer sedes para índice geo (conservando catálogo existente): {}", e.getMessage());
             }
         }
 
@@ -152,12 +154,17 @@ public class GeoSearchService {
                             .build());
                 }
             } catch (Exception e) {
-                log.debug("No se pudieron indexar propiedades en geo: {}", e.getMessage());
+                hadMongoError = true;
+                log.warn("No se pudieron indexar propiedades en geo (conservando catálogo existente): {}", e.getMessage());
             }
         }
 
-        localCatalog.clear();
-        localCatalog.putAll(fresh);
+        if (!hadMongoError) {
+            localCatalog.clear();
+            localCatalog.putAll(fresh);
+        } else {
+            localCatalog.putAll(fresh);
+        }
         initialized.set(true);
 
         if (redisTemplate != null && !fresh.isEmpty()) {
@@ -173,17 +180,19 @@ public class GeoSearchService {
                 redisTemplate.opsForGeo().add(GEO_KEY, geoPoints);
                 redisTemplate.opsForHash().putAll(META_HASH_KEY, metaMap);
 
-                // Depurar entradas obsoletas (p. ej. propiedades suspendidas o rechazadas) sin ventana de indisponibilidad
-                Set<Object> existingKeys = redisTemplate.opsForHash().keys(META_HASH_KEY);
-                if (existingKeys != null && !existingKeys.isEmpty()) {
-                    List<String> staleMembers = existingKeys.stream()
-                            .filter(Objects::nonNull)
-                            .map(Object::toString)
-                            .filter(k -> !fresh.containsKey(k))
-                            .toList();
-                    if (!staleMembers.isEmpty()) {
-                        redisTemplate.opsForGeo().remove(GEO_KEY, staleMembers.toArray(new String[0]));
-                        redisTemplate.opsForHash().delete(META_HASH_KEY, staleMembers.toArray());
+                // Depurar entradas obsoletas solo si no hubo errores al consultar MongoDB
+                if (!hadMongoError) {
+                    Set<Object> existingKeys = redisTemplate.opsForHash().keys(META_HASH_KEY);
+                    if (existingKeys != null && !existingKeys.isEmpty()) {
+                        List<String> staleMembers = existingKeys.stream()
+                                .filter(Objects::nonNull)
+                                .map(Object::toString)
+                                .filter(k -> !fresh.containsKey(k))
+                                .toList();
+                        if (!staleMembers.isEmpty()) {
+                            redisTemplate.opsForGeo().remove(GEO_KEY, staleMembers.toArray(new String[0]));
+                            redisTemplate.opsForHash().delete(META_HASH_KEY, staleMembers.toArray());
+                        }
                     }
                 }
                 log.info("Índice geoespacial Redis actualizado con {} ubicaciones en Cartagena", fresh.size());
@@ -203,6 +212,7 @@ public class GeoSearchService {
         int clampedLimit = Math.max(1, Math.min(50, limit));
         String normalizedType = (typeFilter != null && !typeFilter.isBlank()) ? typeFilter.trim().toUpperCase() : null;
 
+        int searchLimit = (normalizedType != null) ? Math.max(200, clampedLimit * 10) : 50;
         if (redisTemplate != null) {
             try {
                 GeoResults<RedisGeoCommands.GeoLocation<String>> results = redisTemplate.opsForGeo().search(
@@ -213,7 +223,7 @@ public class GeoSearchService {
                                 .includeDistance()
                                 .includeCoordinates()
                                 .sortAscending()
-                                .limit(50)
+                                .limit(searchLimit)
                 );
 
                 if (results != null && !results.getContent().isEmpty()) {

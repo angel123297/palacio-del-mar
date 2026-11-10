@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -29,6 +30,7 @@ public class IntegrationRoomRequest {
     @DecimalMin(value = "10000.0", message = "El precio base debe ser mayor o igual a 10,000")
     private BigDecimal basePrice;
 
+    @Min(value = 1, message = "La capacidad máxima de huéspedes debe ser al menos 1")
     @Builder.Default
     private Integer maxGuests = 2;
 
@@ -38,6 +40,7 @@ public class IntegrationRoomRequest {
 
     private List<String> amenities;
 
+    @Min(value = 1, message = "El número total de unidades debe ser al menos 1")
     @Builder.Default
     private Integer totalUnits = 1;
 

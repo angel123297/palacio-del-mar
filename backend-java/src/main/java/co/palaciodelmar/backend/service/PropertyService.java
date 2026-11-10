@@ -41,6 +41,9 @@ public class PropertyService {
     @Autowired(required = false)
     private GeoSearchService geoSearchService;
 
+    @Autowired(required = false)
+    private co.palaciodelmar.backend.repository.SuiteNightRepository suiteNightRepository;
+
     public void setEmailService(EmailService emailService) {
         this.emailService = emailService;
     }
@@ -325,7 +328,21 @@ public class PropertyService {
             suite.setSizeSqm(req.getSize());
         }
         if (req.getAmenities() != null) suite.setAmenities(req.getAmenities());
-        if (req.getTotalUnits() != null) suite.setTotalUnits(req.getTotalUnits());
+        if (req.getTotalUnits() != null) {
+            int newUnits = Math.max(1, req.getTotalUnits());
+            if (suite.getTotalUnits() != null && newUnits < suite.getTotalUnits() && suiteNightRepository != null && suite.getId() != null) {
+                java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+                List<co.palaciodelmar.backend.model.SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(2));
+                boolean hasActiveInHigherSlots = futureNights.stream()
+                        .anyMatch(sn -> sn.getUnitSlot() != null && sn.getUnitSlot() > newUnits
+                                && !"cancelled".equalsIgnoreCase(sn.getStatus())
+                                && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(Instant.now())));
+                if (hasActiveInHigherSlots) {
+                    throw new IllegalStateException("No se puede reducir la capacidad a " + newUnits + " unidades porque existen reservas activas en unidades superiores");
+                }
+            }
+            suite.setTotalUnits(newUnits);
+        }
         if (req.getActive() != null) suite.setActive(req.getActive());
         suite.setUpdatedAt(Instant.now());
 

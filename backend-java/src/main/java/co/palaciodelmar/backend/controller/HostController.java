@@ -58,6 +58,9 @@ public class HostController {
     @Autowired(required = false)
     private UserRepository userRepository;
 
+    @Autowired(required = false)
+    private co.palaciodelmar.backend.service.PaymentGateway paymentGateway;
+
     @Autowired
     public HostController(
             BookingRepository bookingRepository,
@@ -405,6 +408,11 @@ public class HostController {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+        if (booking.getCheckIn() != null && today.isBefore(booking.getCheckIn())) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("No se puede registrar check-in antes de la fecha de llegada (" + booking.getCheckIn() + ")"));
+        }
+
         bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_IN, user.getId(), "Check-in by host");
         bookingRepository.save(booking);
         return ResponseEntity.ok(ApiResponse.ok("Check-in registrado", null));
@@ -422,6 +430,17 @@ public class HostController {
         User user = userPrincipal != null ? userPrincipal.getUser() : null;
         if (!hasAccessToBooking(user, booking)) {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
+        }
+
+        String currentStatus = booking.getStatus() != null ? booking.getStatus().toUpperCase() : "";
+        co.palaciodelmar.backend.model.BookingStatus statusEnum;
+        try {
+            statusEnum = co.palaciodelmar.backend.model.BookingStatus.valueOf(currentStatus);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("Estado actual de reserva inválido: " + currentStatus));
+        }
+        if (!statusEnum.canTransitionTo(co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT)) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("No se puede realizar check-out desde el estado " + currentStatus));
         }
 
         // Late check-out: el check-out oficial es a las 12:00 (ver FAQ y Branch.checkOutTime).
@@ -446,10 +465,39 @@ public class HostController {
             BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
             BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
             BigDecimal refundable = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
-            booking.setRefundedAmount(refunded.add(refundable));
-            booking.setGuaranteeRefunded(true);
-            booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto: $" + refundable);
+            boolean gatewayRefundOk = true;
+            if (refundable.signum() > 0 && paymentGateway != null) {
+                String depKey = "ref_dep_" + booking.getId();
+                try {
+                    co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse resp =
+                            paymentGateway.refund("tx_" + booking.getId(), refundable, depKey);
+                    if (resp == null || !resp.success()) {
+                        gatewayRefundOk = false;
+                        booking.setPendingRefundAmount(refundable);
+                        booking.setPendingRefundIdempotencyKey(depKey);
+                        booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Reembolso de depósito pendiente en pasarela: $" + refundable);
+                    } else if (resp.refundId() != null) {
+                        if (booking.getProcessedRefundIds() == null) {
+                            booking.setProcessedRefundIds(new java.util.ArrayList<>());
+                        }
+                        if (!booking.getProcessedRefundIds().contains(resp.refundId())) {
+                            booking.getProcessedRefundIds().add(resp.refundId());
+                        }
+                    }
+                } catch (Exception ex) {
+                    gatewayRefundOk = false;
+                    booking.setPendingRefundAmount(refundable);
+                    booking.setPendingRefundIdempotencyKey(depKey);
+                    booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Reembolso de depósito pendiente en pasarela: $" + refundable);
+                }
+            }
+            if (gatewayRefundOk) {
+                booking.setRefundedAmount(refunded.add(refundable));
+                booking.setGuaranteeRefunded(true);
+                booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto: $" + refundable);
+            }
         }
+        booking.setSmartLockPin(null);
         bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT, user.getId(), "Check-out by host");
         bookingRepository.save(booking);
         return ResponseEntity.ok(ApiResponse.ok("Check-out registrado", null));
@@ -538,12 +586,20 @@ public class HostController {
             effectiveMasked = maskAccountNumber(effectiveAccountNumber);
         }
 
+        if (effectiveAccountNumber.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("El número de cuenta bancaria es obligatorio"));
+        }
+        String holderName = request.getHolderName() != null ? request.getHolderName().trim() : "";
+        if (holderName.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("El nombre del titular de la cuenta es obligatorio"));
+        }
+
         User.BankAccount updated = User.BankAccount.builder()
                 .bankName(request.getBankName() != null ? request.getBankName().trim() : "Bancolombia")
                 .accountType(request.getAccountType() != null ? request.getAccountType().trim() : "Ahorros")
                 .accountNumber(effectiveAccountNumber)
                 .accountNumberMasked(effectiveMasked)
-                .holderName(request.getHolderName() != null ? request.getHolderName().trim() : "")
+                .holderName(holderName)
                 .documentId(request.getDocumentId())
                 .documentType(request.getDocumentType())
                 .updatedAt(java.time.Instant.now())

@@ -521,9 +521,11 @@ class PaymentWebhookServiceTest {
 
         assertEquals(new BigDecimal("450000"), cancelledBooking.getRefundedAmount(),
                 "No debe duplicar el reembolso ya contabilizado por cancelBooking");
-        assertEquals("refunded", payment.getStatus());
+        assertEquals("partially_refunded", payment.getStatus(),
+                "Un reembolso de 450.000 sobre un pago de 500.000 (con penalidad de 50.000) es partially_refunded, no refunded");
+        assertEquals(new BigDecimal("450000"), payment.getRefundedAmount());
 
-        // Caso 2: Evento duplicado con otro eventId sobre Payment ya en status refunded -> no toca refundedAmount
+        // Caso 2: Evento duplicado con otro eventId sobre la misma cancelación -> no duplica refundedAmount en Payment ni en Booking
         String body2 = """
                 {
                   "eventId": "evt_ref_2",
@@ -533,6 +535,7 @@ class PaymentWebhookServiceTest {
                 """;
         webhookService.processWebhook(body2, WebhookSigner.sign(body2, secret), "evt_ref_2", ts);
         assertEquals(new BigDecimal("450000"), cancelledBooking.getRefundedAmount());
+        assertEquals(new BigDecimal("450000"), payment.getRefundedAmount());
 
         // Caso 3: Reembolso iniciado externamente con monto inflado se topea estrictamente a paidAmount
         Payment payment2 = Payment.builder()

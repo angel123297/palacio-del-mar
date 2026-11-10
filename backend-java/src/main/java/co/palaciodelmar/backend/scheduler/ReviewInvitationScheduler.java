@@ -45,12 +45,15 @@ public class ReviewInvitationScheduler {
 
         for (Booking booking : candidates) {
             try {
-                emailService.sendReviewInvitation(booking);
-                booking.setReviewRequestSentAt(Instant.now());
-                booking.setUpdatedAt(Instant.now());
-                bookingRepository.save(booking);
-
-                log.info("Invitación a reseña enviada automáticamente para reserva {}", booking.getId());
+                boolean sent = emailService.sendReviewInvitation(booking);
+                if (sent) {
+                    booking.setReviewRequestSentAt(Instant.now());
+                    booking.setUpdatedAt(Instant.now());
+                    bookingRepository.save(booking);
+                    log.info("Invitación a reseña enviada automáticamente para reserva {}", booking.getId());
+                } else {
+                    log.warn("Invitación a reseña no enviada para reserva {} (sin destinatario o fallo SMTP)", booking.getId());
+                }
             } catch (Exception e) {
                 log.error("Error al enviar invitación a reseña para reserva {}: {}", booking.getId(), e.getMessage());
             }

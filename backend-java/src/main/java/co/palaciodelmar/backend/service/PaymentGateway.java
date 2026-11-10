@@ -7,6 +7,9 @@ public interface PaymentGateway {
     PaymentIntentResponse createIntent(Booking booking, String method, String idempotencyKey);
     PaymentConfirmResponse confirmIntent(String intentId, String paymentToken);
     PaymentRefundResponse refund(String transactionId, BigDecimal amount);
+    default PaymentRefundResponse refund(String transactionId, BigDecimal amount, String idempotencyKey) {
+        return refund(transactionId, amount);
+    }
 
     record PaymentIntentResponse(String intentId, String clientSecret, BigDecimal amount, String currency, String status) {}
     record PaymentConfirmResponse(boolean success, String transactionId, String status, String errorMessage) {}

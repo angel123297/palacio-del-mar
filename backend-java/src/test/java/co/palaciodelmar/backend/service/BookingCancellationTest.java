@@ -15,7 +15,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -118,14 +118,17 @@ class BookingCancellationTest {
                         .amount(new BigDecimal("1000.00"))
                         .build()
         ));
-        when(gateway.refund("ch_real_tx_777", new BigDecimal("1000.00")))
+        when(gateway.refund(eq("ch_real_tx_777"), eq(new BigDecimal("1000.00")), anyString()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_777", "refunded", null));
+        when(gateway.refund(eq("ch_real_tx_777"), eq(new BigDecimal("1000.00"))))
                 .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_777", "refunded", null));
 
         service.cancelBooking(BOOKING_ID, USER_ID, "Cancelación válida");
 
         org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(bookingRepository, gateway);
         inOrder.verify(bookingRepository).save(freshBooking);
-        inOrder.verify(gateway).refund("ch_real_tx_777", new BigDecimal("1000.00"));
+        inOrder.verify(gateway).refund(eq("ch_real_tx_777"), eq(new BigDecimal("1000.00")), anyString());
+        inOrder.verify(bookingRepository).save(freshBooking);
     }
 
     private Booking bookingWithCheckIn(LocalDate checkIn) {
@@ -147,6 +150,12 @@ class BookingCancellationTest {
         when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        return new BookingService(bookingRepository, null, null, null, suiteNightRepository, null, null, null, mock(PaymentGateway.class));
+        PaymentGateway gateway = mock(PaymentGateway.class);
+        when(gateway.refund(anyString(), any(BigDecimal.class), anyString()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_cancel_test", "refunded", null));
+        when(gateway.refund(anyString(), any(BigDecimal.class)))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_cancel_test", "refunded", null));
+
+        return new BookingService(bookingRepository, null, null, null, suiteNightRepository, null, null, null, gateway);
     }
 }

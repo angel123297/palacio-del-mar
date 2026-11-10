@@ -19,6 +19,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -35,6 +36,22 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     private final ScheduledExecutorService scheduler;
     private final HttpClient httpClient;
     private final java.util.Set<String> inFlightIntents = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final java.util.concurrent.ConcurrentHashMap<String, Object> INTENT_LOCKS = new java.util.concurrent.ConcurrentHashMap<>();
+    private final String instanceId = "pdm_gw_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RedisLockService redisLockService;
+
+    public void setMongoTemplate(org.springframework.data.mongodb.core.MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
+    }
+
+    public void setRedisLockService(RedisLockService redisLockService) {
+        this.redisLockService = redisLockService;
+    }
 
     private static final java.util.Set<String> FORBIDDEN_SECRETS = java.util.Set.of(
             "whsec_simulated_secret_key_palacio_2026",
@@ -120,32 +137,63 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         if ("succeeded".equalsIgnoreCase(intent.getStatus())) {
             return new PaymentConfirmResponse(true, intent.getTransactionId(), "succeeded", null);
         }
-        if ("processing".equalsIgnoreCase(intent.getStatus()) || !inFlightIntents.add(intentId)) {
+        if ("refunded".equalsIgnoreCase(intent.getStatus()) || "partially_refunded".equalsIgnoreCase(intent.getStatus())) {
+            return new PaymentConfirmResponse(true, intent.getTransactionId(), intent.getStatus(), null);
+        }
+
+        // Si ya está en processing:
+        if ("processing".equalsIgnoreCase(intent.getStatus())) {
+            if (inFlightIntents.contains(intentId)) {
+                return new PaymentConfirmResponse(true, intent.getTransactionId(), "processing", null);
+            }
+            // Intento huérfano (ej. tras reinicio del servidor o tarea de scheduler perdida)
+            if (tryClaimProcessingIntent(intent)) {
+                log.info("Reclamado intento huérfano {} en confirmIntent. Re-agendando simulación...", intentId);
+                scheduleSimulation(intentId);
+            }
+            return new PaymentConfirmResponse(true, intent.getTransactionId(), "processing", null);
+        }
+
+        if (!inFlightIntents.add(intentId)) {
             return new PaymentConfirmResponse(true, intent.getTransactionId(), "processing", null);
         }
 
         try {
-            String safeToken = paymentToken != null ? paymentToken : "";
+            String safeToken = paymentToken != null ? paymentToken.trim() : "";
+            boolean isFailure = false;
+            String errorMessage = null;
+            String outcome = "SUCCEEDED";
+
+            // Evaluar reglas de prueba inmediatamente (sin persistir el token sensible en BD)
+            if (safeToken.endsWith("0002")) {
+                isFailure = true;
+                errorMessage = "Tarjeta rechazada por el banco";
+                outcome = "FAILED_DECLINED";
+            } else if (safeToken.endsWith("9995")) {
+                isFailure = true;
+                errorMessage = "Fondos insuficientes";
+                outcome = "FAILED_INSUFFICIENT_FUNDS";
+            } else if (safeToken.endsWith("0069")) {
+                isFailure = true;
+                errorMessage = "Tarjeta vencida";
+                outcome = "FAILED_EXPIRED";
+            }
+
+            String maskedToken = safeToken.length() >= 4 ? "tok_****" + safeToken.substring(safeToken.length() - 4) : "tok_****";
+
             intent.setStatus("processing");
-            intent.setPaymentToken(safeToken);
+            intent.setSimulationOutcome(outcome);
+            intent.setFailureMessage(errorMessage);
+            intent.setMaskedPaymentToken(maskedToken);
+            intent.setPaymentToken(null); // No persistir el token completo
+            intent.setClaimLock(instanceId);
+            intent.setClaimExpiresAt(Instant.now().plusSeconds(60));
             intent.setUpdatedAt(Instant.now());
             paymentIntentRepository.save(intent);
 
-            log.info("Intento de pago {} marcado en estado 'processing'. Programando resolución asíncrona...", intentId);
+            log.info("Intento de pago {} marcado en estado 'processing' (outcome: {}). Programando resolución asíncrona...", intentId, outcome);
 
-            Runnable simulationTask = () -> {
-                try {
-                    processIntentSimulation(intentId, safeToken);
-                } finally {
-                    inFlightIntents.remove(intentId);
-                }
-            };
-
-            if (simulationDelaySeconds <= 0) {
-                simulationTask.run();
-            } else {
-                scheduler.schedule(simulationTask, simulationDelaySeconds, TimeUnit.SECONDS);
-            }
+            scheduleSimulation(intentId);
 
             return new PaymentConfirmResponse(true, null, "processing", null);
         } catch (RuntimeException e) {
@@ -154,41 +202,175 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         }
     }
 
+    private void scheduleSimulation(String intentId) {
+        inFlightIntents.add(intentId);
+        Runnable simulationTask = () -> {
+            try {
+                processIntentSimulation(intentId);
+            } finally {
+                inFlightIntents.remove(intentId);
+            }
+        };
+
+        if (simulationDelaySeconds <= 0) {
+            simulationTask.run();
+        } else {
+            scheduler.schedule(simulationTask, simulationDelaySeconds, TimeUnit.SECONDS);
+        }
+    }
+
+    public boolean tryClaimProcessingIntent(PaymentIntent intent) {
+        if (mongoTemplate != null) {
+            org.springframework.data.mongodb.core.query.Query q = new org.springframework.data.mongodb.core.query.Query(
+                    org.springframework.data.mongodb.core.query.Criteria.where("id").is(intent.getId())
+                            .and("status").is("processing")
+                            .orOperator(
+                                    org.springframework.data.mongodb.core.query.Criteria.where("claimExpiresAt").exists(false),
+                                    org.springframework.data.mongodb.core.query.Criteria.where("claimExpiresAt").is(null),
+                                    org.springframework.data.mongodb.core.query.Criteria.where("claimExpiresAt").lte(Instant.now()),
+                                    org.springframework.data.mongodb.core.query.Criteria.where("claimLock").is(instanceId)
+                            )
+            );
+            org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
+                    .set("claimLock", instanceId)
+                    .set("claimExpiresAt", Instant.now().plusSeconds(60))
+                    .set("updatedAt", Instant.now());
+            PaymentIntent claimed = mongoTemplate.findAndModify(q, u, PaymentIntent.class);
+            return claimed != null;
+        } else {
+            Instant now = Instant.now();
+            if (intent.getClaimExpiresAt() == null || intent.getClaimExpiresAt().isBefore(now) || instanceId.equals(intent.getClaimLock())) {
+                intent.setClaimLock(instanceId);
+                intent.setClaimExpiresAt(now.plusSeconds(60));
+                intent.setUpdatedAt(now);
+                paymentIntentRepository.save(intent);
+                return true;
+            }
+            return false;
+        }
+    }
+
     public void processIntentSimulation(String intentId, String paymentToken) {
+        // Mantenido por compatibilidad con sobrecarga previa
+        processIntentSimulation(intentId);
+    }
+
+    public void processIntentSimulation(String intentId) {
         try {
             PaymentIntent intent = paymentIntentRepository.findById(intentId).orElse(null);
-            if (intent == null) return;
+            if (intent == null) {
+                return;
+            }
 
-            boolean isFailure = false;
-            String errorMessage = null;
+            if (!"processing".equalsIgnoreCase(intent.getStatus())) {
+                if (("succeeded".equalsIgnoreCase(intent.getStatus()) || "failed".equalsIgnoreCase(intent.getStatus()))
+                        && !Boolean.TRUE.equals(intent.getWebhookDelivered())) {
+                    boolean isFailure = "failed".equalsIgnoreCase(intent.getStatus());
+                    String eventType = isFailure ? "payment.failed" : "payment.succeeded";
+                    String eventId = "evt_" + UUID.randomUUID().toString().replace("-", "");
+                    PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
+                            .eventId(eventId)
+                            .eventType(eventType)
+                            .timestamp(Instant.now().toString())
+                            .data(PaymentWebhookPayload.PaymentWebhookData.builder()
+                                    .intentId(intentId)
+                                    .bookingId(intent.getBookingId())
+                                    .amount(intent.getAmount())
+                                    .currency(intent.getCurrency())
+                                    .status(isFailure ? "failed" : "succeeded")
+                                    .transactionId(intent.getTransactionId())
+                                    .failureMessage(intent.getFailureMessage())
+                                    .build())
+                            .build();
 
-            // Tarjetas de prueba simuladas
-            if (paymentToken.endsWith("0002")) {
-                isFailure = true;
-                errorMessage = "Tarjeta rechazada por el banco";
-            } else if (paymentToken.endsWith("9995")) {
-                isFailure = true;
-                errorMessage = "Fondos insuficientes";
-            } else if (paymentToken.endsWith("0069")) {
-                isFailure = true;
-                errorMessage = "Tarjeta vencida";
+                    boolean delivered = dispatchWebhook(payload, eventId);
+                    if (mongoTemplate != null) {
+                        org.springframework.data.mongodb.core.query.Query qDelivered = new org.springframework.data.mongodb.core.query.Query(
+                                org.springframework.data.mongodb.core.query.Criteria.where("id").is(intentId)
+                        );
+                        org.springframework.data.mongodb.core.query.Update uDelivered = new org.springframework.data.mongodb.core.query.Update()
+                                .set("webhookDelivered", delivered)
+                                .set("updatedAt", Instant.now());
+                        mongoTemplate.updateFirst(qDelivered, uDelivered, PaymentIntent.class);
+                    } else {
+                        Object monitor = INTENT_LOCKS.computeIfAbsent(intentId, k -> new Object());
+                        synchronized (monitor) {
+                            PaymentIntent fresh = paymentIntentRepository.findById(intentId).orElse(intent);
+                            fresh.setWebhookDelivered(delivered);
+                            fresh.setUpdatedAt(Instant.now());
+                            paymentIntentRepository.save(fresh);
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (intent.getClaimLock() == null) {
+                if (!tryClaimProcessingIntent(intent)) {
+                    log.warn("Instancia {} no pudo reclamar bloqueo inicial para intent {}; abortando resolución", instanceId, intentId);
+                    return;
+                }
+                intent = paymentIntentRepository.findById(intentId).orElse(intent);
+            }
+
+            String errorMessage = intent.getFailureMessage();
+            String outcome = intent.getSimulationOutcome();
+            boolean isFailure = !"SUCCEEDED".equalsIgnoreCase(outcome);
+            if (isFailure && (errorMessage == null || errorMessage.isBlank())) {
+                errorMessage = (outcome == null || outcome.isBlank())
+                        ? "Intento de pago sin resultado de simulación verificado; requiere reconfirmación"
+                        : "Pago rechazado en validación de pasarela (" + outcome + ")";
+                intent.setFailureMessage(errorMessage);
             }
 
             String txId = null;
             String eventType;
             if (isFailure) {
-                intent.setStatus("failed");
-                intent.setFailureMessage(errorMessage);
                 eventType = "payment.failed";
             } else {
                 txId = "ch_" + UUID.randomUUID().toString().replace("-", "");
-                intent.setStatus("succeeded");
-                intent.setTransactionId(txId);
                 eventType = "payment.succeeded";
             }
 
-            intent.setUpdatedAt(Instant.now());
-            paymentIntentRepository.save(intent);
+            if (mongoTemplate != null) {
+                Instant now = Instant.now();
+                org.springframework.data.mongodb.core.query.Query q = new org.springframework.data.mongodb.core.query.Query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("id").is(intentId)
+                                .and("status").is("processing")
+                                .and("claimLock").is(instanceId)
+                                .and("claimExpiresAt").gt(now)
+                );
+                org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
+                        .set("status", isFailure ? "failed" : "succeeded")
+                        .set("transactionId", txId)
+                        .set("failureMessage", errorMessage)
+                        .set("claimLock", null)
+                        .set("claimExpiresAt", null)
+                        .set("updatedAt", now);
+
+                PaymentIntent updated = mongoTemplate.findAndModify(q, u, PaymentIntent.class);
+                if (updated == null) {
+                    log.warn("Instancia {} no pudo sellar la transición final del intent {} (bloqueo caducado o tomado por otra instancia); abortando resolución duplicada", instanceId, intentId);
+                    return;
+                }
+                intent = updated;
+            } else {
+                Instant now = Instant.now();
+                if (!instanceId.equals(intent.getClaimLock())
+                        || intent.getClaimExpiresAt() == null
+                        || !intent.getClaimExpiresAt().isAfter(now)) {
+                    log.warn("Instancia {} no posee un bloqueo vigente sobre intent {} (owner={}, expiresAt={}); abortando resolución",
+                            instanceId, intentId, intent.getClaimLock(), intent.getClaimExpiresAt());
+                    return;
+                }
+                intent.setStatus(isFailure ? "failed" : "succeeded");
+                intent.setTransactionId(txId);
+                intent.setFailureMessage(errorMessage);
+                intent.setClaimLock(null);
+                intent.setClaimExpiresAt(null);
+                intent.setUpdatedAt(now);
+                paymentIntentRepository.save(intent);
+            }
 
             // Generar y emitir el webhook
             String eventId = "evt_" + UUID.randomUUID().toString().replace("-", "");
@@ -207,14 +389,87 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                             .build())
                     .build();
 
-            dispatchWebhook(payload, eventId);
+            boolean delivered = dispatchWebhook(payload, eventId);
+            if (mongoTemplate != null) {
+                org.springframework.data.mongodb.core.query.Query qDelivered = new org.springframework.data.mongodb.core.query.Query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("id").is(intentId)
+                );
+                org.springframework.data.mongodb.core.query.Update uDelivered = new org.springframework.data.mongodb.core.query.Update()
+                        .set("webhookDelivered", delivered)
+                        .set("updatedAt", Instant.now());
+                mongoTemplate.updateFirst(qDelivered, uDelivered, PaymentIntent.class);
+            } else {
+                Object monitor = INTENT_LOCKS.computeIfAbsent(intentId, k -> new Object());
+                synchronized (monitor) {
+                    PaymentIntent fresh = paymentIntentRepository.findById(intentId).orElse(intent);
+                    fresh.setWebhookDelivered(delivered);
+                    fresh.setUpdatedAt(Instant.now());
+                    paymentIntentRepository.save(fresh);
+                }
+            }
 
         } catch (Exception e) {
             log.error("Error durante simulación de pago para intent {}: {}", intentId, e.getMessage(), e);
         }
     }
 
-    private void dispatchWebhook(PaymentWebhookPayload payload, String eventId) {
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    @org.springframework.scheduling.annotation.Scheduled(
+            fixedDelayString = "${palacio.payment.recovery.interval.ms:20000}",
+            initialDelayString = "${palacio.payment.recovery.initial-delay.ms:15000}"
+    )
+    public void recoverProcessingIntents() {
+        try {
+            List<PaymentIntent> pending = paymentIntentRepository.findByStatus("processing");
+            if (pending != null && !pending.isEmpty()) {
+                log.info("Verificando {} intentos de pago en estado 'processing'...", pending.size());
+                for (PaymentIntent intent : pending) {
+                    if (intent != null
+                            && intent.getId() != null
+                            && !inFlightIntents.contains(intent.getId())
+                            && tryClaimProcessingIntent(intent)) {
+                        log.info("Reclamado intent huérfano {} por instancia {}. Reanudando simulación...", intent.getId(), instanceId);
+                        scheduleSimulation(intent.getId());
+                    }
+                }
+            }
+
+            List<PaymentIntent> unDelivered = paymentIntentRepository.findByWebhookDeliveredFalse();
+            if (unDelivered != null && !unDelivered.isEmpty()) {
+                for (PaymentIntent intent : unDelivered) {
+                    if (intent != null && intent.getId() != null
+                            && ("succeeded".equalsIgnoreCase(intent.getStatus()) || "failed".equalsIgnoreCase(intent.getStatus()))) {
+                        log.info("Reintentando entrega de webhook pendiente para intent {}", intent.getId());
+                        scheduleSimulation(intent.getId());
+                    }
+                }
+            }
+
+            List<PaymentIntent> unDeliveredRefunds = paymentIntentRepository.findByRefundRecordsWebhookDeliveredFalse();
+            if (unDeliveredRefunds != null && !unDeliveredRefunds.isEmpty()) {
+                for (PaymentIntent intent : unDeliveredRefunds) {
+                    if (intent != null && intent.getId() != null && intent.getRefundRecords() != null) {
+                        for (PaymentIntent.RefundRecord rec : intent.getRefundRecords()) {
+                            if (rec != null && rec.getRefundId() != null && !Boolean.TRUE.equals(rec.getWebhookDelivered())) {
+                                log.info("Recuperando webhook de reembolso pendiente {} para intent {}", rec.getRefundId(), intent.getId());
+                                String iId = intent.getId();
+                                String rId = rec.getRefundId();
+                                if (simulationDelaySeconds <= 0) {
+                                    deliverRefundWebhook(iId, rId);
+                                } else {
+                                    scheduler.execute(() -> deliverRefundWebhook(iId, rId));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error durante recuperación periódica de intentos de pago y webhooks: {}", e.getMessage(), e);
+        }
+    }
+
+    private boolean dispatchWebhook(PaymentWebhookPayload payload, String eventId) {
         try {
             String rawJson = objectMapper.writeValueAsString(payload);
             String signature = WebhookSigner.sign(rawJson, webhookSecret);
@@ -238,7 +493,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                     if (response.statusCode() >= 200 && response.statusCode() < 300) {
                         log.info("Webhook {} entregado exitosamente (HTTP {})", eventId, response.statusCode());
-                        return;
+                        return true;
                     }
                     log.debug("Webhook respondió status {}. Ejecutando procesamiento interno...", response.statusCode());
                 } catch (Exception httpEx) {
@@ -247,20 +502,58 @@ public class SimulatedPaymentGateway implements PaymentGateway {
             }
 
             // Procesamiento interno garantizado (contrato idéntico: verifica firma HMAC, timestamp e idempotencia)
-            paymentWebhookService.processWebhook(rawJson, signature, eventId, timestamp);
+            if (paymentWebhookService != null) {
+                paymentWebhookService.processWebhook(rawJson, signature, eventId, timestamp);
+                return true;
+            }
+            return false;
 
         } catch (Exception e) {
             log.error("Error despachando webhook para evento {}: {}", eventId, e.getMessage(), e);
+            return false;
         }
     }
 
     @Override
     public PaymentRefundResponse refund(String transactionId, BigDecimal amount) {
+        return refund(transactionId, amount, null);
+    }
+
+    @Override
+    public PaymentRefundResponse refund(String transactionId, BigDecimal amount, String idempotencyKey) {
         if (transactionId == null || transactionId.isBlank()) {
             return new PaymentRefundResponse(false, null, "failed", "ID de transacción requerido");
         }
 
-        PaymentIntent intent = paymentIntentRepository.findByTransactionId(transactionId)
+        PaymentIntent initialIntent = resolveIntentForRefund(transactionId);
+        if (initialIntent == null) {
+            return new PaymentRefundResponse(false, null, "failed", "Transacción no encontrada: " + transactionId);
+        }
+
+        String lockId = initialIntent.getId() != null && !initialIntent.getId().isBlank()
+                ? initialIntent.getId().trim()
+                : transactionId.trim();
+
+        java.util.function.Supplier<PaymentRefundResponse> refundAction = () -> {
+            Object localMonitor = INTENT_LOCKS.computeIfAbsent(lockId, k -> new Object());
+            synchronized (localMonitor) {
+                return executeRefundCriticalSection(transactionId, initialIntent, amount, idempotencyKey);
+            }
+        };
+
+        if (redisLockService != null) {
+            return redisLockService.executeWithLock(
+                    "gateway:refund:" + lockId,
+                    Duration.ofSeconds(15),
+                    Duration.ofSeconds(5),
+                    refundAction
+            );
+        }
+        return refundAction.get();
+    }
+
+    private PaymentIntent resolveIntentForRefund(String transactionId) {
+        return paymentIntentRepository.findByTransactionId(transactionId)
                 .or(() -> paymentIntentRepository.findById(transactionId))
                 .or(() -> {
                     String candidateBookingId = transactionId.startsWith("tx_")
@@ -269,51 +562,213 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                     java.util.List<PaymentIntent> byBooking = paymentIntentRepository.findAllByBookingId(candidateBookingId);
                     if (byBooking != null && !byBooking.isEmpty()) {
                         return byBooking.stream()
-                                .filter(pi -> "succeeded".equalsIgnoreCase(pi.getStatus()))
+                                .filter(pi -> "succeeded".equalsIgnoreCase(pi.getStatus()) || "partially_refunded".equalsIgnoreCase(pi.getStatus()))
                                 .findFirst()
                                 .or(() -> Optional.of(byBooking.get(0)));
                     }
                     return paymentIntentRepository.findByBookingId(candidateBookingId);
                 })
                 .orElse(null);
+    }
 
+    private PaymentRefundResponse executeRefundCriticalSection(
+            String transactionId,
+            PaymentIntent fallbackIntent,
+            BigDecimal amount,
+            String idempotencyKey
+    ) {
+        PaymentIntent intent = (fallbackIntent.getId() != null
+                ? paymentIntentRepository.findById(fallbackIntent.getId()).orElse(null)
+                : null);
         if (intent == null) {
-            return new PaymentRefundResponse(false, null, "failed", "Transacción no encontrada: " + transactionId);
+            intent = resolveIntentForRefund(transactionId);
+        }
+        if (intent == null) {
+            intent = fallbackIntent;
         }
 
-        if (!"succeeded".equalsIgnoreCase(intent.getStatus())) {
+        if (!"succeeded".equalsIgnoreCase(intent.getStatus())
+                && !"refunded".equalsIgnoreCase(intent.getStatus())
+                && !"partially_refunded".equalsIgnoreCase(intent.getStatus())) {
             return new PaymentRefundResponse(false, null, "failed", "La transacción no está en estado exitoso (estado actual: " + intent.getStatus() + ")");
         }
 
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0 || amount.compareTo(intent.getAmount()) > 0) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank() && intent.getRefundRecords() != null) {
+            Optional<PaymentIntent.RefundRecord> existing = intent.getRefundRecords().stream()
+                    .filter(r -> idempotencyKey.equals(r.getIdempotencyKey()))
+                    .findFirst();
+            if (existing.isPresent()) {
+                PaymentIntent.RefundRecord rec = existing.get();
+                if (amount == null || rec.getAmount() == null || rec.getAmount().compareTo(amount) != 0) {
+                    log.warn("Clave de idempotencia {} reutilizada con monto inconsistente: registrado {} vs solicitado {}", idempotencyKey, rec.getAmount(), amount);
+                    return new PaymentRefundResponse(false, null, "failed", "Clave de idempotencia ya utilizada con un monto diferente (" + rec.getAmount() + " vs " + amount + ")");
+                }
+                log.info("Reembolso con clave de idempotencia {} ya procesado previamente. Retornando registro existente.", idempotencyKey);
+                if (!Boolean.TRUE.equals(rec.getWebhookDelivered()) && intent.getId() != null && rec.getRefundId() != null) {
+                    String iId = intent.getId();
+                    String rId = rec.getRefundId();
+                    scheduler.execute(() -> deliverRefundWebhook(iId, rId));
+                }
+                String returnStatus = rec.getStatus() != null
+                        ? rec.getStatus()
+                        : (intent.getRefundedAmount() != null && intent.getRefundedAmount().compareTo(intent.getAmount()) >= 0 ? "refunded" : "partially_refunded");
+                return new PaymentRefundResponse(true, rec.getRefundId(), returnStatus, null);
+            }
+        }
+
+        BigDecimal currentRefunded = intent.getRefundedAmount() != null ? intent.getRefundedAmount() : BigDecimal.ZERO;
+        BigDecimal remaining = intent.getAmount().subtract(currentRefunded);
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0 || amount.compareTo(remaining) > 0) {
             return new PaymentRefundResponse(false, null, "failed", "Monto de reembolso inválido");
         }
 
-        String refundId = "re_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        intent.setStatus("refunded");
-        intent.setUpdatedAt(Instant.now());
-        paymentIntentRepository.save(intent);
+        String refundId = (idempotencyKey != null && !idempotencyKey.isBlank())
+                ? "re_" + UUID.nameUUIDFromBytes(idempotencyKey.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString().replace("-", "").substring(0, 16)
+                : "re_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
 
-        // Emitir webhook refund.processed
-        String eventId = "evt_" + UUID.randomUUID().toString().replace("-", "");
-        PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
-                .eventId(eventId)
-                .eventType("refund.processed")
-                .timestamp(Instant.now().toString())
-                .data(PaymentWebhookPayload.PaymentWebhookData.builder()
-                        .intentId(intent.getId())
-                        .bookingId(intent.getBookingId())
-                        .amount(amount)
-                        .currency(intent.getCurrency())
-                        .status("refunded")
-                        .transactionId(transactionId)
-                        .failureMessage(null)
-                        .build())
+        BigDecimal newRefunded = currentRefunded.add(amount);
+        boolean isFullRefund = newRefunded.compareTo(intent.getAmount()) >= 0;
+        String newStatus = isFullRefund ? "refunded" : "partially_refunded";
+        String eventId = "evt_ref_" + refundId.replace("re_", "");
+
+        PaymentIntent.RefundRecord newRecord = PaymentIntent.RefundRecord.builder()
+                .refundId(refundId)
+                .idempotencyKey(idempotencyKey)
+                .amount(amount)
+                .status(newStatus)
+                .webhookEventId(eventId)
+                .webhookDelivered(false)
+                .createdAt(Instant.now())
                 .build();
 
-        scheduler.execute(() -> dispatchWebhook(payload, eventId));
+        if (mongoTemplate != null && intent.getId() != null) {
+            org.springframework.data.mongodb.core.query.Criteria amountCriteria = currentRefunded.compareTo(BigDecimal.ZERO) == 0
+                    ? new org.springframework.data.mongodb.core.query.Criteria().orOperator(
+                            org.springframework.data.mongodb.core.query.Criteria.where("refundedAmount").exists(false),
+                            org.springframework.data.mongodb.core.query.Criteria.where("refundedAmount").is(null),
+                            org.springframework.data.mongodb.core.query.Criteria.where("refundedAmount").is(currentRefunded)
+                    )
+                    : org.springframework.data.mongodb.core.query.Criteria.where("refundedAmount").is(currentRefunded);
 
-        return new PaymentRefundResponse(true, refundId, "refunded", null);
+            org.springframework.data.mongodb.core.query.Query q = new org.springframework.data.mongodb.core.query.Query(
+                    org.springframework.data.mongodb.core.query.Criteria.where("id").is(intent.getId())
+                            .andOperator(amountCriteria)
+            );
+            org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
+                    .set("refundedAmount", newRefunded)
+                    .set("status", newStatus)
+                    .set("updatedAt", Instant.now())
+                    .push("refundRecords", newRecord);
+
+            PaymentIntent updated = mongoTemplate.findAndModify(
+                    q,
+                    u,
+                    org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true),
+                    PaymentIntent.class
+            );
+            if (updated == null) {
+                return new PaymentRefundResponse(false, null, "failed", "Colisión concurrente al procesar reembolso; saldo insuficiente o modificado por otra instancia");
+            }
+            intent.setRefundedAmount(newRefunded);
+            intent.setStatus(newStatus);
+            if (intent.getRefundRecords() == null) {
+                intent.setRefundRecords(new java.util.ArrayList<>());
+            }
+            intent.getRefundRecords().add(newRecord);
+        } else {
+            intent.setRefundedAmount(newRefunded);
+            intent.setStatus(newStatus);
+            if (intent.getRefundRecords() == null) {
+                intent.setRefundRecords(new java.util.ArrayList<>());
+            }
+            intent.getRefundRecords().add(newRecord);
+            intent.setUpdatedAt(Instant.now());
+            paymentIntentRepository.save(intent);
+        }
+
+        String targetIntentId = intent.getId();
+        scheduler.execute(() -> deliverRefundWebhook(targetIntentId, refundId));
+
+        return new PaymentRefundResponse(true, refundId, newStatus, null);
+    }
+
+    public void deliverRefundWebhook(String intentId, String refundId) {
+        try {
+            if (intentId == null || refundId == null) {
+                return;
+            }
+            Object localMonitor = INTENT_LOCKS.computeIfAbsent(intentId, k -> new Object());
+            PaymentIntent intent;
+            PaymentIntent.RefundRecord targetRecord = null;
+            synchronized (localMonitor) {
+                intent = paymentIntentRepository.findById(intentId).orElse(null);
+                if (intent == null || intent.getRefundRecords() == null) {
+                    return;
+                }
+                for (PaymentIntent.RefundRecord r : intent.getRefundRecords()) {
+                    if (refundId.equals(r.getRefundId())) {
+                        targetRecord = r;
+                        break;
+                    }
+                }
+                if (targetRecord == null || Boolean.TRUE.equals(targetRecord.getWebhookDelivered())) {
+                    return;
+                }
+            }
+
+            String eventId = (targetRecord.getWebhookEventId() != null && !targetRecord.getWebhookEventId().isBlank())
+                    ? targetRecord.getWebhookEventId()
+                    : "evt_ref_" + refundId.replace("re_", "");
+
+            PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
+                    .eventId(eventId)
+                    .eventType("refund.processed")
+                    .timestamp(Instant.now().toString())
+                    .data(PaymentWebhookPayload.PaymentWebhookData.builder()
+                            .intentId(intent.getId())
+                            .bookingId(intent.getBookingId())
+                            .amount(targetRecord.getAmount())
+                            .currency(intent.getCurrency())
+                            .status(targetRecord.getStatus() != null ? targetRecord.getStatus() : intent.getStatus())
+                            .transactionId(refundId)
+                            .idempotencyKey(targetRecord.getIdempotencyKey())
+                            .failureMessage(null)
+                            .build())
+                    .build();
+
+            boolean delivered = dispatchWebhook(payload, eventId);
+            if (delivered) {
+                if (mongoTemplate != null) {
+                    org.springframework.data.mongodb.core.query.Query q = new org.springframework.data.mongodb.core.query.Query(
+                            org.springframework.data.mongodb.core.query.Criteria.where("id").is(intentId)
+                                    .and("refundRecords.refundId").is(refundId)
+                    );
+                    org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
+                            .set("refundRecords.$.webhookDelivered", true)
+                            .set("refundRecords.$.webhookEventId", eventId)
+                            .set("updatedAt", Instant.now());
+                    mongoTemplate.updateFirst(q, u, PaymentIntent.class);
+                } else {
+                    synchronized (localMonitor) {
+                        PaymentIntent fresh = paymentIntentRepository.findById(intentId).orElse(intent);
+                        if (fresh != null && fresh.getRefundRecords() != null) {
+                            for (PaymentIntent.RefundRecord r : fresh.getRefundRecords()) {
+                                if (refundId.equals(r.getRefundId())) {
+                                    r.setWebhookEventId(eventId);
+                                    r.setWebhookDelivered(true);
+                                    break;
+                                }
+                            }
+                            fresh.setUpdatedAt(Instant.now());
+                            paymentIntentRepository.save(fresh);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error entregando webhook de reembolso {} para intent {}: {}", refundId, intentId, e.getMessage(), e);
+        }
     }
 
     @PreDestroy

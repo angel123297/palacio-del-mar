@@ -23,7 +23,6 @@ import java.util.*;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class IntegrationService {
 
     private final SuiteRepository suiteRepository;
@@ -32,60 +31,93 @@ public class IntegrationService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private AvailabilityCacheEvictor availabilityCacheEvictor;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RedisLockService redisLockService;
+
+    private final java.util.concurrent.ConcurrentHashMap<String, Object> localUpsertLocks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public IntegrationService(SuiteRepository suiteRepository, SuiteNightRepository suiteNightRepository) {
+        this.suiteRepository = suiteRepository;
+        this.suiteNightRepository = suiteNightRepository;
+    }
+
     @Caching(evict = {
             @CacheEvict(value = "suites", allEntries = true),
             @CacheEvict(value = "suite_detail", allEntries = true),
             @CacheEvict(value = "suite_types", allEntries = true)
     })
     public Suite upsertRoom(ApiKey apiKey, IntegrationRoomRequest request) {
+        if (request.getMaxGuests() != null && request.getMaxGuests() <= 0) {
+            throw new IllegalArgumentException("La capacidad máxima de huéspedes (maxGuests) debe ser al menos 1");
+        }
+        if (request.getTotalUnits() != null && request.getTotalUnits() <= 0) {
+            throw new IllegalArgumentException("El número de unidades físicas (totalUnits) debe ser al menos 1");
+        }
+
         String propertyId = apiKey.getPropertyId();
         String externalId = request.getExternalId().trim();
+        String lockKey = "integration:room:" + propertyId + ":" + externalId;
 
-        Optional<Suite> existingOpt = suiteRepository.findByPropertyIdAndExternalId(propertyId, externalId);
+        return executeWithRoomLock(lockKey, () -> {
+            Optional<Suite> existingOpt = suiteRepository.findByPropertyIdAndExternalId(propertyId, externalId);
 
-        Suite suite;
-        if (existingOpt.isPresent()) {
-            suite = existingOpt.get();
-            log.info("Actualizando habitación externa existente {} para propiedad {}", externalId, propertyId);
-            suite.setName(request.getName().trim());
-            if (request.getType() != null) suite.setType(request.getType());
-            suite.setBasePrice(request.getBasePrice());
-            if (request.getMaxGuests() != null) suite.setMaxGuests(request.getMaxGuests());
-            if (request.getDescription() != null) suite.setDescription(request.getDescription());
-            if (request.getMainImage() != null) suite.setMainImage(request.getMainImage());
-            if (request.getAmenities() != null) suite.setAmenities(request.getAmenities());
-            if (request.getTotalUnits() != null) suite.setTotalUnits(request.getTotalUnits());
-            if (request.getActive() != null) suite.setActive(request.getActive());
-            suite.setUpdatedAt(Instant.now());
-        } else {
-            log.info("Creando nueva habitación externa {} para propiedad {}", externalId, propertyId);
-            String slug = generateSlug(request.getName().trim());
+            Suite suite;
+            if (existingOpt.isPresent()) {
+                suite = existingOpt.get();
+                log.info("Actualizando habitación externa existente {} para propiedad {}", externalId, propertyId);
+                suite.setName(request.getName().trim());
+                if (request.getType() != null) suite.setType(request.getType());
+                suite.setBasePrice(request.getBasePrice());
+                if (request.getMaxGuests() != null) suite.setMaxGuests(request.getMaxGuests());
+                if (request.getDescription() != null) suite.setDescription(request.getDescription());
+                if (request.getMainImage() != null) suite.setMainImage(request.getMainImage());
+                if (request.getAmenities() != null) suite.setAmenities(request.getAmenities());
+                if (request.getTotalUnits() != null) suite.setTotalUnits(request.getTotalUnits());
+                if (request.getActive() != null) suite.setActive(request.getActive());
+                suite.setUpdatedAt(Instant.now());
+            } else {
+                log.info("Creando nueva habitación externa {} para propiedad {}", externalId, propertyId);
+                String slug = generateSlug(request.getName().trim());
 
-            suite = Suite.builder()
-                    .propertyId(propertyId)
-                    .branch("branch-1") // Compatibilidad con consultas monohotel
-                    .source("EXTERNAL")
-                    .externalId(externalId)
-                    .name(request.getName().trim())
-                    .slug(slug)
-                    .type(request.getType() != null ? request.getType() : "Habitación")
-                    .basePrice(request.getBasePrice())
-                    .maxGuests(request.getMaxGuests() != null ? request.getMaxGuests() : 2)
-                    .description(request.getDescription())
-                    .mainImage(request.getMainImage())
-                    .amenities(request.getAmenities() != null ? request.getAmenities() : new ArrayList<>())
-                    .totalUnits(request.getTotalUnits() != null ? request.getTotalUnits() : 1)
-                    .active(request.getActive() != null ? request.getActive() : true)
-                    .createdAt(Instant.now())
-                    .updatedAt(Instant.now())
-                    .build();
+                suite = Suite.builder()
+                        .propertyId(propertyId)
+                        .branch("branch-1") // Compatibilidad con consultas monohotel
+                        .source("EXTERNAL")
+                        .externalId(externalId)
+                        .name(request.getName().trim())
+                        .slug(slug)
+                        .type(request.getType() != null ? request.getType() : "Habitación")
+                        .basePrice(request.getBasePrice())
+                        .maxGuests(request.getMaxGuests() != null ? request.getMaxGuests() : 2)
+                        .description(request.getDescription())
+                        .mainImage(request.getMainImage())
+                        .amenities(request.getAmenities() != null ? request.getAmenities() : new ArrayList<>())
+                        .totalUnits(request.getTotalUnits() != null ? request.getTotalUnits() : 1)
+                        .active(request.getActive() != null ? request.getActive() : true)
+                        .createdAt(Instant.now())
+                        .updatedAt(Instant.now())
+                        .build();
+            }
+
+            Suite saved = suiteRepository.save(suite);
+            if (availabilityCacheEvictor != null) {
+                availabilityCacheEvictor.evictAll();
+            }
+            return saved;
+        });
+    }
+
+    private <T> T executeWithRoomLock(String lockKey, java.util.function.Supplier<T> action) {
+        if (redisLockService != null) {
+            return redisLockService.executeWithLock(lockKey, java.time.Duration.ofSeconds(10), java.time.Duration.ofSeconds(2), action);
         }
-
-        Suite saved = suiteRepository.save(suite);
-        if (availabilityCacheEvictor != null) {
-            availabilityCacheEvictor.evictAll();
+        synchronized (localUpsertLocks.computeIfAbsent(lockKey, k -> new Object())) {
+            try {
+                return action.get();
+            } finally {
+                localUpsertLocks.remove(lockKey);
+            }
         }
-        return saved;
     }
 
     public Map<String, Object> manageAvailability(ApiKey apiKey, IntegrationAvailabilityRequest request) {
@@ -103,7 +135,11 @@ public class IntegrationService {
         }
 
         long nights = ChronoUnit.DAYS.between(start, end);
-        int slot = request.getUnitSlot() != null && request.getUnitSlot() > 0 ? request.getUnitSlot() : 1;
+        int totalUnits = suite.getTotalUnits() != null && suite.getTotalUnits() > 0 ? suite.getTotalUnits() : 1;
+        if (request.getUnitSlot() != null && (request.getUnitSlot() < 1 || request.getUnitSlot() > totalUnits)) {
+            throw new IllegalArgumentException("El unitSlot (" + request.getUnitSlot() + ") debe estar entre 1 y el total de unidades de la habitación (" + totalUnits + ")");
+        }
+        int slot = request.getUnitSlot() != null ? request.getUnitSlot() : 1;
         String action = request.getAction() != null ? request.getAction().toUpperCase() : "BLOCK";
 
         Map<String, Object> response = new LinkedHashMap<>();
@@ -179,7 +215,7 @@ public class IntegrationService {
             List<SuiteNight> toRemove = occupied.stream()
                     .filter(sn -> sn.getUnitSlot() != null && sn.getUnitSlot() == slot)
                     .filter(sn -> "blocked".equalsIgnoreCase(sn.getStatus()))
-                    .filter(sn -> sn.getBooking() == null || sn.getBooking().startsWith("EXT_BLOCK_"))
+                    .filter(sn -> sn.getBooking() != null && sn.getBooking().startsWith("EXT_BLOCK_"))
                     .toList();
 
             suiteNightRepository.deleteAll(toRemove);

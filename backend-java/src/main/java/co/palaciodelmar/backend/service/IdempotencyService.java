@@ -42,6 +42,7 @@ public class IdempotencyService {
     private static final Duration COMPLETED_TTL = Duration.ofHours(24);
 
     private static final DefaultRedisScript<Long> CONDITIONAL_DELETE_SCRIPT;
+    private static final DefaultRedisScript<Long> CONDITIONAL_SET_COMPLETED_SCRIPT;
     static {
         CONDITIONAL_DELETE_SCRIPT = new DefaultRedisScript<>();
         CONDITIONAL_DELETE_SCRIPT.setScriptText(
@@ -53,6 +54,18 @@ public class IdempotencyService {
                 "end"
         );
         CONDITIONAL_DELETE_SCRIPT.setResultType(Long.class);
+
+        CONDITIONAL_SET_COMPLETED_SCRIPT = new DefaultRedisScript<>();
+        CONDITIONAL_SET_COMPLETED_SCRIPT.setScriptText(
+                "local cur = redis.call('get', KEYS[1]) " +
+                "if cur and string.find(cur, ARGV[1], 1, true) then " +
+                "  redis.call('set', KEYS[1], ARGV[2], 'PX', ARGV[3]) " +
+                "  return 1 " +
+                "else " +
+                "  return 0 " +
+                "end"
+        );
+        CONDITIONAL_SET_COMPLETED_SCRIPT.setResultType(Long.class);
     }
 
     private StringRedisTemplate redisTemplate;
@@ -128,7 +141,7 @@ public class IdempotencyService {
             T result = action.get();
             String resultJson = toJson(result);
             StoredRecord completed = new StoredRecord("COMPLETED", ownerToken, payloadHash, resultJson);
-            saveCompleted(fullKey, toJson(completed));
+            saveCompleted(fullKey, toJson(completed), ownerToken);
             return new IdempotentResult<>(result, false);
         } catch (Throwable ex) {
             releaseInProgress(fullKey, ownerToken);
@@ -213,14 +226,24 @@ public class IdempotencyService {
         }
     }
 
-    private void saveCompleted(String fullKey, String completedJson) {
+    private void saveCompleted(String fullKey, String completedJson, String ownerToken) {
         long now = System.currentTimeMillis();
-        localStore.put(fullKey, new LocalEntry(completedJson, now + COMPLETED_TTL.toMillis()));
+        localStore.compute(fullKey, (k, current) -> {
+            if (current == null || current.serializedRecord().contains(ownerToken)) {
+                return new LocalEntry(completedJson, now + COMPLETED_TTL.toMillis());
+            }
+            return current;
+        });
         if (localStore.size() > MAX_LOCAL_ENTRIES) {
             enforceLocalCapacity(now, fullKey);
         }
         if (redisTemplate != null) {
             try {
+                String cur = redisTemplate.opsForValue().get(fullKey);
+                if (cur != null && !cur.contains(ownerToken)) {
+                    log.warn("Clave de idempotencia {} ya no pertenece a ownerToken {}; no se sobrescribió resultado", fullKey, ownerToken);
+                    return;
+                }
                 redisTemplate.opsForValue().set(fullKey, completedJson, COMPLETED_TTL);
             } catch (Exception e) {
                 log.warn("No se pudo persistir resultado idempotente en Redis ({}): {}", fullKey, e.getMessage());

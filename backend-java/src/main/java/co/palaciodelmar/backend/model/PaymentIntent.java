@@ -10,6 +10,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @Builder
@@ -43,6 +45,21 @@ public class PaymentIntent {
     @Indexed(sparse = true)
     private String idempotencyKey;
 
+    @Builder.Default
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
+
+    private String simulationOutcome;
+
+    private String claimLock;
+
+    private Instant claimExpiresAt;
+
+    @Builder.Default
+    private Boolean webhookDelivered = false;
+
+    private String maskedPaymentToken;
+
+    @org.springframework.data.annotation.Transient
     private String paymentToken;
 
     @Indexed(sparse = true)
@@ -55,4 +72,26 @@ public class PaymentIntent {
 
     @Builder.Default
     private Instant updatedAt = Instant.now();
+
+    @org.springframework.data.annotation.Version
+    private Long version;
+
+    @Builder.Default
+    private List<RefundRecord> refundRecords = new ArrayList<>();
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RefundRecord {
+        private String refundId;
+        private String idempotencyKey;
+        private BigDecimal amount;
+        private String status;
+        private String webhookEventId;
+        @Builder.Default
+        private Boolean webhookDelivered = false;
+        @Builder.Default
+        private Instant createdAt = Instant.now();
+    }
 }
