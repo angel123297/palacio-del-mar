@@ -1,5 +1,30 @@
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-11-13 — Revisión diaria de Vibe: reintegro masivo tras el estancamiento
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** 6 commits del usuario (angel123297), tras 2 días sin actividad funcional:
+- [fix(audit): remediate 8 critical audit points and implement realistic test suites (R1-R9)](https://github.com/angel123297/palacio-del-mar/commit/945f9350d5285513d9bbd29a95673730481d4c92) (945f935, 13:32 UTC) — R1 credenciales Atlas desacopladas (sync:false, SEED_DEMO_DATA:false, BACKEND_HOST dinámico); R2 anti-degradación a "refunded" en webhooks de reembolso duplicado/superávit; R3 deadlock Redis resuelto (executor async + lock reentrante); R4 checkout unificado bajo lock con depósito de seguridad; R5 reembolsos secuenciales multi-pago + reconciliación de cancelaciones admin; R6 eliminación de recibos falsos y PINs mock en Flutter, precios alineados con /api/suites/calculate-price; R7 fin de creación falsa de propiedades en host-dashboard + GET /api/admin/bookings/export-csv; R8 rechazo de sobrepagos en bookings pendientes + platformFee solo sobre base gravable; R9 suites de tests realistas (claim: 594/594 pasando).
+- [merge: integrate 8 critical audit points and realistic test suites (R1-R9) into proyecto-angular-java](https://github.com/angel123297/palacio-del-mar/commit/aac4721ed046e6608815ba900df94462fd0e9527) (aac4721, 13:50 UTC) — ⚠️ merge hacia la rama original del usuario.
+- [merge: synchronize develop (plan/marketplace-webhooks) with main (proyecto-angular-java)](https://github.com/angel123297/palacio-del-mar/commit/10482fbc7edcd5f2ce37e89db7937acab804f4a4) (10482fb, 13:53 UTC)
+- [sync: align develop (plan/marketplace-webhooks) codebase with main (proyecto-angular-java)](https://github.com/angel123297/palacio-del-mar/commit/574dc246d02d93d7a1fa23b392fd66aebacb80f2) (574dc24, 13:55 UTC)
+- [sync: finalize develop sync identical to main (proyecto-angular-java)](https://github.com/angel123297/palacio-del-mar/commit/3a2bb9e102dbe194e80e0fd49911e794f787ba6b) (3a2bb9e, 13:56 UTC)
+- [merge: integrate origin QA reports into plan/marketplace-webhooks](https://github.com/angel123297/palacio-del-mar/commit/6dc3fa599c8461a3296af68259e5be1c9956149b) (6dc3fa5, 13:57 UTC) — HEAD al momento de esta revisión.
+
+**Pull requests:** [#26 — Integrar mejoras de auditoría backend (puntos 55-65) y compatibilidad web-móvil](https://github.com/angel123297/palacio-del-mar/pull/26) fue **fusionado hoy** (13 nov, 13:53 UTC) hacia `main`; el flujo del día fue R1-R9 sobre la rama original → merge a main → sync hacia plan/marketplace-webhooks. Quedan 2 drafts abiertos sin actividad: [#25 — Add System Audit Report](https://github.com/angel123297/palacio-del-mar/pull/25) (desde 29 oct) y [#23 — Cleanup unused frontend code and dependencies](https://github.com/angel123297/palacio-del-mar/pull/23) (desde 26 oct, ⚠️ base `proyecto-angular-java` protegida: NO fusionar sin decisión explícita).
+
+**Fase en curso:** Fase 5 del PLAN_MARKETPLACE.md (CI/CD, Swagger, Actuator y automaciones). La remediación R1-R9 y la sincronización de hoy rompen el estancamiento del 28 oct, pero falta verificar avance específico contra los criterios de aceptación de la Fase 5. Fases 0-4 permanecen completadas.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — corregidos y activados desde el 16 oct (commit 1dbd8ee, `PriceIntegritySecurityTest` sin `@Disabled`). La remediación de hoy (R2, R8) refuerza la seguridad de pagos/webhooks sin tocar esas suites.
+
+**Tests esperados en verde:** el commit 945f935 reporta **594/594 tests pasando (backend + Angular + Flutter)** tras añadir las suites realistas (R9). ⚠️ Cifra reportada por agente/usuario, NO verificada por Vibe en CI sobre el HEAD. El salto frente a las cifras previas (~446 backend + 43 frontend) es grande y debe validarse con una corrida del pipeline `.github/workflows/ci.yml`.
+
+**Riesgos / problemas detectados:**
+- ⚠️ El trabajo R1-R9 se hizo primero sobre `proyecto-angular-java` (la rama original del usuario que NO debía modificarse) y luego se propagó a main y a la rama de trabajo. Confirmar con el usuario si esto fue intencional.
+- ⚠️ Los claims de tests (594/594) no están verificados en CI; los 3 commits de sincronización en 5 minutos pueden ocultar conflictos de fusión mal resueltos.
+- ⚠️ Docs eliminados por 0ff7a9e (`docs/PLAN_MARKETPLACE.md`, `docs/AUDITORIA_SEGURIDAD.md`, `docs/CORRECCIONES.md`, `AGENTS.md`) siguen sin restaurarse en la rama; recuperables del commit fd81791.
+- ⚠️ PR #25 (`REPORT.md` duplicado) y PR #23 (base protegida) siguen pendientes de decisión.
+- ⚠️ Verificación de secretos en historial (commit 4ddecea, credencial de Gmail): sigue pendiente.
+
 ### 📅 2026-11-11 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** El único commit en la ventana es el propio reporte de QA de ayer: [docs(qa): reporte diario 2026-11-10](https://github.com/angel123297/palacio-del-mar/commit/8c5b12b29fdae076bce50595f096e8a1e813ffb8) (8c5b12b, 10 nov 14:13 UTC). Sin actividad de los agentes (Antigravity/Jules) ni commits funcionales.
