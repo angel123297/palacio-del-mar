@@ -38,12 +38,20 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
   int _children = 0;
   bool _needsCrib = false;
   bool _petFriendly = false;
+  static const double _petFeeCOP = 80000;
+  static const double _guaranteeDepositCOP = 100000;
 
   // Paso 3: Servicios Adicionales
   bool _airportPickup = false;
   final double _airportPriceCOP = 60000;
   bool _breakfastIncluded = false;
   final double _breakfastPerNightCOP = 35000;
+
+  // Cotización calculada via API
+  double? _apiSubtotal;
+  double? _apiTaxes;
+  double? _apiRoomTotal;
+  bool _isQuoting = false;
 
   // Paso 4: Huésped titular
   final _nameController = TextEditingController();
@@ -57,7 +65,44 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
       if (auth.currentUserName != null && auth.currentUserName!.trim().isNotEmpty) {
         _nameController.text = auth.currentUserName!.trim();
       }
+      _fetchPriceQuote();
     });
+  }
+
+  Future<void> _fetchPriceQuote() async {
+    if (!mounted) return;
+    setState(() => _isQuoting = true);
+    try {
+      final res = await http.post(
+        Uri.parse('${widget.baseUrl}/suites/calculate-price'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'suiteId': widget.suiteId,
+          'checkIn': _checkIn.toIso8601String().split('T')[0],
+          'checkOut': _checkOut.toIso8601String().split('T')[0],
+          'guests': _guests,
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200 && mounted) {
+        final decoded = jsonDecode(res.body);
+        final data = decoded['data'] ?? decoded;
+        if (data is Map<String, dynamic>) {
+          setState(() {
+            _apiSubtotal = (data['subtotal'] as num?)?.toDouble();
+            final rTotal = (data['roomTotal'] as num?)?.toDouble();
+            if (rTotal != null && _apiSubtotal != null) {
+              _apiRoomTotal = rTotal;
+              _apiTaxes = rTotal - _apiSubtotal!;
+            }
+          });
+        }
+      }
+    } catch (_) {
+      // Usar cálculo de respaldo local
+    } finally {
+      if (mounted) setState(() => _isQuoting = false);
+    }
   }
 
   int get _nights {
@@ -65,15 +110,19 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
     return diff > 0 ? diff : 1;
   }
 
-  double get _baseTotal => _nights * widget.pricePerNightCOP;
+  double get _baseSubtotal => _apiSubtotal ?? (_nights * widget.pricePerNightCOP);
+  double get _taxes => _apiTaxes ?? (_baseSubtotal * 0.19);
+  double get _roomTotal => _apiRoomTotal ?? (_baseSubtotal + _taxes);
+
   double get _extraServicesTotal {
     double total = 0;
     if (_airportPickup) total += _airportPriceCOP;
     if (_breakfastIncluded) total += (_breakfastPerNightCOP * _guests * _nights);
+    if (_petFriendly) total += _petFeeCOP;
     return total;
   }
-  double get _platformFee => (_baseTotal + _extraServicesTotal) * 0.08; // 8% comisión
-  double get _grandTotalCOP => _baseTotal + _extraServicesTotal + _platformFee;
+
+  double get _grandTotalCOP => _roomTotal + _extraServicesTotal + _guaranteeDepositCOP;
 
   Future<void> _submitBooking() async {
     setState(() => _isLoading = true);
@@ -93,7 +142,16 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
       'guestName': _nameController.text.trim(),
       'guestEmail': guestEmail,
       'guestPhone': _phoneController.text.trim(),
-      'foodOrders': _breakfastIncluded ? [{'item': 'Desayuno Buffet Ruta del Sabor', 'quantity': _guests * _nights}] : [],
+      'foodOrders': _breakfastIncluded
+          ? [
+              {
+                'dishName': 'Desayuno Buffet Ruta del Sabor',
+                'type': 'normal',
+                'includesBreakfastCombo': true,
+                'price': _breakfastPerNightCOP,
+              }
+            ]
+          : [],
     };
 
     try {
@@ -211,7 +269,10 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                       firstDate: DateTime.now(),
                       lastDate: DateTime.now().add(const Duration(days: 365)),
                     );
-                    if (picked != null) setState(() => _checkIn = picked);
+                    if (picked != null) {
+                      setState(() => _checkIn = picked);
+                      _fetchPriceQuote();
+                    }
                   },
                 ),
                 const SizedBox(height: 8),
@@ -227,7 +288,10 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                       firstDate: _checkIn.add(const Duration(days: 1)),
                       lastDate: DateTime.now().add(const Duration(days: 365)),
                     );
-                    if (picked != null) setState(() => _checkOut = picked);
+                    if (picked != null) {
+                      setState(() => _checkOut = picked);
+                      _fetchPriceQuote();
+                    }
                   },
                 ),
               ],
@@ -248,7 +312,10 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                       value: _guests,
                       dropdownColor: const Color(0xFF1E293B),
                       items: [1, 2, 3, 4, 5].map((e) => DropdownMenuItem(value: e, child: Text('$e', style: const TextStyle(color: Colors.white)))).toList(),
-                      onChanged: (v) => setState(() => _guests = v!),
+                      onChanged: (v) {
+                        setState(() => _guests = v!);
+                        _fetchPriceQuote();
+                      },
                     ),
                   ],
                 ),
@@ -260,6 +327,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                 ),
                 SwitchListTile(
                   title: const Text('Mascota / Pet-Friendly', style: TextStyle(color: Colors.white)),
+                  subtitle: const Text('+\$80.000 COP tarifa por estadía', style: TextStyle(color: Colors.grey)),
                   value: _petFriendly,
                   activeColor: const Color(0xFFD4AF37),
                   onChanged: (v) => setState(() => _petFriendly = v),
@@ -317,17 +385,22 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
                   child: Column(
                     children: [
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Text('Estadía ($_nights noches):', style: const TextStyle(color: Colors.grey)),
-                        Text('\$${_baseTotal.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
+                        Text('Alojamiento ($_nights noches):', style: const TextStyle(color: Colors.grey)),
+                        Text('\$${_baseSubtotal.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
                       ]),
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        const Text('Servicios adicionales:', style: TextStyle(color: Colors.grey)),
-                        Text('\$${_extraServicesTotal.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
+                        const Text('IVA Hospedaje (19%):', style: TextStyle(color: Colors.grey)),
+                        Text('\$${_taxes.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
                       ]),
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        const Text('Tarifa de servicio (8%):', style: TextStyle(color: Colors.grey)),
-                        Text('\$${_platformFee.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
+                        const Text('Depósito de Garantía (reembolsable):', style: TextStyle(color: Colors.grey)),
+                        Text('\$${_guaranteeDepositCOP.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
                       ]),
+                      if (_extraServicesTotal > 0)
+                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                          const Text('Servicios adicionales:', style: TextStyle(color: Colors.grey)),
+                          Text('\$${_extraServicesTotal.toStringAsFixed(0)} COP', style: const TextStyle(color: Colors.white)),
+                        ]),
                       const Divider(color: Colors.grey),
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         const Text('TOTAL RESERVA:', style: TextStyle(color: Color(0xFFD4AF37), fontWeight: FontWeight.bold, fontSize: 16)),

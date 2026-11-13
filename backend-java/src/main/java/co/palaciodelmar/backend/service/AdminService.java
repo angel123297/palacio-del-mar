@@ -123,6 +123,23 @@ public class AdminService {
             bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado");
             Booking saved = bookingRepository.save(fresh);
 
+            if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
+                BigDecimal paid = fresh.getPaidAmount() != null ? fresh.getPaidAmount() : BigDecimal.ZERO;
+                BigDecimal refunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : BigDecimal.ZERO;
+                BigDecimal netPaid = paid.subtract(refunded).max(BigDecimal.ZERO);
+
+                if (netPaid.compareTo(BigDecimal.ZERO) > 0) {
+                    String idemKey = "ref_admin_canc_" + fresh.getId() + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
+                    boolean refundedOk = bookingService.executeSequentialRefund(fresh, netPaid, idemKey);
+                    if (!refundedOk) {
+                        fresh.setPaymentStatus("requires_refund");
+                        fresh.setPendingRefundAmount(netPaid);
+                        fresh.setPendingRefundIdempotencyKey(idemKey);
+                    }
+                    saved = bookingRepository.save(fresh);
+                }
+            }
+
             if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED
                     || targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED
                     || targetStatus == co.palaciodelmar.backend.model.BookingStatus.NO_SHOW) {
@@ -322,5 +339,46 @@ public class AdminService {
 
         payment.setUpdatedAt(Instant.now());
         return paymentRepository.save(payment);
+    }
+
+    public byte[] exportBookingsCsv() {
+        List<Booking> bookings = bookingRepository.findAll(org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+        StringBuilder csv = new StringBuilder();
+        csv.append("\uFEFF"); // UTF-8 BOM
+        csv.append("ID,Código Reserva,Huésped,Email,Teléfono,Check-In,Check-Out,Noches,Huéspedes,Total COP,Monto Pagado COP,Saldo Pendiente COP,Estado Reserva,Estado Pago,Fecha Creación\n");
+        for (Booking b : bookings) {
+            String id = escapeCsv(b.getId());
+            String code = escapeCsv(b.getBookingCode());
+            String name = escapeCsv(b.getGuestDetails() != null ? b.getGuestDetails().getFullName() : "");
+            String email = escapeCsv(b.getGuestDetails() != null ? b.getGuestDetails().getEmail() : "");
+            String phone = escapeCsv(b.getGuestDetails() != null ? b.getGuestDetails().getPhone() : "");
+            String checkIn = b.getCheckIn() != null ? b.getCheckIn().toString() : "";
+            String checkOut = b.getCheckOut() != null ? b.getCheckOut().toString() : "";
+            int nights = b.getNights() != null ? b.getNights() : 0;
+            int guests = b.getGuests() != null ? b.getGuests() : 0;
+            String total = b.getTotalPrice() != null ? b.getTotalPrice().toPlainString() : "0";
+            String paid = b.getPaidAmount() != null ? b.getPaidAmount().toPlainString() : "0";
+            String balance = b.getBalanceDue() != null ? b.getBalanceDue().toPlainString() : "0";
+            String status = escapeCsv(b.getStatus() != null ? b.getStatus() : "");
+            String paymentStatus = escapeCsv(b.getPaymentStatus() != null ? b.getPaymentStatus() : "");
+            String createdAt = b.getCreatedAt() != null ? b.getCreatedAt().toString() : "";
+
+            csv.append(String.join(",",
+                    id, code, name, email, phone,
+                    checkIn, checkOut, String.valueOf(nights), String.valueOf(guests),
+                    total, paid, balance,
+                    status, paymentStatus, createdAt
+            )).append("\n");
+        }
+        return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private String escapeCsv(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }

@@ -182,21 +182,6 @@ class ApiService {
     }
   }
 
-  static Future<bool> sendContactMessage(Map<String, dynamic> messageData) async {
-    try {
-      final response = await AuthenticatedHttpClient.post('/contact', messageData);
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  static Future<void> sendAuditLog(Map<String, dynamic> auditData) async {
-    try {
-      await AuthenticatedHttpClient.post('/audit/log', auditData);
-    } catch (_) {}
-  }
-
   static Future<void> logout() async {
     try {
       await AuthenticatedHttpClient.post('/auth/logout', {});

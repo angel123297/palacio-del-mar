@@ -325,4 +325,71 @@ class AdminServiceTest {
 
         verify(suiteNightRepository, never()).deleteByBooking(anyString());
     }
+
+    @Test
+    @DisplayName("R7b: exportBookingsCsv genera CSV RFC 4180 con UTF-8 BOM y escape de caracteres")
+    void testExportBookingsCsvFormatsRfc4180WithUtf8Bom() {
+        Booking b1 = Booking.builder()
+                .id("b-csv-1")
+                .bookingCode("PDM-20261113-001")
+                .guestDetails(Booking.GuestDetails.builder()
+                        .fullName("García, Juan \"El Viajero\"")
+                        .email("juan.garcia@example.com")
+                        .phone("+57 300 123 4567")
+                        .build())
+                .checkIn(LocalDate.of(2026, 12, 1))
+                .checkOut(LocalDate.of(2026, 12, 5))
+                .nights(4)
+                .guests(2)
+                .totalPrice(new BigDecimal("1200000.00"))
+                .paidAmount(new BigDecimal("1200000.00"))
+                .balanceDue(BigDecimal.ZERO)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .createdAt(java.time.Instant.parse("2026-11-13T10:15:30Z"))
+                .build();
+
+        Booking b2 = Booking.builder()
+                .id("b-csv-2")
+                .bookingCode("PDM-20261113-002")
+                .guestDetails(Booking.GuestDetails.builder()
+                        .fullName("Ana María\nLópez")
+                        .email("ana.lopez@example.com")
+                        .phone(null)
+                        .build())
+                .checkIn(LocalDate.of(2026, 12, 10))
+                .checkOut(LocalDate.of(2026, 12, 12))
+                .nights(2)
+                .guests(1)
+                .totalPrice(new BigDecimal("500000.00"))
+                .paidAmount(new BigDecimal("250000.00"))
+                .balanceDue(new BigDecimal("250000.00"))
+                .status("pending")
+                .paymentStatus("partial")
+                .createdAt(java.time.Instant.parse("2026-11-13T12:00:00Z"))
+                .build();
+
+        when(bookingRepository.findAll(any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(List.of(b1, b2));
+
+        byte[] csvBytes = adminService.exportBookingsCsv();
+        org.junit.jupiter.api.Assertions.assertNotNull(csvBytes);
+        org.junit.jupiter.api.Assertions.assertTrue(csvBytes.length > 3);
+
+        // Verify UTF-8 BOM (\uFEFF -> 0xEF, 0xBB, 0xBF)
+        assertEquals((byte) 0xEF, csvBytes[0]);
+        assertEquals((byte) 0xBB, csvBytes[1]);
+        assertEquals((byte) 0xBF, csvBytes[2]);
+
+        String csvContent = new String(csvBytes, java.nio.charset.StandardCharsets.UTF_8);
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.startsWith("\uFEFFID,Código Reserva,Huésped,Email,Teléfono,Check-In,Check-Out,Noches,Huéspedes,Total COP,Monto Pagado COP,Saldo Pendiente COP,Estado Reserva,Estado Pago,Fecha Creación"));
+
+        // Verify escaping: García, Juan "El Viajero" -> "García, Juan ""El Viajero"""
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("\"García, Juan \"\"El Viajero\"\"\""));
+        // Verify newline escaping: "Ana María\nLópez"
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("\"Ana María\nLópez\""));
+        // Verify formatted numbers
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("1200000.00"));
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("250000.00"));
+    }
 }

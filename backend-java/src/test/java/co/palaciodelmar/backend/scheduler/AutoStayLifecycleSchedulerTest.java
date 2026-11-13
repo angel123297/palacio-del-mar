@@ -85,11 +85,12 @@ class AutoStayLifecycleSchedulerTest {
         ReflectionTestUtils.setField(scheduler, "autoCheckOutHour", 0); // garantiza ejecución
         scheduler.processStayLifecycleTransitions();
 
-        verify(bookingService, atLeastOnce()).changeBookingStatus(
-                eq(booking), eq(BookingStatus.CHECKED_OUT), any(), any()
+        verify(bookingService).processCheckOut(
+                eq("bk-checkout-1"),
+                eq("System-AutoStayLifecycle"),
+                anyString(),
+                eq(true)
         );
-        assertTrue(booking.getGuaranteeRefunded());
-        assertEquals(new BigDecimal("100000"), booking.getRefundedAmount());
     }
 
     @Test
@@ -118,17 +119,12 @@ class AutoStayLifecycleSchedulerTest {
         // Ejecutar a las 13:30 (pasadas las 13:00 límite)
         scheduler.processAutoCheckOuts(today, LocalTime.of(13, 30));
 
-        verify(bookingService, atLeastOnce()).changeBookingStatus(
-                eq(booking), eq(BookingStatus.CHECKED_OUT), any(), any()
+        verify(bookingService).processCheckOut(
+                eq("bk-late-1"),
+                eq("System-AutoStayLifecycle"),
+                anyString(),
+                eq(true)
         );
-
-        // Recargo de 50% de 300000 = 150000; base habitación 500000 + 150000 = 650000 -> fee 8% = 52000, host 92% = 598000
-        assertEquals(new BigDecimal("750000.00"), booking.getTotalPrice());
-        assertEquals(new BigDecimal("150000.00"), booking.getBalanceDue());
-        assertEquals(new BigDecimal("52000.00"), booking.getPlatformFee());
-        assertEquals(new BigDecimal("598000.00"), booking.getHostPayout());
-        assertNull(booking.getSmartLockPin()); // PIN desactivado al cerrar
-        assertTrue(booking.getGuaranteeRefunded());
     }
 
     @Test

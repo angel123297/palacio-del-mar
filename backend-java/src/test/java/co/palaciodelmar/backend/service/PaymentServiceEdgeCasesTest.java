@@ -181,6 +181,35 @@ class PaymentServiceEdgeCasesTest {
     }
 
     @Test
+    void testOverpaymentRejectsExtraPaymentOnPendingBooking() {
+        Booking booking = Booking.builder()
+                .id("book-pending-over")
+                .status("pending")
+                .totalPrice(new BigDecimal("1000"))
+                .paidAmount(new BigDecimal("600"))
+                .balanceDue(new BigDecimal("400"))
+                .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-pending-over")
+                .booking("book-pending-over")
+                .amount(new BigDecimal("500")) // Exceeds balanceDue of 400!
+                .status("pending")
+                .intentId("intent-pending-over")
+                .build();
+
+        when(paymentRepository.findByIntentId("intent-pending-over")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("book-pending-over")).thenReturn(Optional.of(booking));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment(null, "intent-pending-over", "tok_test")
+        );
+        assertEquals("El monto del intento de pago (500) excede el saldo pendiente actual (400)", ex.getMessage());
+        verify(paymentGateway, never()).confirmIntent(any(), any());
+    }
+
+    @Test
     void testConfirmPaymentOnAlreadyCompletedIntentReturnsIdempotently() {
         Booking booking = Booking.builder()
                 .id("book-paid")

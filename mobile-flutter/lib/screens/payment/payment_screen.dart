@@ -408,7 +408,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       bk['code'] ??
                       'PDM-CONFIRMADO')
                   .toString();
-              final smartPin = (updatedBooking['smartLockPin'] ?? bk['smartLockPin'] ?? '182786').toString();
+              final smartPin = (updatedBooking['smartLockPin'] ?? bk['smartLockPin'] ?? '').toString();
 
               final fullBookingMap = Map<String, dynamic>.from(bk);
               fullBookingMap['smartLockPin'] = smartPin;
@@ -477,23 +477,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
             message: 'Tarjeta expirada / vencida (0069).',
           );
         } else {
-          // Fallback exitoso si fue 4242 o PSE/Nequi
-          final bookingCode = (bk['bookingCode'] ?? bk['code'] ?? 'PDM-CONFIRMADO').toString();
-          final smartPin = (bk['smartLockPin'] ?? '182786').toString();
-          final fullBookingMap = Map<String, dynamic>.from(bk);
-          fullBookingMap['smartLockPin'] = smartPin;
-          fullBookingMap['status'] = 'CONFIRMED';
-          fullBookingMap['paymentStatus'] = 'paid';
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => BookingReceiptScreen(
-                booking: fullBookingMap,
-                amount: amountVal,
-                bookingCode: bookingCode,
-              ),
-            ),
+          _showResultDialog(
+            isSuccess: false,
+            title: 'Tiempo de Espera Agotado',
+            message: 'No pudimos confirmar el estado de tu pago en este momento. Por favor verifica tu entidad bancaria o consulta el estado de tu reserva en Mis Reservas.',
           );
         }
       }

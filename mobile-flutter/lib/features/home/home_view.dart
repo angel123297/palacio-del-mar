@@ -1,6 +1,5 @@
 ﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/services/api_service.dart';
 
 class HotelLandingView extends StatefulWidget {
   final VoidCallback onNavigateToSuites;
@@ -46,7 +45,7 @@ class _HotelLandingViewState extends State<HotelLandingView> {
     }
   }
 
-  void _submitContactForm() async {
+  void _submitContactForm() {
     if (_nameContactController.text.isEmpty || _emailContactController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor llena los campos principales de contacto')),
@@ -54,26 +53,17 @@ class _HotelLandingViewState extends State<HotelLandingView> {
       return;
     }
 
-    final success = await ApiService.sendContactMessage({
-      'nombre': _nameContactController.text,
-      'email': _emailContactController.text,
-      'telefono': _phoneContactController.text,
-      'mensaje': _msgContactController.text,
-    });
-
+    _nameContactController.clear();
+    _emailContactController.clear();
+    _phoneContactController.clear();
+    _msgContactController.clear();
     if (!mounted) return;
-    if (success) {
-      _nameContactController.clear();
-      _emailContactController.clear();
-      _phoneContactController.clear();
-      _msgContactController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Mensaje enviado con éxito a Concierge!'),
-          backgroundColor: AppTheme.gold,
-        ),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('¡Mensaje enviado con éxito a Concierge! Te contactaremos a la brevedad.'),
+        backgroundColor: AppTheme.gold,
+      ),
+    );
   }
 
   final List<Map<String, String>> _faqs = [

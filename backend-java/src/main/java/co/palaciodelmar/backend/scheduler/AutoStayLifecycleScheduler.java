@@ -121,105 +121,23 @@ public class AutoStayLifecycleScheduler {
             boolean isCheckOutDayReady = today.isEqual(candidate.getCheckOut()) && nowTime.getHour() >= autoCheckOutHour;
 
             if (isPastCheckOutDate || isCheckOutDayReady) {
+                Booking fresh = bookingRepository.findById(candidate.getId()).orElse(null);
+                if (fresh == null || !"checked_in".equalsIgnoreCase(fresh.getStatus()) || fresh.getCheckOut() == null) {
+                    continue;
+                }
+                boolean freshPast = today.isAfter(fresh.getCheckOut());
+                boolean freshReady = today.isEqual(fresh.getCheckOut()) && nowTime.getHour() >= autoCheckOutHour;
+                if (!freshPast && !freshReady) {
+                    continue;
+                }
                 try {
-                    executeWithBookingLock(candidate.getId(), () -> {
-                        Booking booking = bookingRepository.findById(candidate.getId()).orElse(null);
-                        if (booking == null || !"checked_in".equalsIgnoreCase(booking.getStatus()) || booking.getCheckOut() == null) {
-                            return null;
-                        }
-                        boolean freshPast = today.isAfter(booking.getCheckOut());
-                        boolean freshReady = today.isEqual(booking.getCheckOut()) && nowTime.getHour() >= autoCheckOutHour;
-                        if (!freshPast && !freshReady) {
-                            return null;
-                        }
-
-                        // Late check-out automático: aplica si el PIN sigue activo pasadas las 13:00 ANTES de cerrar
-                        boolean isPast13 = freshPast || (today.isEqual(booking.getCheckOut()) && (nowTime.getHour() >= 13 || nowTime.isAfter(LocalTime.of(13, 0))));
-                        boolean pinStillActive = booking.getSmartLockPin() != null && !booking.getSmartLockPin().isBlank();
-
-                        if (isPast13 && pinStillActive && booking.getPricePerNight() != null) {
-                            BigDecimal currentTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
-                            BigDecimal currentBalance = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
-                            BigDecimal recargo = booking.getPricePerNight().multiply(new BigDecimal("0.50")).setScale(2, RoundingMode.HALF_UP);
-                            booking.setTotalPrice(currentTotal.add(recargo));
-                            booking.setBalanceDue(currentBalance.add(recargo));
-                            booking.setPaymentStatus("partial");
-
-                            // Recalcular comisión de plataforma (8%) y liquidación del anfitrión (92%) incluyendo el recargo
-                            BigDecimal currentFee = booking.getPlatformFee() != null ? booking.getPlatformFee() : BigDecimal.ZERO;
-                            BigDecimal currentHostPayout = booking.getHostPayout() != null ? booking.getHostPayout() : BigDecimal.ZERO;
-                            if (currentFee.signum() > 0 || currentHostPayout.signum() > 0) {
-                                BigDecimal recargoFee = recargo.multiply(PLATFORM_FEE_RATE).setScale(2, RoundingMode.HALF_UP);
-                                BigDecimal recargoHost = recargo.subtract(recargoFee);
-                                booking.setPlatformFee(currentFee.add(recargoFee));
-                                booking.setHostPayout(currentHostPayout.add(recargoHost));
-                            } else {
-                                BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
-                                BigDecimal baseRoom = booking.getSubtotal() != null
-                                        ? booking.getSubtotal()
-                                        : currentTotal.subtract(deposit).max(BigDecimal.ZERO);
-                                BigDecimal newRoomBase = baseRoom.add(recargo);
-                                BigDecimal totalFee = newRoomBase.multiply(PLATFORM_FEE_RATE).setScale(2, RoundingMode.HALF_UP);
-                                booking.setPlatformFee(totalFee);
-                                booking.setHostPayout(newRoomBase.subtract(totalFee));
-                            }
-
-                            booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Recargo automático Late Check-out aplicado: $" + recargo);
-                        }
-
-                        // Desactivar el PIN de la cerradura inteligente al cerrar
-                        booking.setSmartLockPin(null);
-
-                        // Devolución automática del depósito de garantía
-                        BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
-                        if (deposit.signum() > 0 && !Boolean.TRUE.equals(booking.getGuaranteeRefunded())) {
-                            BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
-                            BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
-                            BigDecimal refundable = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
-                            boolean gatewayRefundOk = true;
-                            if (refundable.signum() > 0 && paymentGateway != null) {
-                                String depKey = "ref_dep_" + booking.getId();
-                                try {
-                                    co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse resp =
-                                            paymentGateway.refund("tx_" + booking.getId(), refundable, depKey);
-                                    if (resp == null || !resp.success()) {
-                                        gatewayRefundOk = false;
-                                        booking.setPendingRefundAmount(refundable);
-                                        booking.setPendingRefundIdempotencyKey(depKey);
-                                        booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Reembolso de depósito pendiente en pasarela: $" + refundable);
-                                    } else if (resp.refundId() != null) {
-                                        if (booking.getProcessedRefundIds() == null) {
-                                            booking.setProcessedRefundIds(new java.util.ArrayList<>());
-                                        }
-                                        if (!booking.getProcessedRefundIds().contains(resp.refundId())) {
-                                            booking.getProcessedRefundIds().add(resp.refundId());
-                                        }
-                                    }
-                                } catch (Exception ex) {
-                                    gatewayRefundOk = false;
-                                    booking.setPendingRefundAmount(refundable);
-                                    booking.setPendingRefundIdempotencyKey(depKey);
-                                    booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Reembolso de depósito pendiente en pasarela: $" + refundable);
-                                }
-                            }
-                            if (gatewayRefundOk) {
-                                booking.setRefundedAmount(refunded.add(refundable));
-                                booking.setGuaranteeRefunded(true);
-                                booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto automáticamente: $" + refundable);
-                            }
-                        }
-
-                        bookingService.changeBookingStatus(
-                                booking,
-                                BookingStatus.CHECKED_OUT,
-                                "System-AutoStayLifecycle",
-                                "Auto Check-out programado ejecutado a la hora límite (" + autoCheckOutHour + ":00)"
-                        );
-                        bookingRepository.save(booking);
-
-                        log.info("Auto Check-out procesado para reserva {} (Garantía reembolsada, suite liberada)", booking.getId());
-                        return null;
-                    });
+                    bookingService.processCheckOut(
+                            candidate.getId(),
+                            "System-AutoStayLifecycle",
+                            "Auto Check-out programado ejecutado a la hora límite (" + autoCheckOutHour + ":00)",
+                            true
+                    );
+                    log.info("Auto Check-out procesado para reserva {}", candidate.getId());
                 } catch (Exception e) {
                     log.error("Error al procesar auto check-out para reserva {}: {}", candidate.getId(), e.getMessage());
                 }

@@ -411,7 +411,8 @@ public class PaymentWebhookService {
             Payment payment = paymentRepository.findByIntentId(data.getIntentId()).orElse(initialPayment);
             BigDecimal paymentTotal = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
             BigDecimal currentPaymentRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount() : BigDecimal.ZERO;
-            BigDecimal refundAmount = data.getAmount() != null ? data.getAmount() : paymentTotal;
+            BigDecimal rawRefund = data.getAmount() != null ? data.getAmount() : paymentTotal;
+            BigDecimal refundAmount = rawRefund.max(BigDecimal.ZERO);
 
             Booking booking = (payment.getBooking() != null && !payment.getBooking().isBlank())
                     ? bookingRepository.findById(payment.getBooking()).orElse(null)
@@ -424,12 +425,17 @@ public class PaymentWebhookService {
             boolean paymentAlreadyFullyRefunded = "refunded".equalsIgnoreCase(payment.getStatus())
                     && paymentTotal.compareTo(BigDecimal.ZERO) > 0
                     && currentPaymentRefunded.compareTo(paymentTotal) >= 0;
+            boolean isUnprocessedSurplusPayment = booking != null
+                    && booking.getProcessedPaymentIds() != null
+                    && !booking.getProcessedPaymentIds().isEmpty()
+                    && payment.getId() != null
+                    && !booking.getProcessedPaymentIds().contains(payment.getId());
             boolean bookingAlreadyProcessed = booking != null && booking.getProcessedRefundIds() != null && (
                     (eventId != null && booking.getProcessedRefundIds().contains(eventId))
                     || (refundId != null && booking.getProcessedRefundIds().contains(refundId))
             );
 
-            if ((paymentAlreadyProcessed || paymentAlreadyFullyRefunded) && (booking == null || bookingAlreadyProcessed)) {
+            if ((paymentAlreadyProcessed || paymentAlreadyFullyRefunded) && (booking == null || bookingAlreadyProcessed || isUnprocessedSurplusPayment)) {
                 log.info("Evento de reembolso {} / {} ya aplicado previamente en payment {} y booking; omitiendo reprocesamiento", eventId, refundId, payment.getId());
                 return;
             }
@@ -441,9 +447,9 @@ public class PaymentWebhookService {
             if (!paymentAlreadyProcessed && !paymentAlreadyFullyRefunded) {
                 BigDecimal newPaymentRefunded;
                 if (isCancelled && currentPaymentRefunded.compareTo(BigDecimal.ZERO) > 0 && !hasUnsettledCancelRefund && refundId == null) {
-                    newPaymentRefunded = currentPaymentRefunded.max(refundAmount).min(paymentTotal);
+                    newPaymentRefunded = currentPaymentRefunded.max(refundAmount).min(paymentTotal).max(BigDecimal.ZERO);
                 } else {
-                    newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal);
+                    newPaymentRefunded = currentPaymentRefunded.add(refundAmount).min(paymentTotal).max(BigDecimal.ZERO);
                 }
                 String nextPaymentStatus = (paymentTotal.compareTo(BigDecimal.ZERO) > 0 && newPaymentRefunded.compareTo(paymentTotal) >= 0)
                         ? "refunded"
@@ -495,7 +501,11 @@ public class PaymentWebhookService {
                 }
             }
 
-            if (booking == null || bookingAlreadyProcessed) {
+            if (booking == null || bookingAlreadyProcessed || isUnprocessedSurplusPayment) {
+                if (isUnprocessedSurplusPayment) {
+                    log.info("Omitiendo actualización de Booking {} para reembolso de pago {} porque el pago no pertenece a processedPaymentIds de la reserva",
+                            booking.getId(), payment.getId());
+                }
                 return;
             }
 
@@ -505,7 +515,7 @@ public class PaymentWebhookService {
             BigDecimal currentRefunded = booking.getRefundedAmount() != null
                     ? booking.getRefundedAmount().max(BigDecimal.ZERO)
                     : BigDecimal.ZERO;
-            BigDecimal rawRefund = data.getAmount() != null
+            rawRefund = data.getAmount() != null
                     ? data.getAmount()
                     : (payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO);
             BigDecimal eventRefund = rawRefund.max(BigDecimal.ZERO);
