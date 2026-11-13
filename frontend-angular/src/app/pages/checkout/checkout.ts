@@ -239,11 +239,11 @@ import { finalize, switchMap } from 'rxjs';
              <div style="border-top: 1px dashed rgba(212,175,55,0.4); padding-top: 1.5rem; margin-bottom: 1.5rem;">
                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                  <span style="font-size: 1rem; color: #ccc;">Subtotal (sin IVA)</span>
-                 <span style="font-size: 1rem; color: #fff;">$ {{ netSubtotal | number:'1.0-0' }}</span>
+                 <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice / 1.19) | number:'1.0-0' }}</span>
                </div>
                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                  <span style="font-size: 1rem; color: #ccc;">IVA (19%)</span>
-                 <span style="font-size: 1rem; color: #fff;">$ {{ netIva | number:'1.0-0' }}</span>
+                 <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice - (booking.totalPrice / 1.19)) | number:'1.0-0' }}</span>
                </div>
                <div *ngIf="booking.guaranteeDeposit && booking.guaranteeDeposit > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                  <span style="font-size: 1rem; color: #ccc;">Depósito Garantía (Reembolsable)</span>
@@ -307,22 +307,6 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   get paymentAmount(): number {
     return this.balanceDue;
-  }
-
-  /** Base gravable del servicio de alojamiento (el depósito de garantía es fianza reembolsable, no causa IVA). */
-  get taxableAmount(): number {
-    if (!this.booking) return 0;
-    const total = this.booking.totalPrice || 0;
-    const guarantee = this.booking.guaranteeDeposit || 0;
-    return Math.max(0, total - guarantee);
-  }
-
-  get netSubtotal(): number {
-    return Math.round(this.taxableAmount / 1.19);
-  }
-
-  get netIva(): number {
-    return Math.max(0, this.taxableAmount - this.netSubtotal);
   }
 
   constructor(

@@ -38,7 +38,7 @@ class HostBankAccountTest {
         PropertyRepository propertyRepo = mock(PropertyRepository.class);
         userRepository = mock(UserRepository.class);
 
-        hostController = new HostController(bookingRepo, suiteRepo, bookingService, promotionRepo, propertyRepo, mock(co.palaciodelmar.backend.service.AdminService.class));
+        hostController = new HostController(bookingRepo, suiteRepo, bookingService, promotionRepo, propertyRepo);
         ReflectionTestUtils.setField(hostController, "userRepository", userRepository);
 
         hostUser = User.builder()

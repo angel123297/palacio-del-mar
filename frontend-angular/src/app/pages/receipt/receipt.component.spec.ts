@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { SecurityContext } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -56,12 +56,6 @@ describe('ReceiptComponent', () => {
     fixture = TestBed.createComponent(ReceiptComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
-  });
-
-  afterEach(() => {
-    fixture?.destroy();
-    TestBed.resetTestingModule();
-    vi.clearAllMocks();
   });
 
   it('debe crearse e inicializar el comprobante con la reserva', () => {

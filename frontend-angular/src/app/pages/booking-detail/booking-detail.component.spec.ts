@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { BookingDetailComponent } from './booking-detail.component';
 import { provideHttpClient } from '@angular/common/http';
@@ -73,12 +73,6 @@ describe('BookingDetailComponent (Anti-IDOR y Roles)', () => {
         }
       ]
     }).compileComponents();
-  });
-
-  afterEach(() => {
-    fixture?.destroy();
-    TestBed.resetTestingModule();
-    vi.clearAllMocks();
   });
 
   it('cuando un ANFITRIÓN consulta la reserva de un huésped: oculta Google Maps, oculta el form de calificar y muestra datos del huésped', () => {

@@ -314,8 +314,7 @@ class RoleAndIdorSecurityTest {
         co.palaciodelmar.backend.repository.PromotionRepository promoRepo = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
         co.palaciodelmar.backend.controller.HostController hostOpsController =
                 new co.palaciodelmar.backend.controller.HostController(
-                        bookingRepository, suiteRepository, bookingService, promoRepo, propertyRepository,
-                        mock(co.palaciodelmar.backend.service.AdminService.class));
+                        bookingRepository, suiteRepository, bookingService, promoRepo, propertyRepository);
 
         MockMvc opsMvc = MockMvcBuilders.standaloneSetup(hostOpsController)
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())

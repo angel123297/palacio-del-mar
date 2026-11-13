@@ -18,8 +18,9 @@ import java.time.LocalDate;
 public class PromotionRequest {
     @NotBlank(message = "El título de la promoción es obligatorio")
     private String title;
-    @NotBlank(message = "debes de especificar una sede o propiedad")
+
     private String branchId;
+    private String branch;
 
     private LocalDate startDate;
     private LocalDate endDate;
@@ -30,4 +31,11 @@ public class PromotionRequest {
     private Integer discountPercent;
 
     private String code;
+
+    public String resolveBranch() {
+        if (branchId != null && !branchId.isBlank()) {
+            return branchId;
+        }
+        return branch;
+    }
 }

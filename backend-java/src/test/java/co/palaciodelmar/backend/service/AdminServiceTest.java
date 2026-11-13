@@ -1,7 +1,6 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.model.Booking;
-import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,9 +12,6 @@ import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 class AdminServiceTest {
@@ -27,7 +23,6 @@ class AdminServiceTest {
     private SuiteNightRepository suiteNightRepository;
     private BookingService bookingService;
     private PropertyRepository propertyRepository;
-    private BranchRepository branchRepository;
     private PaymentRepository paymentRepository;
     private PaymentGateway paymentGateway;
 
@@ -42,7 +37,6 @@ class AdminServiceTest {
         suiteNightRepository = mock(SuiteNightRepository.class);
         bookingService = mock(BookingService.class);
         propertyRepository = mock(PropertyRepository.class);
-        branchRepository = mock(BranchRepository.class);
         paymentRepository = mock(PaymentRepository.class);
         paymentGateway = mock(PaymentGateway.class);
 
@@ -54,7 +48,6 @@ class AdminServiceTest {
                 suiteNightRepository,
                 bookingService,
                 propertyRepository,
-                branchRepository,
                 paymentRepository,
                 paymentGateway
         );

@@ -25,7 +25,6 @@ public class AdminService {
     private final SuiteNightRepository suiteNightRepository;
     private final BookingService bookingService;
     private final PropertyRepository propertyRepository;
-    private final BranchRepository branchRepository;
     private final PaymentRepository paymentRepository;
     private final PaymentGateway paymentGateway;
 
@@ -44,7 +43,6 @@ public class AdminService {
             SuiteNightRepository suiteNightRepository,
             BookingService bookingService,
             @org.springframework.beans.factory.annotation.Autowired(required = false) PropertyRepository propertyRepository,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) BranchRepository branchRepository,
             @org.springframework.beans.factory.annotation.Autowired(required = false) PaymentRepository paymentRepository,
             @org.springframework.beans.factory.annotation.Autowired(required = false) PaymentGateway paymentGateway
     ) {
@@ -55,7 +53,6 @@ public class AdminService {
         this.suiteNightRepository = suiteNightRepository;
         this.bookingService = bookingService;
         this.propertyRepository = propertyRepository;
-        this.branchRepository = branchRepository;
         this.paymentRepository = paymentRepository;
         this.paymentGateway = paymentGateway;
     }
@@ -189,18 +186,6 @@ public class AdminService {
     }
 
     public Promotion createPromotion(Promotion promotion) {
-        String targetScope = promotion.getBranch();
-        if (targetScope == null || targetScope.isBlank()) {
-            throw new IllegalArgumentException("La promoción debe especificar una sede, una propiedad o 'all' como alcance");
-        }
-        if (!"all".equalsIgnoreCase(targetScope)) {
-            boolean esSede = branchRepository != null && branchRepository.existsById(targetScope);
-            boolean esPropiedad = propertyRepository != null && propertyRepository.existsById(targetScope);
-            if (!esSede && !esPropiedad) {
-                throw new IllegalArgumentException(
-                        "La sede o propiedad especificada no existe: " + targetScope);
-            }
-        }
         promotion.setCreatedAt(Instant.now());
         promotion.setUpdatedAt(Instant.now());
         Promotion saved = promotionRepository.save(promotion);

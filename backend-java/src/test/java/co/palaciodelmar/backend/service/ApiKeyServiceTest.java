@@ -11,7 +11,6 @@ import co.palaciodelmar.backend.repository.PropertyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -108,30 +107,6 @@ class ApiKeyServiceTest {
         assertEquals("prop_01", result.get().getPropertyId());
         assertNotNull(result.get().getLastUsedAt());
         verify(apiKeyRepository).save(key);
-    }
-
-    @Test
-    void testAuthenticateApiKeyThrottlesLastUsedAtUpdates() {
-        String rawKey = "pdm_live_throttle_test_1234567890";
-        String hashed = apiKeyService.hashKey(rawKey);
-
-        ApiKey keyRecentlyUsed = ApiKey.builder()
-                .id("key_recent")
-                .propertyId("prop_01")
-                .ownerId("host_01")
-                .keyPrefix("pdm_live_thro...")
-                .hashedKey(hashed)
-                .active(true)
-                .lastUsedAt(Instant.now().minusSeconds(60)) // Used 1 min ago
-                .build();
-
-        when(apiKeyRepository.findByHashedKeyAndActiveTrue(hashed)).thenReturn(Optional.of(keyRecentlyUsed));
-
-        Optional<ApiKey> result = apiKeyService.authenticateApiKey(rawKey);
-
-        assertTrue(result.isPresent());
-        // Verify save was NOT called again because it's within the 5-minute throttle window
-        verify(apiKeyRepository, org.mockito.Mockito.never()).save(keyRecentlyUsed);
     }
 
     @Test

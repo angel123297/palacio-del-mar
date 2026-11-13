@@ -1,4 +1,3 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { VerifyEmail } from './verify-email';
 import { provideHttpClient } from '@angular/common/http';
@@ -17,11 +16,6 @@ describe('VerifyEmail', () => {
     fixture = TestBed.createComponent(VerifyEmail);
     component = fixture.componentInstance;
     fixture.detectChanges();
-  });
-
-  afterEach(() => {
-    fixture?.destroy();
-    TestBed.resetTestingModule();
   });
 
   it('should create', () => {

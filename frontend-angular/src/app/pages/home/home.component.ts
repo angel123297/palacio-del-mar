@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { HeroComponent } from '../../components/hero/hero.component';
 import { BookingBarComponent } from '../../components/booking-bar/booking-bar.component';
@@ -17,7 +17,6 @@ import { ConciergeChatComponent } from '../../components/concierge-chat/concierg
   standalone: true,
   imports: [
     CommonModule,
-    RouterModule,
     HeroComponent,
     BookingBarComponent,
     BranchSelectorComponent,
@@ -42,21 +41,20 @@ import { ConciergeChatComponent } from '../../components/concierge-chat/concierg
     </ng-container>
   `
 })
-export class HomeComponent {
-  constructor(private auth: AuthService) {}
+export class HomeComponent implements OnInit {
+  constructor(private auth: AuthService, private router: Router) {}
 
   get isCorporateUser(): boolean {
     const role = (this.auth.currentUser()?.role || '').toLowerCase();
     return role === 'admin' || role === 'host' || role === 'anfitrion';
   }
 
-  get corporateRoleLabel(): string {
+  ngOnInit(): void {
     const role = (this.auth.currentUser()?.role || '').toLowerCase();
-    return role === 'admin' ? 'Administrador' : 'Anfitrión';
-  }
-
-  get corporatePortalUrl(): string {
-    const role = (this.auth.currentUser()?.role || '').toLowerCase();
-    return role === 'admin' ? '/admin' : '/anfitrion';
+    if (role === 'admin') {
+      this.router.navigate(['/admin']);
+    } else if (role === 'host' || role === 'anfitrion') {
+      this.router.navigate(['/anfitrion']);
+    }
   }
 }

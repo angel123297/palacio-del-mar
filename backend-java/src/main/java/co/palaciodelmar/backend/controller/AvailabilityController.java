@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -66,7 +65,7 @@ public class AvailabilityController {
     public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getPeakDates(
             @RequestParam(required = false) Integer year
     ) {
-        int targetYear = year != null ? year : LocalDate.now(ZoneId.of("America/Bogota")).getYear();
+        int targetYear = year != null ? year : LocalDate.now().getYear();
         java.util.Map<String, Object> data = availabilityService.getPeakDates(targetYear);
         return ResponseEntity.ok(ApiResponse.ok(data));
     }

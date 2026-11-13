@@ -28,7 +28,7 @@ public class BranchService {
 
         List<BranchResponseDTO> dtoList = new ArrayList<>(branches.stream().map(b -> {
             List<Suite> branchSuites = activeSuites.stream()
-                    .filter(s -> b.getId().equals(s.getBranch()))
+                    .filter(s -> b.getId().equals(s.getBranch()) || (b.getSlug() != null && b.getSlug().equalsIgnoreCase(s.getBranch())))
                     .toList();
             BigDecimal minPrice = branchSuites.stream()
                     .map(Suite::getBasePrice)

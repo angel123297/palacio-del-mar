@@ -267,7 +267,6 @@ public class GeoSearchService {
 
         double[] origin = resolveSuiteCoordinates(suiteIdOrSlug.trim());
         return findNearby(origin[0], origin[1], radiusKm, typeFilter, limit).stream()
-                .filter(p -> !"PROPERTY".equalsIgnoreCase(p.getType()))
                 .filter(p -> p.getDistanceKm() == null || p.getDistanceKm() > 0.01 || !"BRANCH".equalsIgnoreCase(p.getType()))
                 .toList();
     }
@@ -359,7 +358,8 @@ public class GeoSearchService {
             if (suiteOpt.isPresent()) {
                 Suite s = suiteOpt.get();
                 if (s.getBranch() != null && branchRepository != null) {
-                    Optional<Branch> br = branchRepository.findById(s.getBranch());
+                    Optional<Branch> br = branchRepository.findById(s.getBranch())
+                            .or(() -> branchRepository.findBySlug(s.getBranch().toLowerCase()));
                     if (br.isPresent() && br.get().getLocation() != null
                             && isValidCoord(br.get().getLocation().getLat(), br.get().getLocation().getLng())) {
                         return new double[]{br.get().getLocation().getLat(), br.get().getLocation().getLng()};

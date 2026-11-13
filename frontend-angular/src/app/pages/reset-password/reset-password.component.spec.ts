@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ResetPasswordComponent } from './reset-password.component';
 import { provideHttpClient } from '@angular/common/http';
-import { provideRouter, ActivatedRoute, convertToParamMap } from '@angular/router';
+import { provideRouter, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { of, throwError } from 'rxjs';
 
@@ -26,8 +26,8 @@ describe('ResetPasswordComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: {
-              paramMap: convertToParamMap({ token: 'valid-token-123' }),
-              queryParamMap: convertToParamMap({})
+              paramMap: { get: (key: string) => (key === 'token' ? 'valid-token-123' : null) },
+              queryParamMap: { get: () => null }
             }
           }
         }
@@ -37,12 +37,6 @@ describe('ResetPasswordComponent', () => {
     fixture = TestBed.createComponent(ResetPasswordComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
-  });
-
-  afterEach(() => {
-    fixture?.destroy();
-    TestBed.resetTestingModule();
-    vi.clearAllMocks();
   });
 
   it('debe crearse correctamente e inicializar el token de la ruta', () => {

@@ -247,13 +247,8 @@ public class BookingService {
         }
 
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
-        if (request.getGuests() != null) {
-            if (request.getGuests() < 1) {
-                throw new IllegalArgumentException("El número de huéspedes debe ser al menos 1");
-            }
-            if (request.getGuests() > maxGuests) {
-                throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
-            }
+        if (request.getGuests() != null && (request.getGuests() < 1 || request.getGuests() > maxGuests)) {
+            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
         }
 
         if (request.getCheckIn() == null || request.getCheckOut() == null) {
@@ -299,7 +294,7 @@ public class BookingService {
                 throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
             }
 
-            Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), suite.getPropertyId(), request.getCheckIn(), request.getCheckIn().plusDays(nights));
+            Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), request.getCheckIn(), request.getCheckIn().plusDays(nights));
             BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null
                     ? BigDecimal.valueOf(activePromo.getDiscountPercent())
                     : BigDecimal.ZERO;
@@ -494,13 +489,8 @@ public class BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada"));
 
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
-        if (request.getGuests() != null) {
-            if (request.getGuests() < 1) {
-                throw new IllegalArgumentException("El número de huéspedes debe ser al menos 1");
-            }
-            if (request.getGuests() > maxGuests) {
-                throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
-            }
+        if (request.getGuests() != null && (request.getGuests() < 1 || request.getGuests() > maxGuests)) {
+            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
         }
 
         if (request.getCheckIn() == null || request.getCheckOut() == null) {
@@ -572,7 +562,7 @@ public class BookingService {
                 throw new IllegalArgumentException("La suite no está disponible para las fechas seleccionadas");
             }
 
-            Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), suite.getPropertyId(), request.getCheckIn(), request.getCheckOut());
+            Promotion activePromo = findActiveBranchPromotionEntity(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
             BigDecimal branchPromoPercent = activePromo != null && activePromo.getDiscountPercent() != null
                     ? BigDecimal.valueOf(activePromo.getDiscountPercent())
                     : BigDecimal.ZERO;

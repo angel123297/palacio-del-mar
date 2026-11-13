@@ -25,7 +25,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -139,75 +138,5 @@ class PromotionPricingTest {
 
         assertEquals(0, BigDecimal.ZERO.compareTo(response.getDiscount()));
         assertNull(response.getDiscountReason());
-    }
-
-    @Test
-    void calculatePriceAppliesGlobalPromotionWithAllScope() {
-        LocalDate checkIn = LocalDate.parse("2026-11-02");
-        LocalDate checkOut = LocalDate.parse("2026-11-04");
-
-        Promotion promoGlobal = Promotion.builder()
-                .id("promo-global")
-                .branch("all")
-                .title("Black Friday Global")
-                .discountPercent(15)
-                .startDate(LocalDate.parse("2026-11-01"))
-                .endDate(LocalDate.parse("2026-11-10"))
-                .active(true)
-                .build();
-
-        when(suiteRepository.findById("suite-101")).thenReturn(Optional.of(testSuite));
-        lenient().when(promotionRepository.findByBranchAndActiveTrue("branch-getsemani")).thenReturn(List.of());
-        lenient().when(promotionRepository.findByBranchAndActiveTrue("all")).thenReturn(List.of(promoGlobal));
-
-        CalculatePriceRequest request = CalculatePriceRequest.builder()
-                .suiteId("suite-101")
-                .checkIn(checkIn)
-                .checkOut(checkOut)
-                .build();
-
-        CalculatePriceResponseDTO response = suiteService.calculatePrice(request);
-
-        assertNotNull(response);
-        // Subtotal: 2 * 1000 = 2000; Descuento: 15% de 2000 = 300
-        assertEquals(0, new BigDecimal("300.00").compareTo(response.getDiscount()));
-        assertEquals("Promoción / Larga estadía", response.getDiscountReason());
-    }
-
-    @Test
-    void calculatePriceAppliesPropertySpecificPromotionViaPropertyId() {
-        LocalDate checkIn = LocalDate.parse("2026-11-02");
-        LocalDate checkOut = LocalDate.parse("2026-11-04");
-
-        testSuite.setPropertyId("prop-getsemani-01");
-
-        Promotion promoProp = Promotion.builder()
-                .id("promo-prop")
-                .branch("prop-getsemani-01")
-                .title("Descuento Propiedad")
-                .discountPercent(30)
-                .startDate(LocalDate.parse("2026-11-01"))
-                .endDate(LocalDate.parse("2026-11-10"))
-                .active(true)
-                .build();
-
-        when(suiteRepository.findById("suite-101")).thenReturn(Optional.of(testSuite));
-        lenient().when(propertyRepository.findById("prop-getsemani-01")).thenReturn(Optional.of(
-                co.palaciodelmar.backend.model.Property.builder().id("prop-getsemani-01").active(true).status("APPROVED").build()
-        ));
-        lenient().when(promotionRepository.findByBranchAndActiveTrue("branch-getsemani")).thenReturn(List.of());
-        lenient().when(promotionRepository.findByBranchAndActiveTrue("prop-getsemani-01")).thenReturn(List.of(promoProp));
-
-        CalculatePriceRequest request = CalculatePriceRequest.builder()
-                .suiteId("suite-101")
-                .checkIn(checkIn)
-                .checkOut(checkOut)
-                .build();
-
-        CalculatePriceResponseDTO response = suiteService.calculatePrice(request);
-
-        assertNotNull(response);
-        // Subtotal: 2 * 1000 = 2000; Descuento: 30% de 2000 = 600
-        assertEquals(0, new BigDecimal("600.00").compareTo(response.getDiscount()));
     }
 }

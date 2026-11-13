@@ -2,6 +2,7 @@ package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.BookingDTO;
 import co.palaciodelmar.backend.dto.PaymentDTO;
+import co.palaciodelmar.backend.dto.PaymentRequest;
 import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Payment;
@@ -303,42 +304,26 @@ public class PaymentService {
         try {
             updatedBooking = bookingRepository.save(booking);
         } catch (org.springframework.dao.OptimisticLockingFailureException e) {
-            // Re-fetch Payment y Booking desde la BD para verificar si el webhook asíncrono ya aplicó el pago concurrentemente
-            Payment latestPayment = paymentRepository.findByIntentId(intentId).orElse(payment);
-            Booking latestBooking = (payment.getBooking() != null)
-                    ? bookingRepository.findById(payment.getBooking()).orElse(booking)
-                    : booking;
-
-            if ("completed".equalsIgnoreCase(latestPayment.getStatus())) {
-                log.info("Pago {} ya fue completado concurrentemente (webhook) tras OptimisticLockingFailureException. Devolviendo replay idempotente sin reembolsar.", intentId);
-                java.util.Map<String, Object> replayMap = new java.util.HashMap<>();
-                replayMap.put("payment", toDTO(latestPayment));
-                replayMap.put("booking", bookingService.toDTO(latestBooking));
-                replayMap.put("status", latestPayment.getStatus());
-                replayMap.put("transactionId", latestPayment.getTransactionId());
-                return replayMap;
-            }
-
-            // El cargo síncrono ya fue emitido pero no fue aplicado por concurrencia: registrar transactionId e intentar reversión inmediata en pasarela
-            latestPayment.setTransactionId(confirmResponse.transactionId());
+            // El cargo síncrono ya fue emitido: registrar transactionId e intentar reversión inmediata en pasarela
+            payment.setTransactionId(confirmResponse.transactionId());
             boolean refunded = false;
-            if (confirmResponse.transactionId() != null && !confirmResponse.transactionId().isBlank() && latestPayment.getAmount() != null) {
+            if (confirmResponse.transactionId() != null && !confirmResponse.transactionId().isBlank() && payment.getAmount() != null) {
                 try {
-                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(confirmResponse.transactionId(), latestPayment.getAmount());
+                    PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(confirmResponse.transactionId(), payment.getAmount());
                     refunded = (refundResp != null && refundResp.success());
                 } catch (Exception ignored) {
                 }
             }
-            latestPayment.setStatus(refunded ? "refunded" : "requires_refund");
-            latestPayment.setUpdatedAt(Instant.now());
-            latestPayment.setNotes(refunded
+            payment.setStatus(refunded ? "refunded" : "requires_refund");
+            payment.setUpdatedAt(Instant.now());
+            payment.setNotes(refunded
                     ? "Conflicto por concurrencia tras cobro síncrono. Reembolso automático emitido."
                     : "Conflicto por concurrencia tras cobro síncrono. Requiere reembolso manual.");
-            paymentRepository.save(latestPayment);
+            paymentRepository.save(payment);
 
-            if (suiteNightRepository != null && latestBooking.getId() != null) {
+            if (suiteNightRepository != null && booking.getId() != null) {
                 try {
-                    suiteNightRepository.deleteByBooking(latestBooking.getId());
+                    suiteNightRepository.deleteByBooking(booking.getId());
                     if (availabilityCacheEvictor != null) {
                         availabilityCacheEvictor.evictAvailability();
                     }

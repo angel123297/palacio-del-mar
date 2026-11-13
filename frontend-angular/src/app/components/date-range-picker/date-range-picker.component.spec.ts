@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { DateRangePickerComponent } from './date-range-picker.component';
@@ -57,12 +57,6 @@ describe('DateRangePickerComponent', () => {
     await component.loadMonth(2026, 11);
     await component.loadPeak(2026);
     fixture.detectChanges();
-  });
-
-  afterEach(() => {
-    fixture?.destroy();
-    TestBed.resetTestingModule();
-    vi.clearAllMocks();
   });
 
   it('should create and load monthly availability without marking totalSuites=0 as sold out', () => {
