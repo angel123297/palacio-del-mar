@@ -184,8 +184,8 @@ import { finalize, switchMap } from 'rxjs';
              
              <div style="display: flex; flex-direction: column; gap: 1.2rem; margin-bottom: 2rem;">
                <div>
-                 <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">Suite</span>
-                 <span style="font-weight: 600; font-size: 1.1rem;">{{ booking.suite?.name || 'Suite de Lujo' }}</span>
+                 <span style="display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 4px;">{{ isStandaloneExperience ? 'Actividad / Experiencia' : 'Suite' }}</span>
+                 <span style="font-weight: 600; font-size: 1.1rem;">{{ isStandaloneExperience ? (booking.experiences?.[0]?.name || 'Experiencia Exclusiva') : (booking.suite?.name || 'Suite de Lujo') }}</span>
                </div>
                
                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -204,7 +204,7 @@ import { finalize, switchMap } from 'rxjs';
                  <span style="font-weight: 600;">{{ booking.guests }} personas</span>
                </div>
                
-               <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 10px 15px; border-radius: 6px;">
+               <div *ngIf="!isStandaloneExperience" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 10px 15px; border-radius: 6px;">
                  <span style="color: #aaa;">Noches</span>
                  <span style="font-weight: 600;">{{ booking.nights || 1 }}</span>
                </div>
@@ -293,6 +293,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   private confirmIdempotencyKey = '';
 
   paymentForm: FormGroup;
+
+  get isStandaloneExperience(): boolean {
+    const sId = this.booking?.suite?.id || this.booking?.suite?._id || (typeof this.booking?.suite === 'string' ? this.booking?.suite : '');
+    return sId === 'standalone-experience' || !!(this.booking?.bookingCode && this.booking.bookingCode.startsWith('PDM-EXP'));
+  }
 
   get balanceDue(): number {
     if (!this.booking) return 0;

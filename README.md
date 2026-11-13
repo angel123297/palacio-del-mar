@@ -155,3 +155,40 @@ Servicios locales disponibles:
 | `**** **** **** 0002` | Tarjeta rechazada por la entidad bancaria (`payment.failed`) |
 | `**** **** **** 9995` | Fondos insuficientes (`payment.failed`) |
 | `**** **** **** 0069` | Tarjeta expirada / vencida (`payment.failed`) |
+
+---
+
+## 📱 Guía de Instalación Móvil (Directo desde tu Celular)
+
+Instala la aplicación de **Palacio del Mar** en tu dispositivo móvil en menos de 1 minuto, sin necesidad de cables ni computadores, sincronizada automáticamente y en tiempo real con la versión web del hotel.
+
+---
+
+### 🤖 1. En Dispositivos Android (APK Palacio Del Mar)
+
+Instala directamente la aplicación en tu celular Android descargando el paquete oficial:
+
+- 📲 **Descargar APK Palacio Del Mar:**
+  👉 **[Descargar APK Palacio Del Mar (v1.0.0 Oficial)](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)**
+- 📦 **Releases (Tag v1.0.0):**
+  👉 **[APK Palacio Del Mar (Release v1.0.0)](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)**
+
+#### Pasos para instalar en Android:
+1. **Descarga el APK:** Toca el enlace **[Descargar APK Palacio Del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)** desde tu celular.
+2. **Instala el archivo:** Abre la notificación de descarga finalizada (`palacio-del-mar-release.apk`). Si Android solicita permisos, presiona **Ajustes** y activa *"Permitir desde esta fuente"*, luego pulsa **Instalar**.
+3. **Listo para usar:** Abre la app **Palacio del Mar**. Puedes explorar suites, reservar con cuenta regresiva de 15 minutos, pagar con tu tarjeta o PSE/Nequi y obtener tu llave digital y comprobante en tiempo real.
+
+---
+
+### 🍏 2. En Dispositivos iOS (iPhone & iPad)
+
+En iPhone y iPad no se requiere descargar archivos. Accede directamente a la aplicación nativa desde el enlace oficial:
+
+👉 **[https://unbroke-unsized-zandra.ngrok-free.dev/app/](https://unbroke-unsized-zandra.ngrok-free.dev/app/)**
+
+> 💡 *Tip para PC:* Haz `Ctrl + Clic` (o clic con la rueda del ratón) sobre el enlace para abrirlo directamente en una pestaña nueva sin salir de GitHub. En tu iPhone / iPad tócalo directamente para abrir Safari.
+
+#### Pasos para instalar en iPhone / iPad:
+1. Abre el enlace anterior en tu navegador **Safari**.
+2. Presiona el botón de **Compartir** `⎋` y selecciona **"Agregar al inicio"** (*Add to Home Screen*).
+3. Se agregará el icono oficial de **Palacio del Mar** en tu pantalla de inicio, funcionando como app nativa a pantalla completa con soporte de pagos y llave digital.

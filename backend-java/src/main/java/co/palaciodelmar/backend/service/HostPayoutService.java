@@ -76,6 +76,12 @@ public class HostPayoutService {
                 .filter(b -> b.getPayoutId() == null)
                 .filter(b -> b.getCheckIn() != null && !b.getCheckIn().isAfter(today))
                 .filter(b -> b.getPaidAmount() != null && b.getPaidAmount().compareTo(BigDecimal.ZERO) > 0)
+                .filter(b -> b.getBalanceDue() == null || b.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0)
+                .filter(b -> {
+                    BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
+                    BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
+                    return paid.subtract(refunded).compareTo(BigDecimal.ZERO) > 0;
+                })
                 .toList();
 
         if (candidates.isEmpty()) {
@@ -131,8 +137,7 @@ public class HostPayoutService {
                     .propertyId(propId)
                     .propertyName(propName)
                     .ownerId(ownerId)
-                    .status("PROCESSED")
-                    .processedAt(Instant.now())
+                    .status("PENDING")
                     .createdAt(Instant.now())
                     .build();
 
@@ -174,8 +179,10 @@ public class HostPayoutService {
 
             if (settledBookings.size() < validBookings.size()) {
                 recomputePayoutTotals(savedPayout, settledBookings, today);
-                savedPayout = hostPayoutRepository.save(savedPayout);
             }
+            savedPayout.setStatus("PROCESSED");
+            savedPayout.setProcessedAt(Instant.now());
+            savedPayout = hostPayoutRepository.save(savedPayout);
 
             HostPayoutDTO dto = toDTO(savedPayout);
             generated.add(dto);

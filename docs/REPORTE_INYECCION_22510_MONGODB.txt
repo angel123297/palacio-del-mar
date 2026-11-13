@@ -1,0 +1,131 @@
+================================================================================
+   PALACIO DEL MAR - REPORTE TÉCNICO DE INYECCIÓN MASIVA (MONGODB)
+   Autores & Desarrolladores: Darío (Gatbat) & Abigail 🖤🐾
+   Fecha: 7 de Noviembre, 2026 | Hora: 12:49 PM (UTC-5)
+   Base de Datos: palacio_db | Colección: users | Conexión: mongodb://localhost:27017
+================================================================================
+
+1. RESUMEN EJECUTIVO
+--------------------------------------------------------------------------------
+A solicitud de la dirección técnica, se diseñó, desarrolló y ejecutó con éxito
+un protocolo automatizado de carga masiva para poblar la colección principal de
+usuarios ('users') en MongoDB con exactamente 22.510 documentos de alta variedad
+y fidelidad de datos, simulando meses de actividad real en la plataforma hotelera.
+
+2. PROTOCOLO TÉCNICO EJECUTADO PASO A PASO
+--------------------------------------------------------------------------------
+[PASO 1] CONSULTA INICIAL DE CONTROL
+  - Se realizó una lectura previa en 'palacio_db.users'.
+  - Conteo inicial registrado: 0 documentos.
+
+[PASO 2] LIMPIEZA ATÓMICA DE LA COLECCIÓN
+  - Se ejecutó un borrado completo mediante 'delete_many({})' para garantizar
+    un estado neutro, libre de registros huérfanos o índices corruptos.
+  - Registros eliminados: 0.
+  - Verificación post-borrado: 0 documentos confirmados.
+
+[PASO 3] GENERACIÓN SINTÉTICA DE ALTA VARIEDAD (22.510 REGISTROS)
+  Los datos fueron generados combinando algoritmos de dispersión y bancos de
+  información realista con estricta contextualización colombiana (Cartagena):
+  
+  A. GRUPO 1: Usuarios registrados pero NUNCA ingresados (loginCount = 0)
+     - Cantidad exacta: 4.500 documentos.
+     - Estado: 'pending_verification'.
+     - Correo verificado: false.
+     - Token criptográfico de verificación: Hash SHA-256 generado con expiración a 48h.
+     - Último acceso (lastLogin): null.
+
+  B. GRUPO 2: Usuarios registrados con SOLO 1 ingreso (loginCount = 1)
+     - Cantidad exacta: 5.000 documentos.
+     - Estado: 'active'.
+     - Correo verificado: true.
+     - Último acceso (lastLogin): Fecha pasada realista (1 a 12 horas tras registro).
+     - Token de verificación: null (consumido exitosamente).
+
+  C. GRUPO 3: Variedad Extrema ("Irse a lo loco con el resto")
+     - Cantidad exacta: 13.010 documentos.
+     - Inicios de sesión: Rango dinámico aleatorio entre 2 y 450 ingresos.
+     - Marcas de tiempo (lastLogin): Distribuidas a lo largo de los últimos 60 días.
+     - Distribución de Roles:
+       * Huéspedes ('user'): ~78%
+       * Anfitriones Boutique ('host'): ~19%
+       * Administradores del Sistema ('admin'): ~3%
+     - Diversidad de Estados:
+       * Activos ('active'): ~85%
+       * Inactivos ('inactive'): ~7%
+       * Suspendidos ('suspended'): ~5%
+       * Pendientes ('pending_verification'): ~3%
+     - Perfiles Financieros y Bancarios (Host Payouts en COP):
+       * Cuentas asociadas en Bancolombia, Davivienda, Nequi, Daviplata y Banco de Bogotá.
+       * Enmascaramiento de seguridad contable (ej. '****4819') y cédulas validadas.
+     - Localización Geográfica y Demografía:
+       * Direcciones reales en barrios turísticos de Cartagena de Indias:
+         Bocagrande, Castillogrande, Getsemaní, Centro Histórico, Manga, Crespo, Marbella.
+       * Teléfonos móviles colombianos válidos (+57 300/310/320...).
+       * Nombres y apellidos colombianos diversos con paridad de género.
+       * Avatares dinámicos basados en semillas de CDN.
+
+[PASO 4] INSERCIÓN MASIVA POR LOTES (BATCH INSERT)
+  - La carga se realizó en lotes de 5.000 documentos con 'ordered=False'.
+  - Tiempo de ejecución de la inserción: ~2.8 segundos.
+  - Cero colisiones de claves primarias (_id ObjectId BSON).
+
+[PASO 5] RECONSTRUCCIÓN DE ÍNDICES B-TREE
+  Para garantizar latencias sub-milisegundo en las consultas de Spring Boot,
+  se crearon e indexaron los siguientes campos en MongoDB:
+  - { email: 1 } (Índice ÚNICO estricto para prevención de duplicados)
+  - { status: 1 }
+  - { role: 1 }
+  - { loginCount: 1 }
+
+[PASO 6] AUDITORÍA Y CONTEO FINAL CONFIRMADO
+  - TOTAL REGISTROS EN BASE DE DATOS: 22.510 DOCUMENTOS
+  - Margen de error: 0.00% (Coincidencia exacta con el requerimiento).
+
+3. TABLA DE ESTADÍSTICAS FINALES VERIFICADAS
+--------------------------------------------------------------------------------
+MÉTRICA / SEGMENTO                       | CANTIDAD EXACTA | PORCENTAJE
+-----------------------------------------+-----------------+------------
+Total Documentos en 'users'              | 22.510          | 100.00%
+-----------------------------------------+-----------------+------------
+Usuarios NUNCA ingresados (loginCount=0) |  4.500          |  19.99%
+Usuarios con SOLO 1 ingreso (loginCount=1)|  5.000          |  22.21%
+Usuarios con múltiples ingresos (>= 2)   | 13.010          |  57.80%
+-----------------------------------------+-----------------+------------
+Rol: Huéspedes ('user')                  | 19.655          |  87.32%
+Rol: Anfitriones ('host')                |  2.465          |  10.95%
+Rol: Administradores ('admin')           |    390          |   1.73%
+-----------------------------------------+-----------------+------------
+Estado: Activo ('active')                | 15.979          |  70.99%
+Estado: Pendiente de Verificación        |  4.911          |  21.82%
+Estado: Inactivo                         |    958          |   4.26%
+Estado: Suspendido                       |    662          |   2.94%
+-----------------------------------------+-----------------+------------
+
+4. COMANDOS RÁPIDOS PARA COMPROBACIÓN EN MONGO SHELL / COMPASS
+--------------------------------------------------------------------------------
+Si deseas auditar los datos desde la terminal de MongoDB ('mongosh') o Compass:
+
+  use palacio_db;
+
+  // 1. Conteo total:
+  db.users.countDocuments(); // Retorna 22510
+
+  // 2. Conteo de usuarios registrados sin ingresar:
+  db.users.countDocuments({ loginCount: 0 }); // Retorna 4500
+
+  // 3. Conteo de usuarios con exactamente 1 ingreso:
+  db.users.countDocuments({ loginCount: 1 }); // Retorna 5000
+
+  // 4. Ver un ejemplo de anfitrión con cuenta bancaria:
+  db.users.findOne({ role: "host", bankAccount: { $ne: null } });
+
+5. UBICACIÓN DEL SCRIPT FUENTE
+--------------------------------------------------------------------------------
+El código Python que orquesta todo el proceso se encuentra versionado en:
+C:\Users\hdari\Desktop\palacio-del-mar\scripts\seed_22510_users.py
+
+================================================================================
+  FIN DEL REPORTE - PALACIO DEL MAR BOUTIQUE MARKETPLACE
+  Darío (Gatbat) & Abigail 🖤🐾
+================================================================================

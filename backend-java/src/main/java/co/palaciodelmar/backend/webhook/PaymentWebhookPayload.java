@@ -32,6 +32,7 @@ public class PaymentWebhookPayload {
         private String currency;
         private String status; // "succeeded", "failed", "refunded"
         private String transactionId;
+        private String idempotencyKey;
         private String failureMessage;
     }
 }

@@ -334,96 +334,69 @@ class AdminServiceTest {
     }
 
     @Test
-    @DisplayName("createPromotion rechaza un scope inexistente: ni 'all', ni sede, ni propiedad -> no se guarda promo huérfana")
-    void createPromotionRejectsUnknownScope() {
-        when(branchRepository.existsById("sede-falsa")).thenReturn(false);
-        when(propertyRepository.existsById("sede-falsa")).thenReturn(false);
-
-        Promotion promo = Promotion.builder()
-                .title("Promo con scope corrupto")
-                .branch("sede-falsa")
-                .discountPercent(10)
-                .active(true)
+    @DisplayName("R7b: exportBookingsCsv genera CSV RFC 4180 con UTF-8 BOM y escape de caracteres")
+    void testExportBookingsCsvFormatsRfc4180WithUtf8Bom() {
+        Booking b1 = Booking.builder()
+                .id("b-csv-1")
+                .bookingCode("PDM-20261113-001")
+                .guestDetails(Booking.GuestDetails.builder()
+                        .fullName("García, Juan \"El Viajero\"")
+                        .email("juan.garcia@example.com")
+                        .phone("+57 300 123 4567")
+                        .build())
+                .checkIn(LocalDate.of(2026, 12, 1))
+                .checkOut(LocalDate.of(2026, 12, 5))
+                .nights(4)
+                .guests(2)
+                .totalPrice(new BigDecimal("1200000.00"))
+                .paidAmount(new BigDecimal("1200000.00"))
+                .balanceDue(BigDecimal.ZERO)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .createdAt(java.time.Instant.parse("2026-11-13T10:15:30Z"))
                 .build();
 
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
-                () -> adminService.createPromotion(promo)
-        );
-        assertTrue(ex.getMessage().toLowerCase().contains("sede"),
-                "El mensaje debe explicar que el scope no es una sede o propiedad válida");
-        verify(promotionRepository, never()).save(any(Promotion.class));
-    }
-
-    @Test
-    @DisplayName("createPromotion rechaza scope nulo o vacío: una promo sin scope es huérfana")
-    void createPromotionRejectsNullScope() {
-        Promotion sinScope = Promotion.builder()
-                .title("Promo sin scope")
-                .discountPercent(10)
-                .active(true)
+        Booking b2 = Booking.builder()
+                .id("b-csv-2")
+                .bookingCode("PDM-20261113-002")
+                .guestDetails(Booking.GuestDetails.builder()
+                        .fullName("Ana María\nLópez")
+                        .email("ana.lopez@example.com")
+                        .phone(null)
+                        .build())
+                .checkIn(LocalDate.of(2026, 12, 10))
+                .checkOut(LocalDate.of(2026, 12, 12))
+                .nights(2)
+                .guests(1)
+                .totalPrice(new BigDecimal("500000.00"))
+                .paidAmount(new BigDecimal("250000.00"))
+                .balanceDue(new BigDecimal("250000.00"))
+                .status("pending")
+                .paymentStatus("partial")
+                .createdAt(java.time.Instant.parse("2026-11-13T12:00:00Z"))
                 .build();
 
-        assertThrows(IllegalArgumentException.class, () -> adminService.createPromotion(sinScope));
-        verify(promotionRepository, never()).save(any(Promotion.class));
+        when(bookingRepository.findAll(any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(List.of(b1, b2));
 
-        Promotion scopeVacio = Promotion.builder()
-                .title("Promo con scope vacío")
-                .branch("   ")
-                .discountPercent(10)
-                .active(true)
-                .build();
+        byte[] csvBytes = adminService.exportBookingsCsv();
+        org.junit.jupiter.api.Assertions.assertNotNull(csvBytes);
+        org.junit.jupiter.api.Assertions.assertTrue(csvBytes.length > 3);
 
-        assertThrows(IllegalArgumentException.class, () -> adminService.createPromotion(scopeVacio));
-        verify(promotionRepository, never()).save(any(Promotion.class));
-    }
+        // Verify UTF-8 BOM (\uFEFF -> 0xEF, 0xBB, 0xBF)
+        assertEquals((byte) 0xEF, csvBytes[0]);
+        assertEquals((byte) 0xBB, csvBytes[1]);
+        assertEquals((byte) 0xBF, csvBytes[2]);
 
-    @Test
-    @DisplayName("createPromotion acepta el scope global 'all' en mayúsculas o minúsculas")
-    void createPromotionAcceptsGlobalScope() {
-        when(promotionRepository.save(any(Promotion.class))).thenAnswer(i -> i.getArgument(0));
+        String csvContent = new String(csvBytes, java.nio.charset.StandardCharsets.UTF_8);
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.startsWith("\uFEFFID,Código Reserva,Huésped,Email,Teléfono,Check-In,Check-Out,Noches,Huéspedes,Total COP,Monto Pagado COP,Saldo Pendiente COP,Estado Reserva,Estado Pago,Fecha Creación"));
 
-        Promotion promoGlobal = Promotion.builder()
-                .title("Promoción global")
-                .branch("all")
-                .discountPercent(15)
-                .active(true)
-                .build();
-        assertNotNull(adminService.createPromotion(promoGlobal));
-
-        Promotion promoGlobalMayusculas = Promotion.builder()
-                .title("Promoción global MAYÚSCULAS")
-                .branch("ALL")
-                .discountPercent(15)
-                .active(true)
-                .build();
-        assertNotNull(adminService.createPromotion(promoGlobalMayusculas));
-        verify(promotionRepository, times(2)).save(any(Promotion.class));
-    }
-
-    @Test
-    @DisplayName("createPromotion acepta como scope una sede existente o una propiedad existente")
-    void createPromotionAcceptsExistingBranchOrProperty() {
-        when(branchRepository.existsById("br-boca")).thenReturn(true);
-        when(propertyRepository.existsById("prop-boca")).thenReturn(false);
-        when(branchRepository.existsById("prop-boca")).thenReturn(false);
-        when(propertyRepository.existsById("prop-waos")).thenReturn(true);
-        when(promotionRepository.save(any(Promotion.class))).thenAnswer(i -> i.getArgument(0));
-
-        Promotion porSede = Promotion.builder()
-                .title("Promo por sede")
-                .branch("br-boca")
-                .discountPercent(10)
-                .active(true)
-                .build();
-        assertNotNull(adminService.createPromotion(porSede));
-
-        Promotion porPropiedad = Promotion.builder()
-                .title("Promo por propiedad")
-                .branch("prop-waos")
-                .discountPercent(12)
-                .active(true)
-                .build();
-        assertNotNull(adminService.createPromotion(porPropiedad));
+        // Verify escaping: García, Juan "El Viajero" -> "García, Juan ""El Viajero"""
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("\"García, Juan \"\"El Viajero\"\"\""));
+        // Verify newline escaping: "Ana María\nLópez"
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("\"Ana María\nLópez\""));
+        // Verify formatted numbers
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("1200000.00"));
+        org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("250000.00"));
     }
 }

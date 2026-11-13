@@ -47,28 +47,23 @@
 
     <!-- PANEL 1: SUITE PRINCIPAL (Layout 65/35 Balanceado con Sticky Sidebar) -->
     <div class="panel" *ngIf="step === 1">
-      <div class="suite-main-grid">
-        
-        <!-- Columna Izquierda: Galería y Experiencia de la Suite -->
-        <div class="suite-content-col">
-          <!-- Galería Editorial -->
-          <div class="gallery-showcase">
-            <div class="gallery-hero-wrapper">
-              <img [src]="getSuiteImage(suite)" (error)="onImageError($event)" [alt]="suite.name" class="gallery-hero-img">
-              <div class="gallery-badge">{{ suite.type || 'Suite Deluxe' }}</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2.5rem;">
+        <div>
+          <div class="relative group cursor-pointer" (click)="openLightbox(0)">
+            <img [src]="getSuiteImage(suite)" (error)="onImageError($event)" [alt]="suite.name" style="width: 100%; height: 380px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.2);">
+            <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-2 text-white font-serif text-sm tracking-wider">
+              <span>🔍 Ver galería en pantalla completa</span>
             </div>
-            <div *ngIf="suite.images && suite.images.length > 0" class="gallery-thumbs-grid">
-              <img *ngFor="let img of suite.images.slice(0,4); let imgIdx = index"
-                   [src]="img"
-                   (error)="onImageError($event)"
-                   [alt]="suite.name + ' miniatura ' + (imgIdx + 1)"
-                   class="gallery-thumb"
-                   [class.active]="suite.mainImage === img"
-                   role="button"
-                   tabindex="0"
-                   (keydown.enter)="suite.mainImage = img"
-                   (keydown.space)="suite.mainImage = img; $event.preventDefault()"
-                   (click)="suite.mainImage = img">
+          </div>
+          <div *ngIf="suite.images && suite.images.length > 0" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.8rem; margin-top: 1rem;">
+            <img *ngFor="let img of suite.images.slice(0,4); let imgIdx = index" [src]="img" (error)="onImageError($event)" [alt]="suite.name + ' foto ' + (imgIdx + 1)" role="button" tabindex="0" (keydown.enter)="suite.mainImage = img" (keydown.space)="suite.mainImage = img; $event.preventDefault()" style="width: 100%; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2); cursor: pointer; opacity: 0.7;" (click)="suite.mainImage = img">
+          </div>
+          <h1 style="font-family: var(--font-title); font-size: 2rem; margin: 1.5rem 0 0.5rem 0;">{{ suite.name }}</h1>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0.5rem; flex-wrap: wrap;">
+            <p style="color: var(--gold); margin: 0;">{{ suite.type }} · {{ suite.size || 45 }} m² · Máx {{ suite.maxGuests || 2 }} huéspedes</p>
+            <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(241,196,15,0.15); border: 1px solid rgba(241,196,15,0.35); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; color: #f1c40f;">
+              <span>★ {{ averageRating }}</span>
+              <span style="color: rgba(245,240,232,0.6);">({{ reviews.length }} {{ reviews.length === 1 ? 'reseña' : 'reseñas' }})</span>
             </div>
           </div>
 
@@ -565,3 +560,6 @@
 
   <app-auth-modal [isOpen]="authModalOpen" [initialMode]="authMode" (closeEvent)="onAuthClose()"></app-auth-modal>
 </div>
+
+<app-lightbox-modal [isOpen]="lightboxOpen" [images]="allSuiteImages" [currentIndex]="lightboxIndex" [title]="suite ? suite.name : ''" (closed)="lightboxOpen = false"></app-lightbox-modal>
+<app-concierge-chat [suiteName]="suite ? suite.name : ''"></app-concierge-chat>

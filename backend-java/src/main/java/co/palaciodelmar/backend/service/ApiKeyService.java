@@ -10,6 +10,11 @@ import co.palaciodelmar.backend.repository.ApiKeyRepository;
 import co.palaciodelmar.backend.repository.PropertyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -23,11 +28,22 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ApiKeyService {
 
     private final ApiKeyRepository apiKeyRepository;
     private final PropertyRepository propertyRepository;
+    private final MongoTemplate mongoTemplate;
+
+    @Autowired
+    public ApiKeyService(ApiKeyRepository apiKeyRepository, PropertyRepository propertyRepository, @Autowired(required = false) MongoTemplate mongoTemplate) {
+        this.apiKeyRepository = apiKeyRepository;
+        this.propertyRepository = propertyRepository;
+        this.mongoTemplate = mongoTemplate;
+    }
+
+    public ApiKeyService(ApiKeyRepository apiKeyRepository, PropertyRepository propertyRepository) {
+        this(apiKeyRepository, propertyRepository, null);
+    }
 
     public ApiKeyDTO createApiKey(User currentUser, CreateApiKeyRequest request) {
         Property property = propertyRepository.findById(request.getPropertyId())
@@ -117,9 +133,14 @@ public class ApiKeyService {
         Optional<ApiKey> match = apiKeyRepository.findByHashedKeyAndActiveTrue(hashedKey);
         if (match.isPresent()) {
             ApiKey apiKey = match.get();
-            Instant now = Instant.now();
-            if (apiKey.getLastUsedAt() == null || apiKey.getLastUsedAt().isBefore(now.minusSeconds(300))) {
-                apiKey.setLastUsedAt(now);
+            apiKey.setLastUsedAt(Instant.now());
+            if (mongoTemplate != null && apiKey.getId() != null) {
+                mongoTemplate.updateFirst(
+                        Query.query(Criteria.where("id").is(apiKey.getId())),
+                        Update.update("lastUsedAt", apiKey.getLastUsedAt()),
+                        ApiKey.class
+                );
+            } else {
                 apiKeyRepository.save(apiKey);
             }
             return Optional.of(apiKey);

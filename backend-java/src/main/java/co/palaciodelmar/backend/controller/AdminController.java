@@ -60,6 +60,15 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok(bookings));
     }
 
+    @GetMapping(value = "/bookings/export-csv", produces = "text/csv;charset=UTF-8")
+    public ResponseEntity<byte[]> exportBookingsCsv() {
+        byte[] csvBytes = adminService.exportBookingsCsv();
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"reservas-palacio-del-mar.csv\"")
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8")
+                .body(csvBytes);
+    }
+
     @PutMapping("/bookings/{id}/status")
     public ResponseEntity<ApiResponse<BookingDTO>> updateBookingStatus(
             @PathVariable String id,

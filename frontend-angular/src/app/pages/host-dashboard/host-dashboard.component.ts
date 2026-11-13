@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { BookingStreamService } from '../../services/booking-stream.service';
+import { CurrencyService } from '../../services/currency.service';
 import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property, WebhookSubscription, WebhookDelivery, ApiKeyItem } from '../../models/types';
 import { environment } from '../../../environments/environment';
 
@@ -93,7 +95,7 @@ export interface HostPromotionItem {
             </div>
             <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
               <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Ingresos Generados</p>
-              <p class="font-serif text-4xl text-[#f5f0e8]">$ {{ metrics()?.totalRevenue || 0 | number:'1.0-0' }}</p>
+              <p class="font-serif text-4xl text-[#f5f0e8]">{{ currency.formatPrice(metrics()?.totalRevenue || 0) }}</p>
             </div>
           </div>
 
@@ -551,7 +553,7 @@ export interface HostPromotionItem {
                         <p class="text-[10px] text-[#f5f0e8] opacity-60">{{ s.type }} &bull; Máx {{ s.maxGuests }} huéspedes &bull; {{ s.size || 30 }} m²</p>
                       </div>
                       <div class="text-right">
-                        <p class="text-xs font-bold text-[#c9a96e]">$ {{ s.basePrice | number:'1.0-0' }} <span class="text-[10px] font-normal text-white/50">/ noche</span></p>
+                        <p class="text-xs font-bold text-[#c9a96e]">{{ currency.formatPrice(s.basePrice || 0) }} <span class="text-[10px] font-normal text-white/50">/ noche</span></p>
                         <span class="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#2ecc71]/20 text-[#2ecc71]">● Activa</span>
                       </div>
                     </div>
@@ -988,12 +990,12 @@ export interface HostPromotionItem {
                 </div>
                 <div class="p-3 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg">
                   <p class="text-[10px] uppercase tracking-wider text-[#c9a96e] mb-0.5">Total Cobrado al Huésped</p>
-                  <p class="font-serif text-lg text-[#f5f0e8] font-semibold">$ {{ (calcRate * calcNights) | number:'1.0-0' }} COP</p>
-                  <p class="text-[10px] text-[#e74c3c] mt-0.5">Comisión 8%: -$ {{ (calcRate * calcNights * 0.08) | number:'1.0-0' }}</p>
+                  <p class="font-serif text-lg text-[#f5f0e8] font-semibold">{{ currency.formatPrice(calcRate * calcNights) }}</p>
+                  <p class="text-[10px] text-[#e74c3c] mt-0.5">Comisión 8%: -{{ currency.formatPrice(calcRate * calcNights * 0.08) }}</p>
                 </div>
                 <div class="p-3 bg-[rgba(46,204,113,0.08)] border border-[rgba(46,204,113,0.3)] rounded-lg">
                   <p class="text-[10px] uppercase tracking-wider text-[#2ecc71] font-bold mb-0.5">Tu Desembolso Neto (92%)</p>
-                  <p class="font-serif text-2xl text-[#2ecc71] font-bold">$ {{ (calcRate * calcNights * 0.92) | number:'1.0-0' }} COP</p>
+                  <p class="font-serif text-2xl text-[#2ecc71] font-bold">{{ currency.formatPrice(calcRate * calcNights * 0.92) }}</p>
                   <p class="text-[10px] text-[#f5f0e8] opacity-75 mt-0.5">Garantizado a tu cuenta ACH</p>
                 </div>
               </div>
@@ -1080,9 +1082,9 @@ export interface HostPromotionItem {
                       <td class="p-4 font-semibold">{{ p.propertyName || p.propertyId }}</td>
                       <td class="p-4 text-xs opacity-75">{{ p.periodStart }} — {{ p.periodEnd }}</td>
                       <td class="p-4 text-center font-bold">{{ p.totalBookings }}</td>
-                      <td class="p-4 text-right">$ {{ (p.grossTotal || 0) | number:'1.0-0' }}</td>
-                      <td class="p-4 text-right text-[#e74c3c]">-$ {{ (p.platformFee || 0) | number:'1.0-0' }}</td>
-                      <td class="p-4 text-right font-bold text-[#2ecc71] text-sm">$ {{ (p.netAmount || 0) | number:'1.0-0' }}</td>
+                      <td class="p-4 text-right">{{ currency.formatPrice(p.grossTotal || 0) }}</td>
+                      <td class="p-4 text-right text-[#e74c3c]">-{{ currency.formatPrice(p.platformFee || 0) }}</td>
+                      <td class="p-4 text-right font-bold text-[#2ecc71] text-sm">{{ currency.formatPrice(p.netAmount || 0) }}</td>
                       <td class="p-4 text-xs font-mono text-[#c9a96e]">{{ p.destinationBank ? (p.destinationBank + ' ' + (p.destinationAccountMasked || '')) : 'ACH Bancario' }}</td>
                       <td class="p-4 text-center">
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border border-[rgba(46,204,113,0.3)]">
@@ -1155,6 +1157,8 @@ export class HostDashboardComponent implements OnInit {
   api = inject(ApiService);
   auth = inject(AuthService);
   router = inject(Router);
+  bookingStream = inject(BookingStreamService);
+  currency = inject(CurrencyService);
 
   constructor() {
     effect(() => {
@@ -1445,6 +1449,24 @@ export class HostDashboardComponent implements OnInit {
     this.fetchDemoFailureStatus();
     this.fetchApiKeys();
     this.fetchHostReviews();
+
+    // Actualización en tiempo real vía SSE sin necesidad de recargar la página
+    this.bookingStream.getBookingUpdates().subscribe({
+      next: (updatedBooking) => {
+        if (!updatedBooking) return;
+        const bId = updatedBooking.id || (updatedBooking as any)._id;
+        this.bookings.update(list => {
+          const idx = list.findIndex(b => (b.id || (b as any)._id) === bId);
+          if (idx >= 0) {
+            const copy = [...list];
+            copy[idx] = { ...copy[idx], ...updatedBooking };
+            return copy;
+          }
+          return [updatedBooking, ...list];
+        });
+        this.fetchMetrics();
+      }
+    });
   }
 
   fetchApiKeys() {
@@ -1676,9 +1698,10 @@ export class HostDashboardComponent implements OnInit {
   }
 
   fetchDemoEvents() {
-    this.api.get<ApiResponse<any[]>>('/demo/webhook-receiver/events').subscribe({
+    this.api.get<ApiResponse<any>>('/demo/webhook-receiver/events').subscribe({
       next: (res) => {
-        const list = res?.data || (res as any) || [];
+        const data = res?.data || (res as any);
+        const list = data?.events ?? (Array.isArray(data) ? data : []);
         this.demoEvents.set(Array.isArray(list) ? list : []);
       }
     });
@@ -1802,37 +1825,7 @@ export class HostDashboardComponent implements OnInit {
       },
       error: (err) => {
         this.submittingProperty = false;
-        if (!editId) {
-          // En modo offline o fallback, agregar localmente para retroalimentación inmediata
-          const mockId = 'prop-' + Date.now().toString().slice(-4);
-          const localProp: Property = {
-            id: mockId,
-            name: this.newProperty.name,
-            type: this.newProperty.type,
-            city: this.newProperty.city,
-            address: this.newProperty.address,
-            description: this.newProperty.description,
-            status: 'PENDING',
-            mainImage: this.newProperty.mainImage || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
-            suitesCount: this.newProperty.initialSuitePrice ? 1 : 0
-          } as any;
-          this.properties.update(list => [localProp, ...list]);
-          this.propertySuccess = '¡Alojamiento registrado exitosamente! En revisión por administración.';
-          this.newProperty = {
-            name: '',
-            type: 'HOTEL',
-            city: 'Cartagena',
-            address: '',
-            description: '',
-            phone: '',
-            mainImage: '',
-            initialSuiteName: '',
-            initialSuitePrice: null as any,
-            initialSuiteGuests: 2
-          };
-        } else {
-          this.propertyError = err?.error?.message || 'Error al guardar el alojamiento';
-        }
+        this.propertyError = err?.error?.message || (editId ? 'Error al guardar el alojamiento' : 'Error al registrar el alojamiento');
       }
     });
   }
@@ -1858,34 +1851,18 @@ export class HostDashboardComponent implements OnInit {
 
   fetchPropertySuites(propId: string) {
     this.loadingSuites.set(true);
+    this.suiteError = '';
     this.api.get<ApiResponse<any[]>>(`/host/properties/${propId}/suites`).subscribe({
       next: (res) => {
         this.loadingSuites.set(false);
         const list = res?.data || (res as any) || [];
         const suitesList = Array.isArray(list) ? list : [];
-        if (suitesList.length > 0) {
-          this.propertySuites.set(suitesList);
-        } else {
-          const fallback = [{
-            name: `Suite Principal - ${this.selectedPropertyForSuites?.name || 'Alojamiento'}`,
-            type: 'Suite Deluxe',
-            basePrice: 450000,
-            maxGuests: 2,
-            size: 35
-          }];
-          this.propertySuites.set(fallback);
-        }
+        this.propertySuites.set(suitesList);
       },
-      error: () => {
+      error: (err) => {
         this.loadingSuites.set(false);
-        const fallback = [{
-          name: `Suite Principal - ${this.selectedPropertyForSuites?.name || 'Alojamiento'}`,
-          type: 'Suite Deluxe',
-          basePrice: 450000,
-          maxGuests: 2,
-          size: 35
-        }];
-        this.propertySuites.set(fallback);
+        this.propertySuites.set([]);
+        this.suiteError = err?.error?.message || 'Error al cargar las habitaciones del alojamiento';
       }
     });
   }

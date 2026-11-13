@@ -1,0 +1,48 @@
+services:
+  # --- Backend Java Spring Boot 3 ---
+  - type: web
+    name: palacio-backend
+    runtime: docker
+    dockerfilePath: backend-java/Dockerfile
+    dockerContext: backend-java
+    plan: free
+    region: oregon
+    envVars:
+      - key: SERVER_PORT
+        value: 5000
+      - key: MONGODB_URI
+        sync: false
+      - key: SPRING_DATA_MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRATION
+        value: "604800000"
+      - key: PAYMENTS_WEBHOOK_SECRET
+        generateValue: true
+      - key: PALACIO_PROXY_TOKEN
+        generateValue: true
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: SPRING_CACHE_TYPE
+        value: "none"
+
+  # --- Frontend Web + Flutter iOS App + APK Download ---
+  - type: web
+    name: palacio-web
+    runtime: docker
+    dockerfilePath: frontend-angular/Dockerfile
+    dockerContext: frontend-angular
+    plan: free
+    region: oregon
+    envVars:
+      - key: PALACIO_PROXY_TOKEN
+        fromService:
+          type: web
+          name: palacio-backend
+          envVarKey: PALACIO_PROXY_TOKEN
+      - key: BACKEND_HOST
+        fromService:
+          type: web
+          name: palacio-backend
+          property: hostport

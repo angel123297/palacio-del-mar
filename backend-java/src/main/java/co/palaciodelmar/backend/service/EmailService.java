@@ -419,14 +419,13 @@ public class EmailService {
         }
     }
 
-    @Async
-    public void sendReviewInvitation(Booking booking) {
-        if (booking == null) return;
+    public boolean sendReviewInvitation(Booking booking) {
+        if (booking == null) return false;
         try {
             BookingEmailContext ctx = resolveBookingContext(booking);
             if (isBlank(ctx.guestEmail())) {
                 log.warn("sendReviewInvitation omitido: no se encontró email para la reserva {}", booking.getId());
-                return;
+                return false;
             }
 
             MimeMessage message = javaMailSender.createMimeMessage();
@@ -447,8 +446,10 @@ public class EmailService {
 
             helper.setText(html, true);
             javaMailSender.send(message);
+            return true;
         } catch (Exception e) {
             log.warn("No se pudo enviar invitación de reseña para la reserva {} (servidor SMTP no disponible): {}", booking.getId(), e.getMessage());
+            return false;
         }
     }
 
@@ -805,6 +806,14 @@ public class EmailService {
     private String sanitizeIcsText(String value) {
         if (value == null) return "";
         return value.replace("\r", " ").replace("\n", " ").replace(",", "\\,").replace(";", "\\;");
+    }
+
+    public boolean isConfigured() {
+        if (mailAuth && isBlank(mailUsername)) return false;
+        if (javaMailSender instanceof JavaMailSenderImpl senderImpl) {
+            return !isBlank(senderImpl.getPassword());
+        }
+        return !isBlank(mailUsername);
     }
 
     private boolean isBlank(String s) {

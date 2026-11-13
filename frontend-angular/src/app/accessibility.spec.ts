@@ -1,4 +1,3 @@
-import { afterEach } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
@@ -12,9 +11,6 @@ import { ProfileComponent } from './pages/profile/profile';
 import { AuthService } from './services/auth.service';
 
 describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
-  afterEach(() => {
-    TestBed.resetTestingModule();
-  });
   describe('App Root Landmarks & Bypass Blocks (WCAG 2.4.1)', () => {
     let fixture: ComponentFixture<App>;
     let compiled: HTMLElement;
@@ -161,7 +157,8 @@ describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
     });
 
     it('debe rotular "Mis Reservas" para un huésped y "Panel Admin" para un administrador', () => {
-      localStorage.setItem('user', JSON.stringify({ id: 'u1', name: 'Carlos', role: 'USER' }));
+      localStorage.setItem('user', JSON.stringify({ id: 'u1', name: 'Carlos', role: 'USER', emailVerified: true }));
+      localStorage.setItem('token', 'fake-jwt-token');
       authService.loadCachedUser();
       fixture.detectChanges();
       compiled = fixture.nativeElement as HTMLElement;
@@ -170,7 +167,7 @@ describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
       expect(bookingsLink).toBeTruthy();
       expect(bookingsLink?.textContent?.trim()).toBe('Mis Reservas');
 
-      localStorage.setItem('user', JSON.stringify({ id: 'u1', name: 'Carlos', role: 'ADMIN' }));
+      localStorage.setItem('user', JSON.stringify({ id: 'u1', name: 'Carlos', role: 'ADMIN', emailVerified: true }));
       authService.loadCachedUser();
       fixture.detectChanges();
       compiled = fixture.nativeElement as HTMLElement;
@@ -181,10 +178,12 @@ describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
       expect(adminLink?.textContent?.trim()).toBe('Panel Admin');
 
       localStorage.removeItem('user');
+      localStorage.removeItem('token');
     });
 
     it('el botón de Salir debe tener aria-label accesible y contraste visible', () => {
-      localStorage.setItem('user', JSON.stringify({ id: 'u2', name: 'Laura', role: 'GUEST' }));
+      localStorage.setItem('user', JSON.stringify({ id: 'u2', name: 'Laura', role: 'GUEST', emailVerified: true }));
+      localStorage.setItem('token', 'fake-jwt-token');
       authService.loadCachedUser();
       fixture.detectChanges();
       compiled = fixture.nativeElement as HTMLElement;
@@ -194,6 +193,7 @@ describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
       expect(logoutBtn?.textContent?.trim()).toBe('Salir');
 
       localStorage.removeItem('user');
+      localStorage.removeItem('token');
     });
 
     it('al presionar Pon tu alojamiento debe abrir el modal en modo registro y rol host, incluso tras cerrar y reabrir', () => {
@@ -250,7 +250,8 @@ describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
       }).compileComponents();
 
       authService = TestBed.inject(AuthService);
-      localStorage.setItem('user', JSON.stringify({ id: 'u-vip', name: 'Viajero VIP', email: 'vip@palacio.co' }));
+      localStorage.setItem('user', JSON.stringify({ id: 'u-vip', name: 'Viajero VIP', email: 'vip@palacio.co', emailVerified: true }));
+      localStorage.setItem('token', 'fake-jwt-token');
       authService.loadCachedUser();
       fixture = TestBed.createComponent(ProfileComponent);
       fixture.componentInstance.loading = false;
@@ -260,6 +261,7 @@ describe('Universal Accessibility Audit (WCAG 2.2 AA Compliance)', () => {
 
     afterEach(() => {
       localStorage.removeItem('user');
+      localStorage.removeItem('token');
     });
 
     it('debe vincular los inputs de perfil con sus etiquetas mediante for/id explícitos', () => {

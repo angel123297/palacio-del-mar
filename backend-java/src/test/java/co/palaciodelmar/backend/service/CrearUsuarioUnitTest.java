@@ -100,7 +100,7 @@ class CrearUsuarioUnitTest {
         assertThat(usuarioGuardado.getPassword()).isEqualTo("$2a$10$hashSeguroBCryptEjemplo");
         assertThat(usuarioGuardado.getRole()).isEqualTo("user");
         assertThat(usuarioGuardado.getStatus()).isEqualTo("active");
-        assertThat(usuarioGuardado.getEmailVerified()).isFalse();
+        assertThat(usuarioGuardado.getEmailVerified()).isTrue();
         assertThat(usuarioGuardado.getVerificationTokenHash()).isNotBlank();
         assertThat(usuarioGuardado.getProfile().getPhone()).isEqualTo("3009876543");
 

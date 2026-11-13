@@ -1,4 +1,4 @@
-@charset "UTF-8";
+﻿@charset "UTF-8";
 @use 'styles/variables' as *;
 @use 'styles/mixins' as *;
 
@@ -380,7 +380,7 @@ nav {
 #booking-bar {
   background: var(--warm);
   border-bottom: 2px solid rgba(201, 169, 110, 0.2);
-  padding: 0 48px;
+  padding: 0;
   display: flex;
   align-items: stretch;
   position: sticky;
@@ -2420,6 +2420,54 @@ footer {
   .receipt { box-shadow: none; padding: 0; }
 }
 
+/* ---------- Formularios ---------- */
+.auth-form, .booking-step-body, .admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.field-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  margin-top: 6px;
+}
+input, select, textarea {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(201, 169, 110, 0.25) !important;
+  color: var(--cream) !important;
+  padding: 12px 14px;
+  border-radius: 3px;
+  font-family: Jost, sans-serif;
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+  color-scheme: dark;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.4) !important;
+  color: var(--cream) !important;
+}
+select option {
+  background: #1a1815 !important;
+  color: var(--cream) !important;
+}
+.btn-block { width: 100%; margin-top: 10px; }
+.form-error {
+  background: rgba(192, 57, 43, 0.15);
+  border: 1px solid rgba(192, 57, 43, 0.4);
+  color: #f2a99e;
+  padding: 10px 14px;
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+.form-hint { font-size: 0.78rem; opacity: 0.65; }
+.auth-forgot { align-self: flex-end; margin-top: -4px; }
+.auth-switch { text-align: center; margin-top: 14px; font-size: 0.85rem; opacity: 0.85; }
+
 /* ===== Accessible Input Placeholders & High Contrast (WCAG 2.2 AA) ===== */
 ::placeholder {
   color: rgba(245, 240, 232, 0.65) !important;
@@ -2433,3 +2481,53 @@ select::placeholder {
   opacity: 1;
 }
 
+
+
+/* ===== Modal de Autenticación - Inputs con alto contraste y visibilidad garantizada ===== */
+.modal-content input {
+  background: #181513 !important;
+  border: 1px solid rgba(201, 169, 110, 0.35) !important;
+  border-radius: 6px !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  padding: 10px 14px;
+  font-size: 0.95rem !important;
+  font-family: inherit !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.modal-content input[type="password"],
+.modal-content input[id*="password"],
+.modal-content input[id*="confirm"] {
+  padding-right: 42px !important;
+}
+
+.modal-content input:focus {
+  border-color: var(--gold, #c9a96e) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.25) !important;
+}
+
+.modal-content input::placeholder {
+  color: rgba(245, 240, 232, 0.45) !important;
+  -webkit-text-fill-color: rgba(245, 240, 232, 0.45) !important;
+  opacity: 1 !important;
+}
+
+.modal-content input:-webkit-autofill,
+.modal-content input:-webkit-autofill:hover, 
+.modal-content input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff !important;
+  -webkit-box-shadow: 0 0 0px 1000px #181513 inset !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+.modal-content .field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+  letter-spacing: 0.5px;
+  color: var(--cream, #f5f0e8);
+  font-weight: 500;
+}

@@ -263,6 +263,7 @@ public class SuiteService {
         BigDecimal roomTotal = result.total();
         BigDecimal guaranteeDeposit = new BigDecimal("100000");
         BigDecimal total = roomTotal.add(experiencesTotal).add(extraGuestsFee);
+        BigDecimal totalWithDeposit = total.add(guaranteeDeposit);
 
         CalculatePriceResponseDTO.DatesInfo datesInfo = CalculatePriceResponseDTO.DatesInfo.builder()
                 .checkIn(request.getCheckIn())
@@ -290,6 +291,7 @@ public class SuiteService {
                 .discountReason(result.discount().compareTo(BigDecimal.ZERO) > 0 ? "Promoción / Larga estadía" : null)
                 .dynamicPricingNotes(new ArrayList<>(DynamicPricingService.describe(dynamicAdjustments)))
                 .total(total)
+                .totalWithDeposit(totalWithDeposit)
                 .lines(List.of(lineItem))
                 .build();
     }
@@ -316,7 +318,7 @@ public class SuiteService {
 
         Integer maxDiscount = promoMap.values().stream()
                 .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
-                .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut)) &&
+                .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut.minusDays(1))) &&
                              (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
                 .map(Promotion::getDiscountPercent)
                 .max(Integer::compareTo)

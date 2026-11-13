@@ -183,10 +183,19 @@ public class WebhookDispatcher {
                     }
                 }
             } catch (Exception ssrfEx) {
+                String msg = ssrfEx.getMessage() != null ? ssrfEx.getMessage() : "";
+                boolean isDnsLookupFailure = msg.contains("inalcanzable por DNS") || msg.contains("No se pudo resolver");
+                if (isDnsLookupFailure) {
+                    log.warn("Fallo transitorio de resolución DNS para webhook {} hacia {}: {}",
+                            delivery.getEventId(), delivery.getTargetUrl(), msg);
+                    handleDeliveryFailure(delivery, "Fallo transitorio DNS: " + msg);
+                    deliveryRepository.save(delivery);
+                    return;
+                }
                 log.error("Entrega de webhook {} bloqueada por política SSRF/Rebinding en destino {}: {}",
                         delivery.getEventId(), delivery.getTargetUrl(), ssrfEx.getMessage());
                 delivery.setStatus("FAILED");
-                delivery.setErrorMessage("Destino bloqueado por política de seguridad SSRF o host inalcanzable");
+                delivery.setErrorMessage("Destino bloqueado por política de seguridad SSRF: " + msg);
                 delivery.setNextRetryAt(null);
                 deliveryRepository.save(delivery);
                 return;

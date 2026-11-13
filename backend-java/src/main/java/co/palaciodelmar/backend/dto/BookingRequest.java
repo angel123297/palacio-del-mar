@@ -19,14 +19,11 @@ import java.util.List;
 @AllArgsConstructor
 public class BookingRequest {
 
-    @NotBlank(message = "Por favor selecciona una habitación")
-    private String suiteId;
+        private String suiteId;
 
-    @NotNull(message = "Por favor selecciona la fecha de llegada (check-in)")
-    private LocalDate checkIn;
+        private LocalDate checkIn;
 
-    @NotNull(message = "Por favor selecciona la fecha de salida (check-out)")
-    private LocalDate checkOut;
+        private LocalDate checkOut;
 
     private LocalDate newCheckIn;
     private LocalDate newCheckOut;

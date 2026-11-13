@@ -4,6 +4,7 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { SearchStateService } from '../../services/search-state.service';
+import { CurrencyService } from '../../services/currency.service';
 import { Suite, ApiResponse } from '../../models/types';
 
 @Component({
@@ -161,7 +162,7 @@ import { Suite, ApiResponse } from '../../models/types';
                   <p class="text-[10px] uppercase tracking-[0.2em] text-[#c9a96e] mb-1">
                     {{ suite.totalPrice ? 'Precio Total (' + searchState.nights() + 'n)' : 'Precio desde' }}
                   </p>
-                  <p class="font-serif text-2xl text-[#f5f0e8]">$ {{ (suite.totalPrice || suite.basePrice || 0) | number:'1.0-0' }}</p>
+                  <p class="font-serif text-2xl text-[#f5f0e8]">{{ currency.formatPrice(suite.totalPrice || suite.basePrice || 0) }}</p>
                 </div>
                 <button class="px-5 py-2 bg-[#c9a96e] text-[#0d0d0d] uppercase tracking-widest text-xs font-semibold hover:bg-[#e2c99b] transition cursor-pointer">
                   Reservar
@@ -177,6 +178,7 @@ import { Suite, ApiResponse } from '../../models/types';
 export class SearchComponent implements OnInit {
   api = inject(ApiService);
   searchState = inject(SearchStateService);
+  currency = inject(CurrencyService);
   
   suites = signal<Suite[]>([]);
   branches = signal<any[]>([]);

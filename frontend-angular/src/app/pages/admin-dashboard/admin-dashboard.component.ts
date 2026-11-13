@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
+import { BookingStreamService } from '../../services/booking-stream.service';
+import { CurrencyService } from '../../services/currency.service';
 import { Booking, ApiResponse, DashboardMetricsDTO, PaginatedResponse, Property } from '../../models/types';
 
 export interface PromotionItem {
@@ -190,7 +192,7 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
             </div>
             <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
               <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Ingresos Netos</p>
-              <p class="font-serif text-4xl text-[#f5f0e8]">$ {{ metrics()?.totalRevenue || 0 | number:'1.0-0' }}</p>
+              <p class="font-serif text-4xl text-[#f5f0e8]">{{ currency.formatPrice(metrics()?.totalRevenue || 0) }}</p>
             </div>
             <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
               <p class="text-[10px] uppercase tracking-widest text-[#c9a96e] mb-2">Total Habitaciones</p>
@@ -257,7 +259,7 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
                       <p class="text-[10px] text-[#f5f0e8] opacity-50">{{ b.guestEmail }}</p>
                     </td>
                     <td class="py-4 px-6 text-sm text-[#f5f0e8] opacity-80">{{ b.checkIn | date:'dd/MM' }} &rarr; {{ b.checkOut | date:'dd/MM' }}</td>
-                    <td class="py-4 px-6 font-serif text-lg text-[#c9a96e]">$ {{ b.totalPrice | number:'1.0-0' }}</td>
+                    <td class="py-4 px-6 font-serif text-lg text-[#c9a96e]">{{ currency.formatPrice(b.totalPrice || 0) }}</td>
                     <td class="py-4 px-6">
                       <span class="px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold"
                             [ngClass]="{
@@ -563,7 +565,7 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
                   <tr *ngFor="let r of refunds()" class="hover:bg-[rgba(255,255,255,0.02)] transition">
                     <td class="py-4 px-4 font-mono text-xs text-[#f5f0e8]">{{ r.id }}</td>
                     <td class="py-4 px-4 font-mono text-xs text-[#c9a96e]">{{ r.bookingId || 'N/A' }}</td>
-                    <td class="py-4 px-4 font-serif text-[#f5f0e8] font-bold">$ {{ r.amount | number:'1.0-0' }} {{ r.currency }}</td>
+                    <td class="py-4 px-4 font-serif text-[#f5f0e8] font-bold">{{ currency.formatPrice(r.amount || 0) }}</td>
                     <td class="py-4 px-4">
                       <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[rgba(231,76,60,0.2)] text-[#e74c3c] border border-[rgba(231,76,60,0.4)] whitespace-nowrap">
                         Requiere Reembolso
@@ -690,7 +692,7 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
               {{ activeRefundAction() === 'mark_refunded' ? '✔ Confirmar Reembolso Bancario' : '✕ Descartar Reembolso' }}
             </h3>
             <p class="text-xs text-[#f5f0e8] opacity-85 mb-3">
-              Reserva: <strong class="text-[#c9a96e]">{{ activeRefundItem()!.bookingId || activeRefundItem()!.id }}</strong> &bull; Monto: <strong class="text-white">$ {{ activeRefundItem()!.amount | number:'1.0-0' }} COP</strong>
+              Reserva: <strong class="text-[#c9a96e]">{{ activeRefundItem()!.bookingId || activeRefundItem()!.id }}</strong> &bull; Monto: <strong class="text-white">{{ currency.formatPrice(activeRefundItem()!.amount || 0) }}</strong>
             </p>
             <div class="mb-4">
               <label for="modalRefundNotes" class="block text-[10px] uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">
@@ -715,6 +717,8 @@ export class AdminDashboardComponent implements OnInit {
   api = inject(ApiService);
   auth = inject(AuthService);
   router = inject(Router);
+  bookingStream = inject(BookingStreamService);
+  currency = inject(CurrencyService);
 
   constructor() {
     effect(() => {
@@ -800,6 +804,24 @@ export class AdminDashboardComponent implements OnInit {
     this.fetchPromotions();
     this.fetchProperties();
     this.fetchRefunds();
+
+    // Actualización en tiempo real vía SSE para el panel de administración
+    this.bookingStream.getBookingUpdates().subscribe({
+      next: (updatedBooking) => {
+        if (!updatedBooking) return;
+        const bId = updatedBooking.id || (updatedBooking as any)._id;
+        this.bookings.update(list => {
+          const idx = list.findIndex(b => (b.id || (b as any)._id) === bId);
+          if (idx >= 0) {
+            const copy = [...list];
+            copy[idx] = { ...copy[idx], ...updatedBooking };
+            return copy;
+          }
+          return [updatedBooking, ...list];
+        });
+        this.fetchMetrics();
+      }
+    });
   }
 
   fetchMetrics() {

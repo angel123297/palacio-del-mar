@@ -30,6 +30,9 @@ public class Payment {
     private BigDecimal amount;
     private String currency; // e.g., "COP", "USD"
 
+    @Builder.Default
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
+
     @Indexed
     @Builder.Default
     private String status = "pending"; // "pending", "completed", "failed", "refunded"
@@ -55,4 +58,10 @@ public class Payment {
 
     @Builder.Default
     private Instant updatedAt = Instant.now();
+
+    @Builder.Default
+    private java.util.List<String> processedRefundIds = new java.util.ArrayList<>();
+
+    @org.springframework.data.annotation.Version
+    private Long version;
 }

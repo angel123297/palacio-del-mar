@@ -92,4 +92,52 @@ class PaymentConcurrencyTest {
         verify(paymentGateway).refund("tx-999", new BigDecimal("500000"));
         verify(paymentRepository).save(payment);
     }
+
+    @Test
+    void confirmPaymentDoesNotOverwriteAlreadyCompletedPaymentFromAsyncWebhook() {
+        // Initial pending payment retrieved by intentId
+        Payment payment = Payment.builder()
+                .id("pay-webhook-race")
+                .booking("book-race")
+                .amount(new BigDecimal("500000"))
+                .currency("COP")
+                .status("pending")
+                .intentId("intent-race")
+                .createdAt(Instant.now())
+                .build();
+
+        // Payment in DB is already "completed" by concurrent webhook
+        Payment completedInDb = Payment.builder()
+                .id("pay-webhook-race")
+                .booking("book-race")
+                .amount(new BigDecimal("500000"))
+                .currency("COP")
+                .status("completed")
+                .intentId("intent-race")
+                .transactionId("tx-webhook-777")
+                .createdAt(Instant.now())
+                .build();
+
+        Booking booking = Booking.builder()
+                .id("book-race")
+                .user("user-race")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .balanceDue(BigDecimal.ZERO)
+                .build();
+
+        when(paymentRepository.findByIntentId("intent-race")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("book-race")).thenReturn(Optional.of(booking));
+        when(paymentRepository.findById("pay-webhook-race")).thenReturn(Optional.of(completedInDb));
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment("user-race", "intent-race", "tok-xyz");
+
+        assertEquals("completed", result.get("status"));
+        assertEquals("tx-webhook-777", result.get("transactionId"));
+        // Ensure gateway was NEVER called and status was NOT regressed to processing
+        verify(paymentGateway, never()).confirmIntent(any(), any());
+        verify(paymentRepository, never()).save(argThat(p -> "processing".equals(p.getStatus())));
+    }
 }

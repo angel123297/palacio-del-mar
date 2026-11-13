@@ -126,6 +126,23 @@ public class AdminService {
             bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado");
             Booking saved = bookingRepository.save(fresh);
 
+            if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
+                BigDecimal paid = fresh.getPaidAmount() != null ? fresh.getPaidAmount() : BigDecimal.ZERO;
+                BigDecimal refunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : BigDecimal.ZERO;
+                BigDecimal netPaid = paid.subtract(refunded).max(BigDecimal.ZERO);
+
+                if (netPaid.compareTo(BigDecimal.ZERO) > 0) {
+                    String idemKey = "ref_admin_canc_" + fresh.getId() + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
+                    boolean refundedOk = bookingService.executeSequentialRefund(fresh, netPaid, idemKey);
+                    if (!refundedOk) {
+                        fresh.setPaymentStatus("requires_refund");
+                        fresh.setPendingRefundAmount(netPaid);
+                        fresh.setPendingRefundIdempotencyKey(idemKey);
+                    }
+                    saved = bookingRepository.save(fresh);
+                }
+            }
+
             if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED
                     || targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED
                     || targetStatus == co.palaciodelmar.backend.model.BookingStatus.NO_SHOW) {
@@ -290,18 +307,43 @@ public class AdminService {
 
         if ("mark_refunded".equalsIgnoreCase(action) || "refund".equalsIgnoreCase(action)) {
             String refundDetails = "";
-            if (paymentGateway != null && payment.getTransactionId() != null) {
+            BigDecimal totalAmt = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+            BigDecimal currentRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount().max(BigDecimal.ZERO) : BigDecimal.ZERO;
+            BigDecimal refundable = totalAmt.subtract(currentRefunded).max(BigDecimal.ZERO);
+            if ("refund".equalsIgnoreCase(action) && (payment.getTransactionId() == null || payment.getTransactionId().isBlank())) {
+                throw new IllegalStateException("No se puede procesar reembolso en pasarela sin ID de transacción. Usa 'mark_refunded' para conciliar manualmente.");
+            }
+            if (paymentGateway != null && payment.getTransactionId() != null && refundable.compareTo(BigDecimal.ZERO) > 0) {
                 co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse res =
-                        paymentGateway.refund(payment.getTransactionId(), payment.getAmount());
+                        paymentGateway.refund(payment.getTransactionId(), refundable);
                 if (res == null || !res.success()) {
                     String errorMsg = (res != null && res.errorMessage() != null) ? res.errorMessage() : "Transacción rechazada por la pasarela";
                     throw new IllegalStateException("Fallo en pasarela al procesar reembolso: " + errorMsg);
                 }
+                if (payment.getProcessedRefundIds() == null) {
+                    payment.setProcessedRefundIds(new java.util.ArrayList<>());
+                }
+                if (res.refundId() != null && !payment.getProcessedRefundIds().contains(res.refundId())) {
+                    payment.getProcessedRefundIds().add(res.refundId());
+                }
                 refundDetails = " (id=" + res.refundId() + ")";
             }
+            payment.setRefundedAmount(totalAmt);
             payment.setStatus("refunded");
             payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
                     "Reembolso procesado por ADMIN" + refundDetails + ": " + (notes != null && !notes.isBlank() ? notes : "Aprobado manualmente"));
+
+            if (payment.getBooking() != null && bookingRepository != null) {
+                bookingRepository.findById(payment.getBooking()).ifPresent(b -> {
+                    BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
+                    b.setRefundedAmount(paid);
+                    b.setPaymentStatus("refunded");
+                    b.setPendingRefundAmount(BigDecimal.ZERO);
+                    b.setPendingRefundIdempotencyKey(null);
+                    b.setUpdatedAt(Instant.now());
+                    bookingRepository.save(b);
+                });
+            }
         } else if ("dismiss".equalsIgnoreCase(action) || "reject".equalsIgnoreCase(action)) {
             payment.setStatus("failed");
             payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
@@ -312,5 +354,46 @@ public class AdminService {
 
         payment.setUpdatedAt(Instant.now());
         return paymentRepository.save(payment);
+    }
+
+    public byte[] exportBookingsCsv() {
+        List<Booking> bookings = bookingRepository.findAll(org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+        StringBuilder csv = new StringBuilder();
+        csv.append("\uFEFF"); // UTF-8 BOM
+        csv.append("ID,Código Reserva,Huésped,Email,Teléfono,Check-In,Check-Out,Noches,Huéspedes,Total COP,Monto Pagado COP,Saldo Pendiente COP,Estado Reserva,Estado Pago,Fecha Creación\n");
+        for (Booking b : bookings) {
+            String id = escapeCsv(b.getId());
+            String code = escapeCsv(b.getBookingCode());
+            String name = escapeCsv(b.getGuestDetails() != null ? b.getGuestDetails().getFullName() : "");
+            String email = escapeCsv(b.getGuestDetails() != null ? b.getGuestDetails().getEmail() : "");
+            String phone = escapeCsv(b.getGuestDetails() != null ? b.getGuestDetails().getPhone() : "");
+            String checkIn = b.getCheckIn() != null ? b.getCheckIn().toString() : "";
+            String checkOut = b.getCheckOut() != null ? b.getCheckOut().toString() : "";
+            int nights = b.getNights() != null ? b.getNights() : 0;
+            int guests = b.getGuests() != null ? b.getGuests() : 0;
+            String total = b.getTotalPrice() != null ? b.getTotalPrice().toPlainString() : "0";
+            String paid = b.getPaidAmount() != null ? b.getPaidAmount().toPlainString() : "0";
+            String balance = b.getBalanceDue() != null ? b.getBalanceDue().toPlainString() : "0";
+            String status = escapeCsv(b.getStatus() != null ? b.getStatus() : "");
+            String paymentStatus = escapeCsv(b.getPaymentStatus() != null ? b.getPaymentStatus() : "");
+            String createdAt = b.getCreatedAt() != null ? b.getCreatedAt().toString() : "";
+
+            csv.append(String.join(",",
+                    id, code, name, email, phone,
+                    checkIn, checkOut, String.valueOf(nights), String.valueOf(guests),
+                    total, paid, balance,
+                    status, paymentStatus, createdAt
+            )).append("\n");
+        }
+        return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private String escapeCsv(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }

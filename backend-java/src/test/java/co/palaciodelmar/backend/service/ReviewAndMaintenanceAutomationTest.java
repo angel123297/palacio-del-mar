@@ -164,6 +164,7 @@ class ReviewAndMaintenanceAutomationTest {
                 .build();
 
         when(bookingRepository.findByStatusIn(anyList())).thenReturn(List.of(booking));
+        when(emailService.sendReviewInvitation(any())).thenReturn(true);
 
         invitationScheduler.sendAutomatedReviewInvitations();
 

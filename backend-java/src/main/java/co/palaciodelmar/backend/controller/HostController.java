@@ -60,6 +60,9 @@ public class HostController {
     @Autowired(required = false)
     private UserRepository userRepository;
 
+    @Autowired(required = false)
+    private co.palaciodelmar.backend.service.PaymentGateway paymentGateway;
+
     @Autowired
     public HostController(
             BookingRepository bookingRepository,
@@ -400,6 +403,11 @@ public class HostController {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+        if (booking.getCheckIn() != null && today.isBefore(booking.getCheckIn())) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("No se puede registrar check-in antes de la fecha de llegada (" + booking.getCheckIn() + ")"));
+        }
+
         bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_IN, user.getId(), "Check-in by host");
         bookingRepository.save(booking);
         return ResponseEntity.ok(ApiResponse.ok("Check-in registrado", null));
@@ -419,35 +427,14 @@ public class HostController {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
 
-        // Late check-out: el check-out oficial es a las 12:00 (ver FAQ y Branch.checkOutTime).
-        java.time.ZoneId bogota = java.time.ZoneId.of("America/Bogota");
-        java.time.LocalDate today = java.time.LocalDate.now(bogota);
-        java.time.LocalTime nowTime = java.time.LocalTime.now(bogota);
-        boolean lateCheckout = booking.getCheckOut() != null
-                && (today.isAfter(booking.getCheckOut())
-                    || (today.isEqual(booking.getCheckOut()) && nowTime.isAfter(java.time.LocalTime.NOON)));
-        BigDecimal currentTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
-        BigDecimal currentBalance = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
-        if (lateCheckout && booking.getPricePerNight() != null) {
-            BigDecimal recargo = booking.getPricePerNight().multiply(new BigDecimal("0.50")).setScale(2, java.math.RoundingMode.HALF_UP);
-            booking.setTotalPrice(currentTotal.add(recargo));
-            booking.setBalanceDue(currentBalance.add(recargo));
-            booking.setPaymentStatus("partial");
-            booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Recargo Late Check-out aplicado: $" + recargo);
+        try {
+            bookingService.processCheckOut(id, user != null ? user.getId() : "host", "Check-out by host", false);
+            return ResponseEntity.ok(ApiResponse.ok("Check-out registrado", null));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
         }
-        // Depósito de garantía: se devuelve al hacer check-out (se refleja en lo devuelto, no como ingreso).
-        BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
-        if (deposit.signum() > 0 && !Boolean.TRUE.equals(booking.getGuaranteeRefunded())) {
-            BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
-            BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
-            BigDecimal refundable = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
-            booking.setRefundedAmount(refunded.add(refundable));
-            booking.setGuaranteeRefunded(true);
-            booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía devuelto: $" + refundable);
-        }
-        bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT, user.getId(), "Check-out by host");
-        bookingRepository.save(booking);
-        return ResponseEntity.ok(ApiResponse.ok("Check-out registrado", null));
     }
 
     @PostMapping("/bookings/{id}/regenerate-pin")
@@ -533,12 +520,20 @@ public class HostController {
             effectiveMasked = maskAccountNumber(effectiveAccountNumber);
         }
 
+        if (effectiveAccountNumber.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("El número de cuenta bancaria es obligatorio"));
+        }
+        String holderName = request.getHolderName() != null ? request.getHolderName().trim() : "";
+        if (holderName.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("El nombre del titular de la cuenta es obligatorio"));
+        }
+
         User.BankAccount updated = User.BankAccount.builder()
                 .bankName(request.getBankName() != null ? request.getBankName().trim() : "Bancolombia")
                 .accountType(request.getAccountType() != null ? request.getAccountType().trim() : "Ahorros")
                 .accountNumber(effectiveAccountNumber)
                 .accountNumberMasked(effectiveMasked)
-                .holderName(request.getHolderName() != null ? request.getHolderName().trim() : "")
+                .holderName(holderName)
                 .documentId(request.getDocumentId())
                 .documentType(request.getDocumentType())
                 .updatedAt(java.time.Instant.now())

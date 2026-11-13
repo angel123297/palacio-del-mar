@@ -36,6 +36,9 @@ public class AvailabilityService {
     private final PropertyRepository propertyRepository;
     private final PricingService pricingService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DynamicPricingService dynamicPricingService;
+
     public static final Map<String, String> SLUG_ALIASES = Map.of(
             "suite-presidencial-mar", "penthouse-bocagrande",
             "casona-colonial-getsemani", "suite-arte-patio-getsemani",
@@ -132,6 +135,7 @@ public class AvailabilityService {
                         (a, b) -> a
                 ));
         return suiteRepository.findByActiveTrue().stream()
+                .filter(s -> !Boolean.FALSE.equals(s.getAvailable()))
                 .filter(s -> {
                     if (s.getPropertyId() == null) {
                         return true;
@@ -154,6 +158,9 @@ public class AvailabilityService {
         long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
         if (nights <= 0) {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
+        }
+        if (nights > 365) {
+            throw new IllegalArgumentException("El rango de fechas no puede exceder 365 días");
         }
 
         String resolvedBranchId = null;
@@ -207,7 +214,25 @@ public class AvailabilityService {
             }
             int free = availableSlots.size();
 
-            co.palaciodelmar.backend.service.PricingService.PricingResult pricingResult = pricingService.calculatePrice(suite.getBasePrice(), checkIn, checkOut, java.math.BigDecimal.ZERO);
+            BigDecimal promoDiscount = BigDecimal.ZERO;
+            if (suite.getBranch() != null) {
+                List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(suite.getBranch());
+                promoDiscount = promotions.stream()
+                        .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
+                        .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut.minusDays(1))) &&
+                                     (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
+                        .max(Comparator.comparing(Promotion::getDiscountPercent))
+                        .map(p -> BigDecimal.valueOf(p.getDiscountPercent()))
+                        .orElse(BigDecimal.ZERO);
+            }
+
+            Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
+                    ? dynamicPricingService.adjustmentsFor(suite, checkIn, checkOut, null)
+                    : Map.of();
+
+            co.palaciodelmar.backend.service.PricingService.PricingResult pricingResult = (dynamicAdjustments != null && !dynamicAdjustments.isEmpty())
+                    ? pricingService.calculatePrice(suite.getBasePrice(), checkIn, checkOut, promoDiscount, DynamicPricingService.asFactorFunction(dynamicAdjustments))
+                    : pricingService.calculatePrice(suite.getBasePrice(), checkIn, checkOut, promoDiscount);
             java.math.BigDecimal totalPrice = pricingResult.total();
             java.math.BigDecimal pricePerNight = suite.getBasePrice();
 
@@ -349,7 +374,7 @@ public class AvailabilityService {
 
             // Un día solo está agotado (soldOut) si existen habitaciones en catálogo (totalSuites > 0)
             // y todas han sido reservadas. Si no hay suites en el filtro, no es agotado (soldOut = false).
-            int available = totalSuites > 0 ? Math.max(0, totalSuites - totalOccupiedOnDay) : 1;
+            int available = totalSuites > 0 ? Math.max(0, totalSuites - totalOccupiedOnDay) : 0;
             boolean soldOut = totalSuites > 0 && available == 0;
             if (soldOut) {
                 soldOutDays++;
@@ -415,8 +440,13 @@ public class AvailabilityService {
 
     public java.util.Map<String, Object> getPeakDates(int year) {
         java.util.Map<String, Object> res = new java.util.HashMap<>();
+        LocalDate easter = calculateEaster(year);
+        LocalDate juevesSanto = easter.minusDays(3);
+        LocalDate viernesSanto = easter.minusDays(2);
+        LocalDate semanaSantaStart = easter.minusDays(7);
+
         List<java.util.Map<String, String>> highSeason = List.of(
-                java.util.Map.of("start", year + "-04-01", "end", year + "-04-10", "startDate", year + "-04-01", "endDate", year + "-04-10", "name", "Semana Santa", "label", "Semana Santa"),
+                java.util.Map.of("start", semanaSantaStart.toString(), "end", easter.toString(), "startDate", semanaSantaStart.toString(), "endDate", easter.toString(), "name", "Semana Santa", "label", "Semana Santa"),
                 java.util.Map.of("start", year + "-06-01", "end", year + "-08-31", "startDate", year + "-06-01", "endDate", year + "-08-31", "name", "Vacaciones de Mitad de Año", "label", "Vacaciones de Mitad de Año")
         );
         List<java.util.Map<String, String>> peakSeason = List.of(
@@ -424,21 +454,21 @@ public class AvailabilityService {
         );
         List<java.util.Map<String, String>> holidaysList = List.of(
                 java.util.Map.of("date", year + "-01-01", "name", "Año Nuevo"),
-                java.util.Map.of("date", year + "-01-06", "name", "Reyes Magos"),
-                java.util.Map.of("date", year + "-03-23", "name", "San José"),
-                java.util.Map.of("date", year + "-04-09", "name", "Jueves Santo"),
-                java.util.Map.of("date", year + "-04-10", "name", "Viernes Santo"),
+                java.util.Map.of("date", moveToNextMonday(LocalDate.of(year, 1, 6)).toString(), "name", "Reyes Magos"),
+                java.util.Map.of("date", moveToNextMonday(LocalDate.of(year, 3, 19)).toString(), "name", "San José"),
+                java.util.Map.of("date", juevesSanto.toString(), "name", "Jueves Santo"),
+                java.util.Map.of("date", viernesSanto.toString(), "name", "Viernes Santo"),
                 java.util.Map.of("date", year + "-05-01", "name", "Día del Trabajo"),
-                java.util.Map.of("date", year + "-05-25", "name", "Ascensión del Señor"),
-                java.util.Map.of("date", year + "-06-15", "name", "Corpus Christi"),
-                java.util.Map.of("date", year + "-06-22", "name", "Sagrado Corazón"),
-                java.util.Map.of("date", year + "-06-29", "name", "San Pedro y San Pablo"),
+                java.util.Map.of("date", moveToNextMonday(easter.plusDays(39)).toString(), "name", "Ascensión del Señor"),
+                java.util.Map.of("date", moveToNextMonday(easter.plusDays(60)).toString(), "name", "Corpus Christi"),
+                java.util.Map.of("date", moveToNextMonday(easter.plusDays(68)).toString(), "name", "Sagrado Corazón"),
+                java.util.Map.of("date", moveToNextMonday(LocalDate.of(year, 6, 29)).toString(), "name", "San Pedro y San Pablo"),
                 java.util.Map.of("date", year + "-07-20", "name", "Independencia de Colombia"),
                 java.util.Map.of("date", year + "-08-07", "name", "Batalla de Boyacá"),
-                java.util.Map.of("date", year + "-08-17", "name", "Asunción de la Virgen"),
-                java.util.Map.of("date", year + "-10-12", "name", "Día de la Raza"),
-                java.util.Map.of("date", year + "-11-02", "name", "Todos los Santos"),
-                java.util.Map.of("date", year + "-11-16", "name", "Independencia de Cartagena"),
+                java.util.Map.of("date", moveToNextMonday(LocalDate.of(year, 8, 15)).toString(), "name", "Asunción de la Virgen"),
+                java.util.Map.of("date", moveToNextMonday(LocalDate.of(year, 10, 12)).toString(), "name", "Día de la Raza"),
+                java.util.Map.of("date", moveToNextMonday(LocalDate.of(year, 11, 1)).toString(), "name", "Todos los Santos"),
+                java.util.Map.of("date", moveToNextMonday(LocalDate.of(year, 11, 11)).toString(), "name", "Independencia de Cartagena"),
                 java.util.Map.of("date", year + "-12-08", "name", "Inmaculada Concepción"),
                 java.util.Map.of("date", year + "-12-25", "name", "Navidad")
         );
@@ -446,5 +476,30 @@ public class AvailabilityService {
         res.put("peakSeason", peakSeason);
         res.put("holidays", holidaysList);
         return res;
+    }
+
+    private static LocalDate calculateEaster(int year) {
+        int a = year % 19;
+        int b = year / 100;
+        int c = year % 100;
+        int d = b / 4;
+        int e = b % 4;
+        int f = (b + 8) / 25;
+        int g = (b - f + 1) / 3;
+        int h = (19 * a + b - d - g + 15) % 30;
+        int i = c / 4;
+        int k = c % 4;
+        int l = (32 + 2 * e + 2 * i - h - k) % 7;
+        int m = (a + 11 * h + 22 * l) / 451;
+        int month = (h + l - 7 * m + 114) / 31;
+        int day = ((h + l - 7 * m + 114) % 31) + 1;
+        return LocalDate.of(year, month, day);
+    }
+
+    private static LocalDate moveToNextMonday(LocalDate date) {
+        if (date.getDayOfWeek() == java.time.DayOfWeek.MONDAY) {
+            return date;
+        }
+        return date.with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY));
     }
 }

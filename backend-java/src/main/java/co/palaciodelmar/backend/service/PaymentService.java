@@ -35,6 +35,10 @@ public class PaymentService {
 
     @Setter
     @Autowired(required = false)
+    private co.palaciodelmar.backend.repository.PaymentIntentRepository paymentIntentRepository;
+
+    @Setter
+    @Autowired(required = false)
     private RedisLockService redisLockService;
 
     @Setter
@@ -78,12 +82,37 @@ public class PaymentService {
                         }
                     });
                 }
+                String realSecret = null;
+                String status = existingPayment.getStatus();
+                BigDecimal amount = existingPayment.getAmount();
+                String currency = existingPayment.getCurrency();
+
+                if (paymentIntentRepository != null) {
+                    co.palaciodelmar.backend.model.PaymentIntent intent = paymentIntentRepository.findById(existingPayment.getIntentId()).orElse(null);
+                    if (intent != null) {
+                        realSecret = intent.getClientSecret();
+                        status = intent.getStatus();
+                        amount = intent.getAmount();
+                        currency = intent.getCurrency();
+                    }
+                }
+                if (realSecret == null && existingPayment.getClientSecret() != null) {
+                    realSecret = existingPayment.getClientSecret();
+                }
+
+                if (realSecret == null || realSecret.isBlank()) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.CONFLICT,
+                            "Inconsistencia en clave de idempotencia: el intento de pago original no tiene secreto válido"
+                    );
+                }
+
                 return new PaymentGateway.PaymentIntentResponse(
                         existingPayment.getIntentId(),
-                        "secret_" + existingPayment.getIntentId(),
-                        existingPayment.getAmount(),
-                        existingPayment.getCurrency(),
-                        existingPayment.getStatus()
+                        realSecret,
+                        amount,
+                        currency,
+                        status
                 );
             }
         }
@@ -111,6 +140,10 @@ public class PaymentService {
         if ("cancelled".equalsIgnoreCase(booking.getStatus()) || "expired".equalsIgnoreCase(booking.getStatus())) {
             throw new IllegalArgumentException("No se puede pagar una reserva cancelada o vencida");
         }
+        if (booking.getBalanceDue() != null && booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0
+                && "paid".equalsIgnoreCase(booking.getPaymentStatus())) {
+            throw new IllegalStateException("La reserva ya ha sido pagada en su totalidad.");
+        }
 
         PaymentGateway.PaymentIntentResponse intentResponse = paymentGateway.createIntent(booking, method, idempotencyKey);
 
@@ -124,6 +157,7 @@ public class PaymentService {
                 .paymentMethod(method != null ? method : "card")
                 .idempotencyKey(idempotencyKey)
                 .intentId(intentResponse.intentId())
+                .clientSecret(intentResponse.clientSecret())
                 .notes("Intención de pago creada")
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -180,6 +214,10 @@ public class PaymentService {
             }
         }
 
+        // Re-consultar payment y booking bajo el lock para evitar carreras con webhooks concurrentes
+        payment = paymentRepository.findById(payment.getId()).orElse(payment);
+        booking = bookingRepository.findById(booking.getId()).orElse(booking);
+
         // Reproducción idempotente si esta intención específica ya fue completada previamente
         if ("completed".equalsIgnoreCase(payment.getStatus())) {
             java.util.Map<String, Object> replayMap = new java.util.HashMap<>();
@@ -195,11 +233,21 @@ public class PaymentService {
             throw new IllegalStateException("La reserva ya ha sido pagada en su totalidad.");
         }
 
-        if (!"pending".equalsIgnoreCase(booking.getStatus()) && !"confirmed".equalsIgnoreCase(booking.getStatus())) {
+        boolean isPayableStatus = "pending".equalsIgnoreCase(booking.getStatus())
+                || "confirmed".equalsIgnoreCase(booking.getStatus())
+                || "checked_in".equalsIgnoreCase(booking.getStatus())
+                || ("checked_out".equalsIgnoreCase(booking.getStatus()) && booking.getBalanceDue() != null && booking.getBalanceDue().compareTo(BigDecimal.ZERO) > 0);
+
+        if (!isPayableStatus) {
             throw new IllegalStateException("No se puede confirmar el pago para una reserva en estado " + booking.getStatus());
         }
         if ("pending".equalsIgnoreCase(booking.getStatus()) && booking.getExpiresAt() != null && booking.getExpiresAt().isBefore(java.time.Instant.now())) {
             throw new IllegalStateException("El tiempo para pagar esta reserva ha expirado");
+        }
+
+        if (booking.getBalanceDue() != null && payment.getAmount() != null
+                && payment.getAmount().compareTo(booking.getBalanceDue()) > 0) {
+            throw new IllegalStateException("El monto del intento de pago (" + payment.getAmount() + ") excede el saldo pendiente actual (" + booking.getBalanceDue() + ")");
         }
 
         PaymentGateway.PaymentConfirmResponse confirmResponse = paymentGateway.confirmIntent(intentId, paymentToken);
@@ -212,6 +260,17 @@ public class PaymentService {
         }
 
         if ("processing".equalsIgnoreCase(confirmResponse.status())) {
+            Payment freshPayment = paymentRepository.findById(payment.getId()).orElse(payment);
+            if ("completed".equalsIgnoreCase(freshPayment.getStatus())) {
+                log.info("Payment {} ya fue completado concurrentemente por webhook; no degradar a processing", payment.getId());
+                Booking freshBooking = bookingRepository.findById(payment.getBooking()).orElse(booking);
+                java.util.Map<String, Object> returnMap = new java.util.HashMap<>();
+                returnMap.put("payment", toDTO(freshPayment));
+                returnMap.put("booking", bookingService.toDTO(freshBooking));
+                returnMap.put("status", freshPayment.getStatus());
+                returnMap.put("transactionId", freshPayment.getTransactionId());
+                return returnMap;
+            }
             payment.setStatus("processing");
             payment.setNotes("Procesando pago con pasarela");
             payment.setUpdatedAt(Instant.now());
@@ -226,13 +285,16 @@ public class PaymentService {
 
         booking.setPaidAmount((booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO).add(payment.getAmount()));
 
-        BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
-        BigDecimal balance = totalPrice.subtract(booking.getPaidAmount());
+        BigDecimal refundedAmt = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+        BigDecimal netPaid = booking.getPaidAmount().subtract(refundedAmt).max(BigDecimal.ZERO);
+        BigDecimal balance = booking.getTotalPrice().subtract(netPaid);
         booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
              booking.setPaymentStatus("paid");
-             bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CONFIRMED, "System", "Pago completado");
+             if ("pending".equalsIgnoreCase(booking.getStatus())) {
+                 bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CONFIRMED, "System", "Pago completado");
+             }
         } else {
              booking.setPaymentStatus("partial");
         }

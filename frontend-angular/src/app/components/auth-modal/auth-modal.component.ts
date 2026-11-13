@@ -224,7 +224,51 @@ import { environment } from '../../../environments/environment';
 
       </div>
     </div>
-  `
+  `,
+  styles: [`
+    .auth-form input {
+      background: #181513 !important;
+      border: 1px solid rgba(201, 169, 110, 0.35) !important;
+      border-radius: 6px !important;
+      color: #ffffff !important;
+      -webkit-text-fill-color: #ffffff !important;
+      padding: 10px 14px;
+      font-size: 0.95rem !important;
+      font-family: inherit !important;
+      box-sizing: border-box !important;
+      outline: none !important;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+    }
+    .auth-form input[type="password"],
+    .auth-form input[id*="password"],
+    .auth-form input[id*="confirm"] {
+      padding-right: 42px !important;
+    }
+    .auth-form input:focus {
+      border-color: var(--gold, #c9a96e) !important;
+      box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.25) !important;
+    }
+    .auth-form input::placeholder {
+      color: rgba(245, 240, 232, 0.45) !important;
+      -webkit-text-fill-color: rgba(245, 240, 232, 0.45) !important;
+      opacity: 1 !important;
+    }
+    .auth-form input:-webkit-autofill,
+    .auth-form input:-webkit-autofill:hover, 
+    .auth-form input:-webkit-autofill:focus {
+      -webkit-text-fill-color: #ffffff !important;
+      -webkit-box-shadow: 0 0 0px 1000px #181513 inset !important;
+      transition: background-color 5000s ease-in-out 0s !important;
+    }
+    .field-label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.82rem;
+      letter-spacing: 0.5px;
+      color: var(--cream, #f5f0e8);
+      font-weight: 500;
+    }
+  `]
 })
 export class AuthModalComponent implements OnChanges {
   @ViewChild('modalContainer') modalContainer?: ElementRef<HTMLElement>;
