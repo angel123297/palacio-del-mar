@@ -17,6 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -566,5 +567,135 @@ class PaymentWebhookServiceTest {
         webhookService.processWebhook(body3, WebhookSigner.sign(body3, secret), "evt_ref_cap", ts);
         assertEquals(new BigDecimal("300000"), activePaidBooking.getRefundedAmount(),
                 "refundedAmount jamás debe superar paidAmount");
+    }
+
+    @Test
+    void testDuplicateRefundIgnoredOnBookingPreservesHostPayout() {
+        String realPaymentId = "pay_real_1";
+        String duplicatePaymentId = "pay_surplus_duplicate_99";
+        String bookingId = "book_stay_completed";
+
+        Payment duplicatePayment = Payment.builder()
+                .id(duplicatePaymentId)
+                .intentId("pi_duplicate_intent")
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .status("completed")
+                .refundedAmount(BigDecimal.ZERO)
+                .build();
+
+        // Booking completed and settled, only has pay_real_1 in processedPaymentIds
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .status("checked_out")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .processedPaymentIds(List.of(realPaymentId))
+                .build();
+
+        when(processedWebhookEventRepository.existsByEventId("evt_dup_ref")).thenReturn(false);
+        when(paymentRepository.findByIntentId("pi_duplicate_intent")).thenReturn(Optional.of(duplicatePayment));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+        String body = """
+                {
+                  "eventId": "evt_dup_ref",
+                  "eventType": "refund.processed",
+                  "data": { "intentId": "pi_duplicate_intent", "bookingId": "book_stay_completed", "amount": 500000 }
+                }
+                """;
+
+        Map<String, Object> result = webhookService.processWebhook(body, WebhookSigner.sign(body, secret), "evt_dup_ref", ts);
+
+        assertEquals("processed", result.get("status"));
+        // Payment itself is updated to refunded
+        assertEquals("refunded", duplicatePayment.getStatus());
+        assertEquals(new BigDecimal("500000"), duplicatePayment.getRefundedAmount());
+
+        // Booking must NOT be degraded: refundedAmount remains 0, paymentStatus remains paid
+        assertEquals(BigDecimal.ZERO, booking.getRefundedAmount(),
+                "El reembolso de un pago duplicado/sobrante no debe alterar el refundedAmount de la reserva");
+        assertEquals("paid", booking.getPaymentStatus(),
+                "El paymentStatus de la reserva no debe cambiar a refunded por un pago excedente");
+
+        // Verificamos que HostPayout settlement (paidAmount - refundedAmount > 0) se mantiene intacto
+        BigDecimal netPaid = booking.getPaidAmount().subtract(booking.getRefundedAmount());
+        assertTrue(netPaid.compareTo(BigDecimal.ZERO) > 0,
+                "La reserva completada no debe ser excluida de la liquidación del anfitrión");
+    }
+
+    @Test
+    void testNegativeRefundAmountInWebhookDoesNotCorruptPaymentRefundedAmount() {
+        String paymentId = "pay_neg_01";
+        String bookingId = "book_neg_01";
+        String intentId = "pi_neg_intent";
+
+        Payment payment = Payment.builder()
+                .id(paymentId)
+                .intentId(intentId)
+                .booking(bookingId)
+                .amount(new BigDecimal("500000"))
+                .currency("COP")
+                .status("completed")
+                .refundedAmount(BigDecimal.ZERO)
+                .build();
+
+        Booking booking = Booking.builder()
+                .id(bookingId)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .balanceDue(BigDecimal.ZERO)
+                .refundedAmount(BigDecimal.ZERO)
+                .processedPaymentIds(List.of(paymentId))
+                .build();
+
+        when(processedWebhookEventRepository.existsByEventId("evt_neg_01")).thenReturn(false);
+        when(paymentRepository.findByIntentId(intentId)).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(paymentRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+        when(bookingRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+        String body = """
+                {
+                  "eventId": "evt_neg_01",
+                  "eventType": "refund.processed",
+                  "data": {
+                    "intentId": "pi_neg_intent",
+                    "bookingId": "book_neg_01",
+                    "amount": -200000
+                  }
+                }
+                """;
+
+        Map<String, Object> result = webhookService.processWebhook(body, WebhookSigner.sign(body, secret), "evt_neg_01", ts);
+
+        assertEquals("processed", result.get("status"));
+        // Payment refundedAmount must be clamped to non-negative (>= 0)
+        assertNotNull(payment.getRefundedAmount());
+        assertTrue(payment.getRefundedAmount().compareTo(BigDecimal.ZERO) >= 0,
+                "Payment refundedAmount must not be negative");
+        assertEquals(BigDecimal.ZERO, payment.getRefundedAmount(),
+                "Negative refund amount should be clamped to 0, leaving refundedAmount unchanged at 0");
+
+        // Booking refundedAmount must remain non-negative and uncorrupted
+        assertNotNull(booking.getRefundedAmount());
+        assertTrue(booking.getRefundedAmount().compareTo(BigDecimal.ZERO) >= 0,
+                "Booking refundedAmount must not be negative");
+        assertEquals(BigDecimal.ZERO, booking.getRefundedAmount(),
+                "Booking refundedAmount must remain 0");
+
+        // Invariant: available for refund in BookingService must never exceed original payment amount
+        BigDecimal pAmount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+        BigDecimal pRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount() : BigDecimal.ZERO;
+        BigDecimal availableForRefund = pAmount.subtract(pRefunded).max(BigDecimal.ZERO);
+        assertTrue(availableForRefund.compareTo(pAmount) <= 0,
+                "Available refund amount must never exceed the original payment total");
+        assertEquals(new BigDecimal("500000"), availableForRefund);
     }
 }

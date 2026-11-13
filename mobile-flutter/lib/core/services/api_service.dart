@@ -182,21 +182,6 @@ class ApiService {
     }
   }
 
-  static Future<bool> sendContactMessage(Map<String, dynamic> messageData) async {
-    try {
-      final response = await AuthenticatedHttpClient.post('/contact', messageData);
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  static Future<void> sendAuditLog(Map<String, dynamic> auditData) async {
-    try {
-      await AuthenticatedHttpClient.post('/audit/log', auditData);
-    } catch (_) {}
-  }
-
   static Future<void> logout() async {
     try {
       await AuthenticatedHttpClient.post('/auth/logout', {});
@@ -281,67 +266,6 @@ class ApiService {
       return null;
     } catch (_) {
       return null;
-    }
-  }
-
-  static Future<List<Map<String, dynamic>>> getExperiences() async {
-    try {
-      final response = await AuthenticatedHttpClient.get('/experiences');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data is Map && data['data'] is List) {
-          return List<Map<String, dynamic>>.from(data['data']);
-        } else if (data is List) {
-          return List<Map<String, dynamic>>.from(data);
-        }
-      }
-      return [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static Future<Map<String, dynamic>> bookExperienceOnly({
-    required String experienceId,
-    required DateTime date,
-    required int quantity,
-    required String guestName,
-    required String guestEmail,
-    String? guestPhone,
-  }) async {
-    try {
-      final dateStr = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      final response = await AuthenticatedHttpClient.post('/bookings', {
-        'suiteId': 'standalone-experience',
-        'checkIn': dateStr,
-        'checkOut': dateStr,
-        'guests': quantity,
-        'guestName': guestName,
-        'guestEmail': guestEmail,
-        'guestPhone': guestPhone ?? '',
-        'experiences': [
-          {
-            'experienceId': experienceId,
-            'quantity': quantity,
-          }
-        ],
-      });
-
-      Map<String, dynamic> responseData = {};
-      try {
-        responseData = jsonDecode(response.body);
-      } catch (_) {}
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {'success': true, 'data': responseData['data'] ?? responseData};
-      } else {
-        return {
-          'success': false,
-          'message': responseData['message'] ?? 'Error al reservar experiencia (${response.statusCode})'
-        };
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Error de conexión con el servidor'};
     }
   }
 }

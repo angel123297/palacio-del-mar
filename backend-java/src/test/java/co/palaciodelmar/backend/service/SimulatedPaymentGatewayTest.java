@@ -173,6 +173,7 @@ class SimulatedPaymentGatewayTest {
         when(paymentIntentRepository.findById("pi_card_0002")).thenReturn(Optional.of(intent1));
 
         gateway.confirmIntent("pi_card_0002", "tok_4242424242420002");
+        gateway.awaitAllSimulations(1000);
         assertEquals("failed", intent1.getStatus());
         assertEquals("Tarjeta rechazada por el banco", intent1.getFailureMessage());
 
@@ -185,6 +186,7 @@ class SimulatedPaymentGatewayTest {
         when(paymentIntentRepository.findById("pi_card_9995")).thenReturn(Optional.of(intent2));
 
         gateway.confirmIntent("pi_card_9995", "tok_4242424242429995");
+        gateway.awaitAllSimulations(1000);
         assertEquals("failed", intent2.getStatus());
         assertEquals("Fondos insuficientes", intent2.getFailureMessage());
 
@@ -197,6 +199,7 @@ class SimulatedPaymentGatewayTest {
         when(paymentIntentRepository.findById("pi_card_0069")).thenReturn(Optional.of(intent3));
 
         gateway.confirmIntent("pi_card_0069", "tok_4242424242420069");
+        gateway.awaitAllSimulations(1000);
         assertEquals("failed", intent3.getStatus());
         assertEquals("Tarjeta vencida", intent3.getFailureMessage());
     }
@@ -283,5 +286,40 @@ class SimulatedPaymentGatewayTest {
 
         ReflectionTestUtils.setField(gateway, "webhookSecret", "f0e1d2c3b4a5968778695a4b3c2d1e0ff0e1d2c3b4a5968778695a4b3c2d1e0f");
         assertDoesNotThrow(() -> gateway.validateSecret());
+    }
+
+    @Test
+    void testZeroDelaySimulationRunsAsynchronouslyOnSchedulerPool() throws Exception {
+        ReflectionTestUtils.setField(gateway, "simulationDelaySeconds", 0);
+        String callingThreadName = Thread.currentThread().getName();
+        java.util.concurrent.atomic.AtomicReference<String> webhookThreadName = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+
+        doAnswer(invocation -> {
+            webhookThreadName.set(Thread.currentThread().getName());
+            latch.countDown();
+            return java.util.Map.of("status", "processed");
+        }).when(paymentWebhookService).processWebhook(any(), any(), any(), any());
+
+        PaymentIntent intent = PaymentIntent.builder()
+                .id("pi_async_test")
+                .bookingId("b_async")
+                .amount(new BigDecimal("100000"))
+                .currency("COP")
+                .status("requires_payment_method")
+                .paymentMethod("card")
+                .build();
+
+        when(paymentIntentRepository.findById("pi_async_test")).thenReturn(Optional.of(intent));
+        when(paymentIntentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        PaymentGateway.PaymentConfirmResponse response = gateway.confirmIntent("pi_async_test", "tok_visa");
+        assertTrue(response.success());
+
+        boolean completed = latch.await(2, TimeUnit.SECONDS);
+        assertTrue(completed, "La tarea de simulación debe haberse ejecutado");
+        assertNotNull(webhookThreadName.get());
+        assertNotEquals(callingThreadName, webhookThreadName.get(),
+                "La simulación con delay <= 0 debe despacharse asíncronamente en el scheduler para evitar deadlocks de Redis");
     }
 }

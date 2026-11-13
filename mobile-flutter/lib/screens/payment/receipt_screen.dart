@@ -17,10 +17,11 @@ class BookingReceiptScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final suiteName = (booking['suiteName'] ?? booking['suite']?['name'] ?? 'Suite Palacio del Mar').toString();
-    final smartPin = booking['smartLockPin']?.toString() ?? '842917';
-    final checkIn = (booking['checkIn'] ?? '2026-11-07').toString();
-    final checkOut = (booking['checkOut'] ?? '2026-11-09').toString();
-    final guestName = (booking['guestName'] ?? booking['user']?['name'] ?? 'Huésped Palacio').toString();
+    final rawPin = booking['smartLockPin']?.toString().trim();
+    final smartPin = (rawPin != null && rawPin.isNotEmpty) ? rawPin : 'Pendiente';
+    final checkIn = (booking['checkIn'] ?? booking['checkInDate'] ?? '').toString();
+    final checkOut = (booking['checkOut'] ?? booking['checkOutDate'] ?? '').toString();
+    final guestName = (booking['guestName'] ?? booking['user']?['name'] ?? booking['guestDetails']?['fullName'] ?? 'Huésped Palacio').toString();
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -126,12 +127,12 @@ class BookingReceiptScreen extends StatelessWidget {
                     ),
                     child: Text(
                       smartPin,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
+                      style: TextStyle(
+                        fontFamily: smartPin == 'Pendiente' ? 'sans-serif' : 'monospace',
                         color: AppTheme.gold,
-                        fontSize: 28,
+                        fontSize: smartPin == 'Pendiente' ? 20 : 28,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 6,
+                        letterSpacing: smartPin == 'Pendiente' ? 2 : 6,
                       ),
                     ),
                   ),
@@ -171,9 +172,9 @@ class BookingReceiptScreen extends StatelessWidget {
                 children: [
                   _detailRow('Facturado a:', guestName),
                   const Divider(color: Colors.white10, height: 16),
-                  _detailRow('Llegada (Check-in 15:00):', checkIn),
+                  _detailRow('Llegada (Check-in 15:00):', checkIn.isNotEmpty ? checkIn : 'Por definir'),
                   const Divider(color: Colors.white10, height: 16),
-                  _detailRow('Salida (Check-out 13:00):', checkOut),
+                  _detailRow('Salida (Check-out 13:00):', checkOut.isNotEmpty ? checkOut : 'Por definir'),
                   const Divider(color: Colors.white10, height: 16),
                   _detailRow('Estado de Reserva:', 'CONFIRMADA · PAGADA', color: const Color(0xFF2ECC71)),
                 ],

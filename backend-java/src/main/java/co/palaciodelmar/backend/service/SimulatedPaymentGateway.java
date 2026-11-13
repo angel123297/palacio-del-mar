@@ -213,7 +213,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         };
 
         if (simulationDelaySeconds <= 0) {
-            simulationTask.run();
+            scheduler.execute(simulationTask);
         } else {
             scheduler.schedule(simulationTask, simulationDelaySeconds, TimeUnit.SECONDS);
         }
@@ -464,8 +464,23 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                     }
                 }
             }
+            if (simulationDelaySeconds <= 0) {
+                awaitAllSimulations(3000);
+            }
         } catch (Exception e) {
             log.error("Error durante recuperación periódica de intentos de pago y webhooks: {}", e.getMessage(), e);
+        }
+    }
+
+    public void awaitAllSimulations(long timeoutMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (!inFlightIntents.isEmpty() && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
     }
 

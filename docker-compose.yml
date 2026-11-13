@@ -113,6 +113,7 @@ services:
       - "127.0.0.1:4200:80"
     environment:
       PALACIO_PROXY_TOKEN: "${PALACIO_PROXY_TOKEN:?PALACIO_PROXY_TOKEN must be defined in .env}"
+      BACKEND_HOST: "${BACKEND_HOST:-backend-java:5000}"
     depends_on:
       - backend-java
 

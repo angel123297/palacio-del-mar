@@ -11,9 +11,9 @@ services:
       - key: SERVER_PORT
         value: 5000
       - key: MONGODB_URI
-        value: "mongodb://samgl2024_db_user:qLLvNfFfb7wPoSCp@ac-fh9cryk-shard-00-00.v4l2d4i.mongodb.net:27017,ac-fh9cryk-shard-00-01.v4l2d4i.mongodb.net:27017,ac-fh9cryk-shard-00-02.v4l2d4i.mongodb.net:27017/palacio_db?ssl=true&replicaSet=atlas-8ln4ql-shard-0&authSource=admin"
+        sync: false
       - key: SPRING_DATA_MONGODB_URI
-        value: "mongodb://samgl2024_db_user:qLLvNfFfb7wPoSCp@ac-fh9cryk-shard-00-00.v4l2d4i.mongodb.net:27017,ac-fh9cryk-shard-00-01.v4l2d4i.mongodb.net:27017,ac-fh9cryk-shard-00-02.v4l2d4i.mongodb.net:27017/palacio_db?ssl=true&replicaSet=atlas-8ln4ql-shard-0&authSource=admin"
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRATION
@@ -23,7 +23,7 @@ services:
       - key: PALACIO_PROXY_TOKEN
         generateValue: true
       - key: SEED_DEMO_DATA
-        value: "true"
+        value: "false"
       - key: SPRING_CACHE_TYPE
         value: "none"
 
@@ -41,3 +41,8 @@ services:
           type: web
           name: palacio-backend
           envVarKey: PALACIO_PROXY_TOKEN
+      - key: BACKEND_HOST
+        fromService:
+          type: web
+          name: palacio-backend
+          property: hostport

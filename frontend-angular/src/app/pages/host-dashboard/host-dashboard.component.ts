@@ -1698,9 +1698,10 @@ export class HostDashboardComponent implements OnInit {
   }
 
   fetchDemoEvents() {
-    this.api.get<ApiResponse<any[]>>('/demo/webhook-receiver/events').subscribe({
+    this.api.get<ApiResponse<any>>('/demo/webhook-receiver/events').subscribe({
       next: (res) => {
-        const list = res?.data || (res as any) || [];
+        const data = res?.data || (res as any);
+        const list = data?.events ?? (Array.isArray(data) ? data : []);
         this.demoEvents.set(Array.isArray(list) ? list : []);
       }
     });
@@ -1824,37 +1825,7 @@ export class HostDashboardComponent implements OnInit {
       },
       error: (err) => {
         this.submittingProperty = false;
-        if (!editId) {
-          // En modo offline o fallback, agregar localmente para retroalimentación inmediata
-          const mockId = 'prop-' + Date.now().toString().slice(-4);
-          const localProp: Property = {
-            id: mockId,
-            name: this.newProperty.name,
-            type: this.newProperty.type,
-            city: this.newProperty.city,
-            address: this.newProperty.address,
-            description: this.newProperty.description,
-            status: 'PENDING',
-            mainImage: this.newProperty.mainImage || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
-            suitesCount: this.newProperty.initialSuitePrice ? 1 : 0
-          } as any;
-          this.properties.update(list => [localProp, ...list]);
-          this.propertySuccess = '¡Alojamiento registrado exitosamente! En revisión por administración.';
-          this.newProperty = {
-            name: '',
-            type: 'HOTEL',
-            city: 'Cartagena',
-            address: '',
-            description: '',
-            phone: '',
-            mainImage: '',
-            initialSuiteName: '',
-            initialSuitePrice: null as any,
-            initialSuiteGuests: 2
-          };
-        } else {
-          this.propertyError = err?.error?.message || 'Error al guardar el alojamiento';
-        }
+        this.propertyError = err?.error?.message || (editId ? 'Error al guardar el alojamiento' : 'Error al registrar el alojamiento');
       }
     });
   }
@@ -1880,34 +1851,18 @@ export class HostDashboardComponent implements OnInit {
 
   fetchPropertySuites(propId: string) {
     this.loadingSuites.set(true);
+    this.suiteError = '';
     this.api.get<ApiResponse<any[]>>(`/host/properties/${propId}/suites`).subscribe({
       next: (res) => {
         this.loadingSuites.set(false);
         const list = res?.data || (res as any) || [];
         const suitesList = Array.isArray(list) ? list : [];
-        if (suitesList.length > 0) {
-          this.propertySuites.set(suitesList);
-        } else {
-          const fallback = [{
-            name: `Suite Principal - ${this.selectedPropertyForSuites?.name || 'Alojamiento'}`,
-            type: 'Suite Deluxe',
-            basePrice: 450000,
-            maxGuests: 2,
-            size: 35
-          }];
-          this.propertySuites.set(fallback);
-        }
+        this.propertySuites.set(suitesList);
       },
-      error: () => {
+      error: (err) => {
         this.loadingSuites.set(false);
-        const fallback = [{
-          name: `Suite Principal - ${this.selectedPropertyForSuites?.name || 'Alojamiento'}`,
-          type: 'Suite Deluxe',
-          basePrice: 450000,
-          maxGuests: 2,
-          size: 35
-        }];
-        this.propertySuites.set(fallback);
+        this.propertySuites.set([]);
+        this.suiteError = err?.error?.message || 'Error al cargar las habitaciones del alojamiento';
       }
     });
   }

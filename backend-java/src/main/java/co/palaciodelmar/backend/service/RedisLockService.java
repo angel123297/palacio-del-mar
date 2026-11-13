@@ -52,6 +52,23 @@ public class RedisLockService {
     private record TimedOwner(String token, long expiresAtMs) {}
     private final ConcurrentHashMap<String, TimedOwner> localTryLocks = new ConcurrentHashMap<>();
 
+    private static final class ReentrantLockState {
+        final String ownerToken;
+        final boolean redisAcquired;
+        final ReentrantLock localLock;
+        int holdCount;
+
+        ReentrantLockState(String ownerToken, boolean redisAcquired, ReentrantLock localLock) {
+            this.ownerToken = ownerToken;
+            this.redisAcquired = redisAcquired;
+            this.localLock = localLock;
+            this.holdCount = 1;
+        }
+    }
+
+    private final ThreadLocal<java.util.Map<String, ReentrantLockState>> threadHeldLocks =
+            ThreadLocal.withInitial(java.util.HashMap::new);
+
     public RedisLockService(@Autowired(required = false) StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
         for (int i = 0; i < STRIPE_COUNT; i++) {
@@ -148,6 +165,14 @@ public class RedisLockService {
             throw new IllegalArgumentException("La clave del bloqueo distribuido es obligatoria");
         }
         String sanitizedKey = LOCK_PREFIX + resourceKey.trim();
+        java.util.Map<String, ReentrantLockState> currentThreadLocks = threadHeldLocks.get();
+        ReentrantLockState existing = currentThreadLocks.get(sanitizedKey);
+        if (existing != null) {
+            existing.holdCount++;
+            existing.localLock.lock();
+            return new LockHandle(sanitizedKey, existing.ownerToken, existing.redisAcquired, existing.localLock);
+        }
+
         String ownerToken = UUID.randomUUID().toString();
         long waitMillis = maxWait != null ? Math.max(0, maxWait.toMillis()) : 0;
         long ttlMillis = ttl != null && ttl.toMillis() > 0 ? ttl.toMillis() : 10_000L;
@@ -174,6 +199,8 @@ public class RedisLockService {
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                         "Coordinación distribuida requerida pero Redis no está configurado.");
             }
+            ReentrantLockState newState = new ReentrantLockState(ownerToken, false, localLock);
+            currentThreadLocks.put(sanitizedKey, newState);
             return new LockHandle(sanitizedKey, ownerToken, false, localLock);
         }
 
@@ -183,6 +210,8 @@ public class RedisLockService {
                     Boolean acquired = redisTemplate.opsForValue()
                             .setIfAbsent(sanitizedKey, ownerToken, Duration.ofMillis(ttlMillis));
                     if (Boolean.TRUE.equals(acquired)) {
+                        ReentrantLockState newState = new ReentrantLockState(ownerToken, true, localLock);
+                        currentThreadLocks.put(sanitizedKey, newState);
                         return new LockHandle(sanitizedKey, ownerToken, true, localLock);
                     }
                 } catch (Exception redisEx) {
@@ -193,6 +222,8 @@ public class RedisLockService {
                     }
                     log.warn("Redis no disponible al adquirir lock '{}': {}. Usando protección concurrente L1.",
                             sanitizedKey, redisEx.getMessage());
+                    ReentrantLockState newState = new ReentrantLockState(ownerToken, false, localLock);
+                    currentThreadLocks.put(sanitizedKey, newState);
                     return new LockHandle(sanitizedKey, ownerToken, false, localLock);
                 }
 
@@ -302,12 +333,32 @@ public class RedisLockService {
             }
             closed = true;
             try {
-                if (redisAcquired && redisTemplate != null) {
-                    try {
-                        redisTemplate.execute(UNLOCK_SCRIPT, Collections.singletonList(lockKey), ownerToken);
-                    } catch (Exception ex) {
-                        log.warn("Falla al liberar lock distribuido '{}' en Redis (expirará por TTL): {}",
-                                lockKey, ex.getMessage());
+                java.util.Map<String, ReentrantLockState> currentThreadLocks = threadHeldLocks.get();
+                ReentrantLockState state = currentThreadLocks != null ? currentThreadLocks.get(lockKey) : null;
+                if (state != null) {
+                    state.holdCount--;
+                    if (state.holdCount <= 0) {
+                        currentThreadLocks.remove(lockKey);
+                        if (currentThreadLocks.isEmpty()) {
+                            threadHeldLocks.remove();
+                        }
+                        if (redisAcquired && redisTemplate != null) {
+                            try {
+                                redisTemplate.execute(UNLOCK_SCRIPT, Collections.singletonList(lockKey), ownerToken);
+                            } catch (Exception ex) {
+                                log.warn("Falla al liberar lock distribuido '{}' en Redis (expirará por TTL): {}",
+                                        lockKey, ex.getMessage());
+                            }
+                        }
+                    }
+                } else {
+                    if (redisAcquired && redisTemplate != null) {
+                        try {
+                            redisTemplate.execute(UNLOCK_SCRIPT, Collections.singletonList(lockKey), ownerToken);
+                        } catch (Exception ex) {
+                            log.warn("Falla al liberar lock distribuido '{}' en Redis (expirará por TTL): {}",
+                                    lockKey, ex.getMessage());
+                        }
                     }
                 }
             } finally {

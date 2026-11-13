@@ -11,6 +11,7 @@ import co.palaciodelmar.backend.repository.PaymentRepository;
 import co.palaciodelmar.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
@@ -213,6 +215,10 @@ public class PaymentService {
             }
         }
 
+        // Re-consultar payment y booking bajo el lock para evitar carreras con webhooks concurrentes
+        payment = paymentRepository.findById(payment.getId()).orElse(payment);
+        booking = bookingRepository.findById(booking.getId()).orElse(booking);
+
         // Reproducción idempotente si esta intención específica ya fue completada previamente
         if ("completed".equalsIgnoreCase(payment.getStatus())) {
             java.util.Map<String, Object> replayMap = new java.util.HashMap<>();
@@ -241,7 +247,6 @@ public class PaymentService {
         }
 
         if (booking.getBalanceDue() != null && payment.getAmount() != null
-                && !"pending".equalsIgnoreCase(booking.getStatus())
                 && payment.getAmount().compareTo(booking.getBalanceDue()) > 0) {
             throw new IllegalStateException("El monto del intento de pago (" + payment.getAmount() + ") excede el saldo pendiente actual (" + booking.getBalanceDue() + ")");
         }
@@ -256,6 +261,17 @@ public class PaymentService {
         }
 
         if ("processing".equalsIgnoreCase(confirmResponse.status())) {
+            Payment freshPayment = paymentRepository.findById(payment.getId()).orElse(payment);
+            if ("completed".equalsIgnoreCase(freshPayment.getStatus())) {
+                log.info("Payment {} ya fue completado concurrentemente por webhook; no degradar a processing", payment.getId());
+                Booking freshBooking = bookingRepository.findById(payment.getBooking()).orElse(booking);
+                java.util.Map<String, Object> returnMap = new java.util.HashMap<>();
+                returnMap.put("payment", toDTO(freshPayment));
+                returnMap.put("booking", bookingService.toDTO(freshBooking));
+                returnMap.put("status", freshPayment.getStatus());
+                returnMap.put("transactionId", freshPayment.getTransactionId());
+                return returnMap;
+            }
             payment.setStatus("processing");
             payment.setNotes("Procesando pago con pasarela");
             payment.setUpdatedAt(Instant.now());
