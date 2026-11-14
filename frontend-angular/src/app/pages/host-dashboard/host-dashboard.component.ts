@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal, effect, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, effect, computed } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -437,12 +438,15 @@ export interface HostPromotionItem {
                     <div>
                       <div class="flex justify-between items-start gap-2 mb-2">
                         <h3 class="font-semibold text-lg text-[#f5f0e8]">{{ prop.name }}</h3>
-                        <span [ngClass]="prop.status === 'APPROVED' ? 'bg-[rgba(46,204,113,0.2)] text-[#2ecc71]' : 'bg-[rgba(241,196,15,0.2)] text-[#f1c40f]'" class="px-2.5 py-0.5 font-bold text-[10px] tracking-wider uppercase rounded-full">
-                          {{ prop.status === 'APPROVED' ? '● Aprobado' : '⏳ Pendiente' }}
+                        <span [ngClass]="prop.status === 'APPROVED' ? 'bg-[rgba(46,204,113,0.2)] text-[#2ecc71]' : (prop.status === 'REJECTED' ? 'bg-[rgba(231,76,60,0.2)] text-[#ff6b6b]' : 'bg-[rgba(241,196,15,0.2)] text-[#f1c40f]')" class="px-2.5 py-0.5 font-bold text-[10px] tracking-wider uppercase rounded-full">
+                          {{ prop.status === 'APPROVED' ? '● Aprobado' : (prop.status === 'REJECTED' ? '✕ Rechazado' : '⏳ Pendiente') }}
                         </span>
                       </div>
                       <p class="text-xs text-[#c9a96e] mb-1">📍 {{ prop.city }} &bull; {{ prop.address }}</p>
                       <p *ngIf="prop.description" class="text-xs text-[#f5f0e8] opacity-75 line-clamp-2 mb-3">{{ prop.description }}</p>
+                      <p *ngIf="prop.status === 'REJECTED' && prop.rejectionReason" class="text-xs text-[#ff8a8a] bg-[rgba(231,76,60,0.12)] border border-[rgba(231,76,60,0.3)] rounded px-2.5 py-1.5 mb-3">
+                        <strong>Motivo de rechazo:</strong> {{ prop.rejectionReason }}
+                      </p>
                     </div>
 
                     <div class="pt-3 border-t border-[rgba(255,255,255,0.08)] flex justify-between items-center text-xs gap-2">
@@ -1153,7 +1157,12 @@ export interface HostPromotionItem {
     </div>
   `
 })
-export class HostDashboardComponent implements OnInit {
+export class HostDashboardComponent implements OnInit, OnDestroy {
+  private streamSub?: Subscription;
+
+  ngOnDestroy(): void {
+    this.streamSub?.unsubscribe();
+  }
   api = inject(ApiService);
   auth = inject(AuthService);
   router = inject(Router);
@@ -1164,7 +1173,7 @@ export class HostDashboardComponent implements OnInit {
     effect(() => {
       const user = this.auth.currentUser();
       const role = (user?.role || '').toLowerCase();
-      if (!user || (role !== 'host' && role !== 'anfitrion')) {
+      if (!user || (role !== 'host' && role !== 'anfitrion' && role !== 'admin')) {
         this.router.navigate(['/']);
       }
     });
@@ -1367,8 +1376,8 @@ export class HostDashboardComponent implements OnInit {
       },
       error: (err) => {
         const msg = err?.error?.message || 'Error al guardar los datos bancarios.';
-        this.actionMessage.set(msg);
-        setTimeout(() => this.actionMessage.set(''), 4000);
+        this.actionError.set(msg);
+        setTimeout(() => this.actionError.set(''), 5000);
       }
     });
   }
@@ -1451,7 +1460,8 @@ export class HostDashboardComponent implements OnInit {
     this.fetchHostReviews();
 
     // Actualización en tiempo real vía SSE sin necesidad de recargar la página
-    this.bookingStream.getBookingUpdates().subscribe({
+    this.streamSub?.unsubscribe();
+    this.streamSub = this.bookingStream.getBookingUpdates().subscribe({
       next: (updatedBooking) => {
         if (!updatedBooking) return;
         const bId = updatedBooking.id || (updatedBooking as any)._id;

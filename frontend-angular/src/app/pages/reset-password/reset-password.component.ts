@@ -51,8 +51,8 @@ export class ResetPasswordComponent implements OnInit {
       return;
     }
 
-    if (!this.newPassword || this.newPassword.length < 6) {
-      this.errorMessage.set('La nueva contraseña debe tener al menos 6 caracteres.');
+    if (!this.newPassword || this.newPassword.length < 8) {
+      this.errorMessage.set('La nueva contraseña debe tener al menos 8 caracteres.');
       return;
     }
 

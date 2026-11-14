@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, effect } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -713,7 +714,12 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
     </div>
   `
 })
-export class AdminDashboardComponent implements OnInit {
+export class AdminDashboardComponent implements OnInit, OnDestroy {
+  private streamSub?: Subscription;
+
+  ngOnDestroy(): void {
+    this.streamSub?.unsubscribe();
+  }
   api = inject(ApiService);
   auth = inject(AuthService);
   router = inject(Router);
@@ -806,7 +812,8 @@ export class AdminDashboardComponent implements OnInit {
     this.fetchRefunds();
 
     // Actualización en tiempo real vía SSE para el panel de administración
-    this.bookingStream.getBookingUpdates().subscribe({
+    this.streamSub?.unsubscribe();
+    this.streamSub = this.bookingStream.getBookingUpdates().subscribe({
       next: (updatedBooking) => {
         if (!updatedBooking) return;
         const bId = updatedBooking.id || (updatedBooking as any)._id;

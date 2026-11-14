@@ -63,10 +63,18 @@ export class SearchStateService {
   }
 
   updateRawDates(checkIn: string, checkOut: string) {
+    let effectiveCheckOut = checkOut;
+    if (checkIn && (!effectiveCheckOut || effectiveCheckOut <= checkIn)) {
+      const start = this.parseToMidday(checkIn);
+      if (!isNaN(start.getTime())) {
+        const nextDay = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1, 12, 0, 0);
+        effectiveCheckOut = format(nextDay, 'yyyy-MM-dd');
+      }
+    }
     this.state.update(s => ({
       ...s,
       checkIn,
-      checkOut
+      checkOut: effectiveCheckOut
     }));
   }
 

@@ -320,6 +320,9 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   }
 
   validateDates() {
+    if (!this.checkIn || !this.checkOut) {
+      return;
+    }
     if (this.checkOut <= this.checkIn) {
       const d = new Date(this.checkIn + 'T12:00:00');
       d.setDate(d.getDate() + 1);
@@ -379,7 +382,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     const user = this.auth.currentUserValue;
     const role = (user?.role || '').toLowerCase();
     const propertyId = this.suite?.propertyId || this.suite?.branchId;
-    if (!user || role !== 'host' || !propertyId) return;
+    if (!user || (role !== 'host' && role !== 'anfitrion') || !propertyId) return;
 
     this.checkingOwnership = true;
     this.api.get<any>('/host/properties').subscribe({
@@ -451,9 +454,11 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     } else if (currentStep === 3) {
       this.airportPickup = false;
       this.petFriendly = false;
+      this.needsCrib = false;
       this.wantFood = false;
       this.foodType = '';
       this.customFood = '';
+      this.breakfastCombo = false;
     }
     this.nextStep();
   }

@@ -126,4 +126,38 @@ describe('CheckoutComponent Flow & Idempotency Tests', () => {
     vi.advanceTimersByTime(1200);
     expect(apiServiceMock.post).toHaveBeenCalled();
   });
+
+  it('permite reservas checked_out con saldo pendiente y bloquea checked_out sin saldo', () => {
+    apiServiceMock.get.mockImplementation((url: string) => {
+      if (url.includes('/payments/config')) {
+        return of({ success: true, data: { gateway: 'simulated', currency: 'COP' } });
+      }
+      return of({
+        success: true,
+        data: { ...sampleBooking, status: 'checked_out', paymentStatus: 'partial', balanceDue: 150000 }
+      });
+    });
+
+    const fixtureWithBalance = TestBed.createComponent(CheckoutComponent);
+    const compWithBalance = fixtureWithBalance.componentInstance;
+    fixtureWithBalance.detectChanges();
+    expect(compWithBalance.booking?.status).toBe('checked_out');
+    expect(compWithBalance.unavailableStatusMsg).toBe('');
+
+    apiServiceMock.get.mockImplementation((url: string) => {
+      if (url.includes('/payments/config')) {
+        return of({ success: true, data: { gateway: 'simulated', currency: 'COP' } });
+      }
+      return of({
+        success: true,
+        data: { ...sampleBooking, status: 'checked_out', paymentStatus: 'partial', balanceDue: 0 }
+      });
+    });
+
+    const fixtureNoBalance = TestBed.createComponent(CheckoutComponent);
+    const compNoBalance = fixtureNoBalance.componentInstance;
+    fixtureNoBalance.detectChanges();
+    expect(compNoBalance.booking).toBeNull();
+    expect(compNoBalance.unavailableStatusMsg).toContain('checked_out');
+  });
 });

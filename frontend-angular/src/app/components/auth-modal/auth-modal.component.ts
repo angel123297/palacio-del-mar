@@ -210,6 +210,9 @@ import { environment } from '../../../environments/environment';
 
           <p *ngIf="message" [attr.role]="sentForgot ? 'status' : 'alert'" aria-live="polite" [style.color]="sentForgot ? '#2ecc71' : '#ff4d4d'" [style.background]="sentForgot ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 77, 77, 0.1)'" [style.border-color]="sentForgot ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 77, 77, 0.3)'" style="margin-top: 1rem; text-align: center; font-size: 0.9rem; font-weight: 500; padding: 10px 14px; border-radius: 6px; border-width: 1px; border-style: solid; display: flex; flex-direction: column; align-items: center; gap: 8px;">
             <span>{{ message }}</span>
+            <a *ngIf="sentForgot && resetUrl" [href]="resetUrl" (click)="close()" style="background: rgba(46, 204, 113, 0.18); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.45); padding: 8px 16px; border-radius: 4px; font-weight: 600; text-decoration: none; font-size: 0.85rem; margin-top: 4px;">
+              Abrir Enlace de Recuperación →
+            </a>
             <button *ngIf="sentForgot" type="button" (click)="mode = 'login'" style="background: var(--gold); color: var(--dark); border: none; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 0.85rem; margin-top: 4px;">
               Ir a Iniciar Sesión →
             </button>
@@ -316,6 +319,7 @@ export class AuthModalComponent implements OnChanges {
 
   selectedPortal: 'guest' | 'host' | 'admin' = 'guest';
   registerRole: 'user' | 'host' = 'user';
+  resetUrl = '';
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['isOpen'] && changes['isOpen'].currentValue === true) {
@@ -498,6 +502,7 @@ export class AuthModalComponent implements OnChanges {
     this.showResendVerification = false;
     this.busyResend = false;
     this.targetVerificationEmail = '';
+    this.resetUrl = '';
     this.closeEvent.emit();
     this.cdr.detectChanges();
   }
@@ -555,7 +560,7 @@ export class AuthModalComponent implements OnChanges {
           return;
         }
 
-        if (this.selectedPortal === 'host' && role !== 'host' && role !== 'anfitrion') {
+        if (this.selectedPortal === 'host' && role !== 'host' && role !== 'anfitrion' && role !== 'admin') {
           this.busy = false;
           this.message = 'Esta cuenta tiene rol de ' + (role === 'admin' ? 'Administrador' : 'Huésped') + ', no de Anfitrión. Selecciona la pestaña Huésped.';
           this.isSuccess = false;
@@ -665,12 +670,15 @@ export class AuthModalComponent implements OnChanges {
     this.busy = true;
     this.message = '';
     this.sentForgot = false;
+    this.resetUrl = '';
     this.cdr.detectChanges();
 
     this.auth.forgotPassword(this.email.trim()).subscribe({
       next: (res: any) => {
         this.busy = false;
         this.sentForgot = true;
+        const rawResetUrl = res?.resetUrl || res?.data?.resetUrl || '';
+        this.resetUrl = /^(https?:\/\/|\/)/i.test(rawResetUrl) ? rawResetUrl : '';
         this.message = res?.message || 'Si tu correo se encuentra registrado, te hemos enviado un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada o spam.';
         this.cdr.detectChanges();
       },

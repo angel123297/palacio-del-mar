@@ -1,6 +1,7 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, ActivatedRoute } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { SearchStateService } from '../../services/search-state.service';
@@ -79,6 +80,10 @@ import { Suite, ApiResponse } from '../../models/types';
               </span>
               <span *ngIf="selectedBranch()" class="px-2.5 py-1 bg-[rgba(201,169,110,0.12)] border border-[rgba(201,169,110,0.3)] rounded-full text-[#c9a96e]">
                 📍 {{ getBranchName(selectedBranch()) }}
+              </span>
+              <span *ngIf="searchQuery()" class="px-2.5 py-1 bg-[rgba(201,169,110,0.12)] border border-[rgba(201,169,110,0.3)] rounded-full text-[#c9a96e] inline-flex items-center gap-1.5">
+                🔍 "{{ searchQuery() }}"
+                <button type="button" (click)="clearSearchQuery()" aria-label="Quitar filtro de texto" class="hover:text-white cursor-pointer font-bold">✕</button>
               </span>
               <span *ngIf="searchState.filters().vibe" class="px-2.5 py-1 bg-[rgba(201,169,110,0.12)] border border-[rgba(201,169,110,0.3)] rounded-full text-[#c9a96e]">
                 ✨ {{ getVibeLabel() }}
@@ -179,6 +184,8 @@ export class SearchComponent implements OnInit {
   api = inject(ApiService);
   searchState = inject(SearchStateService);
   currency = inject(CurrencyService);
+  private route = inject(ActivatedRoute, { optional: true });
+  private destroyRef = inject(DestroyRef);
   
   suites = signal<Suite[]>([]);
   branches = signal<any[]>([]);
@@ -189,10 +196,28 @@ export class SearchComponent implements OnInit {
   checkOutDate = signal<string>('');
   selectedBranch = signal<string>('');
   guestsCount = signal<number>(2);
+  searchQuery = signal<string>('');
   sortBy = signal<'recommended' | 'price_asc' | 'price_desc' | 'capacity'>('recommended');
 
+  private normalizeSearchText(value: string): string {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  }
+
   sortedSuites = computed(() => {
-    const list = [...this.suites()];
+    const q = this.normalizeSearchText(this.searchQuery());
+    let list = [...this.suites()];
+    if (q) {
+      list = list.filter((s: any) => {
+        const haystack = this.normalizeSearchText(
+          `${s?.name || ''} ${s?.branch?.name || ''} ${s?.type || ''} ${s?.description || ''}`
+        );
+        return haystack.includes(q);
+      });
+    }
     const order = this.sortBy();
     if (order === 'price_asc') {
       list.sort((a, b) => ((a.totalPrice || a.basePrice || 0) - (b.totalPrice || b.basePrice || 0)));
@@ -213,8 +238,23 @@ export class SearchComponent implements OnInit {
     this.selectedBranch.set(f.branchSlug);
     this.guestsCount.set(f.adults + f.children);
 
+    const initialQ = this.route?.snapshot?.queryParamMap?.get('q') || '';
+    if (initialQ) {
+      this.searchQuery.set(initialQ.trim());
+    }
+    this.route?.queryParamMap
+      ?.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const q = (params.get('q') || '').trim();
+        this.searchQuery.set(q);
+      });
+
     this.fetchBranches();
     this.fetchResults();
+  }
+
+  clearSearchQuery() {
+    this.searchQuery.set('');
   }
 
   fetchBranches() {
@@ -234,6 +274,9 @@ export class SearchComponent implements OnInit {
 
   applyRefinements() {
     this.searchState.updateRawDates(this.checkInDate(), this.checkOutDate());
+    const updated = this.searchState.filters();
+    this.checkInDate.set(updated.checkIn);
+    this.checkOutDate.set(updated.checkOut);
     this.searchState.updateBranch(this.selectedBranch());
     this.searchState.updateGuests(this.guestsCount(), 0);
     this.fetchResults();
@@ -241,6 +284,7 @@ export class SearchComponent implements OnInit {
 
   resetFilters() {
     this.selectedBranch.set('');
+    this.searchQuery.set('');
     this.searchState.updateBranch('');
     this.fetchResults();
   }

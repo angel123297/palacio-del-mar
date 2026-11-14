@@ -214,17 +214,34 @@ public class AvailabilityService {
             }
             int free = availableSlots.size();
 
-            BigDecimal promoDiscount = BigDecimal.ZERO;
-            if (suite.getBranch() != null) {
-                List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(suite.getBranch());
-                promoDiscount = promotions.stream()
-                        .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
-                        .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut.minusDays(1))) &&
-                                     (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
-                        .max(Comparator.comparing(Promotion::getDiscountPercent))
-                        .map(p -> BigDecimal.valueOf(p.getDiscountPercent()))
-                        .orElse(BigDecimal.ZERO);
+            Set<String> promoTargets = new LinkedHashSet<>();
+            if (suite.getBranch() != null && !suite.getBranch().isBlank()) promoTargets.add(suite.getBranch());
+            if (suite.getPropertyId() != null && !suite.getPropertyId().isBlank()) promoTargets.add(suite.getPropertyId());
+            promoTargets.add("all");
+
+            Map<String, Promotion> promoMap = new LinkedHashMap<>();
+            List<Promotion> batchPromos = promotionRepository.findByBranchInAndActiveTrue(promoTargets);
+            if (batchPromos != null && !batchPromos.isEmpty()) {
+                for (Promotion p : batchPromos) {
+                    if (p != null) promoMap.put(p.getId() != null ? p.getId() : String.valueOf(System.identityHashCode(p)), p);
+                }
+            } else {
+                for (String target : promoTargets) {
+                    List<Promotion> found = promotionRepository.findByBranchAndActiveTrue(target);
+                    if (found != null) {
+                        for (Promotion p : found) {
+                            if (p != null) promoMap.put(p.getId() != null ? p.getId() : String.valueOf(System.identityHashCode(p)), p);
+                        }
+                    }
+                }
             }
+            BigDecimal promoDiscount = promoMap.values().stream()
+                    .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
+                    .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut.minusDays(1))) &&
+                                 (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
+                    .max(Comparator.comparing(Promotion::getDiscountPercent))
+                    .map(p -> BigDecimal.valueOf(p.getDiscountPercent()))
+                    .orElse(BigDecimal.ZERO);
 
             Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
                     ? dynamicPricingService.adjustmentsFor(suite, checkIn, checkOut, null)
@@ -430,7 +447,29 @@ public class AvailabilityService {
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
         if (branchId != null && !branchId.isEmpty()) {
             String resolvedBranchId = branchRepository.findBySlug(branchId).map(b -> b.getId()).orElse(branchId);
-            return promotionRepository.findByBranchAndActiveTrue(resolvedBranchId).stream()
+            String resolvedPropId = propertyRepository.findBySlug(branchId).map(p -> p.getId()).orElse(branchId);
+            Set<String> targets = new LinkedHashSet<>();
+            targets.add(resolvedBranchId);
+            targets.add(resolvedPropId);
+            targets.add(branchId);
+            targets.add("all");
+            Map<String, Promotion> unique = new LinkedHashMap<>();
+            List<Promotion> batch = promotionRepository.findByBranchInAndActiveTrue(targets);
+            if (batch != null && !batch.isEmpty()) {
+                for (Promotion p : batch) {
+                    if (p != null) unique.put(p.getId() != null ? p.getId() : String.valueOf(System.identityHashCode(p)), p);
+                }
+            } else {
+                for (String t : targets) {
+                    List<Promotion> found = promotionRepository.findByBranchAndActiveTrue(t);
+                    if (found != null) {
+                        for (Promotion p : found) {
+                            if (p != null) unique.put(p.getId() != null ? p.getId() : String.valueOf(System.identityHashCode(p)), p);
+                        }
+                    }
+                }
+            }
+            return unique.values().stream()
                     .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(endDate)) &&
                                  (p.getEndDate() == null || !p.getEndDate().isBefore(startDate)))
                     .toList();

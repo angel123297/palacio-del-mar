@@ -181,15 +181,30 @@ public class PropertyService {
             @CacheEvict(value = "suite_types", allEntries = true)
     })
     public PropertyDTO updatePropertyStatus(String propertyId, String status) {
+        return updatePropertyStatus(propertyId, status, null);
+    }
+
+    @Caching(evict = {
+            @CacheEvict(value = "suites", allEntries = true),
+            @CacheEvict(value = "suite_detail", allEntries = true),
+            @CacheEvict(value = "suite_types", allEntries = true)
+    })
+    public PropertyDTO updatePropertyStatus(String propertyId, String status, String reason) {
         Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Propiedad no encontrada"));
-        property.setStatus(status.toUpperCase());
+        String normalizedStatus = status.toUpperCase();
+        property.setStatus(normalizedStatus);
+        if ("REJECTED".equals(normalizedStatus)) {
+            property.setRejectionReason(reason != null && !reason.isBlank() ? reason.trim() : null);
+        } else {
+            property.setRejectionReason(null);
+        }
         property.setUpdatedAt(Instant.now());
         Property saved = propertyRepository.save(property);
         syncCachesAndGeo();
         if (emailService != null) {
             try {
-                emailService.sendPropertyStatusNotification(saved, status);
+                emailService.sendPropertyStatusNotification(saved, normalizedStatus, saved.getRejectionReason());
             } catch (Exception e) {
                 log.warn("Error al enviar notificación de estado para propiedad {}: {}", propertyId, e.getMessage());
             }
@@ -397,6 +412,7 @@ public class PropertyService {
                 .images(p.getImages())
                 .commissionRate(p.getCommissionRate())
                 .status(p.getStatus())
+                .rejectionReason(p.getRejectionReason())
                 .externalSiteUrl(p.getExternalSiteUrl())
                 .phone(p.getPhone())
                 .active(p.getActive())

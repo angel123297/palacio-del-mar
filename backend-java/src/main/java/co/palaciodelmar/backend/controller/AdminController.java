@@ -41,7 +41,10 @@ public class AdminController {
             @PathVariable String id,
             @RequestBody Map<String, String> body) {
         String status = body.getOrDefault("status", "APPROVED");
-        co.palaciodelmar.backend.dto.PropertyDTO updated = propertyService.updatePropertyStatus(id, status);
+        String reason = body.get("reason");
+        co.palaciodelmar.backend.dto.PropertyDTO updated = reason != null
+                ? propertyService.updatePropertyStatus(id, status, reason)
+                : propertyService.updatePropertyStatus(id, status);
         return ResponseEntity.ok(ApiResponse.ok("Estado de propiedad actualizado", updated));
     }
 
@@ -90,6 +93,7 @@ public class AdminController {
             @jakarta.validation.Valid @RequestBody co.palaciodelmar.backend.dto.PromotionRequest request) {
         Promotion promotion = Promotion.builder()
                 .title(request.getTitle())
+                .code(request.getCode() != null && !request.getCode().isBlank() ? request.getCode().trim().toUpperCase() : null)
                 .branch(request.resolveBranch())
                 .discountPercent(request.getDiscountPercent())
                 .startDate(request.getStartDate())
@@ -161,6 +165,7 @@ public class AdminController {
                 .id(promotion.getId())
                 .branch(promotion.getBranch())
                 .title(promotion.getTitle())
+                .code(promotion.getCode())
                 .discountPercent(promotion.getDiscountPercent())
                 .startDate(promotion.getStartDate())
                 .endDate(promotion.getEndDate())

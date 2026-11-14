@@ -72,6 +72,15 @@ export class AuthService {
     this.currentUserSignal.set(null);
   }
 
+  updateCurrentUser(partial: Partial<User>) {
+    const current = this.currentUserSignal();
+    const updated = { ...(current || {}), ...partial } as User;
+    if (updated && updated.id) {
+      localStorage.setItem('user', JSON.stringify(updated));
+      this.currentUserSignal.set(updated);
+    }
+  }
+
   login(credentials: LoginDTO) {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(
       timeout(this.TIMEOUT_MS),

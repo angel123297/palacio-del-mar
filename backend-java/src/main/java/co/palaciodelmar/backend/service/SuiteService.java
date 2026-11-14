@@ -221,7 +221,7 @@ public class SuiteService {
             nights = 1;
         }
 
-        BigDecimal branchPromoPercent = findActiveBranchPromotion(suite.getBranch(), request.getCheckIn(), request.getCheckOut());
+        BigDecimal branchPromoPercent = findActiveSuitePromotion(suite, request.getCheckIn(), request.getCheckOut());
         Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
                 ? dynamicPricingService.adjustmentsFor(suite, request.getCheckIn(), request.getCheckOut(), null)
                 : Map.of();
@@ -286,10 +286,31 @@ public class SuiteService {
                 .build();
     }
 
-    private BigDecimal findActiveBranchPromotion(String branchId, LocalDate checkIn, LocalDate checkOut) {
-        if (branchId == null || checkIn == null || checkOut == null) return BigDecimal.ZERO;
-        List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(branchId);
-        Integer maxDiscount = promotions.stream()
+    private BigDecimal findActiveSuitePromotion(Suite suite, LocalDate checkIn, LocalDate checkOut) {
+        if (suite == null || checkIn == null || checkOut == null) return BigDecimal.ZERO;
+        Set<String> targets = new LinkedHashSet<>();
+        if (suite.getBranch() != null && !suite.getBranch().isBlank()) targets.add(suite.getBranch());
+        if (suite.getPropertyId() != null && !suite.getPropertyId().isBlank()) targets.add(suite.getPropertyId());
+        targets.add("all");
+
+        Map<String, Promotion> unique = new LinkedHashMap<>();
+        List<Promotion> batch = promotionRepository.findByBranchInAndActiveTrue(targets);
+        if (batch != null && !batch.isEmpty()) {
+            for (Promotion p : batch) {
+                if (p != null) unique.put(p.getId() != null ? p.getId() : String.valueOf(System.identityHashCode(p)), p);
+            }
+        } else {
+            for (String target : targets) {
+                List<Promotion> found = promotionRepository.findByBranchAndActiveTrue(target);
+                if (found != null) {
+                    for (Promotion p : found) {
+                        if (p != null) unique.put(p.getId() != null ? p.getId() : String.valueOf(System.identityHashCode(p)), p);
+                    }
+                }
+            }
+        }
+
+        Integer maxDiscount = unique.values().stream()
                 .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
                 .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut.minusDays(1))) &&
                              (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))

@@ -171,7 +171,13 @@ export class ExperiencesSectionComponent implements OnInit {
     this.bookingQty = 1;
     this.bookingDate = new Date().toISOString().split('T')[0];
     const user = this.auth.currentUserValue;
-    if (user) {
+    if (!this.auth.isLoggedIn() || !user) {
+      this.errorMessage = 'Debes iniciar sesión con tu cuenta de huésped para reservar una experiencia.';
+    } else {
+      const role = (user.role || '').toLowerCase();
+      if (role === 'host' || role === 'anfitrion' || role === 'admin') {
+        this.errorMessage = 'Las cuentas corporativas (Anfitrión / Administrador) no pueden realizar reservas. Usa una cuenta de huésped.';
+      }
       this.guestName = user.name || this.guestName;
       this.guestEmail = user.email || this.guestEmail;
       this.guestPhone = user.phone || this.guestPhone;
@@ -187,6 +193,16 @@ export class ExperiencesSectionComponent implements OnInit {
 
   submitExperienceBooking(): void {
     if (!this.selectedExp) return;
+
+    if (!this.auth.isLoggedIn()) {
+      this.errorMessage = 'Debes iniciar sesión con tu cuenta de huésped para reservar una experiencia.';
+      return;
+    }
+    const role = (this.auth.currentUserValue?.role || '').toLowerCase();
+    if (role === 'host' || role === 'anfitrion' || role === 'admin') {
+      this.errorMessage = 'Las cuentas corporativas (Anfitrión / Administrador) no pueden realizar reservas. Usa una cuenta de huésped.';
+      return;
+    }
 
     if (!this.bookingDate) {
       this.errorMessage = 'Por favor selecciona la fecha de la actividad.';

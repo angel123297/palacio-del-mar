@@ -1,5 +1,6 @@
-import { Component, AfterViewInit, ViewEncapsulation } from '@angular/core';
+import { Component, AfterViewInit, ViewEncapsulation, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import * as L from 'leaflet';
 
 @Component({
@@ -117,7 +118,7 @@ import * as L from 'leaflet';
               <span class="text-base font-serif text-[#C5A059] font-bold">{{ selectedHotel.price }}</span>
             </div>
 
-            <button (click)="selectedHotel = null" class="w-full bg-[#C5A059] text-black font-semibold py-2 rounded-lg hover:bg-[#b08d4b] transition text-xs shadow">
+            <button (click)="goToAvailability(selectedHotel)" class="w-full bg-[#C5A059] text-black font-semibold py-2 rounded-lg hover:bg-[#b08d4b] transition text-xs shadow">
               Ver Disponibilidad
             </button>
           </div>
@@ -255,6 +256,8 @@ export class HotelMapComponent implements AfterViewInit {
     }
   ];
 
+  private router = inject(Router, { optional: true });
+
   ngAfterViewInit(): void {
     setTimeout(() => {
       this.initMap();
@@ -343,5 +346,10 @@ export class HotelMapComponent implements AfterViewInit {
 
   public selectHotel(hotel: any, sectorName: string): void {
     this.selectedHotel = { ...hotel, sector: sectorName };
+  }
+
+  public goToAvailability(hotel: any): void {
+    this.selectedHotel = null;
+    this.router?.navigate(['/buscar'], hotel?.name ? { queryParams: { q: hotel.name } } : undefined);
   }
 }

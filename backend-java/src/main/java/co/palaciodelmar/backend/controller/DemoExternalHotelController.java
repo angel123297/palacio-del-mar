@@ -33,7 +33,7 @@ public class DemoExternalHotelController {
                 <h1 class="text-3xl font-bold text-white mt-2">Cartagena Luxury Beach Resort</h1>
                 <p class="text-sm text-slate-400">Demostración de Integración Bidireccional (Dirección B vía API Key) con Palacio del Mar</p>
             </div>
-            <a href="http://localhost:4200/host" target="_blank" class="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-lg hover:bg-amber-500/20 transition">
+            <a href="http://localhost:4200/anfitrion" target="_blank" class="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-lg hover:bg-amber-500/20 transition">
                 &larr; Volver al Panel de Anfitrión
             </a>
         </header>

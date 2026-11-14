@@ -322,6 +322,7 @@ public class HostController {
                         .id(promo.getId())
                         .branch(promo.getBranch())
                         .title(promo.getTitle())
+                        .code(promo.getCode())
                         .discountPercent(promo.getDiscountPercent())
                         .startDate(promo.getStartDate())
                         .endDate(promo.getEndDate())
@@ -351,6 +352,7 @@ public class HostController {
 
         Promotion promo = Promotion.builder()
                 .title(request.getTitle())
+                .code(request.getCode() != null && !request.getCode().isBlank() ? request.getCode().trim().toUpperCase() : null)
                 .branch(targetBranch)
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
@@ -365,6 +367,7 @@ public class HostController {
                 .id(saved.getId())
                 .branch(saved.getBranch())
                 .title(saved.getTitle())
+                .code(saved.getCode())
                 .discountPercent(saved.getDiscountPercent())
                 .startDate(saved.getStartDate())
                 .endDate(saved.getEndDate())

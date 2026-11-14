@@ -63,25 +63,27 @@ public class IntegrationService {
 
             Suite suite;
             if (existingOpt.isPresent()) {
-                suite = existingOpt.get();
-                log.info("Actualizando habitación externa existente {} para propiedad {}", externalId, propertyId);
-                suite.setName(request.getName().trim());
-                if (request.getType() != null) suite.setType(request.getType());
-                suite.setBasePrice(request.getBasePrice());
-                if (request.getMaxGuests() != null) suite.setMaxGuests(request.getMaxGuests());
-                if (request.getDescription() != null) suite.setDescription(request.getDescription());
-                if (request.getMainImage() != null) suite.setMainImage(request.getMainImage());
-                if (request.getAmenities() != null) suite.setAmenities(request.getAmenities());
-                if (request.getTotalUnits() != null) suite.setTotalUnits(request.getTotalUnits());
-                if (request.getActive() != null) suite.setActive(request.getActive());
-                suite.setUpdatedAt(Instant.now());
+                Suite existing = existingOpt.get();
+                if (existing.getId() != null) {
+                    return executeWithRoomLock("suite:" + existing.getId(), () -> {
+                        Suite fresh = suiteRepository.findById(existing.getId()).orElse(existing);
+                        applyExistingRoomUpdate(fresh, propertyId, externalId, request);
+                        Suite saved = suiteRepository.save(fresh);
+                        if (availabilityCacheEvictor != null) {
+                            availabilityCacheEvictor.evictAll();
+                        }
+                        return saved;
+                    });
+                }
+                applyExistingRoomUpdate(existing, propertyId, externalId, request);
+                suite = existing;
             } else {
                 log.info("Creando nueva habitación externa {} para propiedad {}", externalId, propertyId);
                 String slug = generateSlug(request.getName().trim());
 
                 suite = Suite.builder()
                         .propertyId(propertyId)
-                        .branch("branch-1") // Compatibilidad con consultas monohotel
+                        .branch(propertyId)
                         .source("EXTERNAL")
                         .externalId(externalId)
                         .name(request.getName().trim())
@@ -107,15 +109,49 @@ public class IntegrationService {
         });
     }
 
+    private void applyExistingRoomUpdate(Suite suite, String propertyId, String externalId, IntegrationRoomRequest request) {
+        log.info("Actualizando habitación externa existente {} para propiedad {}", externalId, propertyId);
+        suite.setName(request.getName().trim());
+        if (request.getType() != null) suite.setType(request.getType());
+        suite.setBasePrice(request.getBasePrice());
+        if (request.getMaxGuests() != null) suite.setMaxGuests(request.getMaxGuests());
+        if (request.getDescription() != null) suite.setDescription(request.getDescription());
+        if (request.getMainImage() != null) suite.setMainImage(request.getMainImage());
+        if (suite.getBranch() == null || suite.getBranch().isBlank() || "branch-1".equals(suite.getBranch())) {
+            suite.setBranch(propertyId);
+        }
+        if (request.getAmenities() != null) suite.setAmenities(request.getAmenities());
+        if (request.getTotalUnits() != null) {
+            int currentUnits = suite.getTotalUnits() != null ? suite.getTotalUnits() : 1;
+            int newUnits = request.getTotalUnits();
+            if (newUnits < currentUnits && suite.getId() != null && suiteNightRepository != null) {
+                LocalDate today = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+                Instant now = Instant.now();
+                List<SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(5));
+                boolean hasConflict = futureNights.stream()
+                        .filter(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus()))
+                        .filter(sn -> sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(now))
+                        .anyMatch(sn -> sn.getUnitSlot() != null && sn.getUnitSlot() > newUnits);
+                if (hasConflict) {
+                    throw new IllegalStateException("No se puede reducir totalUnits a " + newUnits + " porque existen reservas o bloqueos activos en unidades superiores");
+                }
+            }
+            suite.setTotalUnits(newUnits);
+        }
+        if (request.getActive() != null) suite.setActive(request.getActive());
+        suite.setUpdatedAt(Instant.now());
+    }
+
     private <T> T executeWithRoomLock(String lockKey, java.util.function.Supplier<T> action) {
         if (redisLockService != null) {
             return redisLockService.executeWithLock(lockKey, java.time.Duration.ofSeconds(10), java.time.Duration.ofSeconds(2), action);
         }
-        synchronized (localUpsertLocks.computeIfAbsent(lockKey, k -> new Object())) {
+        Object monitor = localUpsertLocks.computeIfAbsent(lockKey, k -> new Object());
+        synchronized (monitor) {
             try {
                 return action.get();
             } finally {
-                localUpsertLocks.remove(lockKey);
+                localUpsertLocks.remove(lockKey, monitor);
             }
         }
     }
@@ -151,87 +187,98 @@ public class IntegrationService {
         response.put("endDate", end.toString());
         response.put("action", action);
 
-        if ("BLOCK".equals(action)) {
-            Instant now = Instant.now();
-            List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), start, end.minusDays(1))
-                    .stream()
-                    .filter(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus()))
-                    .filter(sn -> sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(now))
-                    .toList();
-
-            // Verificar si hay reservas nativas o bloqueos conflictivos en ese slot
-            for (SuiteNight sn : occupied) {
-                if (sn.getUnitSlot() != null && sn.getUnitSlot() == slot) {
-                    if (sn.getBooking() != null && !sn.getBooking().startsWith("EXT_BLOCK_")) {
-                        throw new IllegalStateException("Conflicto: La fecha " + sn.getDates() + " ya tiene una reserva activa (" + sn.getBooking() + ")");
-                    }
-                }
-            }
-
-            String blockRef = "EXT_BLOCK_" + UUID.randomUUID().toString().substring(0, 8);
-            List<SuiteNight> inserted = new ArrayList<>();
-            try {
-                for (int i = 0; i < nights; i++) {
-                    LocalDate date = start.plusDays(i);
-
-                    // Verificar si ya está bloqueado en esa fecha para ese slot
-                    boolean alreadyBlocked = occupied.stream().anyMatch(sn ->
-                            sn.getUnitSlot() != null && sn.getUnitSlot() == slot &&
-                            sn.getDates() != null && sn.getDates().contains(date) &&
-                            "blocked".equalsIgnoreCase(sn.getStatus())
-                    );
-
-                    if (!alreadyBlocked) {
-                        SuiteNight sn = SuiteNight.builder()
-                                .suite(suite.getId())
-                                .branch(suite.getBranch())
-                                .unitSlot(slot)
-                                .dates(Collections.singletonList(date))
-                                .booking(blockRef)
-                                .status("blocked")
-                                .createdAt(Instant.now())
-                                .build();
-                        inserted.add(suiteNightRepository.save(sn));
-                    }
-                }
-            } catch (DuplicateKeyException e) {
-                suiteNightRepository.deleteAll(inserted);
-                throw new IllegalStateException("Colisión de concurrencia al bloquear fechas. Intente nuevamente.");
-            }
-
-            if (availabilityCacheEvictor != null) {
-                availabilityCacheEvictor.evictAvailability();
-            }
-
-            response.put("status", "SUCCESS");
-            response.put("nightsBlocked", nights);
-            response.put("recordsCreated", inserted.size());
-            response.put("message", "Fechas bloqueadas exitosamente. Las reservas nativas quedan protegidas contra overbooking.");
-            log.info("Bloqueadas {} noches para suite {} desde integración externa ({})", nights, suite.getId(), externalId);
-            return response;
-
-        } else if ("UNBLOCK".equals(action)) {
-            List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), start, end.minusDays(1));
-            List<SuiteNight> toRemove = occupied.stream()
-                    .filter(sn -> sn.getUnitSlot() != null && sn.getUnitSlot() == slot)
-                    .filter(sn -> "blocked".equalsIgnoreCase(sn.getStatus()))
-                    .filter(sn -> sn.getBooking() != null && sn.getBooking().startsWith("EXT_BLOCK_"))
-                    .toList();
-
-            suiteNightRepository.deleteAll(toRemove);
-            if (availabilityCacheEvictor != null) {
-                availabilityCacheEvictor.evictAvailability();
-            }
-
-            response.put("status", "SUCCESS");
-            response.put("recordsRemoved", toRemove.size());
-            response.put("message", "Bloqueos liberados. Las fechas vuelven a estar disponibles para reserva.");
-            log.info("Desbloqueadas {} noches para suite {} desde integración externa", toRemove.size(), suite.getId());
-            return response;
-
-        } else {
+        if (!"BLOCK".equals(action) && !"UNBLOCK".equals(action)) {
             throw new IllegalArgumentException("Acción no válida: " + action + ". Use 'BLOCK' o 'UNBLOCK'.");
         }
+
+        return executeWithRoomLock("suite:" + suite.getId(), () -> {
+            if ("BLOCK".equals(action)) {
+                Instant now = Instant.now();
+                List<SuiteNight> rangeNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), start, end.minusDays(1));
+                List<SuiteNight> expiredHeld = rangeNights.stream()
+                        .filter(sn -> "held".equalsIgnoreCase(sn.getStatus()))
+                        .filter(sn -> sn.getExpiresAt() != null && sn.getExpiresAt().isBefore(now))
+                        .toList();
+                if (!expiredHeld.isEmpty()) {
+                    suiteNightRepository.deleteAll(expiredHeld);
+                }
+
+                List<SuiteNight> occupied = rangeNights.stream()
+                        .filter(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus()))
+                        .filter(sn -> sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(now))
+                        .toList();
+
+                // Verificar si hay reservas nativas o bloqueos conflictivos en ese slot
+                for (SuiteNight sn : occupied) {
+                    if (sn.getUnitSlot() != null && sn.getUnitSlot() == slot) {
+                        if (sn.getBooking() != null && !sn.getBooking().startsWith("EXT_BLOCK_")) {
+                            throw new IllegalStateException("Conflicto: La fecha " + sn.getDates() + " ya tiene una reserva activa (" + sn.getBooking() + ")");
+                        }
+                    }
+                }
+
+                String blockRef = "EXT_BLOCK_" + UUID.randomUUID().toString().substring(0, 8);
+                List<SuiteNight> inserted = new ArrayList<>();
+                try {
+                    for (int i = 0; i < nights; i++) {
+                        LocalDate date = start.plusDays(i);
+
+                        // Verificar si ya está bloqueado en esa fecha para ese slot
+                        boolean alreadyBlocked = occupied.stream().anyMatch(sn ->
+                                sn.getUnitSlot() != null && sn.getUnitSlot() == slot &&
+                                sn.getDates() != null && sn.getDates().contains(date) &&
+                                "blocked".equalsIgnoreCase(sn.getStatus())
+                        );
+
+                        if (!alreadyBlocked) {
+                            SuiteNight sn = SuiteNight.builder()
+                                    .suite(suite.getId())
+                                    .branch(suite.getBranch())
+                                    .unitSlot(slot)
+                                    .dates(Collections.singletonList(date))
+                                    .booking(blockRef)
+                                    .status("blocked")
+                                    .createdAt(Instant.now())
+                                    .build();
+                            inserted.add(suiteNightRepository.save(sn));
+                        }
+                    }
+                } catch (DuplicateKeyException e) {
+                    suiteNightRepository.deleteAll(inserted);
+                    throw new IllegalStateException("Colisión de concurrencia al bloquear fechas. Intente nuevamente.");
+                }
+
+                if (availabilityCacheEvictor != null) {
+                    availabilityCacheEvictor.evictAvailability();
+                }
+
+                response.put("status", "SUCCESS");
+                response.put("nightsBlocked", nights);
+                response.put("recordsCreated", inserted.size());
+                response.put("message", "Fechas bloqueadas exitosamente. Las reservas nativas quedan protegidas contra overbooking.");
+                log.info("Bloqueadas {} noches para suite {} desde integración externa ({})", nights, suite.getId(), externalId);
+                return response;
+
+            } else {
+                List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), start, end.minusDays(1));
+                List<SuiteNight> toRemove = occupied.stream()
+                        .filter(sn -> sn.getUnitSlot() != null && sn.getUnitSlot() == slot)
+                        .filter(sn -> "blocked".equalsIgnoreCase(sn.getStatus()))
+                        .filter(sn -> sn.getBooking() != null && sn.getBooking().startsWith("EXT_BLOCK_"))
+                        .toList();
+
+                suiteNightRepository.deleteAll(toRemove);
+                if (availabilityCacheEvictor != null) {
+                    availabilityCacheEvictor.evictAvailability();
+                }
+
+                response.put("status", "SUCCESS");
+                response.put("recordsRemoved", toRemove.size());
+                response.put("message", "Bloqueos liberados. Las fechas vuelven a estar disponibles para reserva.");
+                log.info("Desbloqueadas {} noches para suite {} desde integración externa", toRemove.size(), suite.getId());
+                return response;
+            }
+        });
     }
 
     private String generateSlug(String name) {

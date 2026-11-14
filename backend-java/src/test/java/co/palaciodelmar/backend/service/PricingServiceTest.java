@@ -151,6 +151,16 @@ class PricingServiceTest {
                 () -> service.calculatePrice(new BigDecimal("100"), checkIn, checkIn.minusDays(1), BigDecimal.ZERO));
     }
 
+    @Test
+    void appliesDynamicComputusMultiplierInMarchHolyWeek() {
+        // En 2027, el Domingo de Pascua cae el 28 de marzo (Semana Santa: 21-28 de marzo)
+        LocalDate maundyThursday2027 = LocalDate.parse("2027-03-25");
+        PricingService.PricingResult result = service.calculatePrice(
+                new BigDecimal("100.00"), maundyThursday2027, maundyThursday2027.plusDays(1), BigDecimal.ZERO);
+
+        assertMoneyEquals(new BigDecimal("130.00"), result.subtotal());
+    }
+
     private static void assertMoneyEquals(BigDecimal expected, BigDecimal actual) {
         assertEquals(0, expected.compareTo(actual),
                 () -> "Expected " + expected.toPlainString() + " but got " + actual.toPlainString());

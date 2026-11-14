@@ -19,7 +19,7 @@ function isAdmin(auth: AuthService): boolean {
 
 function isHost(auth: AuthService): boolean {
   const role = (auth.currentUserValue?.role || '').toLowerCase();
-  return auth.isLoggedIn() && (role === 'host' || role === 'anfitrion');
+  return auth.isLoggedIn() && (role === 'host' || role === 'anfitrion' || role === 'admin');
 }
 
 export const authGuard: CanActivateFn = (_route, state) => {
