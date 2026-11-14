@@ -1179,6 +1179,22 @@ public class BookingService {
 
         boolean multiPaymentBooking = allPaymentsWithTx.size() > 1;
         BigDecimal remainingToRefund = totalRefundToProcess;
+
+        // Reconciliar si un fallo previo actualizó Payment antes de actualizar Booking
+        if (!allPaymentsWithTx.isEmpty()) {
+            BigDecimal totalPaymentsRefunded = allPaymentsWithTx.stream()
+                    .map(p -> p.getRefundedAmount() != null ? p.getRefundedAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal bookingRefunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+            BigDecimal unrecordedOnBooking = totalPaymentsRefunded.subtract(bookingRefunded).max(BigDecimal.ZERO);
+            if (unrecordedOnBooking.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal syncedDelta = unrecordedOnBooking.min(remainingToRefund);
+                BigDecimal nextRem = remainingToRefund.subtract(syncedDelta).max(BigDecimal.ZERO);
+                applyConfirmedRefundToBooking(booking, syncedDelta, null, nextRem, baseIdempotencyKey);
+                remainingToRefund = nextRem;
+            }
+        }
+
         boolean allSucceeded = true;
 
         if (!eligiblePayments.isEmpty()) {
@@ -1202,8 +1218,8 @@ public class BookingService {
                     PaymentGateway.PaymentRefundResponse resp = paymentGateway.refund(payment.getTransactionId(), chunk, chunkKey);
                     if (resp != null && resp.success()) {
                         BigDecimal nextRemaining = remainingToRefund.subtract(chunk).max(BigDecimal.ZERO);
-                        applyConfirmedRefundToBooking(booking, chunk, resp.refundId(), nextRemaining, baseIdempotencyKey);
                         recordConfirmedRefundOnSpecificPayment(payment, chunk, resp.refundId());
+                        applyConfirmedRefundToBooking(booking, chunk, resp.refundId(), nextRemaining, baseIdempotencyKey);
                         remainingToRefund = nextRemaining;
                     } else {
                         allSucceeded = false;

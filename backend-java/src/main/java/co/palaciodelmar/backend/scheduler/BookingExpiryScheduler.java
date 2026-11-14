@@ -95,7 +95,18 @@ public class BookingExpiryScheduler {
             return false;
         }
 
-        // 1. Transicionar y persistir EXPIRED primero (protegido por @Version contra confirmación concurrente)
+        // 1. Transicionar y persistir EXPIRED primero (protegido por @Version contra confirmación concurrente).
+        // Si ya hubo un pago parcial cobrado, registrar requires_refund atómicamente junto con EXPIRED
+        // para no perder la devolución pendiente ante fallos posteriores.
+        java.math.BigDecimal paid = fresh.getPaidAmount() != null ? fresh.getPaidAmount() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal refunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal netPaid = paid.subtract(refunded).max(java.math.BigDecimal.ZERO);
+        String expKey = "ref_exp_" + fresh.getId();
+        if (netPaid.signum() > 0) {
+            fresh.setPendingRefundAmount(netPaid);
+            fresh.setPendingRefundIdempotencyKey(expKey);
+            fresh.setPaymentStatus("requires_refund");
+        }
         bookingService.changeBookingStatus(
                 fresh,
                 BookingStatus.EXPIRED,
@@ -122,12 +133,8 @@ public class BookingExpiryScheduler {
             );
         }
 
-        // 3. Si la reserva expirada tenía un pago parcial cobrado, reembolsar o encolar en requires_refund
-        java.math.BigDecimal paid = fresh.getPaidAmount() != null ? fresh.getPaidAmount() : java.math.BigDecimal.ZERO;
-        java.math.BigDecimal refunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : java.math.BigDecimal.ZERO;
-        java.math.BigDecimal netPaid = paid.subtract(refunded).max(java.math.BigDecimal.ZERO);
+        // 3. Si la reserva expirada tenía un pago parcial cobrado, intentar reembolso automático
         if (netPaid.signum() > 0) {
-            String expKey = "ref_exp_" + fresh.getId();
             bookingService.executeSequentialRefund(fresh, netPaid, expKey);
             java.math.BigDecimal updatedRefunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : java.math.BigDecimal.ZERO;
             java.math.BigDecimal remaining = paid.subtract(updatedRefunded).max(java.math.BigDecimal.ZERO);

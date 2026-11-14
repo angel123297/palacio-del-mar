@@ -272,9 +272,15 @@ public class AuthService {
             }
         }
         user.setUpdatedAt(now);
-        User saved;
-        if (mongoTemplate != null) {
-            // Actualización parcial atómica para no sobrescribir password/tokens modificados concurrentemente por resetPassword
+        User saved = atomicPartialUserUpdate(userId, update, user);
+        if (userSessionCacheService != null) {
+            userSessionCacheService.putCachedUser(saved);
+        }
+        return toDTO(saved);
+    }
+
+    private User atomicPartialUserUpdate(String userId, org.springframework.data.mongodb.core.query.Update update, User fallbackUser) {
+        if (mongoTemplate != null && userId != null) {
             User updated = mongoTemplate.findAndModify(
                     new org.springframework.data.mongodb.core.query.Query(
                             org.springframework.data.mongodb.core.query.Criteria.where("id").is(userId)),
@@ -282,14 +288,11 @@ public class AuthService {
                     org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true),
                     User.class
             );
-            saved = updated != null ? updated : user;
-        } else {
-            saved = userRepository.save(user);
+            if (updated != null) {
+                return updated;
+            }
         }
-        if (userSessionCacheService != null) {
-            userSessionCacheService.putCachedUser(saved);
-        }
-        return toDTO(saved);
+        return userRepository.save(fallbackUser);
     }
 
     public AuthResponse verifyEmail(String token) {
@@ -301,11 +304,20 @@ public class AuthService {
             throw new IllegalArgumentException("El token ha expirado");
         }
 
+        Instant now = Instant.now();
         user.setEmailVerified(true);
         user.setVerificationTokenHash(null);
         user.setVerificationTokenExpiresAt(null);
-        user.setUpdatedAt(Instant.now());
-        User savedUser = userRepository.save(user);
+        user.setUpdatedAt(now);
+        User savedUser = atomicPartialUserUpdate(
+                user.getId(),
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("emailVerified", true)
+                        .unset("verificationTokenHash")
+                        .unset("verificationTokenExpiresAt")
+                        .set("updatedAt", now),
+                user
+        );
         if (userSessionCacheService != null) {
             userSessionCacheService.putCachedUser(savedUser);
         }
@@ -330,11 +342,20 @@ public class AuthService {
             throw new IllegalArgumentException("La nueva contraseña debe tener al menos 8 caracteres");
         }
         Instant changedAt = Instant.now();
-        user.setPassword(passwordEncoder.encode(newPassword));
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        user.setPassword(encodedPassword);
         user.setPasswordChangedAt(changedAt);
         user.setSessionsRevokedAt(changedAt);
         user.setUpdatedAt(changedAt);
-        userRepository.save(user);
+        atomicPartialUserUpdate(
+                user.getId(),
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("password", encodedPassword)
+                        .set("passwordChangedAt", changedAt)
+                        .set("sessionsRevokedAt", changedAt)
+                        .set("updatedAt", changedAt),
+                user
+        );
         if (userSessionCacheService != null) {
             userSessionCacheService.recordGlobalRevocation(user.getEmail(), changedAt);
         }
@@ -350,7 +371,13 @@ public class AuthService {
         Instant now = Instant.now();
         user.setSessionsRevokedAt(now);
         user.setUpdatedAt(now);
-        userRepository.save(user);
+        atomicPartialUserUpdate(
+                user.getId(),
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("sessionsRevokedAt", now)
+                        .set("updatedAt", now),
+                user
+        );
         if (userSessionCacheService != null) {
             userSessionCacheService.recordGlobalRevocation(user.getEmail(), now);
         }
@@ -372,11 +399,20 @@ public class AuthService {
         // Genera token criptográficamente seguro con validez de 15 minutos almacenado con hash SHA-256.
         String rawToken = generateSecureToken();
         String hashedToken = hashToken(rawToken);
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(15, java.time.temporal.ChronoUnit.MINUTES);
 
         user.setResetPasswordTokenHash(hashedToken);
-        user.setResetPasswordTokenExpiresAt(Instant.now().plus(15, java.time.temporal.ChronoUnit.MINUTES));
-        user.setUpdatedAt(Instant.now());
-        userRepository.save(user);
+        user.setResetPasswordTokenExpiresAt(expiresAt);
+        user.setUpdatedAt(now);
+        atomicPartialUserUpdate(
+                user.getId(),
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("resetPasswordTokenHash", hashedToken)
+                        .set("resetPasswordTokenExpiresAt", expiresAt)
+                        .set("updatedAt", now),
+                user
+        );
 
         emailService.sendPasswordResetEmail(user.getEmail(), rawToken);
         log.info("Enlace de restablecimiento de contraseña generado y enviado a {}", normalizedEmail);
@@ -445,11 +481,20 @@ public class AuthService {
 
         String rawToken = generateSecureToken();
         String hashedToken = hashToken(rawToken);
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(24, java.time.temporal.ChronoUnit.HOURS);
 
         user.setVerificationTokenHash(hashedToken);
-        user.setVerificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS));
-        user.setUpdatedAt(Instant.now());
-        userRepository.save(user);
+        user.setVerificationTokenExpiresAt(expiresAt);
+        user.setUpdatedAt(now);
+        atomicPartialUserUpdate(
+                user.getId(),
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("verificationTokenHash", hashedToken)
+                        .set("verificationTokenExpiresAt", expiresAt)
+                        .set("updatedAt", now),
+                user
+        );
 
         emailService.sendVerificationEmail(user.getEmail(), rawToken);
         log.info("Nuevo correo de verificación reenviado exitosamente a {}", normalizedEmail);
