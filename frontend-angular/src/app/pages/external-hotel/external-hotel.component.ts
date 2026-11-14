@@ -191,7 +191,8 @@ export class ExternalHotelComponent implements OnInit {
 
   syncRoom() {
     if (!this.apiKey) {
-      alert('Por favor ingresa tu API Key en la barra superior.');
+      this.roomSuccess.set(false);
+      this.roomResult.set('✖ Por favor ingresa tu API Key en la barra superior.');
       return;
     }
 
@@ -229,7 +230,8 @@ export class ExternalHotelComponent implements OnInit {
 
   syncAvailability() {
     if (!this.apiKey) {
-      alert('Por favor ingresa tu API Key en la barra superior.');
+      this.availSuccess.set(false);
+      this.availResult.set('✖ Por favor ingresa tu API Key en la barra superior.');
       return;
     }
 

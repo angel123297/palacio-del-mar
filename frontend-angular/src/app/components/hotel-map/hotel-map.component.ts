@@ -1,7 +1,8 @@
-import { Component, AfterViewInit, ViewEncapsulation, inject } from '@angular/core';
+import { Component, AfterViewInit, ViewEncapsulation, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import * as L from 'leaflet';
+import { CurrencyService } from '../../services/currency.service';
 
 @Component({
   selector: 'app-hotel-map',
@@ -83,7 +84,7 @@ import * as L from 'leaflet';
                       class="w-full text-left p-3 rounded-lg bg-[#1A1B22] hover:bg-[#C5A059] hover:text-black transition border border-gray-800 flex justify-between items-center group">
                 <div>
                   <span class="font-serif text-sm font-semibold block group-hover:text-black">{{ hotel.name }}</span>
-                  <span class="text-xs text-[#C5A059] group-hover:text-gray-900 font-bold">{{ hotel.price }}</span>
+                  <span class="text-xs text-[#C5A059] group-hover:text-gray-900 font-bold">{{ currency.formatPrice(hotel.priceCop) }}</span>
                 </div>
                 <span class="text-xs group-hover:text-black">Ver ➔</span>
               </button>
@@ -115,7 +116,7 @@ import * as L from 'leaflet';
 
             <div class="flex justify-between items-center bg-[#121318] p-2.5 rounded border border-gray-800 mb-3">
               <span class="text-xs text-gray-400">Tarifa oficial:</span>
-              <span class="text-base font-serif text-[#C5A059] font-bold">{{ selectedHotel.price }}</span>
+              <span class="text-base font-serif text-[#C5A059] font-bold">{{ currency.formatPrice(selectedHotel.priceCop) }}</span>
             </div>
 
             <button (click)="goToAvailability(selectedHotel)" class="w-full bg-[#C5A059] text-black font-semibold py-2 rounded-lg hover:bg-[#b08d4b] transition text-xs shadow">
@@ -177,7 +178,7 @@ export class HotelMapComponent implements AfterViewInit {
         { 
           name: 'Superior Patio Colonial', 
           description: 'Hermosa suite rodeada de arquitectura colonial y balcones tradicionales.', 
-          price: '$450.000 COP', 
+          priceCop: 450000, 
           capacity: '2 Adultos', 
           beds: '1 Cama King', 
           lat: 10.4238, 
@@ -186,7 +187,7 @@ export class HotelMapComponent implements AfterViewInit {
         { 
           name: 'Suite Colonial Imperial', 
           description: 'Elegancia clásica frente a las plazas históricas del Centro Amurallado.', 
-          price: '$620.000 COP', 
+          priceCop: 620000, 
           capacity: '3 Adultos', 
           beds: '1 King + Sofa Cama', 
           lat: 10.4232, 
@@ -203,7 +204,7 @@ export class HotelMapComponent implements AfterViewInit {
         { 
           name: 'Casona Colonial Getsemaní', 
           description: 'Ubicada en el barrio más vibrante y cultural de Cartagena.', 
-          price: '$380.000 COP', 
+          priceCop: 380000, 
           capacity: '2 Adultos', 
           beds: '1 Cama Queen', 
           lat: 10.4192, 
@@ -220,7 +221,7 @@ export class HotelMapComponent implements AfterViewInit {
         { 
           name: 'Palacio Bocagrande Frente al Mar', 
           description: 'Exclusiva torre moderna con vista directa al mar Caribe.', 
-          price: '$750.000 COP', 
+          priceCop: 750000, 
           capacity: '4 Huéspedes', 
           beds: '2 Camas King', 
           lat: 10.4055, 
@@ -229,7 +230,7 @@ export class HotelMapComponent implements AfterViewInit {
         { 
           name: 'Suite Vista Murallas', 
           description: 'Lujo contemporáneo frente a la bahía con piscina infinity.', 
-          price: '$810.000 COP', 
+          priceCop: 810000, 
           capacity: '2 Adultos', 
           beds: '1 Cama King', 
           lat: 10.4045, 
@@ -246,7 +247,7 @@ export class HotelMapComponent implements AfterViewInit {
         { 
           name: 'Reserva Manglares & Sol', 
           description: 'Refugio de paz rodeado de manglares y naturaleza exclusiva.', 
-          price: '$490.000 COP', 
+          priceCop: 490000, 
           capacity: '3 Huéspedes', 
           beds: '1 Queen + 1 Sencilla', 
           lat: 10.4165, 
@@ -257,6 +258,16 @@ export class HotelMapComponent implements AfterViewInit {
   ];
 
   private router = inject(Router, { optional: true });
+  public currency = inject(CurrencyService);
+
+  constructor() {
+    effect(() => {
+      this.currency.currentCurrency();
+      if (this.map) {
+        this.renderMarkers();
+      }
+    });
+  }
 
   ngAfterViewInit(): void {
     setTimeout(() => {
@@ -316,7 +327,7 @@ export class HotelMapComponent implements AfterViewInit {
         marker.bindTooltip(`
           <div style="text-align:center;">
             <b style="color:#C5A059;">${hotel.name}</b><br>
-            <span>${hotel.price}</span>
+            <span>${this.currency.formatPrice(hotel.priceCop)}</span>
           </div>
         `, { direction: 'top', offset: [0, -5], className: 'custom-tooltip' });
 
@@ -324,7 +335,7 @@ export class HotelMapComponent implements AfterViewInit {
           <div style="text-align:center; padding: 2px; max-width: 180px;">
             <b style="color:#C5A059; font-size:13px;">${hotel.name}</b><br>
             <p style="color:#ccc; font-size:11px; margin: 4px 0;">${hotel.description}</p>
-            <b style="color:#C5A059; font-size:12px;">${hotel.price}</b>
+            <b style="color:#C5A059; font-size:12px;">${this.currency.formatPrice(hotel.priceCop)}</b>
           </div>
         `);
 

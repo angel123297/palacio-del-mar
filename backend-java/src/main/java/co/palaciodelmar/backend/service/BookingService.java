@@ -1250,6 +1250,14 @@ public class BookingService {
         }
     }
 
+    public BookingDTO guestCheckOut(String bookingId, String userId) {
+        Booking booking = getBookingEntityById(bookingId);
+        if (!booking.getUser().equals(userId)) {
+            throw new ForbiddenAccessException("No tienes permiso para finalizar esta reserva");
+        }
+        return processCheckOut(bookingId, userId, "Check-out realizado por el huésped", true);
+    }
+
     public BookingDTO processCheckOut(String bookingId, String performedBy, String reason, boolean isAutomatic) {
         return executeWithBookingLock(bookingId, () -> {
             Booking booking = bookingRepository.findById(bookingId)

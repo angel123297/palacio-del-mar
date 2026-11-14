@@ -450,7 +450,7 @@ export interface HostPromotionItem {
                     </div>
 
                     <div class="pt-3 border-t border-[rgba(255,255,255,0.08)] flex justify-between items-center text-xs gap-2">
-                      <span class="text-[#f5f0e8] opacity-60">Comisión: <strong class="text-[#c9a96e]">8%</strong></span>
+                      <span class="text-[#f5f0e8] opacity-60">Comisión: <strong class="text-[#c9a96e]">{{ ((prop.commissionRate ?? 0.08) * 100) | number:'1.0-1' }}%</strong></span>
                       <div class="flex items-center gap-2">
                         <button type="button" (click)="startEditProperty(prop)" class="px-2.5 py-1 bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(201,169,110,0.2)] text-[#f5f0e8] hover:text-[#c9a96e] font-semibold rounded border border-[rgba(255,255,255,0.15)] transition flex items-center gap-1 cursor-pointer">
                           <span>✏️</span> Editar
@@ -551,14 +551,23 @@ export interface HostPromotionItem {
                     No hay habitaciones registradas aún para este alojamiento. Agrega la primera en el formulario superior.
                   </div>
                   <div *ngIf="!loadingSuites() && propertySuites().length > 0" class="space-y-2">
-                    <div *ngFor="let s of propertySuites()" class="p-3 bg-[#161616] border border-[rgba(255,255,255,0.08)] rounded-lg flex justify-between items-center">
+                <div *ngFor="let s of propertySuites()" class="p-3 bg-[#161616] border border-[rgba(255,255,255,0.08)] rounded-lg flex flex-wrap justify-between items-center gap-2">
                       <div>
                         <p class="text-xs font-semibold text-[#f5f0e8]">{{ s.name }}</p>
                         <p class="text-[10px] text-[#f5f0e8] opacity-60">{{ s.type }} &bull; Máx {{ s.maxGuests }} huéspedes &bull; {{ s.size || 30 }} m²</p>
                       </div>
-                      <div class="text-right">
-                        <p class="text-xs font-bold text-[#c9a96e]">{{ currency.formatPrice(s.basePrice || 0) }} <span class="text-[10px] font-normal text-white/50">/ noche</span></p>
-                        <span class="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#2ecc71]/20 text-[#2ecc71]">● Activa</span>
+                      <div class="flex items-center gap-3">
+                        <div class="text-right">
+                          <p class="text-xs font-bold text-[#c9a96e]">{{ currency.formatPrice(s.basePrice || 0) }} <span class="text-[10px] font-normal text-white/50">/ noche</span></p>
+                          <span [ngClass]="s.active === false ? 'bg-amber-500/20 text-amber-300' : 'bg-[#2ecc71]/20 text-[#2ecc71]'" class="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full">
+                            {{ s.active === false ? '○ Pausada' : '● Activa' }}
+                          </span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                          <button type="button" (click)="startEditSuite(s)" class="px-2 py-1 text-[10px] bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(201,169,110,0.2)] text-[#f5f0e8] rounded border border-[rgba(255,255,255,0.15)] cursor-pointer">✏️ Editar</button>
+                          <button type="button" (click)="toggleSuiteActive(s)" class="px-2 py-1 text-[10px] bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(241,196,15,0.2)] text-[#f5f0e8] rounded border border-[rgba(255,255,255,0.15)] cursor-pointer">{{ s.active === false ? '▶ Activar' : '⏸ Pausar' }}</button>
+                          <button type="button" (click)="deleteSuite(s)" class="px-2 py-1 text-[10px] bg-[rgba(231,76,60,0.12)] hover:bg-[rgba(231,76,60,0.25)] text-[#ff6b6b] rounded border border-[rgba(231,76,60,0.3)] cursor-pointer">🗑️</button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -648,6 +657,26 @@ export interface HostPromotionItem {
                     <label class="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" [(ngModel)]="newWebhook.eventCancelled" name="evCancelled" class="accent-[#c9a96e]">
                       <span>Reserva cancelada (Fechas liberadas para la venta)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" [(ngModel)]="newWebhook.eventCheckedIn" name="evCheckedIn" class="accent-[#c9a96e]">
+                      <span>Check-in realizado (Huésped ingresó)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" [(ngModel)]="newWebhook.eventCheckedOut" name="evCheckedOut" class="accent-[#c9a96e]">
+                      <span>Check-out realizado (Estadía finalizada)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" [(ngModel)]="newWebhook.eventNoShow" name="evNoShow" class="accent-[#c9a96e]">
+                      <span>No-Show registrado</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" [(ngModel)]="newWebhook.eventPayout" name="evPayout" class="accent-[#c9a96e]">
+                      <span>Liquidación procesada</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" [(ngModel)]="newWebhook.eventMaintenance" name="evMaintenance" class="accent-[#c9a96e]">
+                      <span>Alerta de mantenimiento</span>
                     </label>
                   </div>
                 </div>
@@ -910,7 +939,7 @@ export interface HostPromotionItem {
             <!-- Right: Active API Keys List -->
             <div class="lg:col-span-2 space-y-4">
               <div class="flex justify-between items-center mb-2">
-                <h3 class="font-serif text-2xl text-[#c9a96e]">Claves de Conexión Activas ({{ apiKeys().length }})</h3>
+                <h3 class="font-serif text-2xl text-[#c9a96e]">Claves de Conexión Activas ({{ activeApiKeysCount() }})</h3>
                 <button (click)="fetchApiKeys()" class="text-xs text-[#c9a96e] hover:underline uppercase tracking-widest">Refrescar</button>
               </div>
 
@@ -1013,8 +1042,8 @@ export interface HostPromotionItem {
                   <p class="text-xs text-[#f5f0e8] opacity-70">Indica la cuenta donde deseas recibir las transferencias automáticas de tus reservas liquidadas.</p>
                 </div>
                 <span class="text-[11px] px-3 py-1 rounded-full border font-semibold"
-                      [ngClass]="bankAccount.accountNumber && bankAccount.holderName ? 'bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border-[rgba(46,204,113,0.3)]' : 'bg-[rgba(241,196,15,0.15)] text-[#f1c40f] border-[rgba(241,196,15,0.3)]'">
-                  {{ bankAccount.accountNumber && bankAccount.holderName ? '✔ Cuenta Verificada para Transferencias ACH' : '⚠️ Pendiente de Configuración Bancaria' }}
+                      [ngClass]="bankAccountSaved() ? 'bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border-[rgba(46,204,113,0.3)]' : 'bg-[rgba(241,196,15,0.15)] text-[#f1c40f] border-[rgba(241,196,15,0.3)]'">
+                  {{ bankAccountSaved() ? '✔ Cuenta Verificada para Transferencias ACH' : '⚠️ Pendiente de Configuración Bancaria' }}
                 </span>
               </div>
               <form (ngSubmit)="saveBankAccount()" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
@@ -1335,6 +1364,7 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
   propertySuccess = '';
 
   // Host Bank Account for Payouts
+  bankAccountSaved = signal<boolean>(false);
   bankAccount = {
     bankName: 'Bancolombia',
     accountType: 'Ahorros',
@@ -1346,16 +1376,21 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
     this.api.get<ApiResponse<any>>('/host/bank-account').subscribe({
       next: (res) => {
         const d = res?.data || res;
-        if (d) {
+        if (d && (d.accountNumberMasked || d.accountNumber) && d.holderName) {
           this.bankAccount = {
             bankName: d.bankName || 'Bancolombia',
             accountType: d.accountType || 'Ahorros',
             accountNumber: d.accountNumberMasked || d.accountNumber || '',
             holderName: d.holderName || ''
           };
+          this.bankAccountSaved.set(true);
+        } else {
+          this.bankAccountSaved.set(false);
         }
       },
-      error: () => {}
+      error: () => {
+        this.bankAccountSaved.set(false);
+      }
     });
   }
 
@@ -1370,6 +1405,7 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
             accountNumber: d.accountNumberMasked || d.accountNumber || this.bankAccount.accountNumber,
             holderName: d.holderName || this.bankAccount.holderName
           };
+          this.bankAccountSaved.set(Boolean(this.bankAccount.accountNumber && this.bankAccount.holderName));
         }
         this.actionMessage.set('Datos bancarios guardados exitosamente en el servidor.');
         setTimeout(() => this.actionMessage.set(''), 4000);
@@ -1398,7 +1434,12 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
       case 'booking.created': return 'Nueva Reserva';
       case 'booking.confirmed': return 'Pago Confirmado';
       case 'booking.cancelled': return 'Reserva Cancelada';
+      case 'booking.checked_in': return 'Check-in Realizado';
+      case 'booking.checked_out': return 'Check-out Realizado';
+      case 'booking.no_show': return 'No-Show';
       case 'payout.processed': return 'Liquidación Procesada';
+      case 'maintenance.alert': return 'Alerta de Mantenimiento';
+      case 'test.ping':
       case 'webhook.test': return 'Aviso de Prueba';
       default: return ev || 'Aviso';
     }
@@ -1411,7 +1452,12 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
     description: '',
     eventCreated: true,
     eventConfirmed: true,
-    eventCancelled: true
+    eventCancelled: true,
+    eventCheckedIn: false,
+    eventCheckedOut: false,
+    eventNoShow: false,
+    eventPayout: false,
+    eventMaintenance: false
   };
   submittingWebhook = false;
   webhookError = '';
@@ -1419,6 +1465,9 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
 
   // Host API Keys State
   apiKeys = signal<ApiKeyItem[]>([]);
+  activeApiKeysCount(): number {
+    return this.apiKeys().filter(k => k.active !== false && !(k as any).revoked).length;
+  }
   recentlyCreatedKey = signal<string>('');
   newApiKey = {
     propertyId: '',
@@ -1434,6 +1483,7 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
   loadingSuites = signal<boolean>(false);
   suiteModalOpen = signal<boolean>(false);
   submittingSuite = false;
+  editingSuiteId: string | null = null;
   suiteError = '';
   suiteSuccess = '';
 
@@ -1605,6 +1655,11 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
     if (this.newWebhook.eventCreated) events.push('booking.created');
     if (this.newWebhook.eventConfirmed) events.push('booking.confirmed');
     if (this.newWebhook.eventCancelled) events.push('booking.cancelled');
+    if (this.newWebhook.eventCheckedIn) events.push('booking.checked_in');
+    if (this.newWebhook.eventCheckedOut) events.push('booking.checked_out');
+    if (this.newWebhook.eventNoShow) events.push('booking.no_show');
+    if (this.newWebhook.eventPayout) events.push('payout.processed');
+    if (this.newWebhook.eventMaintenance) events.push('maintenance.alert');
 
     if (events.length === 0) {
       this.webhookError = 'Debes suscribirte al menos a un evento';
@@ -1629,7 +1684,12 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
           description: '',
           eventCreated: true,
           eventConfirmed: true,
-          eventCancelled: true
+          eventCancelled: true,
+          eventCheckedIn: false,
+          eventCheckedOut: false,
+          eventNoShow: false,
+          eventPayout: false,
+          eventMaintenance: false
         };
         this.fetchSubscriptions();
       },
@@ -1855,6 +1915,16 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
     this.suiteModalOpen.set(false);
     this.selectedPropertyForSuites = null;
     this.propertySuites.set([]);
+    this.editingSuiteId = null;
+    this.newSuite = {
+      name: '',
+      type: 'Habitación',
+      basePrice: 250000,
+      maxGuests: 2,
+      size: 28,
+      description: '',
+      mainImage: ''
+    };
     this.suiteError = '';
     this.suiteSuccess = '';
   }
@@ -1877,6 +1947,67 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  startEditSuite(s: any) {
+    this.suiteError = '';
+    this.suiteSuccess = '';
+    this.editingSuiteId = s.id || s._id || null;
+    this.newSuite = {
+      name: s.name || '',
+      type: s.type || 'Habitación',
+      basePrice: s.basePrice || 250000,
+      maxGuests: s.maxGuests || 2,
+      size: s.size || 28,
+      description: s.description || '',
+      mainImage: s.mainImage || ''
+    };
+  }
+
+  toggleSuiteActive(s: any) {
+    if (!this.selectedPropertyForSuites) return;
+    const propId = this.selectedPropertyForSuites.id || this.selectedPropertyForSuites._id;
+    const suiteId = s.id || s._id;
+    if (!propId || !suiteId) return;
+    const nextActive = s.active === false;
+    this.api.put<ApiResponse<any>>(`/host/properties/${propId}/suites/${suiteId}`, {
+      name: s.name,
+      type: s.type || 'Habitación',
+      basePrice: s.basePrice,
+      maxGuests: s.maxGuests || 2,
+      size: s.size || 28,
+      description: s.description || '',
+      mainImage: s.mainImage || '',
+      active: nextActive
+    }).subscribe({
+      next: () => {
+        this.suiteSuccess = nextActive ? 'Habitación activada.' : 'Habitación pausada.';
+        this.fetchPropertySuites(propId);
+      },
+      error: (err) => {
+        this.suiteError = err?.error?.message || 'No se pudo actualizar el estado de la habitación.';
+      }
+    });
+  }
+
+  deleteSuite(s: any) {
+    if (!this.selectedPropertyForSuites) return;
+    const propId = this.selectedPropertyForSuites.id || this.selectedPropertyForSuites._id;
+    const suiteId = s.id || s._id;
+    if (!propId || !suiteId) return;
+    this.api.delete<ApiResponse<any>>(`/host/properties/${propId}/suites/${suiteId}`).subscribe({
+      next: () => {
+        if (this.editingSuiteId === suiteId) {
+          this.editingSuiteId = null;
+        }
+        this.suiteSuccess = 'Habitación eliminada correctamente.';
+        this.fetchPropertySuites(propId);
+        this.fetchProperties();
+      },
+      error: (err) => {
+        this.suiteError = err?.error?.message || 'No se pudo eliminar la habitación.';
+      }
+    });
+  }
+
   submitSuite() {
     if (!this.selectedPropertyForSuites) return;
     this.suiteError = '';
@@ -1891,13 +2022,21 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
     if (!propId) return;
 
     this.submittingSuite = true;
-    this.api.post<ApiResponse<any>>(`/host/properties/${propId}/suites`, this.newSuite).subscribe({
+    const isEditing = !!this.editingSuiteId;
+    const request$ = isEditing
+      ? this.api.put<ApiResponse<any>>(`/host/properties/${propId}/suites/${this.editingSuiteId}`, this.newSuite)
+      : this.api.post<ApiResponse<any>>(`/host/properties/${propId}/suites`, this.newSuite);
+
+    request$.subscribe({
       next: () => {
         this.submittingSuite = false;
         const isApproved = this.selectedPropertyForSuites?.status === 'APPROVED';
-        this.suiteSuccess = isApproved
-          ? '¡Habitación agregada con éxito y publicada en el catálogo!'
-          : '¡Habitación agregada con éxito! Quedará visible al público una vez que la propiedad sea aprobada por el administrador.';
+        this.suiteSuccess = isEditing
+          ? '¡Habitación actualizada con éxito!'
+          : (isApproved
+            ? '¡Habitación agregada con éxito y publicada en el catálogo!'
+            : '¡Habitación agregada con éxito! Quedará visible al público una vez que la propiedad sea aprobada por el administrador.');
+        this.editingSuiteId = null;
         this.newSuite = {
           name: '',
           type: 'Habitación',

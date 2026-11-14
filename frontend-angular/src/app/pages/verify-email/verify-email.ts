@@ -38,8 +38,17 @@ export class VerifyEmail implements OnInit {
       next: (res) => {
         this.status.set('success');
         this.message.set('¡Tu correo ha sido verificado con éxito! Hemos iniciado tu sesión automáticamente.');
+        const role = (res?.user?.role || '').toLowerCase();
+        let targetUrl = this.returnUrl();
+        if (targetUrl === '/') {
+          if (role === 'admin') {
+            targetUrl = '/admin';
+          } else if (role === 'host' || role === 'anfitrion') {
+            targetUrl = '/anfitrion';
+          }
+        }
         setTimeout(() => {
-          this.router.navigateByUrl(this.returnUrl());
+          this.router.navigateByUrl(targetUrl);
         }, 2000);
       },
       error: (err) => {

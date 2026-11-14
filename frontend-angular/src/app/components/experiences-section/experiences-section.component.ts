@@ -133,7 +133,11 @@ export class ExperiencesSectionComponent implements OnInit {
   guestPhone: string = '';
   submitting = false;
   errorMessage = '';
-  minDate = new Date().toISOString().split('T')[0];
+  minDate = this.bogotaToday();
+
+  private bogotaToday(): string {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+  }
 
   constructor(
     private api: ApiService,
@@ -147,7 +151,7 @@ export class ExperiencesSectionComponent implements OnInit {
     this.api.get<any>('/experiences').subscribe({
       next: (res) => {
         const list = res.data || res || [];
-        this.experiences = Array.isArray(list) ? list.slice(0, 4) : [];
+        this.experiences = Array.isArray(list) ? list : [];
         this.loading = false;
         this.cdr.detectChanges();
       },
@@ -169,7 +173,7 @@ export class ExperiencesSectionComponent implements OnInit {
     this.selectedExp = exp;
     this.errorMessage = '';
     this.bookingQty = 1;
-    this.bookingDate = new Date().toISOString().split('T')[0];
+    this.bookingDate = this.bogotaToday();
     const user = this.auth.currentUserValue;
     if (!this.auth.isLoggedIn() || !user) {
       this.errorMessage = 'Debes iniciar sesión con tu cuenta de huésped para reservar una experiencia.';

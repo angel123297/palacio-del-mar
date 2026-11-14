@@ -103,6 +103,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
          this.guestPhone = user.profile?.phone || user.phone || '';
        }
     }
+    this.checkOwnSuite();
   }
 
   foodOptions = [
@@ -379,6 +380,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
 
   // L1: si el usuario autenticado es HOST dueño de esta propiedad, no puede reservarla aquí.
   private checkOwnSuite(): void {
+    this.isOwnSuite = false;
     const user = this.auth.currentUserValue;
     const role = (user?.role || '').toLowerCase();
     const propertyId = this.suite?.propertyId || this.suite?.branchId;

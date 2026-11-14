@@ -214,7 +214,7 @@ import { finalize, switchMap } from 'rxjs';
                </div>
 
                <!-- EXTRAS IN CHECKOUT SUMMARY -->
-               <div *ngIf="booking.experiences?.length || booking.airportPickup || booking.foodOrders?.length" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+               <div *ngIf="booking.experiences?.length || booking.airportPickup || booking.petFriendly || booking.needsCrib || booking.foodOrders?.length" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
                  <h4 style="color: var(--gold); margin: 0 0 0.8rem 0; font-size: 0.95rem; text-transform: uppercase;">Extras Seleccionados</h4>
                  
                  <div *ngFor="let exp of booking.experiences" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
@@ -225,6 +225,16 @@ import { finalize, switchMap } from 'rxjs';
                  <div *ngIf="booking.airportPickup" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
                    <span style="color: #ccc;">Recogida Aeropuerto</span>
                    <span>{{ currency.formatPrice(150000) }}</span>
+                 </div>
+
+                 <div *ngIf="booking.petFriendly" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                   <span style="color: #ccc;">Estancia Pet-Friendly (Mascota)</span>
+                   <span style="color: #2ecc71;">Incluido</span>
+                 </div>
+
+                 <div *ngIf="booking.needsCrib" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                   <span style="color: #ccc;">Cuna para bebé</span>
+                   <span style="color: #2ecc71;">Incluida</span>
                  </div>
 
                  <ng-container *ngFor="let food of booking.foodOrders">
@@ -503,8 +513,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
       return;
     }
-    if (!this.nequiPhone || this.nequiPhone.trim().length < 10) {
-      this.errorMsg = 'Por favor ingresa un número de celular válido para Nequi (10 dígitos).';
+    const cleanPhone = (this.nequiPhone || '').replace(/\D/g, '');
+    if (!/^3\d{9}$/.test(cleanPhone)) {
+      this.errorMsg = 'Por favor ingresa un número celular colombiano válido para Nequi (10 dígitos iniciando en 3).';
       this.cdr.detectChanges();
       return;
     }

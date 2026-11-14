@@ -107,6 +107,13 @@ import { Booking } from '../../models/types';
                 <span *ngIf="!booking.guaranteeRefunded" style="color: #f1c40f;">(Reembolso automático tras check-out a las 12:00)</span>
               </div>
             </div>
+
+            <div *ngIf="isGuestOwner && booking.status === 'checked_in'" style="margin-top: 1.2rem; padding-top: 1rem; border-top: 1px dashed rgba(212,175,55,0.25);">
+              <p *ngIf="selfCheckOutError" role="alert" style="color: #ff6b6b; font-size: 0.85rem; margin-bottom: 0.75rem;">{{ selfCheckOutError }}</p>
+              <button type="button" (click)="performGuestCheckOut()" [disabled]="selfCheckOutLoading" class="btn-outline" style="padding: 10px 20px; border-color: #2ecc71; color: #2ecc71; cursor: pointer; min-height: 44px; font-weight: 600;">
+                {{ selfCheckOutLoading ? 'Procesando Check-Out...' : '🚪 Hacer Check-Out y Desactivar PIN' }}
+              </button>
+            </div>
           </div>
 
           <!-- Tarjeta de Estancia Finalizada / Check-out procesado -->
@@ -221,7 +228,7 @@ import { Booking } from '../../models/types';
             <div class="bd-section">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 8px;">
                 <h3 class="bd-section-title" style="margin: 0; padding: 0; border: none;">Estancia</h3>
-                <button *ngIf="booking.isModifiable && !isStandaloneExperience && (isGuestOwner || isHostOrAdmin)"
+                <button *ngIf="booking.isModifiable && !isStandaloneExperience && isGuestOwner"
                         type="button"
                         (click)="openModifyModal()"
                         style="background: transparent; border: 1px solid var(--gold); color: var(--gold); padding: 5px 12px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
@@ -253,6 +260,7 @@ import { Booking } from '../../models/types';
               <ul style="list-style: none; padding: 0; margin: 0; color: #ccc; font-size: 0.95rem; display: flex; flex-direction: column; gap: 0.8rem;">
                 <li *ngIf="booking.airportPickup" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">🚗</span> <span>{{ isGuestOwner ? 'Recogida VIP en aeropuerto' : 'Huésped solicitó traslado VIP en aeropuerto' }}</span></li>
                 <li *ngIf="booking.petFriendly" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">🐾</span> <span>Estancia Pet Friendly</span></li>
+                <li *ngIf="booking.needsCrib" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">👶</span> <span>Cuna para bebé solicitada</span></li>
                 <li *ngFor="let exp of booking.experiences" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">✨</span> <span>{{ exp.name }} (x{{ exp.quantity }})</span></li>
                 <li *ngFor="let food of booking.foodOrders" style="display: flex; gap: 0.5rem;"><span style="color: var(--gold);">🍽️</span> <span>{{ food.dishName || food.foodName || 'Pedido de comida' }}</span></li>
               </ul>
@@ -448,6 +456,8 @@ export class BookingDetailComponent implements OnInit {
   preCheckInCompanions = '';
   preCheckInLoading = false;
   preCheckInError = '';
+  selfCheckOutLoading = false;
+  selfCheckOutError = '';
 
   // Modificar fechas
   showModifyModal = false;
@@ -605,7 +615,7 @@ export class BookingDetailComponent implements OnInit {
     if (!this.booking) return false;
     const hasExperiences = this.booking.experiences && this.booking.experiences.length > 0;
     const hasFood = this.booking.foodOrders && this.booking.foodOrders.length > 0;
-    return !!(this.booking.airportPickup || this.booking.petFriendly || hasExperiences || hasFood);
+    return !!(this.booking.airportPickup || this.booking.petFriendly || this.booking.needsCrib || hasExperiences || hasFood);
   }
 
   copyPin(pin: string): void {
@@ -641,6 +651,31 @@ export class BookingDetailComponent implements OnInit {
       error: (err) => {
         this.preCheckInLoading = false;
         this.preCheckInError = err.error?.message || 'Error al procesar el pre-check-in. Verifica tus datos.';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  performGuestCheckOut(): void {
+    if (!this.booking || this.selfCheckOutLoading) return;
+    this.selfCheckOutLoading = true;
+    this.selfCheckOutError = '';
+    const id = this.booking._id || this.booking.id;
+
+    this.api.post<any>(`/bookings/${id}/checkout`, {}).subscribe({
+      next: (res) => {
+        this.selfCheckOutLoading = false;
+        if (res && res.data) {
+          this.booking = res.data;
+        } else if (this.booking) {
+          this.booking.status = 'checked_out';
+          this.booking.smartLockPin = undefined;
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.selfCheckOutLoading = false;
+        this.selfCheckOutError = err.error?.message || 'No se pudo procesar el check-out en este momento.';
         this.cdr.detectChanges();
       }
     });

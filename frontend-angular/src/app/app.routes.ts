@@ -11,6 +11,7 @@ export const routes: Routes = [
   { path: 'my-bookings', redirectTo: 'mis-reservas', pathMatch: 'full' },
   { path: 'reservas/:id', loadComponent: () => import('./pages/booking-detail/booking-detail.component').then(m => m.BookingDetailComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },
   { path: 'reservas/:id/comprobante', loadComponent: () => import('./pages/receipt/receipt.component').then(m => m.ReceiptComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },
+  { path: 'factura/:id', redirectTo: 'reservas/:id/comprobante', pathMatch: 'full' },
   { path: 'admin', loadComponent: () => import('./pages/admin-dashboard/admin-dashboard.component').then(m => m.AdminDashboardComponent), canMatch: [adminMatchGuard], canActivate: [adminGuard] },
   { path: 'anfitrion', loadComponent: () => import('./pages/host-dashboard/host-dashboard.component').then(m => m.HostDashboardComponent), canMatch: [hostMatchGuard], canActivate: [hostGuard] },
   { path: 'checkout/:bookingId', loadComponent: () => import('./pages/checkout/checkout').then(m => m.CheckoutComponent), canMatch: [authMatchGuard], canActivate: [authGuard] },

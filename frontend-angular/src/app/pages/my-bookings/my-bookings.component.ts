@@ -64,7 +64,7 @@ import { finalize } from 'rxjs';
                 {{ getStatusLabel(booking.status) }}
               </span>
               <a [routerLink]="['/reservas', booking.id || booking._id]" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Ver Detalles</a>
-              <a *ngIf="(booking.status === 'pending' || ((booking.balanceDue || 0) > 0 && booking.status !== 'cancelled' && booking.status !== 'expired' && booking.status !== 'checked_out')) && !isExpired(booking)" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">
+              <a *ngIf="(booking.status === 'pending' || ((booking.balanceDue || 0) > 0 && booking.status !== 'cancelled' && booking.status !== 'expired' && booking.status !== 'no_show')) && !isExpired(booking)" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">
                 {{ booking.status === 'pending' ? 'Pagar' : 'Pagar Saldo' }}
               </a>
               <a *ngIf="booking.status === 'confirmed'" [routerLink]="['/reservas', booking.id || booking._id, 'comprobante']" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #2ecc71; color: #2ecc71; text-decoration: none;">Ver Factura</a>

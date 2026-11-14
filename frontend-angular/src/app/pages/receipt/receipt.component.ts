@@ -62,7 +62,7 @@ import { renderSVG } from '../../utils/qr';
 
             <div style="display: flex; gap: 1.5rem; font-size: 0.85rem; color: #444;">
               <div><strong>Llegada:</strong> {{ booking.checkIn | date:'mediumDate' }} <span style="color:#d4af37; font-weight:bold;">(15:00)</span></div>
-              <div><strong>Salida:</strong> {{ booking.checkOut | date:'mediumDate' }} <span style="color:#d4af37; font-weight:bold;">(13:00)</span></div>
+              <div><strong>Salida:</strong> {{ booking.checkOut | date:'mediumDate' }} <span style="color:#d4af37; font-weight:bold;">(12:00)</span></div>
             </div>
             <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: #777;">Presenta este comprobante en recepción o digita el PIN directamente en la cerradura electrónica.</p>
           </div>
