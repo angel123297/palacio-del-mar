@@ -1172,26 +1172,61 @@ public class BookingService {
                         .toList()
                 : java.util.Collections.emptyList();
 
-        List<co.palaciodelmar.backend.model.Payment> eligiblePayments = allPaymentsWithTx.stream()
+        java.util.List<String> processedPayIds = booking.getProcessedPaymentIds();
+        boolean filterByProcessedIds = processedPayIds != null && !processedPayIds.isEmpty();
+        List<co.palaciodelmar.backend.model.Payment> bookingPaymentsWithTx = allPaymentsWithTx.stream()
+                .filter(p -> !filterByProcessedIds || (p.getId() != null && processedPayIds.contains(p.getId())))
+                .toList();
+        if (bookingPaymentsWithTx.isEmpty() && !filterByProcessedIds) {
+            bookingPaymentsWithTx = allPaymentsWithTx;
+        }
+
+        List<co.palaciodelmar.backend.model.Payment> eligiblePayments = bookingPaymentsWithTx.stream()
                 .filter(p -> "completed".equalsIgnoreCase(p.getStatus()) || "partially_refunded".equalsIgnoreCase(p.getStatus()))
                 .sorted(java.util.Comparator.comparing(co.palaciodelmar.backend.model.Payment::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
                 .toList();
 
-        boolean multiPaymentBooking = allPaymentsWithTx.size() > 1;
+        boolean multiPaymentBooking = bookingPaymentsWithTx.size() > 1;
         BigDecimal remainingToRefund = totalRefundToProcess;
 
-        // Reconciliar si un fallo previo actualizó Payment antes de actualizar Booking
-        if (!allPaymentsWithTx.isEmpty()) {
-            BigDecimal totalPaymentsRefunded = allPaymentsWithTx.stream()
-                    .map(p -> p.getRefundedAmount() != null ? p.getRefundedAmount() : BigDecimal.ZERO)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal bookingRefunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
-            BigDecimal unrecordedOnBooking = totalPaymentsRefunded.subtract(bookingRefunded).max(BigDecimal.ZERO);
-            if (unrecordedOnBooking.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal syncedDelta = unrecordedOnBooking.min(remainingToRefund);
-                BigDecimal nextRem = remainingToRefund.subtract(syncedDelta).max(BigDecimal.ZERO);
-                applyConfirmedRefundToBooking(booking, syncedDelta, null, nextRem, baseIdempotencyKey);
-                remainingToRefund = nextRem;
+        // Reconciliar solo si un pago perteneciente a la reserva tiene refundIds no registrados aún en Booking
+        if (!bookingPaymentsWithTx.isEmpty()) {
+            java.util.List<String> bookingRefIds = booking.getProcessedRefundIds() != null
+                    ? booking.getProcessedRefundIds()
+                    : java.util.Collections.emptyList();
+            java.util.List<String> missingRefundIds = bookingPaymentsWithTx.stream()
+                    .filter(p -> p.getProcessedRefundIds() != null)
+                    .flatMap(p -> p.getProcessedRefundIds().stream())
+                    .filter(rid -> rid != null && !rid.isBlank() && !bookingRefIds.contains(rid))
+                    .distinct()
+                    .toList();
+            if (!missingRefundIds.isEmpty()) {
+                BigDecimal totalPaymentsRefunded = bookingPaymentsWithTx.stream()
+                        .map(p -> p.getRefundedAmount() != null ? p.getRefundedAmount() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal bookingRefunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+                BigDecimal unrecordedOnBooking = totalPaymentsRefunded.subtract(bookingRefunded).max(BigDecimal.ZERO);
+                if (unrecordedOnBooking.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal syncedDelta = unrecordedOnBooking.min(remainingToRefund);
+                    BigDecimal nextRem = remainingToRefund.subtract(syncedDelta).max(BigDecimal.ZERO);
+                    String primaryRefundId = missingRefundIds.get(0);
+                    applyConfirmedRefundToBooking(booking, syncedDelta, primaryRefundId, nextRem, baseIdempotencyKey);
+                    if (missingRefundIds.size() > 1) {
+                        if (booking.getProcessedRefundIds() == null) {
+                            booking.setProcessedRefundIds(new java.util.ArrayList<>());
+                        }
+                        for (int k = 1; k < missingRefundIds.size(); k++) {
+                            String extraRid = missingRefundIds.get(k);
+                            if (!booking.getProcessedRefundIds().contains(extraRid)) {
+                                booking.getProcessedRefundIds().add(extraRid);
+                            }
+                        }
+                        if (bookingRepository != null && booking.getId() != null) {
+                            bookingRepository.save(booking);
+                        }
+                    }
+                    remainingToRefund = nextRem;
+                }
             }
         }
 
@@ -1231,7 +1266,7 @@ public class BookingService {
                     break;
                 }
             }
-        } else {
+        } else if (remainingToRefund.compareTo(BigDecimal.ZERO) > 0) {
             // Fallback para pruebas unitarias o reservas legadas sin entidades Payment en BD
             String txId = resolveRefundTransactionId(booking.getId());
             try {

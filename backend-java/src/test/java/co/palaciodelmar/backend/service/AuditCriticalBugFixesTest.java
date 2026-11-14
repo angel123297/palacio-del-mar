@@ -1040,4 +1040,98 @@ class AuditCriticalBugFixesTest {
         assertEquals(400, res2.getStatusCode().value());
         verify(bookingRepo, never()).save(any());
     }
+
+    @Test
+    @DisplayName("24. Pago duplicado reembolsado no se atribuye a la reserva ni omite la llamada a pasarela")
+    void duplicateSurplusPaymentRefundDoesNotBypassGatewayRefundForRealPayment() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService bookingService = buildBookingService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(SuiteNightRepository.class),
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-dup-1")
+                .status("cancelled")
+                .paymentStatus("paid")
+                .paidAmount(new BigDecimal("100000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-real-1")))
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment realPay = Payment.builder()
+                .id("pay-real-1").booking("bk-dup-1").transactionId("tx-real-1")
+                .amount(new BigDecimal("100000")).refundedAmount(BigDecimal.ZERO)
+                .status("completed").createdAt(Instant.now().minusSeconds(60)).build();
+
+        Payment surplusPay = Payment.builder()
+                .id("pay-surplus-2").booking("bk-dup-1").transactionId("tx-surplus-2")
+                .amount(new BigDecimal("100000")).refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("ref-surplus-2")))
+                .status("refunded").createdAt(Instant.now()).build();
+
+        when(paymentRepository.findByBooking("bk-dup-1")).thenReturn(List.of(realPay, surplusPay));
+        when(paymentGateway.refund(eq("tx-real-1"), eq(new BigDecimal("100000")), eq("ref_dup_test")))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "ref-real-1", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        boolean ok = bookingService.executeSequentialRefund(booking, new BigDecimal("100000"), "ref_dup_test");
+
+        assertTrue(ok);
+        verify(paymentGateway, times(1)).refund("tx-real-1", new BigDecimal("100000"), "ref_dup_test");
+        assertTrue(booking.getProcessedRefundIds().contains("ref-real-1"));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
+    }
+
+    @Test
+    @DisplayName("25. Reconciliación tras caída conserva refundId en booking.processedRefundIds para evitar doble conteo por webhook")
+    void recoveryReconciliationPreservesRefundIdOnBooking() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService bookingService = buildBookingService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(SuiteNightRepository.class),
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-rec-id-1")
+                .status("cancelled")
+                .paymentStatus("requires_refund")
+                .paidAmount(new BigDecimal("100000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .pendingRefundAmount(new BigDecimal("100000"))
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-rec-1")))
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment alreadyUpdatedPay = Payment.builder()
+                .id("pay-rec-1").booking("bk-rec-id-1").transactionId("tx-rec-1")
+                .amount(new BigDecimal("100000")).refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("ref-gw-rec-99")))
+                .status("refunded").createdAt(Instant.now()).build();
+
+        when(paymentRepository.findByBooking("bk-rec-id-1")).thenReturn(List.of(alreadyUpdatedPay));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        boolean ok = bookingService.executeSequentialRefund(booking, new BigDecimal("100000"), "ref_rec_key");
+
+        assertTrue(ok);
+        verify(paymentGateway, never()).refund(anyString(), any(), anyString());
+        assertTrue(booking.getProcessedRefundIds().contains("ref-gw-rec-99"));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getPendingRefundAmount()));
+    }
 }
