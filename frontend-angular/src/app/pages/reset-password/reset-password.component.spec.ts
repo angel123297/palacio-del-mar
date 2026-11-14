@@ -54,12 +54,12 @@ describe('ResetPasswordComponent', () => {
     expect(authServiceMock.resetPassword).not.toHaveBeenCalled();
   });
 
-  it('debe mostrar error si la contraseña tiene menos de 6 caracteres', () => {
-    component.newPassword = '123';
-    component.confirmPassword = '123';
+  it('debe mostrar error si la contraseña tiene menos de 8 caracteres', () => {
+    component.newPassword = '1234567';
+    component.confirmPassword = '1234567';
     component.submitReset();
 
-    expect(component.errorMessage()).toContain('al menos 6 caracteres');
+    expect(component.errorMessage()).toContain('al menos 8 caracteres');
     expect(authServiceMock.resetPassword).not.toHaveBeenCalled();
   });
 

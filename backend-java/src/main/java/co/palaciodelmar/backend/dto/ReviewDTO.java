@@ -15,6 +15,7 @@ import java.util.List;
 public class ReviewDTO {
     private String id;
     private String suite;
+    private String suiteName;
     private String user;
     private String bookingId;
     private String userName;

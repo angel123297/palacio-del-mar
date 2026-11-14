@@ -105,6 +105,18 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
             </button>
           </div>
 
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <span style="color: #aaa; font-size: 0.95rem;">Moneda</span>
+            <div style="display: flex; gap: 6px;">
+              <button *ngFor="let c of ['COP', 'USD', 'EUR']" type="button" (click)="currency.setCurrency($any(c))"
+                [style.background]="currency.currentCurrency() === c ? 'var(--gold)' : 'rgba(255,255,255,0.06)'"
+                [style.color]="currency.currentCurrency() === c ? '#0d0d0d' : '#e2c99b'"
+                style="border: 1px solid rgba(226, 201, 155, 0.35); border-radius: 6px; padding: 6px 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
+                {{ c }}
+              </button>
+            </div>
+          </div>
+
           <!-- Authenticated Links for Mobile -->
           <ng-container *ngIf="auth.isLoggedIn() && auth.currentUser() as user; else mobileNotLogged">
             <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">

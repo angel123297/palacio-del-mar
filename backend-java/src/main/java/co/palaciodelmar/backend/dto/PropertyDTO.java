@@ -28,6 +28,7 @@ public class PropertyDTO {
     private List<String> images;
     private BigDecimal commissionRate;
     private String status;
+    private String rejectionReason;
     private String externalSiteUrl;
     private String phone;
     private Boolean active;

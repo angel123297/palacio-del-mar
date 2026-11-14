@@ -64,7 +64,9 @@ import { finalize } from 'rxjs';
                 {{ getStatusLabel(booking.status) }}
               </span>
               <a [routerLink]="['/reservas', booking.id || booking._id]" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Ver Detalles</a>
-              <a *ngIf="booking.status === 'pending' && !isExpired(booking)" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Pagar</a>
+              <a *ngIf="(booking.status === 'pending' || ((booking.balanceDue || 0) > 0 && booking.status !== 'cancelled' && booking.status !== 'expired' && booking.status !== 'no_show')) && !isExpired(booking)" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">
+                {{ booking.status === 'pending' ? 'Pagar' : 'Pagar Saldo' }}
+              </a>
               <a *ngIf="booking.status === 'confirmed'" [routerLink]="['/reservas', booking.id || booking._id, 'comprobante']" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #2ecc71; color: #2ecc71; text-decoration: none;">Ver Factura</a>
               <button *ngIf="(booking.status === 'confirmed' || booking.status === 'pending') && !isExpired(booking)" (click)="openCancelModal(booking)" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #e74c3c; color: #e74c3c; background: transparent; cursor: pointer;">Cancelar</button>
             </div>
@@ -138,18 +140,45 @@ export class MyBookingsComponent implements OnInit {
 
   openCancelModal(b: Booking): void {
     this.selectedCancelBooking = b;
-    const now = Date.now();
-    const cIn = new Date(b.checkIn).getTime();
-    const diffDays = (cIn - now) / (1000 * 60 * 60 * 24);
-    const paid = b.paidAmount || b.totalPrice || 0;
-
-    if (diffDays > 7) {
-      this.cancelRefundAmount = paid;
-      this.cancelRefundInfo = 'Reembolso total del 100% sin retención por anticipación superior a 7 días.';
-    } else {
-      this.cancelRefundAmount = Math.round(paid * 0.9);
-      this.cancelRefundInfo = 'Reembolso del 90% con 10% de retención por gastos operativos al cancelar con 7 días o menos. El monto final lo calcula el sistema al procesar la cancelación.';
+    const netPaid = Math.max(0, (b.paidAmount || 0) - (b.refundedAmount || 0));
+    if (netPaid <= 0) {
+      this.cancelRefundAmount = 0;
+      this.cancelRefundInfo = 'No hay pagos netos registrados para reembolsar; la reserva pendiente se cancelará sin cargo.';
+      return;
     }
+
+    const diffDays = this.getDaysUntilCheckInBogota(b.checkIn);
+    const totalPrice = b.totalPrice || 0;
+    const deposit = b.guaranteeDeposit || 0;
+    const retentionBase = Math.max(0, totalPrice - deposit);
+
+    if (diffDays < 2) {
+      this.cancelRefundAmount = Math.max(0, Math.min(netPaid, netPaid - retentionBase));
+      this.cancelRefundInfo = deposit > 0 && this.cancelRefundAmount > 0
+        ? 'Cancelación con menos de 48 horas: penalidad del 100% sobre el valor sin depósito; se reembolsará únicamente el depósito de garantía.'
+        : 'Cancelación con menos de 48 horas (No-Show estricto): aplica penalidad del 100% sobre el valor sin depósito de garantía.';
+    } else if (diffDays < 7) {
+      const retention = Math.round(retentionBase * 0.10);
+      this.cancelRefundAmount = Math.max(0, Math.min(netPaid, netPaid - retention));
+      this.cancelRefundInfo = 'Cancelación con menos de 7 días: aplica retención del 10% sobre el total sin depósito de garantía. El monto exacto lo confirma el sistema al procesar.';
+    } else {
+      this.cancelRefundAmount = netPaid;
+      this.cancelRefundInfo = 'Reembolso total del 100% de lo abonado neto sin retención por anticipación de 7 días o más.';
+    }
+  }
+
+  private getDaysUntilCheckInBogota(checkIn?: string): number {
+    if (!checkIn) return 999;
+    const checkInStr = String(checkIn).slice(0, 10);
+    const todayBogota = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
+    const [cy, cm, cd] = checkInStr.split('-').map(Number);
+    const [ty, tm, td] = todayBogota.split('-').map(Number);
+    if (!cy || !cm || !cd || !ty || !tm || !td) {
+      return Math.floor((new Date(checkIn).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    }
+    const utcCheckIn = Date.UTC(cy, cm - 1, cd);
+    const utcToday = Date.UTC(ty, tm - 1, td);
+    return Math.round((utcCheckIn - utcToday) / (1000 * 60 * 60 * 24));
   }
 
   closeCancelModal(): void {

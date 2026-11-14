@@ -178,6 +178,15 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.ok("Pre-check-in completado exitosamente. Llave digital activada.", booking));
     }
 
+    @PostMapping("/{id}/checkout")
+    public ResponseEntity<ApiResponse<BookingDTO>> guestCheckOut(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String id
+    ) {
+        BookingDTO booking = bookingService.guestCheckOut(id, requireUserId(principal));
+        return ResponseEntity.ok(ApiResponse.ok("Check-out realizado exitosamente. PIN desactivado y depósito liberado.", booking));
+    }
+
     @GetMapping("/{id}/smart-key")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getSmartKey(
             @AuthenticationPrincipal UserPrincipal principal,

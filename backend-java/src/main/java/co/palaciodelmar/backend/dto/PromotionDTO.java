@@ -16,6 +16,7 @@ public class PromotionDTO {
     private String id;
     private String branch;
     private String title;
+    private String code;
     private Integer discountPercent;
     private LocalDate startDate;
     private LocalDate endDate;

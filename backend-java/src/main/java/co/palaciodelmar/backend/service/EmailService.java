@@ -337,6 +337,11 @@ public class EmailService {
 
     @Async
     public void sendPropertyStatusNotification(Property property, String status) {
+        sendPropertyStatusNotification(property, status, property != null ? property.getRejectionReason() : null);
+    }
+
+    @Async
+    public void sendPropertyStatusNotification(Property property, String status, String reason) {
         if (property == null || property.getOwnerId() == null) return;
         try {
             String hostEmail = userRepository.findById(property.getOwnerId()).map(User::getEmail).orElse(null);
@@ -365,9 +370,16 @@ public class EmailService {
                         + "<p><a href=\"" + hostUrl + "\" style=\"background:#c9a96e; color:#0d0d0d; padding:10px 20px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block;\">Administrar Disponibilidad</a></p>"
                         + "</div>";
             } else {
+                String reasonBlock = !isBlank(reason)
+                        ? "<div style=\"background:#1a1111; border-left:4px solid #e53e3e; padding:12px 16px; margin:14px 0;\">"
+                        + "<strong style=\"color:#fc8181;\">Motivo indicado por moderación:</strong><br/>"
+                        + "<span style=\"color:#e2e8f0;\">" + escapeHtml(reason.trim()) + "</span>"
+                        + "</div>"
+                        : "";
                 html = "<div style=\"background:#0d0d0d; color:#fff; font-family:sans-serif; padding:25px; border-radius:8px; max-width:600px; margin:auto;\">"
                         + "<h1 style=\"color:#e53e3e; font-size:22px; margin-top:0;\">Alojamiento No Aprobado</h1>"
                         + "<p>Tu solicitud para el alojamiento <strong>" + escapeHtml(property.getName()) + "</strong> ha sido evaluada y requiere ajustes en su descripción, fotografías o documentación.</p>"
+                        + reasonBlock
                         + "<p>Por favor, ingresa a tu panel de anfitrión para actualizar los datos requeridos y solicitar una nueva revisión.</p>"
                         + "<p><a href=\"" + hostUrl + "\" style=\"background:#e53e3e; color:#fff; padding:10px 20px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block;\">Revisar Alojamiento</a></p>"
                         + "</div>";

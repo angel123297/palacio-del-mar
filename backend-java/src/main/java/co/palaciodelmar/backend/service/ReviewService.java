@@ -65,9 +65,13 @@ public class ReviewService {
     }
 
     public List<ReviewDTO> getSuiteReviews(String suiteId) {
-        return reviewRepository.findBySuiteAndApprovedTrueOrderByCreatedAtDesc(suiteId)
-                .stream()
-                .map(this::toDTO)
+        List<Review> reviews = reviewRepository.findBySuiteAndApprovedTrueOrderByCreatedAtDesc(suiteId);
+        if (reviews.isEmpty()) {
+            return List.of();
+        }
+        String suiteName = resolveSuiteName(suiteId);
+        return reviews.stream()
+                .map(r -> toDTO(r, suiteName))
                 .toList();
     }
 
@@ -320,11 +324,26 @@ public class ReviewService {
         return new AnalysisResult(sentiment, score, highlights, maintenanceAlert);
     }
 
+    private String resolveSuiteName(String suiteId) {
+        if (suiteRepository == null || suiteId == null || suiteId.isBlank()) {
+            return null;
+        }
+        return suiteRepository.findById(suiteId)
+                .map(co.palaciodelmar.backend.model.Suite::getName)
+                .orElse(null);
+    }
+
     public ReviewDTO toDTO(Review review) {
+        if (review == null) return null;
+        return toDTO(review, resolveSuiteName(review.getSuite()));
+    }
+
+    private ReviewDTO toDTO(Review review, String resolvedSuiteName) {
         if (review == null) return null;
         return ReviewDTO.builder()
                 .id(review.getId())
                 .suite(review.getSuite())
+                .suiteName(resolvedSuiteName)
                 .user(review.getUser())
                 .bookingId(review.getBookingId())
                 .userName(review.getUserName())

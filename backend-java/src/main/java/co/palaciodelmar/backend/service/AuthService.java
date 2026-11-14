@@ -93,12 +93,24 @@ public class AuthService {
         if (userRepository.existsByEmail(normalizedEmail)) {
             User existing = userRepository.findByEmail(normalizedEmail).orElse(null);
             if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank())) {
+                if ("admin".equalsIgnoreCase(existing.getRole())) {
+                    throw new IllegalArgumentException("No se permite activar ni modificar una cuenta de administrador mediante registro público");
+                }
+                String requestedRole = request.getRole() != null ? request.getRole().trim() : "";
+                if ("admin".equalsIgnoreCase(requestedRole)) {
+                    throw new IllegalArgumentException("No se permite el autorregistro con rol de administrador");
+                }
                 String rawToken = generateSecureToken();
                 String hashedToken = hashToken(rawToken);
 
                 existing.setName(request.getName());
                 if (request.getLastName() != null) {
                     existing.setLastName(request.getLastName());
+                }
+                if ("host".equalsIgnoreCase(requestedRole) || "anfitrion".equalsIgnoreCase(requestedRole)) {
+                    existing.setRole("host");
+                } else if (existing.getRole() == null || existing.getRole().isBlank()) {
+                    existing.setRole("user");
                 }
                 existing.setPassword(passwordEncoder.encode(request.getPassword()));
                 boolean autoVerify = !emailService.isConfigured();
@@ -249,7 +261,7 @@ public class AuthService {
         User user = userRepository.findByVerificationTokenHash(hashedToken)
                 .orElseThrow(() -> new IllegalArgumentException("Token inválido"));
 
-        if (user.getVerificationTokenExpiresAt().isBefore(Instant.now())) {
+        if (user.getVerificationTokenExpiresAt() == null || user.getVerificationTokenExpiresAt().isBefore(Instant.now())) {
             throw new IllegalArgumentException("El token ha expirado");
         }
 

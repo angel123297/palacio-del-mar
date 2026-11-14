@@ -122,7 +122,7 @@
               • {{ note }}
             </div>
           </div>
-          <p class="flex-between"><span>Precio ({{nights}} noches):</span> <strong>$ {{totalRoomPrice | number:'1.0-0'}}</strong></p>
+          <p class="flex-between"><span>Precio ({{nights}} noches):</span> <strong>{{ currency.formatPrice(totalRoomPrice) }}</strong></p>
           <button class="btn-primary" style="width: 100%; margin-top: 1rem; margin-bottom: 2rem;" (click)="nextStep()">Continuar →</button>
           
           <!-- Beneficios y Políticas -->
@@ -208,7 +208,7 @@
             <p style="font-size: 0.85rem; color: #bbb; line-height: 1.45;">{{exp.description}}</p>
           </div>
           <div class="flex-between" style="margin-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
-            <strong style="color: var(--gold);">$ {{exp.price | number:'1.0-0'}}</strong>
+            <strong style="color: var(--gold);">{{ currency.formatPrice(exp.price) }}</strong>
             <div *ngIf="isExperienceSelected(exp)" style="display: flex; align-items: center; gap: 8px; background: rgba(201,169,110,0.18); border: 1px solid var(--gold); padding: 2px 10px; border-radius: 20px;">
               <button type="button" (click)="updateExperienceQty(exp, -1, $event)" aria-label="Disminuir cantidad" style="background: none; border: none; color: var(--gold); font-size: 1.1rem; font-weight: bold; cursor: pointer; padding: 0 4px;">−</button>
               <span style="color: #fff; font-size: 0.85rem; font-weight: bold;">{{ getExperienceQty(exp) }}</span>
@@ -239,10 +239,42 @@
             <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Servicio de transporte privado desde el aeropuerto hasta tu suite.</p>
           </div>
           <div style="text-align: right;">
-            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ {{ 150000 | number:'1.0-0' }}</div>
+            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ {{ currency.formatPrice(150000) }}</div>
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
               <input type="checkbox" [(ngModel)]="airportPickup" style="width: 20px; height: 20px; accent-color: var(--gold);">
               <span>Agregar</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 2rem;">
+        <div class="flex-between">
+          <div>
+            <h3 style="margin: 0 0 0.5rem 0;">🐾 Estancia Pet Friendly</h3>
+            <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Acondicionamiento especial y amenidades para viajar con tu mascota.</p>
+          </div>
+          <div style="text-align: right;">
+            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ {{ currency.formatPrice(80000) }}</div>
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" [(ngModel)]="petFriendly" style="width: 20px; height: 20px; accent-color: var(--gold);">
+              <span>Agregar</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 2rem;">
+        <div class="flex-between">
+          <div>
+            <h3 style="margin: 0 0 0.5rem 0;">👶 Cuna para Bebé</h3>
+            <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Cuna certificada sujeta a disponibilidad (máximo 5 por noche).</p>
+          </div>
+          <div style="text-align: right;">
+            <div style="color: #2ecc71; font-weight: bold; margin-bottom: 0.5rem;">Sin costo adicional</div>
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" [(ngModel)]="needsCrib" style="width: 20px; height: 20px; accent-color: var(--gold);">
+              <span>Solicitar</span>
             </label>
           </div>
         </div>
@@ -255,7 +287,7 @@
             <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Selecciona tu almuerzo y disfruta de los mejores platillos.</p>
           </div>
           <div style="text-align: right;">
-            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ {{ 80000 | number:'1.0-0' }}</div>
+            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ {{ currency.formatPrice(80000) }}</div>
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
               <input type="checkbox" [(ngModel)]="wantFood" style="width: 20px; height: 20px; accent-color: var(--gold);">
               <span>Agregar Comida</span>
@@ -281,7 +313,7 @@
                 <p style="font-size: 0.85rem; color: #aaa; margin: 0.3rem 0 0 0;">Añade el desayuno tradicional cartagenero en tu suite por una tarifa preferencial.</p>
               </div>
               <div style="text-align: right;">
-                <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ $ {{ 35000 | number:'1.0-0' }}</div>
+                <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ {{ currency.formatPrice(35000) }}</div>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; justify-content: flex-end;">
                   <input type="checkbox" [(ngModel)]="breakfastCombo" style="width: 18px; height: 18px; accent-color: var(--gold);">
                   <span>Añadir</span>
@@ -328,37 +360,41 @@
             <tbody>
               <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0;">Estadía base ({{nights}} noches):</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{totalRoomPrice | number:'1.0-0'}}</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">{{ currency.formatPrice(totalRoomPrice) }}</td>
               </tr>
               <tr *ngFor="let item of selectedExperiences" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0;">
                   {{item.exp.name}} <span style="color: var(--gold); font-size: 0.85rem;">(x{{item.qty}})</span>:
                 </td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{(item.exp.price * item.qty) | number:'1.0-0'}}</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">{{ currency.formatPrice(item.exp.price * item.qty) }}</td>
               </tr>
               <tr *ngIf="airportPickup" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0;">Traslado Privado Aeropuerto:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{150000 | number:'1.0-0'}}</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">{{ currency.formatPrice(150000) }}</td>
               </tr>
               <tr *ngIf="petFriendly" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0;">Tarifa Pet-Friendly:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{80000 | number:'1.0-0'}}</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">{{ currency.formatPrice(80000) }}</td>
               </tr>
-              <tr *ngIf="wantFood" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <tr *ngIf="needsCrib" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <td style="padding: 10px 0;">Cuna para Bebé:</td>
+                <td style="text-align: right; padding: 10px 0; color: #2ecc71;">Gratis</td>
+              </tr>
+              <tr *ngIf="wantFood && foodType" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0;">Comida Gourmet:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{80000 | number:'1.0-0'}}</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">{{ currency.formatPrice(80000) }}</td>
               </tr>
-              <tr *ngIf="breakfastCombo" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+              <tr *ngIf="wantFood && foodType && breakfastCombo" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0;">Combo Desayuno Tradicional:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{35000 | number:'1.0-0'}}</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">{{ currency.formatPrice(35000) }}</td>
               </tr>
               <tr *ngIf="extraGuestsFee > 0" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0;">Huéspedes adicionales:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">$ {{extraGuestsFee | number:'1.0-0'}}</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">{{ currency.formatPrice(extraGuestsFee) }}</td>
               </tr>
               <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0; color: #aaa;">Depósito de Garantía (100% reembolsable):</td>
-                <td style="text-align: right; padding: 10px 0; color: #aaa;">$ {{guaranteeDeposit | number:'1.0-0'}}</td>
+                <td style="text-align: right; padding: 10px 0; color: #aaa;">{{ currency.formatPrice(guaranteeDeposit) }}</td>
               </tr>
             </tbody>
           </table>
@@ -370,7 +406,7 @@
 
           <div style="padding-top: 1.25rem; border-top: 2px solid rgba(212,175,55,0.35); display: flex; justify-content: space-between; align-items: center; font-size: 1.35rem; font-weight: bold;">
             <span style="color: #fff;">Total a Pagar:</span>
-            <span style="color: var(--gold); font-size: 1.5rem;">$ {{grandTotal | number:'1.0-0'}}</span>
+            <span style="color: var(--gold); font-size: 1.5rem;">{{ currency.formatPrice(grandTotal) }}</span>
           </div>
           <p style="color: #888; font-size: 0.8rem; margin: 0.75rem 0 0 0; text-align: center;">El depósito de garantía se reintegra automáticamente al finalizar tu estadía tras la inspección.</p>
         </div>

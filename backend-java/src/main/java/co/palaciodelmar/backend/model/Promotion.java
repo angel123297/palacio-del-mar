@@ -25,6 +25,7 @@ public class Promotion {
     private String branch; // Branch ObjectId reference
 
     private String title;
+    private String code;
     private Integer discountPercent;
 
     private LocalDate startDate;

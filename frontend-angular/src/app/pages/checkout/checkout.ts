@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
+import { CurrencyService } from '../../services/currency.service';
 import { Booking } from '../../models/types';
 import { finalize, switchMap } from 'rxjs';
 
@@ -27,6 +28,9 @@ import { finalize, switchMap } from 'rxjs';
             @if (alreadyPaid) {
               <p style="color: #2ecc71; margin-bottom: 1rem; font-size: 1.1rem;">Esta reserva ya está pagada y confirmada.</p>
               <a [routerLink]="['/reservas', bookingId]" class="btn-primary" style="text-decoration: none; padding: 10px 20px;">Ver detalle de la reserva</a>
+            } @else if (unavailableStatusMsg) {
+              <p style="color: #ff9f43; margin-bottom: 1rem; font-size: 1.1rem;">{{ unavailableStatusMsg }}</p>
+              <a [routerLink]="['/reservas', bookingId]" class="btn-primary" style="text-decoration: none; padding: 10px 20px;">Ver detalle de la reserva</a>
             } @else {
               <p style="color: #ff4d4d; margin-bottom: 1rem; font-size: 1.1rem;">No se encontró la reserva o tu sesión no tiene acceso a ella.</p>
               <a routerLink="/mis-reservas" class="btn-primary" style="text-decoration: none; padding: 10px 20px;">Volver a mis reservas</a>
@@ -36,13 +40,13 @@ import { finalize, switchMap } from 'rxjs';
           <div *ngIf="!loading && booking" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; padding: 2rem;">
             
             <!-- Reservation TTL Countdown -->
-            <div *ngIf="timerSeconds > 0" style="background: rgba(201,169,110,0.1); border: 1px solid rgba(201,169,110,0.4); border-radius: 8px; padding: 12px 18px; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div *ngIf="booking.status === 'pending' && timerSeconds > 0" style="background: rgba(201,169,110,0.1); border: 1px solid rgba(201,169,110,0.4); border-radius: 8px; padding: 12px 18px; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
               <span style="font-size: 0.9rem; color: #f5f0e8;"><strong>Tiempo restante para pagar tu reserva:</strong></span>
               <span style="font-family: monospace; font-size: 1.2rem; font-weight: bold; color: var(--gold); letter-spacing: 2px;">{{ timerText }}</span>
             </div>
 
             <!-- Reservation Expired Banner -->
-            <div *ngIf="timerSeconds <= 0" role="alert" aria-live="assertive" style="background: rgba(255,77,77,0.15); border: 1px solid rgba(255,77,77,0.5); border-radius: 8px; padding: 16px; margin-bottom: 1.5rem; text-align: center;">
+            <div *ngIf="booking.status === 'pending' && timerSeconds <= 0" role="alert" aria-live="assertive" style="background: rgba(255,77,77,0.15); border: 1px solid rgba(255,77,77,0.5); border-radius: 8px; padding: 16px; margin-bottom: 1.5rem; text-align: center;">
               <p style="color: #ff6b6b; font-weight: bold; font-size: 1.05rem; margin-bottom: 10px;">El tiempo de retención de 15 minutos ha expirado</p>
               <p style="color: #ccc; font-size: 0.9rem; margin-bottom: 14px;">Las fechas retenidas han sido liberadas para otros huéspedes.</p>
               <a routerLink="/buscar" class="btn-primary" style="display: inline-block; text-decoration: none; padding: 10px 22px; font-weight: bold; font-size: 0.9rem;">Volver a buscar suites</a>
@@ -115,7 +119,7 @@ import { finalize, switchMap } from 'rxjs';
               </div>
 
               <button type="submit" [disabled]="processing || timerSeconds <= 0" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                <span *ngIf="!processing">Pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
+                <span *ngIf="!processing">Pagar {{ currency.formatPrice(paymentAmount) }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
                 </span>
@@ -144,7 +148,7 @@ import { finalize, switchMap } from 'rxjs';
               </div>
 
               <button type="button" (click)="processPSE()" [disabled]="!pseBank || processing || timerSeconds <= 0" class="btn-primary" style="width: 100%; min-height: 52px; padding: 16px; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                <span *ngIf="!processing">Ir al Banco a pagar $ {{ paymentAmount | number:'1.0-0' }}</span>
+                <span *ngIf="!processing">Ir al Banco a pagar {{ currency.formatPrice(paymentAmount) }}</span>
                 <span *ngIf="processing" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                   {{ processingMessage }} <div class="luxury-spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
                 </span>
@@ -210,54 +214,68 @@ import { finalize, switchMap } from 'rxjs';
                </div>
 
                <!-- EXTRAS IN CHECKOUT SUMMARY -->
-               <div *ngIf="booking.experiences?.length || booking.airportPickup || booking.foodOrders?.length" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+               <div *ngIf="booking.experiences?.length || booking.airportPickup || booking.petFriendly || booking.needsCrib || booking.foodOrders?.length" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
                  <h4 style="color: var(--gold); margin: 0 0 0.8rem 0; font-size: 0.95rem; text-transform: uppercase;">Extras Seleccionados</h4>
                  
                  <div *ngFor="let exp of booking.experiences" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
-                   <span style="color: #ccc;">{{ exp.name }}</span>
-                   <span>$ {{ exp.price | number:'1.0-0' }}</span>
+                   <span style="color: #ccc;">{{ exp.name }} <span *ngIf="(exp.quantity || 1) > 1" style="color: var(--gold);">x{{ exp.quantity }}</span></span>
+                   <span>{{ currency.formatPrice((exp.price || 0) * (exp.quantity || 1)) }}</span>
                  </div>
                  
                  <div *ngIf="booking.airportPickup" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
                    <span style="color: #ccc;">Recogida Aeropuerto</span>
-                   <span>$ 150,000</span>
+                   <span>{{ currency.formatPrice(150000) }}</span>
+                 </div>
+
+                 <div *ngIf="booking.petFriendly" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                   <span style="color: #ccc;">Estancia Pet-Friendly (Mascota)</span>
+                   <span style="color: #2ecc71;">Incluido</span>
+                 </div>
+
+                 <div *ngIf="booking.needsCrib" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                   <span style="color: #ccc;">Cuna para bebé</span>
+                   <span style="color: #2ecc71;">Incluida</span>
                  </div>
 
                  <ng-container *ngFor="let food of booking.foodOrders">
                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
                      <span style="color: #ccc;">Comida Personalizada</span>
-                     <span>$ {{ food.price | number:'1.0-0' }}</span>
+                     <span>{{ currency.formatPrice(food.price || 0) }}</span>
                    </div>
                    <div *ngIf="food.includesBreakfastCombo" style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85rem; padding-left: 1rem;">
                      <span style="color: #aaa;">↳ Combo Desayuno</span>
-                     <span style="color: #aaa;">$ 35,000</span>
+                     <span style="color: #aaa;">{{ currency.formatPrice(35000) }}</span>
                    </div>
                  </ng-container>
                </div>
              </div>
 
              <div style="border-top: 1px dashed rgba(212,175,55,0.4); padding-top: 1.5rem; margin-bottom: 1.5rem;">
-               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                 <span style="font-size: 1rem; color: #ccc;">Subtotal (sin IVA)</span>
-                 <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice / 1.19) | number:'1.0-0' }}</span>
+               <div *ngIf="checkoutSubtotal > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                 <span style="font-size: 1rem; color: #ccc;">Subtotal Alojamiento</span>
+                 <span style="font-size: 1rem; color: #fff;">{{ currency.formatPrice(checkoutSubtotal) }}</span>
                </div>
-               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+               <div *ngIf="booking.discount && booking.discount > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                 <span style="font-size: 1rem; color: #2ecc71;">Descuento Aplicado</span>
+                 <span style="font-size: 1rem; color: #2ecc71;">-{{ currency.formatPrice(booking.discount) }}</span>
+               </div>
+               <div *ngIf="checkoutTaxes > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                  <span style="font-size: 1rem; color: #ccc;">IVA (19%)</span>
-                 <span style="font-size: 1rem; color: #fff;">$ {{ (booking.totalPrice - (booking.totalPrice / 1.19)) | number:'1.0-0' }}</span>
+                 <span style="font-size: 1rem; color: #fff;">{{ currency.formatPrice(checkoutTaxes) }}</span>
                </div>
                <div *ngIf="booking.guaranteeDeposit && booking.guaranteeDeposit > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                  <span style="font-size: 1rem; color: #ccc;">Depósito Garantía (Reembolsable)</span>
-                 <span style="font-size: 1rem; color: #fff;">$ {{ booking.guaranteeDeposit | number:'1.0-0' }}</span>
+                 <span style="font-size: 1rem; color: #fff;">{{ currency.formatPrice(booking.guaranteeDeposit) }}</span>
                </div>
              </div>
 
-             <div *ngIf="booking.paidAmount && booking.paidAmount > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.95rem;">
-               <span style="color: #2ecc71;">Abonado previamente</span>
-               <span style="color: #2ecc71; font-weight: bold;">-$ {{ booking.paidAmount | number:'1.0-0' }}</span>
+             <div *ngIf="netPaidAmount > 0" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.95rem;">
+               <span style="color: #2ecc71;">Abonado neto previamente</span>
+               <span style="color: #2ecc71; font-weight: bold;">-{{ currency.formatPrice(netPaidAmount) }}</span>
              </div>
              <div style="border-top: 2px solid rgba(212,175,55,0.3); padding-top: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
                <span style="font-size: 1.2rem; color: #fff; font-weight: bold;">Total a Pagar Ahora</span>
-               <span style="font-size: 1.8rem; font-weight: 800; color: var(--gold);">$ {{ paymentAmount | number:'1.0-0' }}</span>
+               <span style="font-size: 1.8rem; font-weight: 800; color: var(--gold);">{{ currency.formatPrice(paymentAmount) }}</span>
              </div>
              
              <div style="margin-top: 2rem; text-align: center; color: #666; font-size: 0.8rem;">
@@ -283,6 +301,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   pseBank: string = '';
   nequiPhone: string = '';
   alreadyPaid = false;
+  unavailableStatusMsg = '';
+  private pendingTimeouts: any[] = [];
 
   timerText: string = '15:00';
   timerSeconds: number = 900;
@@ -302,7 +322,30 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   get balanceDue(): number {
     if (!this.booking) return 0;
     if (this.booking.balanceDue !== undefined) return this.booking.balanceDue;
-    return Math.max(0, this.booking.totalPrice - (this.booking.paidAmount || 0));
+    return Math.max(0, this.booking.totalPrice - this.netPaidAmount);
+  }
+
+  get netPaidAmount(): number {
+    if (!this.booking) return 0;
+    return Math.max(0, (this.booking.paidAmount || 0) - (this.booking.refundedAmount || 0));
+  }
+
+  get checkoutSubtotal(): number {
+    if (!this.booking) return 0;
+    if (this.booking.subtotal !== undefined && this.booking.subtotal !== null) {
+      return this.booking.subtotal;
+    }
+    const taxableTotal = Math.max(0, (this.booking.totalPrice || 0) - (this.booking.guaranteeDeposit || 0));
+    return Math.round(taxableTotal / 1.19);
+  }
+
+  get checkoutTaxes(): number {
+    if (!this.booking) return 0;
+    if (this.booking.taxes !== undefined && this.booking.taxes !== null) {
+      return this.booking.taxes;
+    }
+    const taxableTotal = Math.max(0, (this.booking.totalPrice || 0) - (this.booking.guaranteeDeposit || 0));
+    return Math.max(0, taxableTotal - this.checkoutSubtotal);
   }
 
   get paymentAmount(): number {
@@ -314,7 +357,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     private router: Router,
     private api: ApiService,
     private fb: FormBuilder,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    public currency: CurrencyService
   ) {
     this.paymentForm = this.fb.group({
       cardName: ['', Validators.required],
@@ -345,7 +389,16 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       next: (res) => {
         const raw = res.data || res;
         this.booking = raw as Booking;
-        if (this.booking && (this.booking.balanceDue === 0 || this.booking.paymentStatus === 'paid')) {
+        this.unavailableStatusMsg = '';
+        this.alreadyPaid = false;
+        const status = (this.booking?.status || '').toLowerCase();
+        const hasBalanceDue = Number(this.booking?.balanceDue ?? 0) > 0;
+        const isTerminalBlocked = ['cancelled', 'expired', 'completed', 'no_show'].includes(status)
+          || (status === 'checked_out' && !hasBalanceDue && this.booking?.paymentStatus !== 'paid');
+        if (this.booking && isTerminalBlocked) {
+          this.unavailableStatusMsg = `Esta reserva ya no admite pagos porque su estado actual es ${this.booking.status}.`;
+          this.booking = null;
+        } else if (this.booking && (this.booking.balanceDue === 0 || (this.booking.paymentStatus === 'paid' && !hasBalanceDue))) {
           this.booking = null;
           this.alreadyPaid = true;
         } else if (this.booking) {
@@ -355,7 +408,12 @@ export class CheckoutComponent implements OnInit, OnDestroy {
             const computedNights = Math.round((d2.getTime() - d1.getTime()) / (1000 * 3600 * 24));
             this.booking.nights = isNaN(computedNights) || computedNights < 1 ? 1 : computedNights;
           }
-          this.initTimer();
+          if (status === 'pending') {
+            this.initTimer();
+          } else {
+            this.timerSeconds = 900;
+            this.updateTimerText();
+          }
         }
         this.cdr.detectChanges();
       },
@@ -396,9 +454,20 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.timerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
+  private scheduleTimeout(fn: () => void, ms: number) {
+    const id = setTimeout(() => {
+      this.pendingTimeouts = this.pendingTimeouts.filter(t => t !== id);
+      fn();
+    }, ms);
+    this.pendingTimeouts.push(id);
+    return id;
+  }
+
   ngOnDestroy() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.pollingInterval) clearInterval(this.pollingInterval);
+    this.pendingTimeouts.forEach(t => clearTimeout(t));
+    this.pendingTimeouts = [];
   }
 
   formatCardNumber(event: Event) {
@@ -429,10 +498,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.errorMsg = '';
     this.cdr.detectChanges();
     
-    setTimeout(() => {
+    this.scheduleTimeout(() => {
       this.processingMessage = `Esperando autorización de débito en ${this.pseBank}...`;
       this.cdr.detectChanges();
-      setTimeout(() => {
+      this.scheduleTimeout(() => {
         this.executePaymentPayload({ method: 'PSE', bank: this.pseBank });
       }, 900);
     }, 900);
@@ -444,8 +513,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
       return;
     }
-    if (!this.nequiPhone || this.nequiPhone.trim().length < 10) {
-      this.errorMsg = 'Por favor ingresa un número de celular válido para Nequi (10 dígitos).';
+    const cleanPhone = (this.nequiPhone || '').replace(/\D/g, '');
+    if (!/^3\d{9}$/.test(cleanPhone)) {
+      this.errorMsg = 'Por favor ingresa un número celular colombiano válido para Nequi (10 dígitos iniciando en 3).';
       this.cdr.detectChanges();
       return;
     }
@@ -454,10 +524,10 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.errorMsg = '';
     this.cdr.detectChanges();
     
-    setTimeout(() => {
+    this.scheduleTimeout(() => {
       this.processingMessage = 'Esperando confirmación en tu aplicación Nequi...';
       this.cdr.detectChanges();
-      setTimeout(() => {
+      this.scheduleTimeout(() => {
         this.executePaymentPayload({ method: 'NEQUI', phone: this.nequiPhone.trim() });
       }, 900);
     }, 900);
@@ -542,7 +612,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     };
     
     // Slight delay to make the CC validation feel real
-    setTimeout(() => {
+    this.scheduleTimeout(() => {
       this.executePaymentPayload(payload);
     }, 1000);
   }
@@ -629,13 +699,12 @@ export class CheckoutComponent implements OnInit, OnDestroy {
           const statusData = res.data || res;
           const paymentStatus = statusData.status;
           const bookingPaymentStatus = statusData.paymentStatus;
-          const bookingStatus = statusData.bookingStatus;
 
-          if (paymentStatus === 'completed' || bookingPaymentStatus === 'paid' || bookingStatus === 'confirmed') {
+          if (paymentStatus === 'completed' || bookingPaymentStatus === 'paid') {
             clearInterval(this.pollingInterval);
             this.processingMessage = '¡Pago aprobado! Redirigiendo a comprobante...';
             this.cdr.detectChanges();
-            setTimeout(() => {
+            this.scheduleTimeout(() => {
               this.processing = false;
               this.router.navigate(['/reservas', bookingId, 'comprobante']);
             }, 600);

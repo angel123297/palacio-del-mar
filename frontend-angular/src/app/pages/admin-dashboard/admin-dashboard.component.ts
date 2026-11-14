@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, effect } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -95,15 +96,6 @@ const DEFAULT_ADMIN_REFUNDS: RefundItem[] = [
     createdAt: '2026-10-20T16:40:00Z'
   }
 ];
-
-const DEFAULT_ADMIN_METRICS: DashboardMetricsDTO = {
-  totalUsers: 148,
-  totalRevenue: 28450000,
-  totalSuites: 36,
-  totalBookings: 64,
-  pendingCheckins: 3,
-  activeBookings: 18
-} as any;
 
 const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
   {
@@ -216,6 +208,8 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
                   <option value="checked_in">Hospedados (En Estancia)</option>
                   <option value="checked_out">Estancias Finalizadas</option>
                   <option value="cancelled">Canceladas</option>
+                  <option value="expired">Expiradas</option>
+                  <option value="no_show">No-Show</option>
                 </select>
               </div>
               <div class="flex flex-col">
@@ -444,7 +438,10 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
             </div>
 
             <div class="flex items-center gap-3">
-              <button (click)="fetchProperties()" class="bg-[#111] hover:bg-[rgba(201,169,110,0.2)] text-[#c9a96e] hover:text-white transition px-4 py-2.5 rounded-md text-xs font-semibold tracking-widest uppercase border border-[rgba(201,169,110,0.4)] flex items-center gap-2">
+              <button (click)="processAdminPayouts()" [disabled]="processingPayouts()" class="bg-[rgba(46,204,113,0.15)] hover:bg-[rgba(46,204,113,0.3)] disabled:opacity-50 disabled:cursor-not-allowed text-[#2ecc71] hover:text-white transition px-4 py-2.5 rounded-md text-xs font-semibold tracking-widest uppercase border border-[rgba(46,204,113,0.5)] flex items-center gap-2 cursor-pointer">
+                <span>💸</span> {{ processingPayouts() ? 'Liquidando...' : 'Liquidar Payouts' }}
+              </button>
+              <button (click)="fetchProperties()" class="bg-[#111] hover:bg-[rgba(201,169,110,0.2)] text-[#c9a96e] hover:text-white transition px-4 py-2.5 rounded-md text-xs font-semibold tracking-widest uppercase border border-[rgba(201,169,110,0.4)] flex items-center gap-2 cursor-pointer">
                 <span>🔄</span> Actualizar
               </button>
               <a routerLink="/demo/external-hotel" target="_blank" class="bg-[rgba(201,169,110,0.15)] hover:bg-[rgba(201,169,110,0.3)] text-[#c9a96e] hover:text-white transition px-4 py-2.5 rounded-md text-xs font-semibold tracking-widest uppercase border border-[#c9a96e] flex items-center gap-2">
@@ -492,7 +489,7 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
                       {{ p.suitesCount || 0 }} suites
                     </td>
                     <td class="py-4 px-6 font-serif text-sm text-[#c9a96e] whitespace-nowrap">
-                      {{ p.commissionRate ? (p.commissionRate * 100 | number:'1.0-0') + '%' : '8%' }}
+                      {{ p.commissionRate ? (p.commissionRate * 100 | number:'1.0-1') + '%' : '8%' }}
                     </td>
                     <td class="py-4 px-6 whitespace-nowrap">
                       <span class="px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-bold whitespace-nowrap inline-block"
@@ -624,7 +621,7 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
                 </div>
                 <div class="p-3 bg-[rgba(255,255,255,0.03)] rounded border border-[rgba(255,255,255,0.06)]">
                   <span class="text-[10px] uppercase tracking-wider text-[#c9a96e] font-semibold block mb-1">Comisión Pactada</span>
-                  <span class="text-sm font-semibold text-[#2ecc71]">8% Plataforma</span>
+                  <span class="text-sm font-semibold text-[#2ecc71]">{{ previewProperty()!.commissionRate ? ((previewProperty()!.commissionRate! * 100) | number:'1.0-1') : '8' }}% Plataforma</span>
                 </div>
               </div>
 
@@ -713,7 +710,12 @@ const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
     </div>
   `
 })
-export class AdminDashboardComponent implements OnInit {
+export class AdminDashboardComponent implements OnInit, OnDestroy {
+  private streamSub?: Subscription;
+
+  ngOnDestroy(): void {
+    this.streamSub?.unsubscribe();
+  }
   api = inject(ApiService);
   auth = inject(AuthService);
   router = inject(Router);
@@ -736,6 +738,7 @@ export class AdminDashboardComponent implements OnInit {
   bookings = signal<Booking[]>([]);
   promotions = signal<PromotionItem[]>([]);
   loading = signal(true);
+  processingPayouts = signal(false);
   actionMessage = signal<string>('');
   actionError = signal<string>('');
 
@@ -806,18 +809,34 @@ export class AdminDashboardComponent implements OnInit {
     this.fetchRefunds();
 
     // Actualización en tiempo real vía SSE para el panel de administración
-    this.bookingStream.getBookingUpdates().subscribe({
+    this.streamSub?.unsubscribe();
+    this.streamSub = this.bookingStream.getBookingUpdates().subscribe({
       next: (updatedBooking) => {
         if (!updatedBooking) return;
         const bId = updatedBooking.id || (updatedBooking as any)._id;
+        const activeStatus = (this.statusFilter() || '').toLowerCase();
+        const incomingStatus = (updatedBooking.status || '').toLowerCase();
+        const q = (this.searchQuery() || '').trim().toLowerCase();
+        const matchesStatus = !activeStatus || incomingStatus === activeStatus;
+        const matchesSearch = !q ||
+          (updatedBooking.bookingCode || '').toLowerCase().includes(q) ||
+          (updatedBooking.guestEmail || '').toLowerCase().includes(q) ||
+          (updatedBooking.guestName || '').toLowerCase().includes(q);
+
         this.bookings.update(list => {
           const idx = list.findIndex(b => (b.id || (b as any)._id) === bId);
           if (idx >= 0) {
+            if (!matchesStatus) {
+              return list.filter((_, i) => i !== idx);
+            }
             const copy = [...list];
             copy[idx] = { ...copy[idx], ...updatedBooking };
             return copy;
           }
-          return [updatedBooking, ...list];
+          if (this.currentPage() === 1 && matchesStatus && matchesSearch) {
+            return [updatedBooking, ...list];
+          }
+          return list;
         });
         this.fetchMetrics();
       }
@@ -830,11 +849,34 @@ export class AdminDashboardComponent implements OnInit {
         if (res.data) {
           this.metrics.set(res.data);
         } else {
-          this.metrics.set(DEFAULT_ADMIN_METRICS);
+          this.actionError.set('No se pudieron cargar las métricas globales del panel.');
         }
       },
-      error: () => {
-        this.metrics.set(DEFAULT_ADMIN_METRICS);
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al cargar métricas administrativas.');
+      }
+    });
+  }
+
+  processAdminPayouts() {
+    if (this.processingPayouts()) return;
+    this.processingPayouts.set(true);
+    this.actionMessage.set('');
+    this.actionError.set('');
+    this.api.post<ApiResponse<any[]>>('/admin/payouts/process', {}).subscribe({
+      next: (res) => {
+        this.processingPayouts.set(false);
+        const count = Array.isArray(res?.data) ? res.data.length : 0;
+        this.actionMessage.set(count > 0
+          ? `Se procesaron ${count} liquidaciones a anfitriones exitosamente.`
+          : 'No hay reservas pendientes por liquidar en este momento.');
+        setTimeout(() => this.actionMessage.set(''), 5000);
+        this.fetchMetrics();
+      },
+      error: (err) => {
+        this.processingPayouts.set(false);
+        this.actionError.set(err?.error?.message || 'Error al procesar liquidaciones.');
+        setTimeout(() => this.actionError.set(''), 5000);
       }
     });
   }

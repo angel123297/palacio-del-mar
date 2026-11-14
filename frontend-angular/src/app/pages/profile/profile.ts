@@ -169,6 +169,7 @@ export class ProfileComponent implements OnInit {
       next: (res) => {
         const user = res.user || (res.data && res.data.user);
         if (user) {
+           this.auth.updateCurrentUser(user);
            this.profileForm.patchValue({
              name: user.name,
              email: user.email
@@ -198,6 +199,7 @@ export class ProfileComponent implements OnInit {
       })
     ).subscribe({
       next: () => {
+        this.auth.updateCurrentUser({ name: this.profileForm.value.name });
         this.profileSuccess = 'Perfil actualizado exitosamente.';
         // Clear message after 3s
         setTimeout(() => { this.profileSuccess = ''; this.cdr.detectChanges(); }, 3000);
@@ -223,9 +225,12 @@ export class ProfileComponent implements OnInit {
       })
     ).subscribe({
       next: () => {
-        this.passwordSuccess = 'Contraseña actualizada exitosamente.';
+        this.passwordSuccess = 'Contraseña actualizada exitosamente. Por seguridad debes volver a iniciar sesión.';
         this.passwordForm.reset();
-        setTimeout(() => { this.passwordSuccess = ''; this.cdr.detectChanges(); }, 3000);
+        this.auth.clearLocalData();
+        setTimeout(() => {
+          this.router.navigate(['/']);
+        }, 1200);
       },
       error: () => {
         this.passwordError = 'Error al cambiar contraseña. Verifica tu contraseña actual.';

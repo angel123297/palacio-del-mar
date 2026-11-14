@@ -28,6 +28,7 @@ export interface Property {
   images?: string[];
   commissionRate?: number;
   status?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejectionReason?: string;
   externalSiteUrl?: string;
   phone?: string;
   active?: boolean;
@@ -138,6 +139,9 @@ export interface Booking {
   nights?: number;
   guests?: number;
   children?: number;
+  subtotal?: number;
+  discount?: number;
+  taxes?: number;
   totalPrice: number;
   paidAmount?: number;
   refundedAmount?: number;

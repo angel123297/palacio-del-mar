@@ -62,7 +62,7 @@ import { renderSVG } from '../../utils/qr';
 
             <div style="display: flex; gap: 1.5rem; font-size: 0.85rem; color: #444;">
               <div><strong>Llegada:</strong> {{ booking.checkIn | date:'mediumDate' }} <span style="color:#d4af37; font-weight:bold;">(15:00)</span></div>
-              <div><strong>Salida:</strong> {{ booking.checkOut | date:'mediumDate' }} <span style="color:#d4af37; font-weight:bold;">(13:00)</span></div>
+              <div><strong>Salida:</strong> {{ booking.checkOut | date:'mediumDate' }} <span style="color:#d4af37; font-weight:bold;">(12:00)</span></div>
             </div>
             <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: #777;">Presenta este comprobante en recepción o digita el PIN directamente en la cerradura electrónica.</p>
           </div>
@@ -82,8 +82,8 @@ import { renderSVG } from '../../utils/qr';
           <div style="text-align: right;">
             <h3 style="margin-top: 0; color: #444; font-size: 1.1rem; text-transform: uppercase;">Estado de Pago:</h3>
             <div style="display: inline-block; padding: 5px 15px; border-radius: 4px; font-weight: bold; border: 2px solid; margin-top: 5px;" 
-                 [ngStyle]="{'color': isPaid ? '#2ecc71' : (booking.status === 'pending' ? '#e67e22' : '#e74c3c'), 'border-color': isPaid ? '#2ecc71' : (booking.status === 'pending' ? '#e67e22' : '#e74c3c')}">
-              {{ isPaid ? 'PAGADO' : (booking.status === 'pending' ? 'PENDIENTE' : 'CANCELADO') }}
+                 [ngStyle]="{'color': paymentBadgeColor, 'border-color': paymentBadgeColor}">
+              {{ paymentBadgeLabel }}
             </div>
           </div>
         </div>
@@ -98,37 +98,85 @@ import { renderSVG } from '../../utils/qr';
             </tr>
           </thead>
           <tbody>
-            <tr style="border-bottom: 1px solid #eee;">
+            <tr *ngIf="!isStandaloneExperience" style="border-bottom: 1px solid #eee;">
               <td style="padding: 15px 12px;">
                 <strong style="display: block; font-size: 1.1rem;">Alojamiento - {{ suiteName }}</strong>
-                <span style="color: #666; font-size: 0.9rem;">Servicio de hotelería</span>
+                <span style="color: #666; font-size: 0.9rem;">Estadía ({{ booking.nights || 1 }} {{ (booking.nights || 1) === 1 ? 'noche' : 'noches' }})</span>
               </td>
               <td style="padding: 15px 12px; text-align: center; color: #555;">
                 {{ booking.checkIn | date:'shortDate' }} a {{ booking.checkOut | date:'shortDate' }}
               </td>
               <td style="padding: 15px 12px; text-align: right; color: #555;">
-                {{ booking.guests }}
+                {{ booking.guests || 1 }}
               </td>
-              <td style="padding: 15px 12px; text-align: right; font-weight: bold; font-size: 1.1rem;">
-                {{ currency.formatPrice(booking.totalPrice || 0) }}
+              <td style="padding: 15px 12px; text-align: right; font-weight: bold; font-size: 1.05rem;">
+                {{ currency.formatPrice(roomGrossTotal) }}
+              </td>
+            </tr>
+            <tr *ngFor="let exp of (booking.experiences || [])" style="border-bottom: 1px solid #eee;">
+              <td style="padding: 12px;">
+                <strong style="display: block; font-size: 1rem;">Experiencia - {{ exp.name }}</strong>
+                <span style="color: #666; font-size: 0.85rem;">Cantidad: {{ exp.quantity || 1 }}</span>
+              </td>
+              <td style="padding: 12px; text-align: center; color: #555;">
+                {{ booking.checkIn | date:'shortDate' }}
+              </td>
+              <td style="padding: 12px; text-align: right; color: #555;">
+                x{{ exp.quantity || 1 }}
+              </td>
+              <td style="padding: 12px; text-align: right; font-weight: bold;">
+                {{ currency.formatPrice((exp.price || 0) * (exp.quantity || 1)) }}
+              </td>
+            </tr>
+            <tr *ngIf="vipExtrasTotal > 0" style="border-bottom: 1px solid #eee;">
+              <td style="padding: 12px;" colspan="3">
+                <strong style="display: block; font-size: 1rem;">Servicios VIP y Cargos Adicionales</strong>
+                <span style="color: #666; font-size: 0.85rem;">Traslado, Pet-Friendly, Alimentación o huéspedes extra</span>
+              </td>
+              <td style="padding: 12px; text-align: right; font-weight: bold;">
+                {{ currency.formatPrice(vipExtrasTotal) }}
               </td>
             </tr>
           </tbody>
         </table>
 
         <div style="display: flex; justify-content: flex-end; margin-top: 2rem;">
-          <div style="width: 300px;">
-            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
-              <span style="color: #666;">Subtotal:</span>
-              <span>{{ currency.formatPrice(booking.totalPrice ? (booking.totalPrice / 1.19) : 0) }}</span>
+          <div style="width: 340px;">
+            <div *ngIf="!isStandaloneExperience" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
+              <span style="color: #666;">Subtotal Alojamiento:</span>
+              <span>{{ currency.formatPrice(accommodationSubtotalDisplay) }}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 2px solid #333;">
-              <span style="color: #666;">IVA (19%):</span>
-              <span>{{ currency.formatPrice(booking.totalPrice ? (booking.totalPrice - (booking.totalPrice / 1.19)) : 0) }}</span>
+            <div *ngIf="(booking.discount || 0) > 0" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; color: #27ae60;">
+              <span>Descuento aplicado:</span>
+              <span>-{{ currency.formatPrice(booking.discount) }}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; padding: 15px 0; font-size: 1.5rem; font-weight: bold; color: #000;">
+            <div *ngIf="experiencesSubtotal > 0" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
+              <span style="color: #666;">Experiencias:</span>
+              <span>{{ currency.formatPrice(experiencesSubtotal) }}</span>
+            </div>
+            <div *ngIf="vipExtrasTotal > 0" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
+              <span style="color: #666;">Servicios VIP / Adicionales:</span>
+              <span>{{ currency.formatPrice(vipExtrasTotal) }}</span>
+            </div>
+            <div *ngIf="taxesDisplay > 0" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
+              <span style="color: #666;">IVA (19% alojamiento):</span>
+              <span>{{ currency.formatPrice(taxesDisplay) }}</span>
+            </div>
+            <div *ngIf="(booking.guaranteeDeposit || 0) > 0" style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee;">
+              <span style="color: #666;">Depósito de Garantía (Reembolsable):</span>
+              <span>{{ currency.formatPrice(booking.guaranteeDeposit) }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 0 8px 0; border-top: 2px solid #333; font-size: 1.2rem; font-weight: bold; color: #000;">
+              <span>Total Reserva:</span>
+              <span>{{ currency.formatPrice(booking.totalPrice || 0) }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 8px 0; font-size: 1.3rem; font-weight: bold; color: #000;">
               <span>Total pagado:</span>
-              <span style="color: #d4af37;">{{ currency.formatPrice(booking.totalPrice || 0) }}</span>
+              <span style="color: #d4af37;">{{ currency.formatPrice(totalPaidDisplay) }}</span>
+            </div>
+            <div *ngIf="(booking.balanceDue || 0) > 0" style="display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.95rem; font-weight: bold; color: #e67e22;">
+              <span>Saldo pendiente:</span>
+              <span>{{ currency.formatPrice(booking.balanceDue) }}</span>
             </div>
           </div>
         </div>
@@ -236,7 +284,87 @@ export class ReceiptComponent implements OnInit {
 
   get isPaid(): boolean {
     const s = this.booking?.status?.toLowerCase();
-    return s === 'confirmed' || s === 'checked_in' || s === 'checked_out' || s === 'completed';
+    const ps = this.booking?.paymentStatus?.toLowerCase();
+    return ps === 'paid' || s === 'confirmed' || s === 'checked_in' || s === 'checked_out' || s === 'completed';
+  }
+
+  get isStandaloneExperience(): boolean {
+    const sId = typeof this.booking?.suite === 'string'
+      ? this.booking.suite
+      : (this.booking?.suite?.id || this.booking?.suite?._id || '');
+    return sId === 'standalone-experience' || !!(this.booking?.bookingCode && String(this.booking.bookingCode).startsWith('PDM-EXP'));
+  }
+
+  get paymentBadgeLabel(): string {
+    const status = (this.booking?.status || '').toLowerCase();
+    const ps = (this.booking?.paymentStatus || '').toLowerCase();
+    if (status === 'cancelled') {
+      if (ps === 'refunded') return 'REEMBOLSADO';
+      if (ps === 'partial' || ps === 'partially_refunded') return 'REEMBOLSO PARCIAL';
+      if (ps === 'requires_refund') return 'REEMBOLSO PENDIENTE';
+      return 'CANCELADO';
+    }
+    if (status === 'expired') return 'EXPIRADO';
+    if (ps === 'requires_refund') return 'REEMBOLSO PENDIENTE';
+    if (ps === 'partially_refunded') return 'REEMBOLSO PARCIAL';
+    if (ps === 'refunded') return 'REEMBOLSADO';
+    if (ps === 'partial') return 'PAGO PARCIAL';
+    if (this.isPaid) return 'PAGADO';
+    return 'PENDIENTE';
+  }
+
+  get paymentBadgeColor(): string {
+    const status = (this.booking?.status || '').toLowerCase();
+    const ps = (this.booking?.paymentStatus || '').toLowerCase();
+    if (status === 'cancelled' || status === 'expired') return '#e74c3c';
+    if (ps === 'partial' || ps === 'requires_refund' || (!this.isPaid && status === 'pending')) return '#e67e22';
+    if (this.isPaid) return '#2ecc71';
+    return '#e67e22';
+  }
+
+  get experiencesSubtotal(): number {
+    const exps: any[] = this.booking?.experiences || [];
+    return exps.reduce((sum, exp) => sum + ((exp?.price || 0) * (exp?.quantity || 1)), 0);
+  }
+
+  get accommodationSubtotalDisplay(): number {
+    if (!this.booking || this.isStandaloneExperience) return 0;
+    if (this.booking.subtotal !== undefined && this.booking.subtotal !== null) {
+      return Number(this.booking.subtotal) || 0;
+    }
+    const netAfterDeposit = Math.max(0, (this.booking.totalPrice || 0) - (this.booking.guaranteeDeposit || 0) - this.experiencesSubtotal);
+    return this.booking.taxes != null ? Math.max(0, netAfterDeposit - this.booking.taxes) : (netAfterDeposit / 1.19);
+  }
+
+  get taxesDisplay(): number {
+    if (!this.booking || this.isStandaloneExperience) return 0;
+    if (this.booking.taxes !== undefined && this.booking.taxes !== null) {
+      return Number(this.booking.taxes) || 0;
+    }
+    if (this.booking.subtotal !== undefined && this.booking.subtotal !== null) {
+      return 0;
+    }
+    const netAfterDeposit = Math.max(0, (this.booking.totalPrice || 0) - (this.booking.guaranteeDeposit || 0) - this.experiencesSubtotal);
+    return Math.max(0, netAfterDeposit - (netAfterDeposit / 1.19));
+  }
+
+  get roomGrossTotal(): number {
+    if (this.isStandaloneExperience) return 0;
+    return Math.max(0, this.accommodationSubtotalDisplay - (this.booking?.discount || 0) + this.taxesDisplay);
+  }
+
+  get vipExtrasTotal(): number {
+    if (!this.booking) return 0;
+    const deposit = this.booking.guaranteeDeposit || 0;
+    return Math.max(0, (this.booking.totalPrice || 0) - this.roomGrossTotal - this.experiencesSubtotal - deposit);
+  }
+
+  get totalPaidDisplay(): number {
+    if (!this.booking) return 0;
+    if (this.booking.paidAmount !== undefined && this.booking.paidAmount !== null) {
+      return Number(this.booking.paidAmount) || 0;
+    }
+    return this.isPaid ? (this.booking.totalPrice || 0) : 0;
   }
 
   get bookingCodeDisplay(): string {

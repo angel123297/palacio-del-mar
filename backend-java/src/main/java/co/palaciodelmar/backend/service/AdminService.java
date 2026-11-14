@@ -118,6 +118,15 @@ public class AdminService {
             throw new IllegalArgumentException("Estado no válido: " + newStatus);
         }
 
+        if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT) {
+            String effectiveBookingId = booking.getId() != null ? booking.getId() : bookingId;
+            bookingService.processCheckOut(effectiveBookingId, "ADMIN", "Check-out administrativo", false);
+            if (availabilityCacheEvictor != null) {
+                availabilityCacheEvictor.evictAvailability();
+            }
+            return findBookingByIdOrCode(bookingId);
+        }
+
         return executeWithSuiteLock(booking.getSuite(), () -> {
             Booking fresh = findBookingByIdOrCode(bookingId);
             bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado");
@@ -131,7 +140,7 @@ public class AdminService {
                 if (netPaid.compareTo(BigDecimal.ZERO) > 0) {
                     String idemKey = "ref_admin_canc_" + fresh.getId() + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
                     boolean refundedOk = bookingService.executeSequentialRefund(fresh, netPaid, idemKey);
-                    if (!refundedOk) {
+                    if (!refundedOk && (fresh.getPendingRefundAmount() == null || fresh.getPendingRefundAmount().compareTo(BigDecimal.ZERO) <= 0)) {
                         fresh.setPaymentStatus("requires_refund");
                         fresh.setPendingRefundAmount(netPaid);
                         fresh.setPendingRefundIdempotencyKey(idemKey);
@@ -275,11 +284,134 @@ public class AdminService {
     }
 
     public List<co.palaciodelmar.backend.model.Payment> getPendingRefunds() {
-        if (paymentRepository == null) return List.of();
-        return paymentRepository.findByStatus("requires_refund");
+        List<co.palaciodelmar.backend.model.Payment> result = new java.util.ArrayList<>();
+        java.util.Set<String> coveredBookingIds = new java.util.HashSet<>();
+
+        if (paymentRepository != null) {
+            List<co.palaciodelmar.backend.model.Payment> paymentList = paymentRepository.findByStatus("requires_refund");
+            if (paymentList != null) {
+                for (co.palaciodelmar.backend.model.Payment p : paymentList) {
+                    if (p.getBooking() != null && !p.getBooking().isBlank()) {
+                        coveredBookingIds.add(p.getBooking());
+                    }
+                    result.add(p);
+                }
+            }
+        }
+
+        if (bookingRepository != null) {
+            List<Booking> bookingsWithPending = bookingRepository.findByPendingRefundIdempotencyKeyIsNotNull();
+            if (bookingsWithPending != null) {
+                for (Booking b : bookingsWithPending) {
+                    if (b == null || b.getId() == null || coveredBookingIds.contains(b.getId())) {
+                        continue;
+                    }
+                    BigDecimal pendingAmt = b.getPendingRefundAmount();
+                    if (pendingAmt != null && pendingAmt.compareTo(BigDecimal.ZERO) > 0) {
+                        result.add(co.palaciodelmar.backend.model.Payment.builder()
+                                .id("booking:" + b.getId())
+                                .booking(b.getId())
+                                .user(b.getUser())
+                                .amount(pendingAmt)
+                                .currency("COP")
+                                .refundedAmount(b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO)
+                                .status("requires_refund")
+                                .provider("booking_pending_refund")
+                                .notes("Reembolso pendiente en reserva "
+                                        + (b.getBookingCode() != null ? b.getBookingCode() : b.getId())
+                                        + " (clave: " + b.getPendingRefundIdempotencyKey() + ")")
+                                .createdAt(b.getUpdatedAt() != null ? b.getUpdatedAt() : Instant.now())
+                                .updatedAt(b.getUpdatedAt() != null ? b.getUpdatedAt() : Instant.now())
+                                .build());
+                    }
+                }
+            }
+        }
+
+        return result;
     }
 
     public co.palaciodelmar.backend.model.Payment resolveRefund(String paymentId, String action, String notes) {
+        if (paymentId != null && paymentId.startsWith("booking:")) {
+            if (bookingRepository == null) {
+                throw new IllegalStateException("BookingRepository no configurado");
+            }
+            String targetBookingId = paymentId.substring("booking:".length());
+            Booking b = findBookingByIdOrCode(targetBookingId);
+            BigDecimal pendingAmt = b.getPendingRefundAmount() != null ? b.getPendingRefundAmount() : BigDecimal.ZERO;
+            String pendingKey = b.getPendingRefundIdempotencyKey();
+            if (pendingAmt.compareTo(BigDecimal.ZERO) <= 0 && (pendingKey == null || pendingKey.isBlank()) && !"requires_refund".equalsIgnoreCase(b.getPaymentStatus())) {
+                throw new IllegalStateException("La reserva no está pendiente de reembolso");
+            }
+
+            if ("mark_refunded".equalsIgnoreCase(action) || "refund".equalsIgnoreCase(action) || "complete".equalsIgnoreCase(action)) {
+                if ("refund".equalsIgnoreCase(action)) {
+                    if (bookingService == null || paymentGateway == null) {
+                        throw new IllegalStateException("Pasarela o servicio de reservas no configurado para ejecutar reembolso automático. Usa 'mark_refunded' para conciliar manualmente.");
+                    }
+                    if (pendingAmt.compareTo(BigDecimal.ZERO) > 0) {
+                        String idemKey = (pendingKey != null && !pendingKey.isBlank()) ? pendingKey : ("ref_adm_" + b.getId());
+                        boolean ok = bookingService.executeSequentialRefund(b, pendingAmt, idemKey);
+                        if (!ok || (b.getPendingRefundAmount() != null && b.getPendingRefundAmount().compareTo(BigDecimal.ZERO) > 0)) {
+                            throw new IllegalStateException("Fallo en pasarela al procesar reembolso pendiente de la reserva");
+                        }
+                        bookingRepository.save(b);
+                    }
+                } else {
+                    BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
+                    BigDecimal prevRefunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
+                    BigDecimal newRefunded = prevRefunded.add(pendingAmt);
+                    if (paid.compareTo(BigDecimal.ZERO) > 0 && newRefunded.compareTo(paid) > 0) {
+                        newRefunded = paid;
+                    }
+                    b.setRefundedAmount(newRefunded);
+                    b.setPaymentStatus(resolveBookingPaymentStatusAfterRefund(b, paid, newRefunded));
+                    b.setPendingRefundAmount(BigDecimal.ZERO);
+                    b.setPendingRefundIdempotencyKey(null);
+                    b.setNotes((b.getNotes() != null ? b.getNotes() + " | " : "") +
+                            "Reembolso conciliado por ADMIN (" + action + "): " + (notes != null && !notes.isBlank() ? notes : "Aprobado manualmente"));
+                    b.setUpdatedAt(Instant.now());
+                    bookingRepository.save(b);
+                }
+                return co.palaciodelmar.backend.model.Payment.builder()
+                        .id(paymentId)
+                        .booking(b.getId())
+                        .user(b.getUser())
+                        .amount(pendingAmt)
+                        .currency("COP")
+                        .refundedAmount(b.getRefundedAmount() != null ? b.getRefundedAmount() : pendingAmt)
+                        .status("refunded")
+                        .provider("booking_pending_refund")
+                        .notes(b.getNotes())
+                        .updatedAt(Instant.now())
+                        .build();
+            } else if ("dismiss".equalsIgnoreCase(action) || "reject".equalsIgnoreCase(action)) {
+                BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
+                BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
+                b.setPaymentStatus(resolveBookingPaymentStatusAfterRefund(b, paid, refunded));
+                b.setPendingRefundAmount(BigDecimal.ZERO);
+                b.setPendingRefundIdempotencyKey(null);
+                b.setNotes((b.getNotes() != null ? b.getNotes() + " | " : "") +
+                        "Reembolso descartado por ADMIN: " + (notes != null && !notes.isBlank() ? notes : "No procede reembolso"));
+                b.setUpdatedAt(Instant.now());
+                bookingRepository.save(b);
+                return co.palaciodelmar.backend.model.Payment.builder()
+                        .id(paymentId)
+                        .booking(b.getId())
+                        .user(b.getUser())
+                        .amount(pendingAmt)
+                        .currency("COP")
+                        .refundedAmount(refunded)
+                        .status("failed")
+                        .provider("booking_pending_refund")
+                        .notes(b.getNotes())
+                        .updatedAt(Instant.now())
+                        .build();
+            } else {
+                throw new IllegalArgumentException("Acción no válida. Opciones permitidas: 'mark_refunded', 'complete', 'refund', 'dismiss'");
+            }
+        }
+
         if (paymentRepository == null) {
             throw new IllegalStateException("PaymentRepository no configurado");
         }
@@ -290,17 +422,31 @@ public class AdminService {
             throw new IllegalStateException("El pago no está pendiente de reembolso (estado: " + payment.getStatus() + ")");
         }
 
-        if ("mark_refunded".equalsIgnoreCase(action) || "refund".equalsIgnoreCase(action)) {
+        if ("mark_refunded".equalsIgnoreCase(action) || "refund".equalsIgnoreCase(action) || "complete".equalsIgnoreCase(action)) {
             String refundDetails = "";
             BigDecimal totalAmt = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
             BigDecimal currentRefunded = payment.getRefundedAmount() != null ? payment.getRefundedAmount().max(BigDecimal.ZERO) : BigDecimal.ZERO;
             BigDecimal refundable = totalAmt.subtract(currentRefunded).max(BigDecimal.ZERO);
-            if ("refund".equalsIgnoreCase(action) && (payment.getTransactionId() == null || payment.getTransactionId().isBlank())) {
-                throw new IllegalStateException("No se puede procesar reembolso en pasarela sin ID de transacción. Usa 'mark_refunded' para conciliar manualmente.");
+
+            Booking linkedBooking = (payment.getBooking() != null && bookingRepository != null)
+                    ? bookingRepository.findById(payment.getBooking()).orElse(null)
+                    : null;
+            BigDecimal targetDelta = refundable;
+            if (linkedBooking != null && linkedBooking.getPendingRefundAmount() != null && linkedBooking.getPendingRefundAmount().compareTo(BigDecimal.ZERO) > 0) {
+                targetDelta = refundable.min(linkedBooking.getPendingRefundAmount());
             }
-            if (paymentGateway != null && payment.getTransactionId() != null && refundable.compareTo(BigDecimal.ZERO) > 0) {
+
+            if ("refund".equalsIgnoreCase(action)) {
+                if (paymentGateway == null) {
+                    throw new IllegalStateException("Pasarela de pago no configurada para ejecutar reembolso automático. Usa 'mark_refunded' para conciliar manualmente.");
+                }
+                if (payment.getTransactionId() == null || payment.getTransactionId().isBlank()) {
+                    throw new IllegalStateException("No se puede procesar reembolso en pasarela sin ID de transacción. Usa 'mark_refunded' para conciliar manualmente.");
+                }
+            }
+            if (paymentGateway != null && payment.getTransactionId() != null && !payment.getTransactionId().isBlank() && targetDelta.compareTo(BigDecimal.ZERO) > 0) {
                 co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse res =
-                        paymentGateway.refund(payment.getTransactionId(), refundable);
+                        paymentGateway.refund(payment.getTransactionId(), targetDelta);
                 if (res == null || !res.success()) {
                     String errorMsg = (res != null && res.errorMessage() != null) ? res.errorMessage() : "Transacción rechazada por la pasarela";
                     throw new IllegalStateException("Fallo en pasarela al procesar reembolso: " + errorMsg);
@@ -313,32 +459,79 @@ public class AdminService {
                 }
                 refundDetails = " (id=" + res.refundId() + ")";
             }
-            payment.setRefundedAmount(totalAmt);
-            payment.setStatus("refunded");
+            BigDecimal newPaymentRefunded = currentRefunded.add(targetDelta);
+            payment.setRefundedAmount(newPaymentRefunded);
+            payment.setStatus(newPaymentRefunded.compareTo(totalAmt) >= 0 ? "refunded" : "partially_refunded");
             payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
                     "Reembolso procesado por ADMIN" + refundDetails + ": " + (notes != null && !notes.isBlank() ? notes : "Aprobado manualmente"));
 
-            if (payment.getBooking() != null && bookingRepository != null) {
-                bookingRepository.findById(payment.getBooking()).ifPresent(b -> {
-                    BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
-                    b.setRefundedAmount(paid);
-                    b.setPaymentStatus("refunded");
-                    b.setPendingRefundAmount(BigDecimal.ZERO);
-                    b.setPendingRefundIdempotencyKey(null);
-                    b.setUpdatedAt(Instant.now());
-                    bookingRepository.save(b);
-                });
+            if (linkedBooking != null) {
+                BigDecimal paid = linkedBooking.getPaidAmount() != null ? linkedBooking.getPaidAmount() : BigDecimal.ZERO;
+                BigDecimal prevBookRefunded = linkedBooking.getRefundedAmount() != null ? linkedBooking.getRefundedAmount() : BigDecimal.ZERO;
+                BigDecimal newBookRefunded = prevBookRefunded.add(targetDelta);
+                if (paid.compareTo(BigDecimal.ZERO) > 0 && newBookRefunded.compareTo(paid) > 0) {
+                    newBookRefunded = paid;
+                }
+                linkedBooking.setRefundedAmount(newBookRefunded);
+                reconcileLinkedBookingPendingRefund(linkedBooking, payment.getId(), targetDelta, paid, newBookRefunded);
+                linkedBooking.setUpdatedAt(Instant.now());
+                bookingRepository.save(linkedBooking);
             }
         } else if ("dismiss".equalsIgnoreCase(action) || "reject".equalsIgnoreCase(action)) {
             payment.setStatus("failed");
             payment.setNotes((payment.getNotes() != null ? payment.getNotes() + " | " : "") +
                     "Reembolso descartado por ADMIN: " + (notes != null && !notes.isBlank() ? notes : "No procede reembolso"));
+            if (payment.getBooking() != null && bookingRepository != null) {
+                bookingRepository.findById(payment.getBooking()).ifPresent(b -> {
+                    BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
+                    BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
+                    reconcileLinkedBookingPendingRefund(b, payment.getId(), BigDecimal.ZERO, paid, refunded);
+                    b.setUpdatedAt(Instant.now());
+                    bookingRepository.save(b);
+                });
+            }
         } else {
-            throw new IllegalArgumentException("Acción no válida. Opciones permitidas: 'mark_refunded', 'dismiss'");
+            throw new IllegalArgumentException("Acción no válida. Opciones permitidas: 'mark_refunded', 'complete', 'refund', 'dismiss'");
         }
 
         payment.setUpdatedAt(Instant.now());
         return paymentRepository.save(payment);
+    }
+
+    private void reconcileLinkedBookingPendingRefund(
+            Booking booking, String resolvedPaymentId, BigDecimal refundedDelta, BigDecimal paid, BigDecimal totalRefunded) {
+        BigDecimal prevPending = booking.getPendingRefundAmount() != null ? booking.getPendingRefundAmount() : BigDecimal.ZERO;
+        BigDecimal delta = refundedDelta != null ? refundedDelta.max(BigDecimal.ZERO) : BigDecimal.ZERO;
+        BigDecimal remainingPending = prevPending.subtract(delta).max(BigDecimal.ZERO);
+        booking.setPendingRefundAmount(remainingPending);
+        if (remainingPending.compareTo(BigDecimal.ZERO) == 0) {
+            booking.setPendingRefundIdempotencyKey(null);
+        }
+        boolean otherPendingPayments = booking.getId() != null && paymentRepository.findByBooking(booking.getId()).stream()
+                .anyMatch(p -> !Objects.equals(p.getId(), resolvedPaymentId) && "requires_refund".equalsIgnoreCase(p.getStatus()));
+        if (remainingPending.compareTo(BigDecimal.ZERO) > 0 || otherPendingPayments) {
+            booking.setPaymentStatus("requires_refund");
+        } else {
+            booking.setPaymentStatus(resolveBookingPaymentStatusAfterRefund(booking, paid, totalRefunded));
+        }
+    }
+
+    private String resolveBookingPaymentStatusAfterRefund(Booking b, BigDecimal paid, BigDecimal refunded) {
+        BigDecimal safePaid = paid != null ? paid : BigDecimal.ZERO;
+        BigDecimal safeRefunded = refunded != null ? refunded : BigDecimal.ZERO;
+        if ("cancelled".equalsIgnoreCase(b.getStatus())) {
+            if (safePaid.compareTo(BigDecimal.ZERO) <= 0) {
+                return "pending";
+            }
+            return safeRefunded.compareTo(safePaid) >= 0 ? "refunded" : (safeRefunded.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "paid");
+        }
+        BigDecimal netPaid = safePaid.subtract(safeRefunded).max(BigDecimal.ZERO);
+        BigDecimal total = b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO;
+        b.setBalanceDue(total.subtract(netPaid).max(BigDecimal.ZERO));
+        if (total.compareTo(BigDecimal.ZERO) > 0 && netPaid.compareTo(total) >= 0) {
+            return "paid";
+        }
+        return netPaid.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "pending";
     }
 
     public byte[] exportBookingsCsv() {

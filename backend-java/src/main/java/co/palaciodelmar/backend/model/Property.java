@@ -63,6 +63,8 @@ public class Property implements Serializable {
     @Builder.Default
     private String status = "PENDING"; // "PENDING", "APPROVED", "REJECTED"
 
+    private String rejectionReason;
+
     private String externalSiteUrl; // URL opcional de la web externa del anfitrión
 
     private String phone;

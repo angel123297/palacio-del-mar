@@ -1,4 +1,4 @@
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable, NgZone, effect } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
 import { AuthService } from './auth.service';
 import { Booking } from '../models/types';
@@ -15,7 +15,13 @@ export class BookingStreamService {
   constructor(
     private auth: AuthService,
     private zone: NgZone
-  ) {}
+  ) {
+    effect(() => {
+      if (!this.auth.currentUser()) {
+        this.closeConnection();
+      }
+    });
+  }
 
   public getBookingUpdates(): Observable<Booking> {
     this.ensureConnection();
