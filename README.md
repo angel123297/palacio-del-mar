@@ -160,35 +160,35 @@ Servicios locales disponibles:
 
 ## 📱 Guía de Instalación Móvil (Directo desde tu Celular)
 
-Instala la aplicación de **Palacio del Mar** en tu dispositivo móvil en menos de 1 minuto, sin necesidad de cables ni computadores, sincronizada automáticamente y en tiempo real con la versión web del hotel.
+Instala la aplicación oficial de **Palacio del Mar** en tu dispositivo móvil en menos de 1 minuto, sincronizada automáticamente y en tiempo real con la versión web del hotel.
 
 ---
 
 ### 🤖 1. En Dispositivos Android (APK Palacio Del Mar)
 
-Instala directamente la aplicación en tu celular Android descargando el paquete oficial:
+Instala directamente la aplicación en tu teléfono Android descargando el paquete instalador oficial:
 
-- 📲 **Descargar APK Palacio Del Mar:**
-  👉 **[Descargar APK Palacio Del Mar (v1.0.0 Oficial)](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)**
-- 📦 **Releases (Tag v1.0.0):**
-  👉 **[APK Palacio Del Mar (Release v1.0.0)](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)**
+- 📲 **Descargar APK Oficial:**
+  👉 **[Descargar APK Palacio Del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)**
+- 📦 **Repositorio GitHub Releases (v1.0.0):**
+  👉 **[Descargar desde GitHub Releases (Tag v1.0.0)](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)**
 
 #### Pasos para instalar en Android:
-1. **Descarga el APK:** Toca el enlace **[Descargar APK Palacio Del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)** desde tu celular.
-2. **Instala el archivo:** Abre la notificación de descarga finalizada (`palacio-del-mar-release.apk`). Si Android solicita permisos, presiona **Ajustes** y activa *"Permitir desde esta fuente"*, luego pulsa **Instalar**.
-3. **Listo para usar:** Abre la app **Palacio del Mar**. Puedes explorar suites, reservar con cuenta regresiva de 15 minutos, pagar con tu tarjeta o PSE/Nequi y obtener tu llave digital y comprobante en tiempo real.
+1. **Descarga el instalador:** Toca el enlace **[Descargar APK Palacio Del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)** desde tu celular.
+2. **Instala el archivo:** Abre la notificación de descarga (`palacio-del-mar-release.apk`). Si Android solicita permisos, presiona **Ajustes** y activa *"Permitir desde esta fuente"*, luego pulsa **Instalar**.
+3. **Listo para usar:** Abre la app **Palacio del Mar**. Tendrás acceso a exploración de suites, reservas con temporizador, pasarela de pagos integrada y llave digital.
 
 ---
 
 ### 🍏 2. En Dispositivos iOS (iPhone & iPad)
 
-En iPhone y iPad no se requiere descargar archivos. Accede directamente a la aplicación nativa desde el enlace oficial:
+En iPhone y iPad no se requiere descargar archivos pesados ni certificados de desarrollo. Accede directamente a la aplicación nativa optimizada desde el siguiente enlace:
 
-👉 **[https://unbroke-unsized-zandra.ngrok-free.dev/app/](https://unbroke-unsized-zandra.ngrok-free.dev/app/)**
+👉 **[Abrir App Móvil Palacio Del Mar (iOS)](https://unbroke-unsized-zandra.ngrok-free.dev/app/)**
 
-> 💡 *Tip para PC:* Haz `Ctrl + Clic` (o clic con la rueda del ratón) sobre el enlace para abrirlo directamente en una pestaña nueva sin salir de GitHub. En tu iPhone / iPad tócalo directamente para abrir Safari.
+> 💡 *En iPhone / iPad tócalo directamente para abrir en Safari. En PC: haz `Ctrl + Clic` para abrir en pestaña nueva.*
 
 #### Pasos para instalar en iPhone / iPad:
-1. Abre el enlace anterior en tu navegador **Safari**.
-2. Presiona el botón de **Compartir** `⎋` y selecciona **"Agregar al inicio"** (*Add to Home Screen*).
-3. Se agregará el icono oficial de **Palacio del Mar** en tu pantalla de inicio, funcionando como app nativa a pantalla completa con soporte de pagos y llave digital.
+1. Abre el enlace **[https://unbroke-unsized-zandra.ngrok-free.dev/app/](https://unbroke-unsized-zandra.ngrok-free.dev/app/)** en **Safari**.
+2. Presiona el botón de **Compartir** `⎋` en la barra inferior de Safari y selecciona **"Agregar al inicio"** (*Add to Home Screen*).
+3. Se creará el acceso de **Palacio del Mar** en tu pantalla de inicio, abriendo como app nativa a pantalla completa sin barras de navegador.
