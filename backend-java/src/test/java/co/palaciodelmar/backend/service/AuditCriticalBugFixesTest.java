@@ -1585,4 +1585,119 @@ class AuditCriticalBugFixesTest {
         assertEquals(0, data.getTotalSuites());
         assertTrue(data.getCalendar().stream().allMatch(day -> day.getAvailableSuites() == 0));
     }
+
+    @Test
+    @DisplayName("35. Webhooks fuera de orden: refund.processed antes que payment.succeeded no confirma ni marca pagada la reserva")
+    void outOfOrderRefundBeforePaymentSucceededDoesNotConfirmOrMarkBookingPaid() {
+        String secret = "whsec_out_of_order_test_secret_1234567890123456";
+        co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository processedRepo =
+                mock(co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        EmailService emailService = mock(EmailService.class);
+
+        co.palaciodelmar.backend.webhook.PaymentWebhookService webhookService =
+                new co.palaciodelmar.backend.webhook.PaymentWebhookService(
+                        paymentRepository,
+                        bookingRepository,
+                        bookingService,
+                        processedRepo,
+                        emailService,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        null
+                );
+        org.springframework.test.util.ReflectionTestUtils.setField(webhookService, "webhookSecret", secret);
+
+        Booking booking = Booking.builder()
+                .id("bk-ooo-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-ooo-1")
+                .booking("bk-ooo-1")
+                .intentId("pi_ooo_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        when(processedRepo.existsByEventId(anyString())).thenReturn(false);
+        when(processedRepo.existsByPayloadHash(anyString())).thenReturn(false);
+        when(processedRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByIntentId("pi_ooo_1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-ooo-1")).thenReturn(Optional.of(booking));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+
+        // 1. Llega primero refund.processed
+        String refundBody = "{\"eventType\":\"refund.processed\",\"data\":{\"intentId\":\"pi_ooo_1\",\"transactionId\":\"re_ooo_1\",\"amount\":300000}}";
+        webhookService.processWebhook(refundBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(refundBody, secret), "evt_ooo_refund", ts);
+        assertEquals("refunded", payment.getStatus());
+
+        // 2. Llega después payment.succeeded
+        String succeededBody = "{\"eventType\":\"payment.succeeded\",\"data\":{\"intentId\":\"pi_ooo_1\",\"transactionId\":\"tx_ooo_1\",\"amount\":300000}}";
+        webhookService.processWebhook(succeededBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(succeededBody, secret), "evt_ooo_paid", ts);
+
+        assertEquals("pending", booking.getStatus());
+        assertEquals("pending", booking.getPaymentStatus());
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getPaidAmount()));
+        assertEquals("refunded", payment.getStatus());
+        verify(bookingService, never()).changeBookingStatus(any(), any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("36. Reenvío de webhook firmado cambiando cabeceras eventId y timestamp es bloqueado")
+    void replayingSignedWebhookWithSwappedTimestampAndEventIdHeadersIsRejected() {
+        String secret = "whsec_replay_header_swap_secret_123456789012345";
+        co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository processedRepo =
+                mock(co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        EmailService emailService = mock(EmailService.class);
+
+        co.palaciodelmar.backend.webhook.PaymentWebhookService webhookService =
+                new co.palaciodelmar.backend.webhook.PaymentWebhookService(
+                        paymentRepository,
+                        bookingRepository,
+                        bookingService,
+                        processedRepo,
+                        emailService,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        null
+                );
+        org.springframework.test.util.ReflectionTestUtils.setField(webhookService, "webhookSecret", secret);
+
+        String nowTs = String.valueOf(Instant.now().getEpochSecond());
+        String oldTs = String.valueOf(Instant.now().minusSeconds(3600).getEpochSecond());
+
+        // Caso A: payload incluye eventId y timestamp firmados -> cambiar cabeceras falla
+        String bodyWithMeta = "{\"eventId\":\"evt_orig_1\",\"timestamp\":\"" + oldTs + "\",\"eventType\":\"payment.failed\",\"data\":{\"intentId\":\"pi_rep_1\"}}";
+        String sigWithMeta = co.palaciodelmar.backend.webhook.WebhookSigner.sign(bodyWithMeta, secret);
+
+        assertThrows(SecurityException.class, () ->
+                webhookService.processWebhook(bodyWithMeta, sigWithMeta, "evt_forged_new", nowTs));
+        assertThrows(IllegalArgumentException.class, () ->
+                webhookService.processWebhook(bodyWithMeta, sigWithMeta, "evt_orig_1", nowTs));
+
+        // Caso B: payload sin eventId/timestamp internos -> hash del payload bloquea reenvío con cabeceras nuevas
+        String bodyNoMeta = "{\"eventType\":\"payment.failed\",\"data\":{\"intentId\":\"pi_rep_2\"}}";
+        String sigNoMeta = co.palaciodelmar.backend.webhook.WebhookSigner.sign(bodyNoMeta, secret);
+        when(processedRepo.existsByEventId("evt_new_header_2")).thenReturn(false);
+        when(processedRepo.existsByPayloadHash(anyString())).thenReturn(true);
+
+        java.util.Map<String, Object> replayRes = webhookService.processWebhook(bodyNoMeta, sigNoMeta, "evt_new_header_2", nowTs);
+        assertEquals("already_processed", replayRes.get("status"));
+        assertEquals(true, replayRes.get("idempotent"));
+        verify(paymentRepository, never()).findByIntentId("pi_rep_2");
+    }
 }

@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface ProcessedWebhookEventRepository extends MongoRepository<ProcessedWebhookEvent, String> {
     boolean existsByEventId(String eventId);
+    boolean existsByPayloadHash(String payloadHash);
     Optional<ProcessedWebhookEvent> findByEventId(String eventId);
 }

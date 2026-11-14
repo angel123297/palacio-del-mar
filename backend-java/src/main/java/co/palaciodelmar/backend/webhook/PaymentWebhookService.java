@@ -123,8 +123,10 @@ public class PaymentWebhookService {
             throw new IllegalArgumentException("Timestamp fuera de ventana permitida (anti-replay)");
         }
 
-        // 4. Idempotencia: Verificar si el evento ya fue procesado
-        if (processedWebhookEventRepository.existsByEventId(eventId)) {
+        // 4. Idempotencia: Verificar si el evento o su payload firmado ya fueron procesados
+        String payloadHash = sha256Hex(rawBody);
+        if (processedWebhookEventRepository.existsByEventId(eventId)
+                || (payloadHash != null && processedWebhookEventRepository.existsByPayloadHash(payloadHash))) {
             log.info("Evento de webhook ya procesado previamente (idempotencia): {}", eventId);
             return Map.of(
                     "status", "already_processed",
@@ -139,6 +141,19 @@ public class PaymentWebhookService {
             payload = objectMapper.readValue(rawBody, PaymentWebhookPayload.class);
         } catch (Exception e) {
             throw new IllegalArgumentException("Cuerpo del webhook con formato JSON inválido", e);
+        }
+
+        // 5b. Validar que eventId y timestamp firmados dentro del payload coincidan y estén vigentes
+        if (payload.getEventId() != null && !payload.getEventId().isBlank()
+                && !payload.getEventId().trim().equals(eventId.trim())) {
+            throw new SecurityException("El eventId de la cabecera no coincide con el payload firmado");
+        }
+        if (payload.getTimestamp() != null && !payload.getTimestamp().isBlank()) {
+            long payloadTimestamp = parseTimestamp(payload.getTimestamp());
+            if (Math.abs(now - payloadTimestamp) > MAX_TOLERANCE_SECONDS) {
+                log.warn("Timestamp del payload firmado fuera de tolerancia: {} (actual: {})", payloadTimestamp, now);
+                throw new IllegalArgumentException("Timestamp del payload fuera de ventana permitida (anti-replay)");
+            }
         }
 
         String eventType = payload.getEventType();
@@ -161,6 +176,7 @@ public class PaymentWebhookService {
         // 7. Registrar evento procesado para garantizar idempotencia futura
         ProcessedWebhookEvent record = ProcessedWebhookEvent.builder()
                 .eventId(eventId)
+                .payloadHash(payloadHash)
                 .eventType(eventType)
                 .processedAt(Instant.now())
                 .details("Procesado exitosamente para intentId: " + data.getIntentId())
@@ -209,6 +225,20 @@ public class PaymentWebhookService {
 
         if ("completed".equalsIgnoreCase(payment.getStatus())) {
             log.info("Payment {} ya estaba completado", payment.getId());
+            return;
+        }
+        boolean alreadyFullyRefunded = "refunded".equalsIgnoreCase(payment.getStatus())
+                || "requires_refund".equalsIgnoreCase(payment.getStatus())
+                || (payment.getAmount() != null && payment.getAmount().compareTo(BigDecimal.ZERO) > 0
+                && payment.getRefundedAmount() != null && payment.getRefundedAmount().compareTo(payment.getAmount()) >= 0);
+        if (alreadyFullyRefunded) {
+            log.warn("Webhook payment.succeeded {} omitido para Payment {} porque ya fue reembolsado previamente (estado={})",
+                    eventId, payment.getId(), payment.getStatus());
+            if ((payment.getTransactionId() == null || payment.getTransactionId().isBlank()) && data.getTransactionId() != null) {
+                payment.setTransactionId(data.getTransactionId());
+                payment.setUpdatedAt(Instant.now());
+                paymentRepository.save(payment);
+            }
             return;
         }
 
@@ -301,6 +331,9 @@ public class PaymentWebhookService {
             }
 
             boolean confirmedNow = false;
+            boolean isPartialRefundAlreadyRecorded = "partially_refunded".equalsIgnoreCase(payment.getStatus())
+                    && payment.getRefundedAmount() != null
+                    && payment.getRefundedAmount().compareTo(BigDecimal.ZERO) > 0;
             if (!alreadyProcessedPayment) {
                 BigDecimal currentPaid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
                 BigDecimal paymentAmount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
@@ -308,6 +341,20 @@ public class PaymentWebhookService {
                 booking.setPaidAmount(newPaid);
 
                 BigDecimal refundedAmt = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+                if (isPartialRefundAlreadyRecorded) {
+                    refundedAmt = refundedAmt.add(payment.getRefundedAmount()).min(newPaid);
+                    booking.setRefundedAmount(refundedAmt);
+                    if (payment.getProcessedRefundIds() != null && !payment.getProcessedRefundIds().isEmpty()) {
+                        if (booking.getProcessedRefundIds() == null) {
+                            booking.setProcessedRefundIds(new java.util.ArrayList<>());
+                        }
+                        for (String rid : payment.getProcessedRefundIds()) {
+                            if (rid != null && !booking.getProcessedRefundIds().contains(rid)) {
+                                booking.getProcessedRefundIds().add(rid);
+                            }
+                        }
+                    }
+                }
                 BigDecimal netPaid = newPaid.subtract(refundedAmt).max(BigDecimal.ZERO);
                 BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.resolveEffectiveTotalPrice() : newPaid;
                 BigDecimal balance = totalPrice.subtract(netPaid);
@@ -340,8 +387,10 @@ public class PaymentWebhookService {
                 throw ole;
             }
 
-            // A-1: Solo sellar Payment como completed y disparar correos DESPUÉS de persistir Booking
-            payment.setStatus("completed");
+            // A-1: Solo sellar Payment como completed (preservando partially_refunded si ya hubo devolución parcial) y disparar correos DESPUÉS de persistir Booking
+            if (!isPartialRefundAlreadyRecorded) {
+                payment.setStatus("completed");
+            }
             payment.setTransactionId(data.getTransactionId());
             payment.setUpdatedAt(Instant.now());
             payment.setNotes("Pago confirmado exitosamente via webhook (" + eventId + ")");
@@ -692,5 +741,22 @@ public class PaymentWebhookService {
 
     public String getWebhookSecret() {
         return webhookSecret;
+    }
+
+    private static String sha256Hex(String rawBody) {
+        if (rawBody == null) {
+            return null;
+        }
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawBody.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 no disponible", e);
+        }
     }
 }
