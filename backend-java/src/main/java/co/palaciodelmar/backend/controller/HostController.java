@@ -61,6 +61,10 @@ public class HostController {
     @Autowired(required = false)
     private co.palaciodelmar.backend.service.PaymentGateway paymentGateway;
 
+    @lombok.Setter
+    @Autowired(required = false)
+    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+
     @Autowired
     public HostController(
             BookingRepository bookingRepository,
@@ -552,9 +556,20 @@ public class HostController {
                 .updatedAt(java.time.Instant.now())
                 .build();
 
+        java.time.Instant now = java.time.Instant.now();
         freshUser.setBankAccount(updated);
-        freshUser.setUpdatedAt(java.time.Instant.now());
-        if (userRepository != null) {
+        freshUser.setUpdatedAt(now);
+        if (mongoTemplate != null && freshUser.getId() != null) {
+            mongoTemplate.updateFirst(
+                    new org.springframework.data.mongodb.core.query.Query(
+                            org.springframework.data.mongodb.core.query.Criteria.where("id").is(freshUser.getId())
+                    ),
+                    new org.springframework.data.mongodb.core.query.Update()
+                            .set("bankAccount", updated)
+                            .set("updatedAt", now),
+                    User.class
+            );
+        } else if (userRepository != null) {
             userRepository.save(freshUser);
         }
 

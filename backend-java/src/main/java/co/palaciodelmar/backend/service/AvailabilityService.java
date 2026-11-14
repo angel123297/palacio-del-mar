@@ -310,7 +310,8 @@ public class AvailabilityService {
         List<Suite> allSuites = getApprovedActiveSuites();
         List<Suite> filteredSuites = new ArrayList<>();
 
-        if (suiteId != null && !suiteId.isBlank()) {
+        boolean hasSpecificSuiteFilter = suiteId != null && !suiteId.isBlank();
+        if (hasSpecificSuiteFilter) {
             Optional<Suite> specificSuite = findSuiteByIdOrSlug(suiteId);
             if (specificSuite.isPresent() && !Boolean.FALSE.equals(specificSuite.get().getActive())) {
                 Suite s = specificSuite.get();
@@ -325,7 +326,7 @@ public class AvailabilityService {
             }
         }
 
-        if (filteredSuites.isEmpty()) {
+        if (filteredSuites.isEmpty() && !hasSpecificSuiteFilter) {
             for (Suite suite : allSuites) {
                 if (branchId != null && !branchId.isEmpty()) {
                     boolean matchesBranch = suite.getBranch() != null && (suite.getBranch().equals(resolvedBranchId) || suite.getBranch().equals(branchId));

@@ -293,6 +293,26 @@ public class PaymentService {
             return returnMap;
         }
 
+        String gwStatus = confirmResponse.status() != null ? confirmResponse.status().trim().toLowerCase(java.util.Locale.ROOT) : "";
+        boolean isSucceededStatus = "succeeded".equals(gwStatus) || "completed".equals(gwStatus) || "paid".equals(gwStatus);
+        if (!isSucceededStatus) {
+            payment.setTransactionId(confirmResponse.transactionId());
+            if ("refunded".equals(gwStatus)) {
+                payment.setStatus("refunded");
+                payment.setRefundedAmount(payment.getAmount());
+                payment.setNotes("El intento en pasarela ya se encontraba reembolsado");
+            } else if ("partially_refunded".equals(gwStatus)) {
+                payment.setStatus("partially_refunded");
+                payment.setNotes("El intento en pasarela ya se encontraba parcialmente reembolsado");
+            } else {
+                payment.setStatus("failed");
+                payment.setNotes("Estado de pasarela no acreditable: " + confirmResponse.status());
+            }
+            payment.setUpdatedAt(Instant.now());
+            paymentRepository.save(payment);
+            throw new IllegalStateException("El pago no puede acreditarse porque la pasarela reportó estado: " + confirmResponse.status());
+        }
+
         Booking updatedBooking;
         if (alreadyCreditedToBooking) {
             log.info("Payment {} ya fue acreditado previamente en Booking {} (processedPaymentIds); evitando doble abono y finalizando Payment.",

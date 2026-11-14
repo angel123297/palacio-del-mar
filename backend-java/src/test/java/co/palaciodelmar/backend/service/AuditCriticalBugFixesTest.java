@@ -1436,4 +1436,153 @@ class AuditCriticalBugFixesTest {
 
         assertTrue(cacheService.isTokenRevokedForUser("stale@palaciodelmar.co", System.currentTimeMillis()));
     }
+
+    @Test
+    @DisplayName("32. Actualizar cuenta bancaria usa actualización parcial atómica sin sobrescribir contraseña ni token")
+    void updateBankAccountUsesPartialAtomicUpdateWithoutOverwritingCredentials() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+
+        co.palaciodelmar.backend.controller.HostController controller = new co.palaciodelmar.backend.controller.HostController(
+                bookingRepository,
+                suiteRepository,
+                bookingService,
+                promotionRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "userRepository", userRepository);
+        controller.setMongoTemplate(mongoTemplate);
+
+        co.palaciodelmar.backend.model.User hostUser = co.palaciodelmar.backend.model.User.builder()
+                .id("host-bank-1")
+                .email("host@palaciodelmar.co")
+                .password("OLD_HASH")
+                .role("HOST")
+                .build();
+        when(userRepository.findById("host-bank-1")).thenReturn(Optional.of(hostUser));
+
+        co.palaciodelmar.backend.security.UserPrincipal principal = new co.palaciodelmar.backend.security.UserPrincipal(hostUser);
+        co.palaciodelmar.backend.dto.BankAccountDTO req = co.palaciodelmar.backend.dto.BankAccountDTO.builder()
+                .bankName("Bancolombia")
+                .accountType("Ahorros")
+                .accountNumber("1234567890")
+                .holderName("Anfitrion Prueba")
+                .documentType("CC")
+                .documentId("1000111222")
+                .build();
+
+        controller.updateBankAccount(principal, req);
+
+        verify(mongoTemplate, times(1)).updateFirst(
+                any(org.springframework.data.mongodb.core.query.Query.class),
+                any(org.springframework.data.mongodb.core.query.Update.class),
+                eq(co.palaciodelmar.backend.model.User.class)
+        );
+        verify(userRepository, never()).save(any(co.palaciodelmar.backend.model.User.class));
+    }
+
+    @Test
+    @DisplayName("33. Confirmar pago pendiente cuando pasarela reporta refunded no acredita saldo en Booking")
+    void confirmPendingPaymentWhenGatewayReportsRefundedDoesNotCreditBooking() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService helperBookingService = mock(BookingService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        EmailService emailService = mock(EmailService.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                helperBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-gw-ref-1")
+                .user("user-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-gw-ref-1")
+                .booking("bk-gw-ref-1")
+                .user("user-1")
+                .amount(new BigDecimal("300000"))
+                .intentId("pi_gw_ref_1")
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_gw_ref-1")).thenReturn(Optional.empty());
+        when(paymentRepository.findByIntentId("pi_gw_ref_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-gw-ref-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-gw-ref-1")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_gw_ref_1", "tok_1"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_gw_ref_1", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThrows(IllegalStateException.class, () -> paymentService.confirmPayment("user-1", "pi_gw_ref_1", "tok_1"));
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getPaidAmount()));
+        assertEquals("refunded", payment.getStatus());
+        verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    @Test
+    @DisplayName("34. Calendario mensual de una suite inexistente no devuelve disponibilidad de otras suites")
+    void monthlyCalendarForNonexistentSuiteDoesNotReturnOtherSuitesAvailability() {
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        PropertyRepository propertyRepository = mock(PropertyRepository.class);
+        PricingService pricingService = new PricingService();
+
+        AvailabilityService availabilityService = new AvailabilityService(
+                suiteRepository,
+                suiteNightRepository,
+                bookingRepository,
+                promotionRepository,
+                branchRepository,
+                propertyRepository,
+                pricingService
+        );
+
+        Suite otherSuite = Suite.builder()
+                .id("suite-real-1")
+                .name("Suite Real")
+                .active(true)
+                .maxGuests(4)
+                .totalUnits(1)
+                .basePrice(new BigDecimal("400000"))
+                .build();
+
+        when(suiteRepository.findById("suite-inexistente")).thenReturn(Optional.empty());
+        when(suiteRepository.findBySlug("suite-inexistente")).thenReturn(Optional.empty());
+        when(suiteRepository.findAll()).thenReturn(List.of(otherSuite));
+
+        LocalDate nextMonth = LocalDate.now().plusMonths(1);
+        AvailabilityService.MonthlyAvailabilityResponseData data = availabilityService.getMonthlyAvailability(
+                nextMonth.getYear(),
+                nextMonth.getMonthValue(),
+                2,
+                null,
+                null,
+                "suite-inexistente"
+        );
+
+        assertEquals(0, data.getTotalSuites());
+        assertTrue(data.getCalendar().stream().allMatch(day -> day.getAvailableSuites() == 0));
+    }
 }
