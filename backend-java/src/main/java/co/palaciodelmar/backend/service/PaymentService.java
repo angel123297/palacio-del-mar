@@ -334,47 +334,74 @@ public class PaymentService {
             BigDecimal balance = booking.resolveEffectiveTotalPrice().subtract(netPaid);
             booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
 
-            if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
-                 booking.setPaymentStatus("paid");
-                 if ("pending".equalsIgnoreCase(booking.getStatus())) {
-                     bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CONFIRMED, "System", "Pago completado");
-                 }
-            } else {
-                 booking.setPaymentStatus("partial");
-            }
-
             try {
-                updatedBooking = bookingRepository.save(booking);
-            } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+                boolean wasPending = "pending".equalsIgnoreCase(booking.getStatus());
+                boolean shouldConfirm = booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0 && wasPending;
+                if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
+                    booking.setPaymentStatus("paid");
+                    if (wasPending) {
+                        bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CONFIRMED, "System", "Pago completado");
+                    }
+                } else {
+                    booking.setPaymentStatus("partial");
+                }
+
+                // Si changeBookingStatus ya persistió la reserva en una instancia real de BookingService, evitar doble guardado redundante
+                if (!shouldConfirm || "pending".equalsIgnoreCase(booking.getStatus()) || booking.getId() == null) {
+                    updatedBooking = bookingRepository.save(booking);
+                } else {
+                    updatedBooking = booking;
+                }
+            } catch (RuntimeException e) {
                 // El cargo síncrono ya fue emitido: registrar transactionId e intentar reversión inmediata en pasarela
                 payment.setTransactionId(confirmResponse.transactionId());
                 boolean refunded = false;
+                String refundId = null;
                 if (confirmResponse.transactionId() != null && !confirmResponse.transactionId().isBlank() && payment.getAmount() != null) {
                     try {
                         PaymentGateway.PaymentRefundResponse refundResp = paymentGateway.refund(confirmResponse.transactionId(), payment.getAmount());
+                        if (refundResp == null) {
+                            String compKey = "ref_comp_" + (payment.getId() != null ? payment.getId() : intentId);
+                            refundResp = paymentGateway.refund(confirmResponse.transactionId(), payment.getAmount(), compKey);
+                        }
                         refunded = (refundResp != null && refundResp.success());
+                        refundId = refundResp != null ? refundResp.refundId() : null;
                     } catch (Exception ignored) {
                     }
                 }
                 payment.setStatus(refunded ? "refunded" : "requires_refund");
-                payment.setUpdatedAt(Instant.now());
-                payment.setNotes(refunded
-                        ? "Conflicto por concurrencia tras cobro síncrono. Reembolso automático emitido."
-                        : "Conflicto por concurrencia tras cobro síncrono. Requiere reembolso manual.");
-                paymentRepository.save(payment);
-
-                if (suiteNightRepository != null && booking.getId() != null) {
-                    try {
-                        suiteNightRepository.deleteByBooking(booking.getId());
-                        if (availabilityCacheEvictor != null) {
-                            availabilityCacheEvictor.evictAvailability();
+                if (refunded) {
+                    payment.setRefundedAmount(payment.getAmount());
+                    if (refundId != null && !refundId.isBlank()) {
+                        if (payment.getProcessedRefundIds() == null) {
+                            payment.setProcessedRefundIds(new java.util.ArrayList<>());
                         }
-                    } catch (Exception ex) {
-                        // Log y continuar propagando la excepción
+                        if (!payment.getProcessedRefundIds().contains(refundId)) {
+                            payment.getProcessedRefundIds().add(refundId);
+                        }
                     }
                 }
+                payment.setUpdatedAt(Instant.now());
+                payment.setNotes(refunded
+                        ? "Conflicto o fallo de persistencia tras cobro síncrono. Reembolso automático emitido."
+                        : "Conflicto o fallo de persistencia tras cobro síncrono. Requiere reembolso manual.");
+                paymentRepository.save(payment);
 
-                throw new IllegalStateException("Conflicto al procesar el pago. La reserva fue modificada o cancelada simultáneamente.");
+                if (e instanceof org.springframework.dao.OptimisticLockingFailureException) {
+                    if (suiteNightRepository != null && booking.getId() != null) {
+                        try {
+                            suiteNightRepository.deleteByBooking(booking.getId());
+                            if (availabilityCacheEvictor != null) {
+                                availabilityCacheEvictor.evictAvailability();
+                            }
+                        } catch (Exception ex) {
+                            // Log y continuar propagando la excepción
+                        }
+                    }
+                    throw new IllegalStateException("Conflicto al procesar el pago. La reserva fue modificada o cancelada simultáneamente.", e);
+                }
+
+                throw new IllegalStateException("Error al persistir la reserva tras el cobro: " + e.getMessage(), e);
             }
         }
 

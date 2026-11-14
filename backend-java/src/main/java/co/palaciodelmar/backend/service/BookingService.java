@@ -1162,8 +1162,20 @@ public class BookingService {
     }
 
     public boolean executeSequentialRefund(Booking booking, BigDecimal totalRefundToProcess, String baseIdempotencyKey) {
-        if (totalRefundToProcess == null || totalRefundToProcess.compareTo(BigDecimal.ZERO) <= 0 || paymentGateway == null) {
+        if (totalRefundToProcess == null || totalRefundToProcess.compareTo(BigDecimal.ZERO) <= 0) {
             return true;
+        }
+        if (paymentGateway == null) {
+            booking.setPendingRefundAmount(totalRefundToProcess);
+            booking.setPendingRefundIdempotencyKey(baseIdempotencyKey);
+            booking.setPaymentStatus("requires_refund");
+            if (bookingRepository != null) {
+                try {
+                    bookingRepository.save(booking);
+                } catch (RuntimeException ignored) {
+                }
+            }
+            return false;
         }
 
         List<co.palaciodelmar.backend.model.Payment> allPaymentsWithTx = (paymentRepository != null && booking.getId() != null)
@@ -1280,6 +1292,7 @@ public class BookingService {
         } else {
             BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
             BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+            String prevPaymentStatus = booking.getPaymentStatus();
             if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
                 booking.setPaymentStatus(refunded.compareTo(paid) >= 0 ? "refunded" : "partial");
             } else if (booking.getBalanceDue() != null && booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
@@ -1290,7 +1303,12 @@ public class BookingService {
             booking.setPendingRefundAmount(BigDecimal.ZERO);
             booking.setPendingRefundIdempotencyKey(null);
             if (bookingRepository != null) {
-                bookingRepository.save(booking);
+                try {
+                    bookingRepository.save(booking);
+                } catch (RuntimeException ex) {
+                    booking.setPaymentStatus(prevPaymentStatus != null ? prevPaymentStatus : "requires_refund");
+                    throw ex;
+                }
             }
             return true;
         }
@@ -2076,7 +2094,21 @@ public class BookingService {
 
         if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
             booking.setExpiresAt(null);
-            java.util.List<co.palaciodelmar.backend.model.SuiteNight> nights = suiteNightRepository.findByBooking(booking.getId());
+        }
+
+        if (persistAndPublish) {
+            if (booking.getId() != null && bookingRepository != null) {
+                Booking saved = bookingRepository.save(booking);
+                if (saved != null && saved.getVersion() != null) {
+                    booking.setVersion(saved.getVersion());
+                }
+            }
+        }
+
+        if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
+            java.util.List<co.palaciodelmar.backend.model.SuiteNight> nights = suiteNightRepository != null
+                    ? suiteNightRepository.findByBooking(booking.getId())
+                    : java.util.List.of();
             for (co.palaciodelmar.backend.model.SuiteNight sn : nights) {
                 sn.setExpiresAt(null);
                 sn.setStatus("confirmed");
@@ -2091,9 +2123,6 @@ public class BookingService {
         }
 
         if (persistAndPublish) {
-            if (booking.getId() != null && bookingRepository != null) {
-                bookingRepository.save(booking);
-            }
             publishBookingStatusEvent(booking, newStatus);
         }
 

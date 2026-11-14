@@ -365,6 +365,9 @@ public class AuthService {
         }
         if (bookingSseService != null) {
             bookingSseService.closeUserConnections(user.getId());
+            if (user.getEmail() != null) {
+                bookingSseService.closeUserConnections(user.getEmail());
+            }
         }
     }
 
@@ -390,6 +393,9 @@ public class AuthService {
         }
         if (bookingSseService != null) {
             bookingSseService.closeUserConnections(user.getId());
+            if (user.getEmail() != null) {
+                bookingSseService.closeUserConnections(user.getEmail());
+            }
         }
         log.info("Revocación global de sesiones ejecutada en todos los dispositivos para {}", user.getEmail());
     }
@@ -472,6 +478,9 @@ public class AuthService {
         }
         if (bookingSseService != null) {
             bookingSseService.closeUserConnections(updatedUser.getId());
+            if (updatedUser.getEmail() != null) {
+                bookingSseService.closeUserConnections(updatedUser.getEmail());
+            }
         }
 
         log.info("Contraseña restablecida exitosamente de forma atómica para el usuario {}", updatedUser.getEmail());

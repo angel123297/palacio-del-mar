@@ -129,25 +129,36 @@ public class AdminService {
 
         return executeWithSuiteLock(booking.getSuite(), () -> {
             Booking fresh = findBookingByIdOrCode(bookingId);
-            bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado");
-            Booking saved = bookingRepository.save(fresh);
+            BigDecimal paid = fresh.getPaidAmount() != null ? fresh.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal refunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : BigDecimal.ZERO;
+            BigDecimal netPaid = paid.subtract(refunded).max(BigDecimal.ZERO);
+            String idemKey = null;
 
-            if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
-                BigDecimal paid = fresh.getPaidAmount() != null ? fresh.getPaidAmount() : BigDecimal.ZERO;
-                BigDecimal refunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : BigDecimal.ZERO;
-                BigDecimal netPaid = paid.subtract(refunded).max(BigDecimal.ZERO);
-
+            if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED
+                    || targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED) {
+                fresh.setBalanceDue(BigDecimal.ZERO);
                 if (netPaid.compareTo(BigDecimal.ZERO) > 0) {
-                    String idemKey = "ref_admin_canc_" + fresh.getId() + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
-                    boolean refundedOk = bookingService.executeSequentialRefund(fresh, netPaid, idemKey);
-                    if (!refundedOk && (fresh.getPendingRefundAmount() == null || fresh.getPendingRefundAmount().compareTo(BigDecimal.ZERO) <= 0)) {
-                        fresh.setPaymentStatus("requires_refund");
-                        fresh.setPendingRefundAmount(netPaid);
-                        fresh.setPendingRefundIdempotencyKey(idemKey);
+                    idemKey = fresh.getPendingRefundIdempotencyKey();
+                    if (idemKey == null || idemKey.isBlank()) {
+                        String prefix = targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED
+                                ? "ref_exp_"
+                                : "ref_admin_canc_";
+                        idemKey = prefix + fresh.getId() + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
                     }
-                    saved = bookingRepository.save(fresh);
+                    fresh.setPendingRefundIdempotencyKey(idemKey);
+                    fresh.setPendingRefundAmount(netPaid);
+                    fresh.setPaymentStatus("requires_refund");
+                } else if (paid.compareTo(BigDecimal.ZERO) > 0) {
+                    fresh.setPaymentStatus(refunded.compareTo(paid) >= 0 ? "refunded" : "partial");
                 }
             }
+
+            bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado", false);
+            if (!targetStatus.name().equalsIgnoreCase(fresh.getStatus())) {
+                bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado");
+            }
+            Booking saved = bookingRepository.save(fresh);
+            bookingService.publishBookingStatusEvent(saved, targetStatus);
 
             if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED
                     || targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED
@@ -162,6 +173,26 @@ public class AdminService {
                             saved.getCheckOut(),
                             effectiveBookingId
                     );
+                }
+            }
+
+            if ((targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED
+                    || targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED)
+                    && idemKey != null && netPaid.compareTo(BigDecimal.ZERO) > 0) {
+                try {
+                    boolean refundedOk = bookingService.executeSequentialRefund(saved, netPaid, idemKey);
+                    if (!refundedOk && (saved.getPendingRefundAmount() == null || saved.getPendingRefundAmount().compareTo(BigDecimal.ZERO) <= 0)) {
+                        saved.setPaymentStatus("requires_refund");
+                        saved.setPendingRefundAmount(netPaid);
+                        saved.setPendingRefundIdempotencyKey(idemKey);
+                        saved = bookingRepository.save(saved);
+                    }
+                } catch (RuntimeException ex) {
+                    if (saved.getPendingRefundAmount() == null || saved.getPendingRefundAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                        saved.setPaymentStatus("requires_refund");
+                        saved.setPendingRefundAmount(netPaid);
+                        saved.setPendingRefundIdempotencyKey(idemKey);
+                    }
                 }
             }
 

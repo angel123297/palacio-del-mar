@@ -1878,4 +1878,217 @@ class AuditCriticalBugFixesTest {
         sseService.emitBookingUpdate("u-sse-logout", co.palaciodelmar.backend.dto.BookingDTO.builder().id("bk-after-logout").build());
         verifyNoMoreInteractions(emitter);
     }
+
+    @Test
+    @DisplayName("40. confirmPayment ejecuta compensación y registra transacción en Payment si falla el primer guardado de Booking tras el cobro")
+    void confirmPaymentExecutesCompensationAndRecordsTransactionWhenFirstBookingSaveFails() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-first-save-fail")
+                .user("u-1")
+                .suite("suite-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-first-save-fail")
+                .booking("bk-first-save-fail")
+                .user("u-1")
+                .intentId("pi_first_save_fail")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_first_save_fail")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-first-save-fail")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-first-save-fail")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_first_save_fail", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_first_save_fail", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class)))
+                .thenThrow(new RuntimeException("Simulated DB write failure on first save after charge"));
+        when(paymentGateway.refund(eq("tx_first_save_fail"), eq(new BigDecimal("300000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_comp_first_save", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThrows(IllegalStateException.class,
+                () -> paymentService.confirmPayment("u-1", "pi_first_save_fail", "tok_ok"));
+
+        assertEquals("tx_first_save_fail", payment.getTransactionId());
+        assertEquals("refunded", payment.getStatus());
+        assertEquals(0, new BigDecimal("300000").compareTo(payment.getRefundedAmount()));
+        verify(paymentGateway, times(1)).refund(eq("tx_first_save_fail"), eq(new BigDecimal("300000")));
+        verify(paymentRepository, atLeastOnce()).save(payment);
+    }
+
+    @Test
+    @DisplayName("41. Cancelación administrativa persiste pendingRefundAmount y requires_refund desde el primer guardado de CANCELLED")
+    void adminCancellationPersistsPendingRefundAtomicallyWithCancelledStatus() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        AdminService adminService = new AdminService(
+                bookingRepository,
+                suiteRepository,
+                userRepository,
+                promotionRepository,
+                suiteNightRepository,
+                realBookingService,
+                null,
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-admin-canc-1")
+                .suite("suite-1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(new BigDecimal("300000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(BigDecimal.ZERO)
+                .checkIn(LocalDate.now().plusDays(10))
+                .checkOut(LocalDate.now().plusDays(12))
+                .build();
+
+        java.util.concurrent.atomic.AtomicReference<Booking> persistedSnapshot = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicInteger saveCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        when(bookingRepository.findById("bk-admin-canc-1")).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
+            Booking arg = inv.getArgument(0);
+            int call = saveCount.incrementAndGet();
+            if (call == 1) {
+                persistedSnapshot.set(Booking.builder()
+                        .id(arg.getId())
+                        .status(arg.getStatus())
+                        .paymentStatus(arg.getPaymentStatus())
+                        .paidAmount(arg.getPaidAmount())
+                        .refundedAmount(arg.getRefundedAmount())
+                        .pendingRefundAmount(arg.getPendingRefundAmount())
+                        .pendingRefundIdempotencyKey(arg.getPendingRefundIdempotencyKey())
+                        .build());
+                return arg;
+            }
+            throw new RuntimeException("Simulated persistence failure after initial CANCELLED save");
+        });
+        when(paymentGateway.refund(anyString(), any(BigDecimal.class), anyString()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(false, null, "failed", "Gateway down"));
+
+        adminService.updateBookingStatus("bk-admin-canc-1", "CANCELLED");
+
+        Booking firstSaved = persistedSnapshot.get();
+        assertNotNull(firstSaved);
+        assertEquals("cancelled", firstSaved.getStatus());
+        assertEquals("requires_refund", firstSaved.getPaymentStatus());
+        assertNotNull(firstSaved.getPendingRefundIdempotencyKey());
+        assertEquals(0, new BigDecimal("300000").compareTo(firstSaved.getPendingRefundAmount()));
+    }
+
+    @Test
+    @DisplayName("42. Una petición autenticada antes de logoutAllDevices no puede abrir canal SSE después del cierre")
+    void preAuthenticatedRequestCannotOpenSseStreamAfterLogoutAllDevices() {
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        org.springframework.security.crypto.password.PasswordEncoder passwordEncoder = mock(org.springframework.security.crypto.password.PasswordEncoder.class);
+        co.palaciodelmar.backend.security.JwtService jwtService = mock(co.palaciodelmar.backend.security.JwtService.class);
+        org.springframework.security.authentication.AuthenticationManager authManager = mock(org.springframework.security.authentication.AuthenticationManager.class);
+        EmailService emailService = mock(EmailService.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+
+        BookingSseService sseService = new BookingSseService();
+        AuthService authService = new AuthService(
+                userRepository,
+                passwordEncoder,
+                jwtService,
+                authManager,
+                emailService,
+                mongoTemplate
+        );
+        authService.setBookingSseService(sseService);
+
+        co.palaciodelmar.backend.controller.BookingStreamController streamController =
+                new co.palaciodelmar.backend.controller.BookingStreamController(sseService, userRepository);
+
+        co.palaciodelmar.backend.model.User user = co.palaciodelmar.backend.model.User.builder()
+                .id("u-race-sse")
+                .email("race-sse@palaciodelmar.co")
+                .role("GUEST")
+                .build();
+        when(userRepository.findById("u-race-sse")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("race-sse@palaciodelmar.co")).thenReturn(Optional.of(user));
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(co.palaciodelmar.backend.model.User.class)))
+                .thenReturn(user);
+
+        // 1. La petición se autentica ANTES de logoutAllDevices
+        co.palaciodelmar.backend.security.UserPrincipal preAuthPrincipal =
+                new co.palaciodelmar.backend.security.UserPrincipal(user);
+        org.springframework.security.core.Authentication preAuth =
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        preAuthPrincipal, null, preAuthPrincipal.getAuthorities());
+
+        // 2. Ocurre «cerrar todas las sesiones»
+        authService.logoutAllDevices("u-race-sse");
+
+        // 3. La petición en vuelo intenta abrir su canal SSE DESPUÉS del cierre
+        assertThrows(SecurityException.class, () -> streamController.streamBookings(preAuth));
+        assertEquals(0, sseService.getActiveSubscribersCount());
+    }
 }

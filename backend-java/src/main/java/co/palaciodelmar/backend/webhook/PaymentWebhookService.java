@@ -374,26 +374,39 @@ public class PaymentWebhookService {
                 }
                 booking.getProcessedPaymentIds().add(payment.getId());
 
-                if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
-                    booking.setPaymentStatus("paid");
-                    if (canConfirm) {
-                        bookingService.changeBookingStatus(booking, BookingStatus.CONFIRMED, "Webhook", "Pago completado via webhook");
-                        confirmedNow = true;
+                try {
+                    if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
+                        booking.setPaymentStatus("paid");
+                        if (canConfirm) {
+                            bookingService.changeBookingStatus(booking, BookingStatus.CONFIRMED, "Webhook", "Pago completado via webhook");
+                            confirmedNow = true;
+                        }
+                    } else {
+                        booking.setPaymentStatus("partial");
                     }
-                } else {
-                    booking.setPaymentStatus("partial");
-                }
-            }
 
-            try {
-                bookingRepository.save(booking);
-            } catch (org.springframework.dao.OptimisticLockingFailureException ole) {
-                if (attempt < 3) {
-                    log.warn("Conflicto @Version acreditando Booking {} en webhook {} (intento {}/3), reintentando...",
-                            booking.getId(), eventId, attempt);
-                    continue;
+                    if (!confirmedNow || "pending".equalsIgnoreCase(booking.getStatus()) || booking.getId() == null) {
+                        bookingRepository.save(booking);
+                    }
+                } catch (org.springframework.dao.OptimisticLockingFailureException ole) {
+                    if (attempt < 3) {
+                        log.warn("Conflicto @Version acreditando Booking {} en webhook {} (intento {}/3), reintentando...",
+                                booking.getId(), eventId, attempt);
+                        continue;
+                    }
+                    throw ole;
                 }
-                throw ole;
+            } else {
+                try {
+                    bookingRepository.save(booking);
+                } catch (org.springframework.dao.OptimisticLockingFailureException ole) {
+                    if (attempt < 3) {
+                        log.warn("Conflicto @Version acreditando Booking {} en webhook {} (intento {}/3), reintentando...",
+                                booking.getId(), eventId, attempt);
+                        continue;
+                    }
+                    throw ole;
+                }
             }
 
             // A-1: Solo sellar Payment como completed (preservando partially_refunded si ya hubo devolución parcial) y disparar correos DESPUÉS de persistir Booking
