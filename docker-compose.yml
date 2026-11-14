@@ -114,8 +114,25 @@ services:
     environment:
       PALACIO_PROXY_TOKEN: "${PALACIO_PROXY_TOKEN:?PALACIO_PROXY_TOKEN must be defined in .env}"
       BACKEND_HOST: "${BACKEND_HOST:-backend-java:5000}"
+    volumes:
+      - ./frontend-angular/public/app:/usr/share/nginx/html/app:ro
+      - ./frontend-angular/public/palacio-del-mar-release.apk:/usr/share/nginx/html/palacio-del-mar-release.apk:ro
     depends_on:
       - backend-java
+
+  # --- Tunel Ngrok Oficial (Conexion Publica Permanente App y Web) -----------
+  ngrok-tunnel:
+    image: ngrok/ngrok:alpine
+    container_name: palacio-ngrok-tunnel
+    restart: unless-stopped
+    command:
+      - "http"
+      - "palacio-web-angular:80"
+      - "--url=unbroke-unsized-zandra.ngrok-free.dev"
+    environment:
+      NGROK_AUTHTOKEN: "${NGROK_AUTHTOKEN:-3BK2wOZ5QxhfPMSPfRqDyCt5gx1_5ShVgm7a8XZXY9SaeU9Bz}"
+    depends_on:
+      - web-angular
 
 volumes:
   mongo-data:
