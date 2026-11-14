@@ -70,21 +70,13 @@ public class HostPayoutService {
 
     private synchronized List<HostPayoutDTO> doProcessAutomatedPayouts() {
         LocalDate today = LocalDate.now(BOGOTA);
-        List<HostPayoutDTO> generated = new ArrayList<>();
-        recoverPendingPayouts(generated, today);
-
         List<String> eligibleStatuses = List.of("checked_out", "completed");
+        List<HostPayoutDTO> generated = new ArrayList<>();
+        recoverPendingPayouts(generated, today, eligibleStatuses);
 
         List<Booking> candidates = bookingRepository.findByStatusIn(eligibleStatuses).stream()
                 .filter(b -> b.getPayoutId() == null)
-                .filter(b -> b.getCheckIn() != null && !b.getCheckIn().isAfter(today))
-                .filter(b -> b.getPaidAmount() != null && b.getPaidAmount().compareTo(BigDecimal.ZERO) > 0)
-                .filter(b -> b.getBalanceDue() == null || b.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0)
-                .filter(b -> {
-                    BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
-                    BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
-                    return paid.subtract(refunded).compareTo(BigDecimal.ZERO) > 0;
-                })
+                .filter(b -> isBookingEligibleForPayout(b, today, eligibleStatuses))
                 .toList();
 
         if (candidates.isEmpty()) {
@@ -201,10 +193,28 @@ public class HostPayoutService {
         return generated;
     }
 
+    private boolean isBookingEligibleForPayout(Booking b, LocalDate today, List<String> eligibleStatuses) {
+        if (b == null || b.getStatus() == null || !eligibleStatuses.contains(b.getStatus().toLowerCase())) {
+            return false;
+        }
+        if (b.getCheckIn() == null || b.getCheckIn().isAfter(today)) {
+            return false;
+        }
+        if (b.getPaidAmount() == null || b.getPaidAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            return false;
+        }
+        if (b.getBalanceDue() != null && b.getBalanceDue().compareTo(BigDecimal.ZERO) > 0) {
+            return false;
+        }
+        BigDecimal paid = b.getPaidAmount();
+        BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
+        return paid.subtract(refunded).compareTo(BigDecimal.ZERO) > 0;
+    }
+
     /**
      * Reconcilia liquidaciones que quedaron en estado PENDING tras una caída o fallo intermedio.
      */
-    private void recoverPendingPayouts(List<HostPayoutDTO> generated, LocalDate today) {
+    private void recoverPendingPayouts(List<HostPayoutDTO> generated, LocalDate today, List<String> eligibleStatuses) {
         List<HostPayout> pendingPayouts = hostPayoutRepository.findByStatus("PENDING");
         if (pendingPayouts == null || pendingPayouts.isEmpty()) {
             return;
@@ -217,6 +227,15 @@ public class HostPayoutService {
                 if (bId == null) continue;
                 Booking b = bookingRepository.findById(bId).orElse(null);
                 if (b == null) continue;
+                boolean eligible = isBookingEligibleForPayout(b, today, eligibleStatuses);
+                if (!eligible) {
+                    if (pending.getId().equals(b.getPayoutId())) {
+                        b.setPayoutId(null);
+                        b.setUpdatedAt(Instant.now());
+                        bookingRepository.save(b);
+                    }
+                    continue;
+                }
                 if (pending.getId().equals(b.getPayoutId())) {
                     settledBookings.add(b);
                 } else if (b.getPayoutId() == null) {
@@ -234,7 +253,7 @@ public class HostPayoutService {
             }
             if (settledBookings.isEmpty()) {
                 hostPayoutRepository.delete(pending);
-                log.warn("Liquidación PENDING {} eliminada en recuperación por no tener reservas selladas.", pending.getPayoutCode());
+                log.warn("Liquidación PENDING {} eliminada en recuperación por no tener reservas elegibles selladas.", pending.getPayoutCode());
                 continue;
             }
             recomputePayoutTotals(pending, settledBookings, today);

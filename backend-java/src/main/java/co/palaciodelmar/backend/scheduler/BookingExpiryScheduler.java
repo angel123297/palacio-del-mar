@@ -44,9 +44,9 @@ public class BookingExpiryScheduler {
     @Scheduled(fixedRateString = "${booking.expiry.check.interval.ms:60000}")
     public void cleanupExpiredBookings() {
         Instant now = Instant.now();
-        // Se filtra en Java: una consulta por paidAmount == 0 no encuentra documentos con paidAmount nulo o con otra escala (0.00).
+        // Incluir también reservas pending con pago parcial cuyo tiempo de retención expiró
         List<Booking> expiredBookings = bookingRepository.findByStatusAndExpiresAtBefore("pending", now).stream()
-                .filter(b -> b.getPaidAmount() == null || b.getPaidAmount().signum() <= 0)
+                .filter(b -> !"paid".equalsIgnoreCase(b.getPaymentStatus()))
                 .toList();
 
         if (expiredBookings.isEmpty()) {
@@ -82,11 +82,14 @@ public class BookingExpiryScheduler {
         }
 
         boolean stillPending = "pending".equalsIgnoreCase(fresh.getStatus());
-        boolean stillUnpaid = (fresh.getPaidAmount() == null || fresh.getPaidAmount().signum() <= 0)
-                && !"paid".equalsIgnoreCase(fresh.getPaymentStatus());
+        boolean notFullyPaid = !"paid".equalsIgnoreCase(fresh.getPaymentStatus());
+        boolean hasUnsettledBalance = fresh.getBalanceDue() == null
+                || fresh.getBalanceDue().signum() > 0
+                || fresh.getPaidAmount() == null
+                || fresh.getPaidAmount().signum() <= 0;
         boolean stillExpired = fresh.getExpiresAt() != null && fresh.getExpiresAt().isBefore(Instant.now());
 
-        if (!stillPending || !stillUnpaid || !stillExpired) {
+        if (!stillPending || !notFullyPaid || !hasUnsettledBalance || !stillExpired) {
             log.info("Omitiendo expiración de reserva {} porque su estado cambió concurrentemente (status={}, paidAmount={})",
                     bookingId, fresh.getStatus(), fresh.getPaidAmount());
             return false;
@@ -117,6 +120,23 @@ public class BookingExpiryScheduler {
                     fresh.getCheckOut(),
                     bookingId
             );
+        }
+
+        // 3. Si la reserva expirada tenía un pago parcial cobrado, reembolsar o encolar en requires_refund
+        java.math.BigDecimal paid = fresh.getPaidAmount() != null ? fresh.getPaidAmount() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal refunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal netPaid = paid.subtract(refunded).max(java.math.BigDecimal.ZERO);
+        if (netPaid.signum() > 0) {
+            String expKey = "ref_exp_" + fresh.getId();
+            bookingService.executeSequentialRefund(fresh, netPaid, expKey);
+            java.math.BigDecimal updatedRefunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : java.math.BigDecimal.ZERO;
+            java.math.BigDecimal remaining = paid.subtract(updatedRefunded).max(java.math.BigDecimal.ZERO);
+            if (remaining.signum() > 0) {
+                fresh.setPendingRefundAmount(remaining);
+                fresh.setPendingRefundIdempotencyKey(expKey);
+                fresh.setPaymentStatus("requires_refund");
+                bookingRepository.save(fresh);
+            }
         }
 
         log.info("Reserva {} marcada como EXPIRED exitosamente", bookingId);

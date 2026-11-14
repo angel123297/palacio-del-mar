@@ -1166,14 +1166,18 @@ public class BookingService {
             return true;
         }
 
-        List<co.palaciodelmar.backend.model.Payment> eligiblePayments = (paymentRepository != null && booking.getId() != null)
+        List<co.palaciodelmar.backend.model.Payment> allPaymentsWithTx = (paymentRepository != null && booking.getId() != null)
                 ? paymentRepository.findByBooking(booking.getId()).stream()
-                        .filter(p -> ("completed".equalsIgnoreCase(p.getStatus()) || "partially_refunded".equalsIgnoreCase(p.getStatus()))
-                                && p.getTransactionId() != null && !p.getTransactionId().isBlank())
-                        .sorted(java.util.Comparator.comparing(co.palaciodelmar.backend.model.Payment::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                        .filter(p -> p.getTransactionId() != null && !p.getTransactionId().isBlank())
                         .toList()
                 : java.util.Collections.emptyList();
 
+        List<co.palaciodelmar.backend.model.Payment> eligiblePayments = allPaymentsWithTx.stream()
+                .filter(p -> "completed".equalsIgnoreCase(p.getStatus()) || "partially_refunded".equalsIgnoreCase(p.getStatus()))
+                .sorted(java.util.Comparator.comparing(co.palaciodelmar.backend.model.Payment::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .toList();
+
+        boolean multiPaymentBooking = allPaymentsWithTx.size() > 1;
         BigDecimal remainingToRefund = totalRefundToProcess;
         boolean allSucceeded = true;
 
@@ -1187,7 +1191,12 @@ public class BookingService {
                 if (available.compareTo(BigDecimal.ZERO) <= 0) continue;
 
                 BigDecimal chunk = remainingToRefund.min(available);
-                String chunkKey = eligiblePayments.size() == 1 ? baseIdempotencyKey : (baseIdempotencyKey + "_p" + i);
+                String paymentDiscriminator = (payment.getId() != null && !payment.getId().isBlank())
+                        ? payment.getId()
+                        : ("tx_" + payment.getTransactionId());
+                String chunkKey = multiPaymentBooking
+                        ? (baseIdempotencyKey + "_" + paymentDiscriminator)
+                        : baseIdempotencyKey;
 
                 try {
                     PaymentGateway.PaymentRefundResponse resp = paymentGateway.refund(payment.getTransactionId(), chunk, chunkKey);

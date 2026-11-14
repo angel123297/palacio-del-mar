@@ -775,6 +775,9 @@ class AuditCriticalBugFixesTest {
                 .propertyId("prop-1")
                 .status("checked_out")
                 .subtotal(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(BigDecimal.ZERO)
                 .platformFee(new BigDecimal("40000"))
                 .hostPayout(new BigDecimal("460000"))
                 .payoutId("po-stuck-1")
@@ -794,5 +797,247 @@ class AuditCriticalBugFixesTest {
         assertEquals("PROCESSED", stuck.getStatus());
         assertNotNull(stuck.getProcessedAt());
         assertEquals(0, new BigDecimal("460000").compareTo(stuck.getNetAmount()));
+    }
+
+    @Test
+    @DisplayName("18. Conciliar manualmente garantía en Admin no crea deuda inexistente en reserva checked_out")
+    void adminManualGuaranteeConciliationDoesNotCreateFakeDebt() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        Booking booking = Booking.builder()
+                .id("bk-man-dep-1")
+                .status("checked_out")
+                .paymentStatus("requires_refund")
+                .totalPrice(new BigDecimal("600000"))
+                .paidAmount(new BigDecimal("600000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(BigDecimal.ZERO)
+                .guaranteeDeposit(new BigDecimal("100000"))
+                .guaranteeCompensated(BigDecimal.ZERO)
+                .guaranteeRefunded(false)
+                .pendingRefundAmount(new BigDecimal("100000"))
+                .pendingRefundIdempotencyKey("ref_dep_bk-man-dep-1")
+                .build();
+
+        when(bookingRepository.findById("bk-man-dep-1")).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        AdminService adminService = new AdminService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(co.palaciodelmar.backend.repository.UserRepository.class),
+                mock(co.palaciodelmar.backend.repository.PromotionRepository.class),
+                mock(SuiteNightRepository.class),
+                mock(BookingService.class),
+                mock(PropertyRepository.class),
+                mock(PaymentRepository.class),
+                null
+        );
+
+        adminService.resolveRefund("booking:bk-man-dep-1", "mark_refunded", "Conciliado manual");
+
+        assertTrue(Boolean.TRUE.equals(booking.getGuaranteeRefunded()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getBalanceDue()));
+        assertEquals("paid", booking.getPaymentStatus());
+    }
+
+    @Test
+    @DisplayName("19. Recuperar payout PENDING descarta reservas sin fondos netos o con saldo pendiente")
+    void recoverPendingPayoutSkipsIneligibleBookings() {
+        co.palaciodelmar.backend.repository.HostPayoutRepository payoutRepo =
+                mock(co.palaciodelmar.backend.repository.HostPayoutRepository.class);
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        PropertyRepository propRepo = mock(PropertyRepository.class);
+
+        co.palaciodelmar.backend.model.HostPayout stuck = co.palaciodelmar.backend.model.HostPayout.builder()
+                .id("po-stuck-inelig")
+                .payoutCode("PO-20261114-BAD1")
+                .propertyId("prop-1")
+                .status("PENDING")
+                .bookingIds(List.of("bk-bad-1"))
+                .build();
+
+        Booking refundedBk = Booking.builder()
+                .id("bk-bad-1")
+                .propertyId("prop-1")
+                .status("checked_out")
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(new BigDecimal("500000"))
+                .balanceDue(BigDecimal.ZERO)
+                .payoutId("po-stuck-inelig")
+                .checkIn(LocalDate.now(BOGOTA).minusDays(2))
+                .checkOut(LocalDate.now(BOGOTA))
+                .build();
+
+        when(payoutRepo.findByStatus("PENDING")).thenReturn(List.of(stuck));
+        when(bookingRepo.findById("bk-bad-1")).thenReturn(Optional.of(refundedBk));
+        when(bookingRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(bookingRepo.findByStatusIn(any())).thenReturn(List.of());
+
+        HostPayoutService payoutService = new HostPayoutService(bookingRepo, payoutRepo, propRepo);
+        List<co.palaciodelmar.backend.dto.HostPayoutDTO> result = payoutService.processAutomatedPayouts();
+
+        assertTrue(result.isEmpty());
+        assertNull(refundedBk.getPayoutId());
+        verify(payoutRepo).delete(stuck);
+    }
+
+    @Test
+    @DisplayName("20. executeSequentialRefund usa claves de idempotencia estables por payment.id al reintentar")
+    void sequentialRefundUsesStablePerPaymentIdempotencyKeysAcrossRetries() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService bookingService = buildBookingService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(SuiteNightRepository.class),
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-key-stable-1")
+                .status("cancelled")
+                .paymentStatus("paid")
+                .paidAmount(new BigDecimal("200000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment p1 = Payment.builder()
+                .id("pay-id-A").booking("bk-key-stable-1").transactionId("tx-A")
+                .amount(new BigDecimal("100000")).refundedAmount(BigDecimal.ZERO)
+                .status("completed").createdAt(Instant.now().minusSeconds(60)).build();
+        Payment p2 = Payment.builder()
+                .id("pay-id-B").booking("bk-key-stable-1").transactionId("tx-B")
+                .amount(new BigDecimal("100000")).refundedAmount(BigDecimal.ZERO)
+                .status("completed").createdAt(Instant.now()).build();
+
+        when(paymentRepository.findByBooking("bk-key-stable-1"))
+                .thenReturn(List.of(p1, p2));
+        when(paymentGateway.refund(eq("tx-A"), eq(new BigDecimal("100000")), eq("ref_stable_pay-id-A")))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "r-A", "succeeded", null));
+        when(paymentGateway.refund(eq("tx-B"), eq(new BigDecimal("50000")), eq("ref_stable_pay-id-B")))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(false, null, "failed", "Timeout"))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "r-B", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertFalse(bookingService.executeSequentialRefund(booking, new BigDecimal("150000"), "ref_stable"));
+        p1.setStatus("refunded");
+        p1.setRefundedAmount(new BigDecimal("100000"));
+        assertTrue(bookingService.executeSequentialRefund(booking, new BigDecimal("50000"), "ref_stable"));
+        verify(paymentGateway, times(2)).refund(eq("tx-B"), eq(new BigDecimal("50000")), eq("ref_stable_pay-id-B"));
+    }
+
+    @Test
+    @DisplayName("21. AuthService.updateProfile usa actualización parcial atómica sin sobrescribir password ni tokens")
+    void updateProfileUsesAtomicPartialUpdate() {
+        co.palaciodelmar.backend.repository.UserRepository userRepo = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+        co.palaciodelmar.backend.model.User existing = co.palaciodelmar.backend.model.User.builder()
+                .id("usr-1")
+                .email("u@ejemplo.com")
+                .name("Viejo")
+                .password("old_hash")
+                .resetPasswordTokenHash("old_tok")
+                .build();
+        co.palaciodelmar.backend.model.User updatedFromDb = co.palaciodelmar.backend.model.User.builder()
+                .id("usr-1")
+                .email("u@ejemplo.com")
+                .name("Nuevo")
+                .password("new_hash_from_reset")
+                .build();
+
+        when(userRepo.findById("usr-1")).thenReturn(Optional.of(existing));
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(co.palaciodelmar.backend.model.User.class)))
+                .thenReturn(updatedFromDb);
+
+        AuthService authService = new AuthService(
+                userRepo,
+                mock(org.springframework.security.crypto.password.PasswordEncoder.class),
+                mock(co.palaciodelmar.backend.security.JwtService.class),
+                mock(org.springframework.security.authentication.AuthenticationManager.class),
+                mock(EmailService.class),
+                mongoTemplate
+        );
+
+        co.palaciodelmar.backend.model.User req = co.palaciodelmar.backend.model.User.builder().name("Nuevo").build();
+        var dto = authService.updateProfile("usr-1", req);
+
+        assertEquals("Nuevo", dto.getName());
+        verify(mongoTemplate, times(1)).findAndModify(any(), any(), any(), eq(co.palaciodelmar.backend.model.User.class));
+        verify(userRepo, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("22. BookingExpiryScheduler expira reservas pending con pago parcial y ejecuta reembolso")
+    void expirySchedulerExpiresAndRefundsPartialPaymentBooking() {
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        SuiteNightRepository nightRepo = mock(SuiteNightRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+
+        Booking partialExpired = Booking.builder()
+                .id("bk-part-exp-1")
+                .status("pending")
+                .paymentStatus("partial")
+                .paidAmount(new BigDecimal("150000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("350000"))
+                .expiresAt(Instant.now().minusSeconds(60))
+                .build();
+
+        when(bookingRepo.findByStatusAndExpiresAtBefore(eq("pending"), any())).thenReturn(List.of(partialExpired));
+        when(bookingRepo.findById("bk-part-exp-1")).thenReturn(Optional.of(partialExpired));
+        when(nightRepo.findByBooking("bk-part-exp-1")).thenReturn(List.of());
+        when(bookingRepo.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(bookingService.executeSequentialRefund(eq(partialExpired), eq(new BigDecimal("150000")), eq("ref_exp_bk-part-exp-1")))
+                .thenReturn(false);
+
+        co.palaciodelmar.backend.scheduler.BookingExpiryScheduler scheduler =
+                new co.palaciodelmar.backend.scheduler.BookingExpiryScheduler(bookingRepo, nightRepo, bookingService);
+        scheduler.cleanupExpiredBookings();
+
+        verify(bookingService).changeBookingStatus(eq(partialExpired), eq(BookingStatus.EXPIRED), anyString(), anyString());
+        verify(bookingService).executeSequentialRefund(eq(partialExpired), eq(new BigDecimal("150000")), eq("ref_exp_bk-part-exp-1"));
+        assertEquals("requires_refund", partialExpired.getPaymentStatus());
+        assertEquals(0, new BigDecimal("150000").compareTo(partialExpired.getPendingRefundAmount()));
+    }
+
+    @Test
+    @DisplayName("23. HostController.regeneratePin rechaza reservas canceladas o terminadas")
+    void regeneratePinRejectsCancelledOrCheckedOutBookings() {
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        PropertyRepository propRepo = mock(PropertyRepository.class);
+
+        co.palaciodelmar.backend.model.User host = co.palaciodelmar.backend.model.User.builder()
+                .id("host-1").role("host").email("h@ejemplo.com").build();
+        co.palaciodelmar.backend.security.UserPrincipal principal =
+                new co.palaciodelmar.backend.security.UserPrincipal(host);
+
+        Property prop = Property.builder().id("prop-1").ownerId("host-1").build();
+        Booking cancelled = Booking.builder().id("bk-c1").propertyId("prop-1").status("cancelled").build();
+        Booking checkedOut = Booking.builder().id("bk-co1").propertyId("prop-1").status("checked_out").build();
+
+        when(propRepo.findById("prop-1")).thenReturn(Optional.of(prop));
+        when(bookingRepo.findById("bk-c1")).thenReturn(Optional.of(cancelled));
+        when(bookingRepo.findById("bk-co1")).thenReturn(Optional.of(checkedOut));
+
+        co.palaciodelmar.backend.controller.HostController controller =
+                new co.palaciodelmar.backend.controller.HostController(
+                        bookingRepo,
+                        mock(SuiteRepository.class),
+                        mock(BookingService.class),
+                        mock(co.palaciodelmar.backend.repository.PromotionRepository.class),
+                        propRepo
+                );
+
+        var res1 = controller.regeneratePin(principal, "bk-c1");
+        var res2 = controller.regeneratePin(principal, "bk-co1");
+
+        assertEquals(400, res1.getStatusCode().value());
+        assertEquals(400, res2.getStatusCode().value());
+        verify(bookingRepo, never()).save(any());
     }
 }

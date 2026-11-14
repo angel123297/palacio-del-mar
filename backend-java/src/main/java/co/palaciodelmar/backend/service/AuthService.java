@@ -230,8 +230,18 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        if (updateRequest.getName() != null) user.setName(updateRequest.getName());
-        if (updateRequest.getLastName() != null) user.setLastName(updateRequest.getLastName());
+        org.springframework.data.mongodb.core.query.Update update = new org.springframework.data.mongodb.core.query.Update();
+        Instant now = Instant.now();
+        update.set("updatedAt", now);
+
+        if (updateRequest.getName() != null) {
+            user.setName(updateRequest.getName());
+            update.set("name", updateRequest.getName());
+        }
+        if (updateRequest.getLastName() != null) {
+            user.setLastName(updateRequest.getLastName());
+            update.set("lastName", updateRequest.getLastName());
+        }
         if (updateRequest.getProfile() != null) {
             if (user.getProfile() == null) user.setProfile(new User.Profile());
             if (updateRequest.getProfile().getPhone() != null) {
@@ -242,14 +252,40 @@ public class AuthService {
                     }
                 }
                 user.getProfile().setPhone(newPhone);
+                update.set("profile.phone", newPhone);
             }
-            if (updateRequest.getProfile().getDocumentId() != null) user.getProfile().setDocumentId(updateRequest.getProfile().getDocumentId());
-            if (updateRequest.getProfile().getDocumentType() != null) user.getProfile().setDocumentType(updateRequest.getProfile().getDocumentType());
-            if (updateRequest.getProfile().getAvatar() != null) user.getProfile().setAvatar(updateRequest.getProfile().getAvatar());
-            if (updateRequest.getProfile().getAddress() != null) user.getProfile().setAddress(updateRequest.getProfile().getAddress());
+            if (updateRequest.getProfile().getDocumentId() != null) {
+                user.getProfile().setDocumentId(updateRequest.getProfile().getDocumentId());
+                update.set("profile.documentId", updateRequest.getProfile().getDocumentId());
+            }
+            if (updateRequest.getProfile().getDocumentType() != null) {
+                user.getProfile().setDocumentType(updateRequest.getProfile().getDocumentType());
+                update.set("profile.documentType", updateRequest.getProfile().getDocumentType());
+            }
+            if (updateRequest.getProfile().getAvatar() != null) {
+                user.getProfile().setAvatar(updateRequest.getProfile().getAvatar());
+                update.set("profile.avatar", updateRequest.getProfile().getAvatar());
+            }
+            if (updateRequest.getProfile().getAddress() != null) {
+                user.getProfile().setAddress(updateRequest.getProfile().getAddress());
+                update.set("profile.address", updateRequest.getProfile().getAddress());
+            }
         }
-        user.setUpdatedAt(Instant.now());
-        User saved = userRepository.save(user);
+        user.setUpdatedAt(now);
+        User saved;
+        if (mongoTemplate != null) {
+            // Actualización parcial atómica para no sobrescribir password/tokens modificados concurrentemente por resetPassword
+            User updated = mongoTemplate.findAndModify(
+                    new org.springframework.data.mongodb.core.query.Query(
+                            org.springframework.data.mongodb.core.query.Criteria.where("id").is(userId)),
+                    update,
+                    org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true),
+                    User.class
+            );
+            saved = updated != null ? updated : user;
+        } else {
+            saved = userRepository.save(user);
+        }
         if (userSessionCacheService != null) {
             userSessionCacheService.putCachedUser(saved);
         }

@@ -458,6 +458,11 @@ public class HostController {
         if (!hasAccessToBooking(user, booking)) {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
+        String status = booking.getStatus() != null ? booking.getStatus().toLowerCase() : "";
+        if (!"confirmed".equals(status) && !"checked_in".equals(status)) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(
+                    "Solo se puede regenerar el PIN en reservas confirmadas o en check-in (estado actual: " + booking.getStatus() + ")"));
+        }
 
         String newPin = String.format("%06d", SECURE_RANDOM.nextInt(100000, 1000000));
         booking.setSmartLockPin(newPin);

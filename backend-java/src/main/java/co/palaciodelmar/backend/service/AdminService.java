@@ -365,6 +365,9 @@ public class AdminService {
                         newRefunded = paid;
                     }
                     b.setRefundedAmount(newRefunded);
+                    if (pendingKey != null && pendingKey.startsWith("ref_dep_") && pendingAmt.compareTo(BigDecimal.ZERO) > 0) {
+                        b.setGuaranteeRefunded(true);
+                    }
                     b.setPaymentStatus(resolveBookingPaymentStatusAfterRefund(b, paid, newRefunded));
                     b.setPendingRefundAmount(BigDecimal.ZERO);
                     b.setPendingRefundIdempotencyKey(null);
@@ -541,7 +544,7 @@ public class AdminService {
             return safeRefunded.compareTo(safePaid) >= 0 ? "refunded" : (safeRefunded.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "paid");
         }
         BigDecimal netPaid = safePaid.subtract(safeRefunded).max(BigDecimal.ZERO);
-        BigDecimal total = b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO;
+        BigDecimal total = b.getTotalPrice() != null ? b.resolveEffectiveTotalPrice() : BigDecimal.ZERO;
         b.setBalanceDue(total.subtract(netPaid).max(BigDecimal.ZERO));
         if (total.compareTo(BigDecimal.ZERO) > 0 && netPaid.compareTo(total) >= 0) {
             return "paid";
