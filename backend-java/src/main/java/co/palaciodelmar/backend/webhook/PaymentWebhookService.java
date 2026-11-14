@@ -342,8 +342,16 @@ public class PaymentWebhookService {
 
                 BigDecimal refundedAmt = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
                 if (isPartialRefundAlreadyRecorded) {
-                    refundedAmt = refundedAmt.add(payment.getRefundedAmount()).min(newPaid);
-                    booking.setRefundedAmount(refundedAmt);
+                    java.util.List<String> bookingRefIds = booking.getProcessedRefundIds() != null
+                            ? booking.getProcessedRefundIds()
+                            : java.util.Collections.emptyList();
+                    boolean refundAlreadyCountedOnBooking = payment.getProcessedRefundIds() != null
+                            && payment.getProcessedRefundIds().stream()
+                                    .anyMatch(rid -> rid != null && bookingRefIds.contains(rid));
+                    if (!refundAlreadyCountedOnBooking) {
+                        refundedAmt = refundedAmt.add(payment.getRefundedAmount()).min(newPaid);
+                        booking.setRefundedAmount(refundedAmt);
+                    }
                     if (payment.getProcessedRefundIds() != null && !payment.getProcessedRefundIds().isEmpty()) {
                         if (booking.getProcessedRefundIds() == null) {
                             booking.setProcessedRefundIds(new java.util.ArrayList<>());

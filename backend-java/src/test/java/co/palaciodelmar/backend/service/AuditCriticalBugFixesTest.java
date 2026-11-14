@@ -1700,4 +1700,67 @@ class AuditCriticalBugFixesTest {
         assertEquals(true, replayRes.get("idempotent"));
         verify(paymentRepository, never()).findByIntentId("pi_rep_2");
     }
+
+    @Test
+    @DisplayName("37. Reserva legada sin processedPaymentIds no duplica reembolso parcial al llegar payment.succeeded")
+    void partialRefundAlreadyAppliedOnLegacyBookingNotDoubleCountedOnPaymentSucceeded() {
+        String secret = "whsec_legacy_partial_ref_secret_123456789012345";
+        co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository processedRepo =
+                mock(co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        EmailService emailService = mock(EmailService.class);
+
+        co.palaciodelmar.backend.webhook.PaymentWebhookService webhookService =
+                new co.palaciodelmar.backend.webhook.PaymentWebhookService(
+                        paymentRepository,
+                        bookingRepository,
+                        bookingService,
+                        processedRepo,
+                        emailService,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        null
+                );
+        org.springframework.test.util.ReflectionTestUtils.setField(webhookService, "webhookSecret", secret);
+
+        // Reserva legada sin processedPaymentIds, pero ya tiene el reembolso parcial de $100.000 contabilizado
+        Booking booking = Booking.builder()
+                .id("bk-leg-pr-1")
+                .status("confirmed")
+                .paymentStatus("partial")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .refundedAmount(new BigDecimal("100000"))
+                .balanceDue(new BigDecimal("300000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .processedRefundIds(new java.util.ArrayList<>(List.of("re_legacy_1")))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-leg-pr-1")
+                .booking("bk-leg-pr-1")
+                .intentId("pi_leg_pr_1")
+                .amount(new BigDecimal("300000"))
+                .refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("re_legacy_1")))
+                .status("partially_refunded")
+                .build();
+
+        when(processedRepo.existsByEventId(anyString())).thenReturn(false);
+        when(processedRepo.existsByPayloadHash(anyString())).thenReturn(false);
+        when(processedRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByIntentId("pi_leg_pr_1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-leg-pr-1")).thenReturn(Optional.of(booking));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+        String succeededBody = "{\"eventType\":\"payment.succeeded\",\"data\":{\"intentId\":\"pi_leg_pr_1\",\"transactionId\":\"tx_leg_pr_1\",\"amount\":300000}}";
+        webhookService.processWebhook(succeededBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(succeededBody, secret), "evt_leg_pr_ok", ts);
+
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getBalanceDue()));
+        assertEquals("partially_refunded", payment.getStatus());
+    }
 }

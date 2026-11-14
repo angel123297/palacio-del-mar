@@ -116,9 +116,11 @@ class CancellationPolicyBoundaryTest {
     }
 
     @Test
-    @DisplayName("Frontera exacta: cancelar 2 días antes ya cae en el tramo del 10% (no 100%)")
+    @DisplayName("Frontera exacta: cancelar 2 días antes (o 3 si ya pasaron las 15:00) cae en el tramo del 10% (no 100%)")
     void testCancelAtExactlyTwoDaysFallsInto10PercentBracket() {
-        LocalDate checkIn = LocalDate.now(BOGOTA).plus(2, ChronoUnit.DAYS);
+        LocalDate checkIn = java.time.LocalTime.now(BOGOTA).isBefore(java.time.LocalTime.of(15, 0))
+                ? LocalDate.now(BOGOTA).plus(2, ChronoUnit.DAYS)
+                : LocalDate.now(BOGOTA).plus(3, ChronoUnit.DAYS);
         when(bookingRepository.findById("b1")).thenReturn(Optional.of(paidBooking(checkIn)));
 
         bookingService.cancelBooking("b1", "u1", "cambio de planes");
