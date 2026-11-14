@@ -288,7 +288,7 @@ public class PaymentService {
 
         BigDecimal refundedAmt = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
         BigDecimal netPaid = booking.getPaidAmount().subtract(refundedAmt).max(BigDecimal.ZERO);
-        BigDecimal balance = booking.getTotalPrice().subtract(netPaid);
+        BigDecimal balance = booking.resolveEffectiveTotalPrice().subtract(netPaid);
         booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {

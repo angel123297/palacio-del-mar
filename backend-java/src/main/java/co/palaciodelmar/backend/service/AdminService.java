@@ -444,6 +444,7 @@ public class AdminService {
                     throw new IllegalStateException("No se puede procesar reembolso en pasarela sin ID de transacción. Usa 'mark_refunded' para conciliar manualmente.");
                 }
             }
+            String gatewayRefundId = null;
             if (paymentGateway != null && payment.getTransactionId() != null && !payment.getTransactionId().isBlank() && targetDelta.compareTo(BigDecimal.ZERO) > 0) {
                 co.palaciodelmar.backend.service.PaymentGateway.PaymentRefundResponse res =
                         paymentGateway.refund(payment.getTransactionId(), targetDelta);
@@ -457,6 +458,7 @@ public class AdminService {
                 if (res.refundId() != null && !payment.getProcessedRefundIds().contains(res.refundId())) {
                     payment.getProcessedRefundIds().add(res.refundId());
                 }
+                gatewayRefundId = res.refundId();
                 refundDetails = " (id=" + res.refundId() + ")";
             }
             BigDecimal newPaymentRefunded = currentRefunded.add(targetDelta);
@@ -466,6 +468,14 @@ public class AdminService {
                     "Reembolso procesado por ADMIN" + refundDetails + ": " + (notes != null && !notes.isBlank() ? notes : "Aprobado manualmente"));
 
             if (linkedBooking != null) {
+                if (gatewayRefundId != null && !gatewayRefundId.isBlank()) {
+                    if (linkedBooking.getProcessedRefundIds() == null) {
+                        linkedBooking.setProcessedRefundIds(new java.util.ArrayList<>());
+                    }
+                    if (!linkedBooking.getProcessedRefundIds().contains(gatewayRefundId)) {
+                        linkedBooking.getProcessedRefundIds().add(gatewayRefundId);
+                    }
+                }
                 BigDecimal paid = linkedBooking.getPaidAmount() != null ? linkedBooking.getPaidAmount() : BigDecimal.ZERO;
                 BigDecimal prevBookRefunded = linkedBooking.getRefundedAmount() != null ? linkedBooking.getRefundedAmount() : BigDecimal.ZERO;
                 BigDecimal newBookRefunded = prevBookRefunded.add(targetDelta);
@@ -505,6 +515,11 @@ public class AdminService {
         BigDecimal remainingPending = prevPending.subtract(delta).max(BigDecimal.ZERO);
         booking.setPendingRefundAmount(remainingPending);
         if (remainingPending.compareTo(BigDecimal.ZERO) == 0) {
+            if (booking.getPendingRefundIdempotencyKey() != null
+                    && booking.getPendingRefundIdempotencyKey().startsWith("ref_dep_")
+                    && delta.compareTo(BigDecimal.ZERO) > 0) {
+                booking.setGuaranteeRefunded(true);
+            }
             booking.setPendingRefundIdempotencyKey(null);
         }
         boolean otherPendingPayments = booking.getId() != null && paymentRepository.findByBooking(booking.getId()).stream()

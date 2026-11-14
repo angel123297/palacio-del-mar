@@ -1192,9 +1192,10 @@ public class BookingService {
                 try {
                     PaymentGateway.PaymentRefundResponse resp = paymentGateway.refund(payment.getTransactionId(), chunk, chunkKey);
                     if (resp != null && resp.success()) {
-                        applyConfirmedRefundToBooking(booking, chunk, resp.refundId());
+                        BigDecimal nextRemaining = remainingToRefund.subtract(chunk).max(BigDecimal.ZERO);
+                        applyConfirmedRefundToBooking(booking, chunk, resp.refundId(), nextRemaining, baseIdempotencyKey);
                         recordConfirmedRefundOnSpecificPayment(payment, chunk, resp.refundId());
-                        remainingToRefund = remainingToRefund.subtract(chunk);
+                        remainingToRefund = nextRemaining;
                     } else {
                         allSucceeded = false;
                         break;
@@ -1303,6 +1304,8 @@ public class BookingService {
                 BigDecimal compensated = deposit.min(debt);
 
                 if (compensated.signum() > 0) {
+                    BigDecimal prevCompensated = booking.getGuaranteeCompensated() != null ? booking.getGuaranteeCompensated() : BigDecimal.ZERO;
+                    booking.setGuaranteeCompensated(prevCompensated.add(compensated));
                     booking.setBalanceDue(debt.subtract(compensated));
                     deposit = deposit.subtract(compensated);
                     booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía retenido/compensado: $" + compensated);
@@ -1316,11 +1319,14 @@ public class BookingService {
                 BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
                 BigDecimal refundableExcess = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
 
+                boolean excessRefunded = true;
                 if (refundableExcess.signum() > 0 && paymentGateway != null) {
                     String depKey = "ref_dep_" + booking.getId();
-                    executeSequentialRefund(booking, refundableExcess, depKey);
+                    excessRefunded = executeSequentialRefund(booking, refundableExcess, depKey);
                 }
-                booking.setGuaranteeRefunded(true);
+                if (excessRefunded) {
+                    booking.setGuaranteeRefunded(true);
+                }
             }
 
             changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT, performedBy, reason);
@@ -1340,15 +1346,26 @@ public class BookingService {
     }
 
     private boolean applyConfirmedRefundToBooking(Booking booking, BigDecimal refundAmount, String refundId) {
+        return applyConfirmedRefundToBooking(booking, refundAmount, refundId, BigDecimal.ZERO, null);
+    }
+
+    private boolean applyConfirmedRefundToBooking(
+            Booking booking,
+            BigDecimal refundAmount,
+            String refundId,
+            BigDecimal remainingPendingAfter,
+            String pendingKey) {
         if (booking == null || refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return false;
         }
+        BigDecimal safePending = remainingPendingAfter != null ? remainingPendingAfter.max(BigDecimal.ZERO) : BigDecimal.ZERO;
+        String nextPendingKey = safePending.compareTo(BigDecimal.ZERO) > 0 ? pendingKey : null;
         if (booking.getProcessedRefundIds() == null) {
             booking.setProcessedRefundIds(new java.util.ArrayList<>());
         }
         if (refundId != null && booking.getProcessedRefundIds().contains(refundId)) {
-            booking.setPendingRefundAmount(BigDecimal.ZERO);
-            booking.setPendingRefundIdempotencyKey(null);
+            booking.setPendingRefundAmount(safePending);
+            booking.setPendingRefundIdempotencyKey(nextPendingKey);
             return false;
         }
         BigDecimal currentRef = booking.getRefundedAmount() != null ? booking.getRefundedAmount().max(BigDecimal.ZERO) : BigDecimal.ZERO;
@@ -1357,8 +1374,10 @@ public class BookingService {
         if (paidCap.compareTo(BigDecimal.ZERO) > 0 && nextRef.compareTo(paidCap) > 0) {
             nextRef = paidCap;
         }
-        boolean isDepositRefund = (booking.getPendingRefundIdempotencyKey() != null
-                && booking.getPendingRefundIdempotencyKey().startsWith("ref_dep_"));
+        String activeDepKey = pendingKey != null ? pendingKey : booking.getPendingRefundIdempotencyKey();
+        boolean isDepositRefund = safePending.compareTo(BigDecimal.ZERO) == 0
+                && activeDepKey != null
+                && activeDepKey.startsWith("ref_dep_");
         if (isDepositRefund) {
             booking.setGuaranteeRefunded(true);
         }
@@ -1370,9 +1389,12 @@ public class BookingService {
             org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
                     .set("refundedAmount", nextRef)
                     .addToSet("processedRefundIds", refundId)
-                    .set("pendingRefundAmount", BigDecimal.ZERO)
-                    .set("pendingRefundIdempotencyKey", null)
+                    .set("pendingRefundAmount", safePending)
+                    .set("pendingRefundIdempotencyKey", nextPendingKey)
                     .set("updatedAt", Instant.now());
+            if (safePending.compareTo(BigDecimal.ZERO) > 0) {
+                u.set("paymentStatus", "requires_refund");
+            }
             if (isDepositRefund) {
                 u.set("guaranteeRefunded", true);
             }
@@ -1385,8 +1407,8 @@ public class BookingService {
                 Booking fresh = bookingRepository.findById(booking.getId()).orElse(booking);
                 booking.setRefundedAmount(fresh.getRefundedAmount());
                 booking.setProcessedRefundIds(fresh.getProcessedRefundIds());
-                booking.setPendingRefundAmount(BigDecimal.ZERO);
-                booking.setPendingRefundIdempotencyKey(null);
+                booking.setPendingRefundAmount(safePending);
+                booking.setPendingRefundIdempotencyKey(nextPendingKey);
                 if (isDepositRefund) {
                     booking.setGuaranteeRefunded(true);
                 }
@@ -1401,8 +1423,11 @@ public class BookingService {
         if (refundId != null) {
             booking.getProcessedRefundIds().add(refundId);
         }
-        booking.setPendingRefundAmount(BigDecimal.ZERO);
-        booking.setPendingRefundIdempotencyKey(null);
+        booking.setPendingRefundAmount(safePending);
+        booking.setPendingRefundIdempotencyKey(nextPendingKey);
+        if (safePending.compareTo(BigDecimal.ZERO) > 0) {
+            booking.setPaymentStatus("requires_refund");
+        }
         if (isDepositRefund) {
             booking.setGuaranteeRefunded(true);
         }

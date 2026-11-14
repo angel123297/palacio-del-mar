@@ -12,5 +12,6 @@ public interface HostPayoutRepository extends MongoRepository<HostPayout, String
     List<HostPayout> findByOwnerIdOrderByCreatedAtDesc(String ownerId);
     List<HostPayout> findByPropertyIdOrderByCreatedAtDesc(String propertyId);
     List<HostPayout> findAllByOrderByCreatedAtDesc();
+    List<HostPayout> findByStatus(String status);
     Optional<HostPayout> findFirstByBookingIdsContaining(String bookingId);
 }

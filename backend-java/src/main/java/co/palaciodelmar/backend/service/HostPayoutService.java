@@ -70,6 +70,9 @@ public class HostPayoutService {
 
     private synchronized List<HostPayoutDTO> doProcessAutomatedPayouts() {
         LocalDate today = LocalDate.now(BOGOTA);
+        List<HostPayoutDTO> generated = new ArrayList<>();
+        recoverPendingPayouts(generated, today);
+
         List<String> eligibleStatuses = List.of("checked_out", "completed");
 
         List<Booking> candidates = bookingRepository.findByStatusIn(eligibleStatuses).stream()
@@ -86,7 +89,7 @@ public class HostPayoutService {
 
         if (candidates.isEmpty()) {
             log.info("No hay reservas pendientes de liquidación a anfitriones al {}", today);
-            return List.of();
+            return generated;
         }
 
         // Agrupar por propiedad
@@ -98,7 +101,6 @@ public class HostPayoutService {
             }
         }
 
-        List<HostPayoutDTO> generated = new ArrayList<>();
         String datePrefix = today.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
         for (Map.Entry<String, List<Booking>> entry : byProperty.entrySet()) {
@@ -197,6 +199,56 @@ public class HostPayoutService {
         }
 
         return generated;
+    }
+
+    /**
+     * Reconcilia liquidaciones que quedaron en estado PENDING tras una caída o fallo intermedio.
+     */
+    private void recoverPendingPayouts(List<HostPayoutDTO> generated, LocalDate today) {
+        List<HostPayout> pendingPayouts = hostPayoutRepository.findByStatus("PENDING");
+        if (pendingPayouts == null || pendingPayouts.isEmpty()) {
+            return;
+        }
+        for (HostPayout pending : pendingPayouts) {
+            if (pending == null || pending.getId() == null) continue;
+            List<String> ids = pending.getBookingIds() != null ? pending.getBookingIds() : List.of();
+            List<Booking> settledBookings = new ArrayList<>();
+            for (String bId : ids) {
+                if (bId == null) continue;
+                Booking b = bookingRepository.findById(bId).orElse(null);
+                if (b == null) continue;
+                if (pending.getId().equals(b.getPayoutId())) {
+                    settledBookings.add(b);
+                } else if (b.getPayoutId() == null) {
+                    try {
+                        b.setPayoutId(pending.getId());
+                        b.setUpdatedAt(Instant.now());
+                        bookingRepository.save(b);
+                        settledBookings.add(b);
+                    } catch (Exception ex) {
+                        b.setPayoutId(null);
+                        log.error("Fallo al sellar reserva {} en recuperación de liquidación {}: {}",
+                                b.getId(), pending.getPayoutCode(), ex.getMessage());
+                    }
+                }
+            }
+            if (settledBookings.isEmpty()) {
+                hostPayoutRepository.delete(pending);
+                log.warn("Liquidación PENDING {} eliminada en recuperación por no tener reservas selladas.", pending.getPayoutCode());
+                continue;
+            }
+            recomputePayoutTotals(pending, settledBookings, today);
+            pending.setStatus("PROCESSED");
+            pending.setProcessedAt(Instant.now());
+            HostPayout recovered = hostPayoutRepository.save(pending);
+            HostPayoutDTO dto = toDTO(recovered);
+            generated.add(dto);
+            log.info("Liquidación PENDING {} recuperada y finalizada como PROCESSED ({} reservas).",
+                    recovered.getPayoutCode(), settledBookings.size());
+            if (webhookDispatcher != null && recovered.getPropertyId() != null) {
+                webhookDispatcher.dispatchToProperty(recovered.getPropertyId(), "payout.processed", dto);
+            }
+        }
     }
 
     private void recomputePayoutTotals(HostPayout target, List<Booking> bookings, LocalDate fallbackDate) {

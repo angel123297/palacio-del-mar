@@ -552,4 +552,247 @@ class AuditCriticalBugFixesTest {
         assertTrue(result.stream().allMatch(dto -> "Suite Imperial N1".equals(dto.getSuiteName())));
         verify(suiteRepository, times(1)).findById("suite-n1");
     }
+
+    @Test
+    @DisplayName("13. AdminService registra refundId en booking.processedRefundIds para evitar doble conteo con webhook")
+    void adminRefundRegistersRefundIdOnBooking() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        Booking booking = Booking.builder()
+                .id("bk-adm-ref-1")
+                .status("cancelled")
+                .paymentStatus("requires_refund")
+                .paidAmount(new BigDecimal("200000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .pendingRefundAmount(new BigDecimal("200000"))
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-adm-1")
+                .booking("bk-adm-ref-1")
+                .transactionId("tx-adm-1")
+                .amount(new BigDecimal("200000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("requires_refund")
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        when(paymentRepository.findById("pay-adm-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-adm-ref-1")).thenReturn(Optional.of(booking));
+        when(paymentRepository.findByBooking("bk-adm-ref-1")).thenReturn(List.of(payment));
+        when(paymentGateway.refund("tx-adm-1", new BigDecimal("200000")))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "ref_gw_123", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        AdminService adminService = new AdminService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(co.palaciodelmar.backend.repository.UserRepository.class),
+                mock(co.palaciodelmar.backend.repository.PromotionRepository.class),
+                mock(SuiteNightRepository.class),
+                mock(BookingService.class),
+                mock(PropertyRepository.class),
+                paymentRepository,
+                paymentGateway
+        );
+
+        adminService.resolveRefund("pay-adm-1", "refund", "OK");
+
+        assertTrue(payment.getProcessedRefundIds().contains("ref_gw_123"));
+        assertTrue(booking.getProcessedRefundIds().contains("ref_gw_123"));
+        assertEquals(0, new BigDecimal("200000").compareTo(booking.getRefundedAmount()));
+    }
+
+    @Test
+    @DisplayName("14. Pago posterior al checkout no vuelve a exigir la garantía compensada")
+    void postCheckoutPaymentDoesNotReDemandCompensatedGuarantee() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService bookingService = buildBookingService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(SuiteNightRepository.class),
+                mock(PaymentRepository.class),
+                null
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-comp-1")
+                .status("checked_in")
+                .paymentStatus("partial")
+                .checkIn(LocalDate.now(BOGOTA).minusDays(2))
+                .checkOut(LocalDate.now(BOGOTA).plusDays(1))
+                .totalPrice(new BigDecimal("750000"))
+                .paidAmount(new BigDecimal("600000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("150000"))
+                .guaranteeDeposit(new BigDecimal("100000"))
+                .guaranteeRefunded(false)
+                .guaranteeCompensated(BigDecimal.ZERO)
+                .build();
+
+        when(bookingRepository.findById("bk-comp-1")).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        bookingService.processCheckOut("bk-comp-1", "host-1", "Check-out normal", false);
+
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getGuaranteeCompensated()));
+        assertEquals(0, new BigDecimal("50000").compareTo(booking.getBalanceDue()));
+        assertTrue(booking.getGuaranteeRefunded());
+
+        // Simular pago posterior de los $50.000 restantes
+        BigDecimal newNetPaid = booking.getPaidAmount().add(new BigDecimal("50000"));
+        BigDecimal balanceAfter = booking.resolveEffectiveTotalPrice().subtract(newNetPaid).max(BigDecimal.ZERO);
+        assertEquals(0, BigDecimal.ZERO.compareTo(balanceAfter));
+    }
+
+    @Test
+    @DisplayName("15. Garantía no se marca como devuelta si la pasarela falla al reembolsar el excedente")
+    void guaranteeNotMarkedRefundedWhenGatewayFails() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService bookingService = buildBookingService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(SuiteNightRepository.class),
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-dep-fail-1")
+                .status("checked_in")
+                .paymentStatus("paid")
+                .checkIn(LocalDate.now(BOGOTA).minusDays(2))
+                .checkOut(LocalDate.now(BOGOTA).plusDays(1))
+                .totalPrice(new BigDecimal("600000"))
+                .paidAmount(new BigDecimal("600000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(BigDecimal.ZERO)
+                .guaranteeDeposit(new BigDecimal("100000"))
+                .guaranteeRefunded(false)
+                .build();
+
+        Payment pay = Payment.builder()
+                .id("pay-dep-1")
+                .booking("bk-dep-fail-1")
+                .transactionId("tx-dep-1")
+                .amount(new BigDecimal("600000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .status("completed")
+                .build();
+
+        when(bookingRepository.findById("bk-dep-fail-1")).thenReturn(Optional.of(booking));
+        when(paymentRepository.findByBooking("bk-dep-fail-1")).thenReturn(List.of(pay));
+        when(paymentGateway.refund(eq("tx-dep-1"), eq(new BigDecimal("100000")), anyString()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(false, null, "failed", "Gateway down"));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        bookingService.processCheckOut("bk-dep-fail-1", "host-1", "Check-out", false);
+
+        assertFalse(Boolean.TRUE.equals(booking.getGuaranteeRefunded()));
+        assertEquals("requires_refund", booking.getPaymentStatus());
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getPendingRefundAmount()));
+    }
+
+    @Test
+    @DisplayName("16. executeSequentialRefund preserva pendingRefundAmount tras el primer pago si el segundo falla")
+    void sequentialRefundPreservesRemainingPendingAfterPartialSuccess() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService bookingService = buildBookingService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(SuiteNightRepository.class),
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-seq-1")
+                .status("cancelled")
+                .paymentStatus("paid")
+                .paidAmount(new BigDecimal("200000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment p1 = Payment.builder()
+                .id("p1").booking("bk-seq-1").transactionId("tx-1")
+                .amount(new BigDecimal("100000")).refundedAmount(BigDecimal.ZERO)
+                .status("completed").createdAt(Instant.now().minusSeconds(60)).build();
+        Payment p2 = Payment.builder()
+                .id("p2").booking("bk-seq-1").transactionId("tx-2")
+                .amount(new BigDecimal("100000")).refundedAmount(BigDecimal.ZERO)
+                .status("completed").createdAt(Instant.now()).build();
+
+        when(paymentRepository.findByBooking("bk-seq-1")).thenReturn(List.of(p1, p2));
+        when(paymentGateway.refund(eq("tx-1"), eq(new BigDecimal("100000")), anyString()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "ref-1", "succeeded", null));
+        when(paymentGateway.refund(eq("tx-2"), eq(new BigDecimal("50000")), anyString()))
+                .thenThrow(new RuntimeException("Connection reset"));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        boolean ok = bookingService.executeSequentialRefund(booking, new BigDecimal("150000"), "ref_seq_1");
+
+        assertFalse(ok);
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
+        assertEquals(0, new BigDecimal("50000").compareTo(booking.getPendingRefundAmount()));
+        assertEquals("ref_seq_1", booking.getPendingRefundIdempotencyKey());
+        assertEquals("requires_refund", booking.getPaymentStatus());
+    }
+
+    @Test
+    @DisplayName("17. HostPayoutService recupera liquidaciones atascadas en estado PENDING")
+    void hostPayoutServiceRecoversPendingPayouts() {
+        co.palaciodelmar.backend.repository.HostPayoutRepository payoutRepo =
+                mock(co.palaciodelmar.backend.repository.HostPayoutRepository.class);
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        PropertyRepository propRepo = mock(PropertyRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepo =
+                mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        co.palaciodelmar.backend.model.HostPayout stuck = co.palaciodelmar.backend.model.HostPayout.builder()
+                .id("po-stuck-1")
+                .payoutCode("PO-20261114-STUCK1")
+                .propertyId("prop-1")
+                .propertyName("Palacio Centro")
+                .ownerId("host-1")
+                .status("PENDING")
+                .bookingIds(List.of("bk-p1"))
+                .build();
+
+        Booking bk = Booking.builder()
+                .id("bk-p1")
+                .propertyId("prop-1")
+                .status("checked_out")
+                .subtotal(new BigDecimal("500000"))
+                .platformFee(new BigDecimal("40000"))
+                .hostPayout(new BigDecimal("460000"))
+                .payoutId("po-stuck-1")
+                .checkIn(LocalDate.now(BOGOTA).minusDays(2))
+                .checkOut(LocalDate.now(BOGOTA))
+                .build();
+
+        when(payoutRepo.findByStatus("PENDING")).thenReturn(List.of(stuck));
+        when(bookingRepo.findById("bk-p1")).thenReturn(Optional.of(bk));
+        when(bookingRepo.findByStatusIn(any())).thenReturn(List.of());
+        when(payoutRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        HostPayoutService payoutService = new HostPayoutService(bookingRepo, payoutRepo, propRepo);
+        List<co.palaciodelmar.backend.dto.HostPayoutDTO> result = payoutService.processAutomatedPayouts();
+
+        assertEquals(1, result.size());
+        assertEquals("PROCESSED", stuck.getStatus());
+        assertNotNull(stuck.getProcessedAt());
+        assertEquals(0, new BigDecimal("460000").compareTo(stuck.getNetAmount()));
+    }
 }
