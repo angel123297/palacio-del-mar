@@ -326,8 +326,8 @@ public class UserSessionCacheService {
                         })
                         .orElse(activeMarker != null ? activeMarker.revokedBeforeEpochMs() : null); // Alert 1: Si no hay revocación en MongoDB, NUNCA escribir "0" en Redis ni cachear negativo
             } catch (Exception ex) {
-                log.error("Falla consultando MongoDB para revocación de {}: {}", normalizedEmail, ex.getMessage());
-                return activeMarker != null ? activeMarker.revokedBeforeEpochMs() : null;
+                log.error("Falla consultando MongoDB para revocación de {} (sin marca en Redis): {}. Fail-closed.", normalizedEmail, ex.getMessage());
+                return Long.MAX_VALUE;
             }
         }
         return activeMarker != null ? activeMarker.revokedBeforeEpochMs() : null;

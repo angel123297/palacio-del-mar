@@ -1292,4 +1292,148 @@ class AuditCriticalBugFixesTest {
             sseService.emitBookingUpdate(userId, co.palaciodelmar.backend.dto.BookingDTO.builder().id("bk-cleanup").build());
         }
     }
+
+    @Test
+    @DisplayName("29. Reintentar confirmPayment tras fallo guardando Payment no acredita doblemente la reserva")
+    void retryConfirmPaymentDoesNotDoubleCreditBookingWhenPaymentSavePreviouslyFailed() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService helperBookingService = mock(BookingService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        EmailService emailService = mock(EmailService.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                helperBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        // El intento 1 guardó Booking (300.000 pagados y pay-retry-1 en processedPaymentIds), pero falló al guardar Payment
+        Booking booking = Booking.builder()
+                .id("bk-retry-1")
+                .user("user-1")
+                .suite("suite-1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(new BigDecimal("300000"))
+                .balanceDue(BigDecimal.ZERO)
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-retry-1")))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-retry-1")
+                .booking("bk-retry-1")
+                .user("user-1")
+                .amount(new BigDecimal("300000"))
+                .intentId("pi_retry_1")
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_retry_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-retry-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-retry-1")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_retry_1", "tok_1"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_retry_1", "succeeded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        paymentService.confirmPayment("user-1", "pi_retry_1", "tok_1");
+
+        assertEquals(0, new BigDecimal("300000").compareTo(booking.getPaidAmount()));
+        assertEquals("completed", payment.getStatus());
+        verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    @Test
+    @DisplayName("30. Reconfirmar un intento partially_refunded retorna idempotente sin volver a acreditar saldo")
+    void reconfirmPartiallyRefundedPaymentDoesNotReCreditBooking() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService helperBookingService = mock(BookingService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        EmailService emailService = mock(EmailService.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                helperBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-part-ref-1")
+                .user("user-1")
+                .status("confirmed")
+                .paymentStatus("partial")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(new BigDecimal("300000"))
+                .refundedAmount(new BigDecimal("100000"))
+                .balanceDue(new BigDecimal("100000"))
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-pr-1")))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-pr-1")
+                .booking("bk-part-ref-1")
+                .user("user-1")
+                .amount(new BigDecimal("300000"))
+                .refundedAmount(new BigDecimal("100000"))
+                .intentId("pi_pr_1")
+                .transactionId("tx_pr_1")
+                .status("partially_refunded")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_pr_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-pr-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-part-ref-1")).thenReturn(Optional.of(booking));
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment("user-1", "pi_pr_1", "tok_1");
+
+        assertEquals("partially_refunded", result.get("status"));
+        assertEquals(0, new BigDecimal("300000").compareTo(booking.getPaidAmount()));
+        verify(paymentGateway, never()).confirmIntent(anyString(), anyString());
+        verify(bookingRepository, never()).save(any(Booking.class));
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("31. Si falta marca en Redis y falla MongoDB, UserSessionCacheService hace fail-closed incluso con caché previa")
+    @SuppressWarnings("unchecked")
+    void missingRedisMarkerPlusMongoFailureFailsClosedEvenWithCachedUser() {
+        org.springframework.data.redis.core.StringRedisTemplate redisTemplate =
+                mock(org.springframework.data.redis.core.StringRedisTemplate.class);
+        org.springframework.data.redis.core.ValueOperations<String, String> valueOps =
+                mock(org.springframework.data.redis.core.ValueOperations.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository =
+                mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(anyString())).thenReturn(null);
+        when(userRepository.findByEmail("stale@palaciodelmar.co"))
+                .thenThrow(new RuntimeException("MongoDB timeout"));
+
+        co.palaciodelmar.backend.security.UserSessionCacheService cacheService =
+                new co.palaciodelmar.backend.security.UserSessionCacheService(
+                        redisTemplate,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        userRepository
+                );
+
+        // Simular usuario antiguo presente en caché L1
+        co.palaciodelmar.backend.model.User cachedUser = co.palaciodelmar.backend.model.User.builder()
+                .id("u-stale")
+                .email("stale@palaciodelmar.co")
+                .role("GUEST")
+                .build();
+        cacheService.putCachedUser(cachedUser);
+
+        assertTrue(cacheService.isTokenRevokedForUser("stale@palaciodelmar.co", System.currentTimeMillis()));
+    }
 }
