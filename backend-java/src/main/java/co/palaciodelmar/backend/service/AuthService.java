@@ -43,6 +43,10 @@ public class AuthService {
         this.userSessionCacheService = userSessionCacheService;
     }
 
+    @lombok.Setter
+    @Autowired(required = false)
+    private BookingSseService bookingSseService;
+
     @Autowired
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                        JwtService jwtService, AuthenticationManager authenticationManager,
@@ -359,6 +363,9 @@ public class AuthService {
         if (userSessionCacheService != null) {
             userSessionCacheService.recordGlobalRevocation(user.getEmail(), changedAt);
         }
+        if (bookingSseService != null) {
+            bookingSseService.closeUserConnections(user.getId());
+        }
     }
 
     /**
@@ -380,6 +387,9 @@ public class AuthService {
         );
         if (userSessionCacheService != null) {
             userSessionCacheService.recordGlobalRevocation(user.getEmail(), now);
+        }
+        if (bookingSseService != null) {
+            bookingSseService.closeUserConnections(user.getId());
         }
         log.info("Revocación global de sesiones ejecutada en todos los dispositivos para {}", user.getEmail());
     }
@@ -459,6 +469,9 @@ public class AuthService {
 
         if (userSessionCacheService != null) {
             userSessionCacheService.recordGlobalRevocation(updatedUser.getEmail(), now);
+        }
+        if (bookingSseService != null) {
+            bookingSseService.closeUserConnections(updatedUser.getId());
         }
 
         log.info("Contraseña restablecida exitosamente de forma atómica para el usuario {}", updatedUser.getEmail());

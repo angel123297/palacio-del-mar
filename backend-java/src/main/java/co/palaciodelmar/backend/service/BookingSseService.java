@@ -109,4 +109,19 @@ public class BookingSseService {
     public int getActiveSubscribersCount() {
         return userEmitters.values().stream().mapToInt(List::size).sum();
     }
+
+    public void closeUserConnections(String userId) {
+        if (userId == null) {
+            return;
+        }
+        List<SseEmitter> removed = userEmitters.remove(userId);
+        if (removed != null) {
+            for (SseEmitter emitter : removed) {
+                try {
+                    emitter.complete();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
 }

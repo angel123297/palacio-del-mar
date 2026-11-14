@@ -345,7 +345,8 @@ public class PaymentWebhookService {
                     java.util.List<String> bookingRefIds = booking.getProcessedRefundIds() != null
                             ? booking.getProcessedRefundIds()
                             : java.util.Collections.emptyList();
-                    boolean refundAlreadyCountedOnBooking = payment.getProcessedRefundIds() != null
+                    boolean refundAlreadyCountedOnBooking = refundedAmt.compareTo(BigDecimal.ZERO) > 0
+                            && payment.getProcessedRefundIds() != null
                             && payment.getProcessedRefundIds().stream()
                                     .anyMatch(rid -> rid != null && bookingRefIds.contains(rid));
                     if (!refundAlreadyCountedOnBooking) {
@@ -586,6 +587,11 @@ public class PaymentWebhookService {
             }
 
             boolean clearPending = matchesPendingRefundOperation(booking, data, eventId, eventRefund);
+            if (newRefunded.compareTo(currentRefunded) <= 0 && !clearPending && paidCap.compareTo(BigDecimal.ZERO) <= 0) {
+                log.info("Booking {} aún no acredita ningún pago (paidAmount=0); difiriendo registro de refund {} hasta que llegue el pago.",
+                        booking.getId(), refundId != null ? refundId : eventId);
+                return;
+            }
             boolean stillHasOtherPendingRefund = !clearPending
                     && booking.getPendingRefundIdempotencyKey() != null
                     && !booking.getPendingRefundIdempotencyKey().isBlank();

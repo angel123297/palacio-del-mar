@@ -1763,4 +1763,119 @@ class AuditCriticalBugFixesTest {
         assertEquals(0, new BigDecimal("100000").compareTo(booking.getBalanceDue()));
         assertEquals("partially_refunded", payment.getStatus());
     }
+
+    @Test
+    @DisplayName("38. Devolución parcial antes del cobro calcula saldo neto pendiente sin confirmar como pagada")
+    void outOfOrderPartialRefundBeforePaymentSucceededComputesNetBalanceWithoutConfirmingAsPaid() {
+        String secret = "whsec_ooo_partial_ref_test_secret_12345678901234";
+        co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository processedRepo =
+                mock(co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        EmailService emailService = mock(EmailService.class);
+
+        co.palaciodelmar.backend.webhook.PaymentWebhookService webhookService =
+                new co.palaciodelmar.backend.webhook.PaymentWebhookService(
+                        paymentRepository,
+                        bookingRepository,
+                        bookingService,
+                        processedRepo,
+                        emailService,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        null
+                );
+        org.springframework.test.util.ReflectionTestUtils.setField(webhookService, "webhookSecret", secret);
+
+        Booking booking = Booking.builder()
+                .id("bk-ooo-pr-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("200000"))
+                .paidAmount(BigDecimal.ZERO)
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("200000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-ooo-pr-1")
+                .booking("bk-ooo-pr-1")
+                .intentId("pi_ooo_pr_1")
+                .amount(new BigDecimal("200000"))
+                .status("pending")
+                .build();
+
+        when(processedRepo.existsByEventId(anyString())).thenReturn(false);
+        when(processedRepo.existsByPayloadHash(anyString())).thenReturn(false);
+        when(processedRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByIntentId("pi_ooo_pr_1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-ooo-pr-1")).thenReturn(Optional.of(booking));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+
+        // 1. Llega primero refund.processed parcial por $100.000
+        String refundBody = "{\"eventType\":\"refund.processed\",\"data\":{\"intentId\":\"pi_ooo_pr_1\",\"transactionId\":\"re_ooo_pr_1\",\"amount\":100000}}";
+        webhookService.processWebhook(refundBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(refundBody, secret), "evt_ooo_pr_ref", ts);
+
+        // 2. Llega después payment.succeeded por $200.000
+        String succeededBody = "{\"eventType\":\"payment.succeeded\",\"data\":{\"intentId\":\"pi_ooo_pr_1\",\"transactionId\":\"tx_ooo_pr_1\",\"amount\":200000}}";
+        webhookService.processWebhook(succeededBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(succeededBody, secret), "evt_ooo_pr_paid", ts);
+
+        assertEquals(0, new BigDecimal("200000").compareTo(booking.getPaidAmount()));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getBalanceDue()));
+        assertEquals("partial", booking.getPaymentStatus());
+        assertEquals("pending", booking.getStatus());
+        assertEquals("partially_refunded", payment.getStatus());
+        verify(bookingService, never()).changeBookingStatus(any(), any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("39. logoutAllDevices cierra los canales SSE abiertos del usuario para cortar eventos en tiempo real")
+    void logoutAllDevicesClosesActiveSseStreamsForUser() {
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        org.springframework.security.crypto.password.PasswordEncoder passwordEncoder = mock(org.springframework.security.crypto.password.PasswordEncoder.class);
+        co.palaciodelmar.backend.security.JwtService jwtService = mock(co.palaciodelmar.backend.security.JwtService.class);
+        org.springframework.security.authentication.AuthenticationManager authManager = mock(org.springframework.security.authentication.AuthenticationManager.class);
+        EmailService emailService = mock(EmailService.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+
+        AuthService authService = new AuthService(
+                userRepository,
+                passwordEncoder,
+                jwtService,
+                authManager,
+                emailService,
+                mongoTemplate
+        );
+        BookingSseService sseService = new BookingSseService();
+        authService.setBookingSseService(sseService);
+
+        co.palaciodelmar.backend.model.User user = co.palaciodelmar.backend.model.User.builder()
+                .id("u-sse-logout")
+                .email("sse@palaciodelmar.co")
+                .role("GUEST")
+                .build();
+        when(userRepository.findById("u-sse-logout")).thenReturn(Optional.of(user));
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(co.palaciodelmar.backend.model.User.class)))
+                .thenReturn(user);
+
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
+                mock(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
+        sseService.subscribe("u-sse-logout", emitter);
+        assertEquals(1, sseService.getActiveSubscribersCount());
+        clearInvocations(emitter);
+
+        authService.logoutAllDevices("u-sse-logout");
+
+        verify(emitter, times(1)).complete();
+        assertEquals(0, sseService.getActiveSubscribersCount());
+
+        sseService.emitBookingUpdate("u-sse-logout", co.palaciodelmar.backend.dto.BookingDTO.builder().id("bk-after-logout").build());
+        verifyNoMoreInteractions(emitter);
+    }
 }
