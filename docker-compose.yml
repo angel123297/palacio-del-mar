@@ -115,6 +115,7 @@ services:
       PALACIO_PROXY_TOKEN: "${PALACIO_PROXY_TOKEN:?PALACIO_PROXY_TOKEN must be defined in .env}"
       BACKEND_HOST: "${BACKEND_HOST:-backend-java:5000}"
     volumes:
+      - ./frontend-angular/nginx.conf:/etc/nginx/templates/default.conf.template:ro
       - ./frontend-angular/public/app:/usr/share/nginx/html/app:ro
       - ./frontend-angular/public/palacio-del-mar-release.apk:/usr/share/nginx/html/palacio-del-mar-release.apk:ro
     depends_on:
