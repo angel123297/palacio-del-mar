@@ -92,6 +92,9 @@ public class Booking {
     @Builder.Default
     private BigDecimal balanceDue = BigDecimal.ZERO;
 
+    @Builder.Default
+    private BigDecimal guaranteeCompensated = BigDecimal.ZERO;
+
     @Indexed
     @Builder.Default
     private String status = "pending"; // "pending", "confirmed", "checked_in", "checked_out", "cancelled", "completed", "expired"
@@ -162,6 +165,19 @@ public class Booking {
 
     /** Momento en que se envió automáticamente la invitación a calificar la estadía. */
     private Instant reviewRequestSentAt;
+
+    /**
+     * Total exigible efectivo descontando la garantía ya compensada o devuelta en check-out.
+     */
+    public BigDecimal resolveEffectiveTotalPrice() {
+        BigDecimal total = totalPrice != null ? totalPrice : BigDecimal.ZERO;
+        BigDecimal compensated = guaranteeCompensated != null ? guaranteeCompensated.max(BigDecimal.ZERO) : BigDecimal.ZERO;
+        BigDecimal refundedGuarantee = BigDecimal.ZERO;
+        if (Boolean.TRUE.equals(guaranteeRefunded) && guaranteeDeposit != null && guaranteeDeposit.compareTo(BigDecimal.ZERO) > 0) {
+            refundedGuarantee = guaranteeDeposit.subtract(compensated).max(BigDecimal.ZERO);
+        }
+        return total.subtract(compensated).subtract(refundedGuarantee).max(BigDecimal.ZERO);
+    }
 
     @Data
     @Builder

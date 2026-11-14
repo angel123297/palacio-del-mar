@@ -309,7 +309,7 @@ public class PaymentWebhookService {
 
                 BigDecimal refundedAmt = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
                 BigDecimal netPaid = newPaid.subtract(refundedAmt).max(BigDecimal.ZERO);
-                BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.getTotalPrice() : newPaid;
+                BigDecimal totalPrice = booking.getTotalPrice() != null ? booking.resolveEffectiveTotalPrice() : newPaid;
                 BigDecimal balance = totalPrice.subtract(netPaid);
                 booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
 
