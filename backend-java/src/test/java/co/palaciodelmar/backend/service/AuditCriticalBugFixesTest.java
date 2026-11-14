@@ -1134,4 +1134,162 @@ class AuditCriticalBugFixesTest {
         assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
         assertEquals(0, BigDecimal.ZERO.compareTo(booking.getPendingRefundAmount()));
     }
+
+    @Test
+    @DisplayName("26. Recuperación de múltiples reembolsos registra todos los refundId en una sola escritura atómica")
+    void multiRefundRecoveryPersistsAllMissingRefundIdsAtomically() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+        BookingService bookingService = buildBookingService(bookingRepository, suiteRepository, suiteNightRepository, paymentRepository, paymentGateway);
+        org.springframework.test.util.ReflectionTestUtils.setField(bookingService, "mongoTemplate", mongoTemplate);
+
+        Booking booking = Booking.builder()
+                .id("bk-multi-rec")
+                .status("cancelled")
+                .paymentStatus("requires_refund")
+                .paidAmount(new BigDecimal("200000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .pendingRefundAmount(new BigDecimal("200000"))
+                .pendingRefundIdempotencyKey("ref_multi_key")
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-m1", "pay-m2")))
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment p1 = Payment.builder()
+                .id("pay-m1").booking("bk-multi-rec").transactionId("tx-m1")
+                .amount(new BigDecimal("100000")).refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("ref-m1")))
+                .status("refunded").createdAt(Instant.now().minusSeconds(10)).build();
+        Payment p2 = Payment.builder()
+                .id("pay-m2").booking("bk-multi-rec").transactionId("tx-m2")
+                .amount(new BigDecimal("100000")).refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("ref-m2")))
+                .status("refunded").createdAt(Instant.now()).build();
+
+        when(paymentRepository.findByBooking("bk-multi-rec")).thenReturn(List.of(p1, p2));
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(Booking.class))).thenAnswer(inv -> {
+            booking.setVersion(1L);
+            return booking;
+        });
+
+        boolean ok = bookingService.executeSequentialRefund(booking, new BigDecimal("200000"), "ref_multi_key");
+
+        assertTrue(ok);
+        verify(paymentGateway, never()).refund(anyString(), any(), anyString());
+        verify(mongoTemplate, times(1)).findAndModify(any(), any(), any(), eq(Booking.class));
+        verify(bookingRepository, times(1)).save(any(Booking.class));
+        assertTrue(booking.getProcessedRefundIds().containsAll(List.of("ref-m1", "ref-m2")));
+        assertEquals(0, new BigDecimal("200000").compareTo(booking.getRefundedAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getPendingRefundAmount()));
+    }
+
+    @Test
+    @DisplayName("27. Confirmación síncrona registra paymentId en processedPaymentIds para no excluirse al combinar con webhook")
+    void syncPaymentConfirmationRegistersProcessedPaymentIdForCombinedWebhookRefunds() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService helperBookingService = mock(BookingService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        EmailService emailService = mock(EmailService.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                helperBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-sync-wh-1")
+                .user("user-1")
+                .suite("suite-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("200000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("200000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment payment1 = Payment.builder()
+                .id("pay-sync-1")
+                .booking("bk-sync-wh-1")
+                .user("user-1")
+                .amount(new BigDecimal("100000"))
+                .intentId("pi_sync_1")
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_sync_1")).thenReturn(Optional.of(payment1));
+        when(paymentRepository.findById("pay-sync-1")).thenReturn(Optional.of(payment1));
+        when(bookingRepository.findById("bk-sync-wh-1")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_sync_1", "tok_1"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_sync_1", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        paymentService.confirmPayment("user-1", "pi_sync_1", "tok_1");
+
+        assertTrue(booking.getProcessedPaymentIds().contains("pay-sync-1"));
+    }
+
+    @Test
+    @DisplayName("28. Reconexión SSE concurrente con limpieza del emisor anterior no pierde la nueva suscripción")
+    void sseReconnectDoesNotDropNewSubscriptionDuringOldCleanup() throws Exception {
+        BookingSseService sseService = new BookingSseService();
+        String userId = "user-sse-race";
+
+        for (int i = 0; i < 100; i++) {
+            org.springframework.web.servlet.mvc.method.annotation.SseEmitter oldEmitter =
+                    mock(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
+            org.springframework.web.servlet.mvc.method.annotation.SseEmitter newEmitter =
+                    mock(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
+
+            final Runnable[] completionHook = new Runnable[1];
+            doAnswer(inv -> {
+                completionHook[0] = inv.getArgument(0);
+                return null;
+            }).when(oldEmitter).onCompletion(any(Runnable.class));
+
+            sseService.subscribe(userId, oldEmitter);
+
+            java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+            Thread tCleanup = new Thread(() -> {
+                try {
+                    start.await();
+                    completionHook[0].run();
+                } catch (InterruptedException ignored) {
+                }
+            });
+            Thread tReconnect = new Thread(() -> {
+                try {
+                    start.await();
+                    sseService.subscribe(userId, newEmitter);
+                } catch (InterruptedException ignored) {
+                }
+            });
+            tCleanup.start();
+            tReconnect.start();
+            start.countDown();
+            tCleanup.join();
+            tReconnect.join();
+
+            assertEquals(1, sseService.getActiveSubscribersCount(), "Debe conservarse la nueva suscripción en iteración " + i);
+            clearInvocations(newEmitter);
+            sseService.emitBookingUpdate(userId, co.palaciodelmar.backend.dto.BookingDTO.builder().id("bk-1").build());
+            verify(newEmitter, times(1)).send(any(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.SseEventBuilder.class));
+
+            // Limpiar newEmitter para la siguiente iteración
+            org.mockito.Mockito.reset(newEmitter);
+            doThrow(new java.io.IOException("close")).when(newEmitter).send(any(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.SseEventBuilder.class));
+            sseService.emitBookingUpdate(userId, co.palaciodelmar.backend.dto.BookingDTO.builder().id("bk-cleanup").build());
+        }
+    }
 }

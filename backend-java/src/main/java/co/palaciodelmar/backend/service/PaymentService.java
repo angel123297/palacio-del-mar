@@ -285,6 +285,14 @@ public class PaymentService {
         }
 
         booking.setPaidAmount((booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO).add(payment.getAmount()));
+        if (payment.getId() != null && !payment.getId().isBlank()) {
+            if (booking.getProcessedPaymentIds() == null) {
+                booking.setProcessedPaymentIds(new java.util.ArrayList<>());
+            }
+            if (!booking.getProcessedPaymentIds().contains(payment.getId())) {
+                booking.getProcessedPaymentIds().add(payment.getId());
+            }
+        }
 
         BigDecimal refundedAmt = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
         BigDecimal netPaid = booking.getPaidAmount().subtract(refundedAmt).max(BigDecimal.ZERO);

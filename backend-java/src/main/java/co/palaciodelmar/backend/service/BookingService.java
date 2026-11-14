@@ -1209,22 +1209,7 @@ public class BookingService {
                 if (unrecordedOnBooking.compareTo(BigDecimal.ZERO) > 0) {
                     BigDecimal syncedDelta = unrecordedOnBooking.min(remainingToRefund);
                     BigDecimal nextRem = remainingToRefund.subtract(syncedDelta).max(BigDecimal.ZERO);
-                    String primaryRefundId = missingRefundIds.get(0);
-                    applyConfirmedRefundToBooking(booking, syncedDelta, primaryRefundId, nextRem, baseIdempotencyKey);
-                    if (missingRefundIds.size() > 1) {
-                        if (booking.getProcessedRefundIds() == null) {
-                            booking.setProcessedRefundIds(new java.util.ArrayList<>());
-                        }
-                        for (int k = 1; k < missingRefundIds.size(); k++) {
-                            String extraRid = missingRefundIds.get(k);
-                            if (!booking.getProcessedRefundIds().contains(extraRid)) {
-                                booking.getProcessedRefundIds().add(extraRid);
-                            }
-                        }
-                        if (bookingRepository != null && booking.getId() != null) {
-                            bookingRepository.save(booking);
-                        }
-                    }
+                    applyConfirmedRefundToBooking(booking, syncedDelta, missingRefundIds, nextRem, baseIdempotencyKey);
                     remainingToRefund = nextRem;
                 }
             }
@@ -1415,15 +1400,33 @@ public class BookingService {
             String refundId,
             BigDecimal remainingPendingAfter,
             String pendingKey) {
+        java.util.List<String> ids = (refundId != null && !refundId.isBlank())
+                ? java.util.List.of(refundId)
+                : java.util.Collections.emptyList();
+        return applyConfirmedRefundToBooking(booking, refundAmount, ids, remainingPendingAfter, pendingKey);
+    }
+
+    private boolean applyConfirmedRefundToBooking(
+            Booking booking,
+            BigDecimal refundAmount,
+            java.util.List<String> refundIds,
+            BigDecimal remainingPendingAfter,
+            String pendingKey) {
         if (booking == null || refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return false;
         }
+        java.util.List<String> cleanRefundIds = refundIds != null
+                ? refundIds.stream().filter(id -> id != null && !id.isBlank()).distinct().toList()
+                : java.util.Collections.emptyList();
         BigDecimal safePending = remainingPendingAfter != null ? remainingPendingAfter.max(BigDecimal.ZERO) : BigDecimal.ZERO;
         String nextPendingKey = safePending.compareTo(BigDecimal.ZERO) > 0 ? pendingKey : null;
         if (booking.getProcessedRefundIds() == null) {
             booking.setProcessedRefundIds(new java.util.ArrayList<>());
         }
-        if (refundId != null && booking.getProcessedRefundIds().contains(refundId)) {
+        java.util.List<String> newRefundIds = cleanRefundIds.stream()
+                .filter(id -> !booking.getProcessedRefundIds().contains(id))
+                .toList();
+        if (!cleanRefundIds.isEmpty() && newRefundIds.isEmpty()) {
             booking.setPendingRefundAmount(safePending);
             booking.setPendingRefundIdempotencyKey(nextPendingKey);
             return false;
@@ -1441,17 +1444,17 @@ public class BookingService {
         if (isDepositRefund) {
             booking.setGuaranteeRefunded(true);
         }
-        if (mongoTemplate != null && booking.getId() != null && refundId != null) {
+        if (mongoTemplate != null && booking.getId() != null && !newRefundIds.isEmpty()) {
             org.springframework.data.mongodb.core.query.Query q = new org.springframework.data.mongodb.core.query.Query(
                     org.springframework.data.mongodb.core.query.Criteria.where("id").is(booking.getId())
-                            .and("processedRefundIds").ne(refundId)
+                            .and("processedRefundIds").nin(newRefundIds)
             );
             org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
                     .set("refundedAmount", nextRef)
-                    .addToSet("processedRefundIds", refundId)
                     .set("pendingRefundAmount", safePending)
                     .set("pendingRefundIdempotencyKey", nextPendingKey)
                     .set("updatedAt", Instant.now());
+            u.addToSet("processedRefundIds").each(newRefundIds.toArray());
             if (safePending.compareTo(BigDecimal.ZERO) > 0) {
                 u.set("paymentStatus", "requires_refund");
             }
@@ -1480,8 +1483,10 @@ public class BookingService {
             }
         }
         booking.setRefundedAmount(nextRef);
-        if (refundId != null) {
-            booking.getProcessedRefundIds().add(refundId);
+        for (String rid : newRefundIds) {
+            if (!booking.getProcessedRefundIds().contains(rid)) {
+                booking.getProcessedRefundIds().add(rid);
+            }
         }
         booking.setPendingRefundAmount(safePending);
         booking.setPendingRefundIdempotencyKey(nextPendingKey);

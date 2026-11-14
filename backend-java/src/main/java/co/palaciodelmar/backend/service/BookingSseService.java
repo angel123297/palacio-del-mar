@@ -30,7 +30,14 @@ public class BookingSseService {
     }
 
     public SseEmitter subscribe(String userId, SseEmitter emitter) {
-        userEmitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        if (userId == null || emitter == null) {
+            return emitter;
+        }
+        userEmitters.compute(userId, (k, existing) -> {
+            List<SseEmitter> list = existing != null ? existing : new CopyOnWriteArrayList<>();
+            list.add(emitter);
+            return list;
+        });
 
         Runnable cleanup = () -> removeEmitter(userId, emitter);
         emitter.onCompletion(cleanup);
@@ -76,21 +83,27 @@ public class BookingSseService {
         }
 
         if (!deadEmitters.isEmpty()) {
-            emitters.removeAll(deadEmitters);
-            if (emitters.isEmpty()) {
-                userEmitters.remove(userId);
-            }
+            userEmitters.compute(userId, (k, current) -> {
+                if (current == null) {
+                    return null;
+                }
+                current.removeAll(deadEmitters);
+                return current.isEmpty() ? null : current;
+            });
         }
     }
 
     private void removeEmitter(String userId, SseEmitter emitter) {
-        List<SseEmitter> emitters = userEmitters.get(userId);
-        if (emitters != null) {
-            emitters.remove(emitter);
-            if (emitters.isEmpty()) {
-                userEmitters.remove(userId);
-            }
+        if (userId == null || emitter == null) {
+            return;
         }
+        userEmitters.compute(userId, (k, current) -> {
+            if (current == null) {
+                return null;
+            }
+            current.remove(emitter);
+            return current.isEmpty() ? null : current;
+        });
     }
 
     public int getActiveSubscribersCount() {
