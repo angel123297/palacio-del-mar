@@ -342,6 +342,10 @@ public class PaymentService {
             booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
 
             boolean wasPending = "pending".equalsIgnoreCase(booking.getStatus());
+            Instant previousExpiresAt = booking.getExpiresAt();
+            BigDecimal previousPaidAmount = booking.getPaidAmount() != null
+                    ? booking.getPaidAmount().subtract(payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO).max(BigDecimal.ZERO)
+                    : BigDecimal.ZERO;
             try {
                 boolean shouldConfirm = booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0 && wasPending;
                 if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
@@ -396,18 +400,32 @@ public class PaymentService {
                 paymentRepository.save(payment);
 
                 if (wasPending && booking.getId() != null) {
-                    if (bookingService != null) {
-                        bookingService.releaseUnpersistedConfirmedSuiteNights(booking);
-                    }
-                    if (suiteNightRepository != null) {
-                        try {
-                            suiteNightRepository.deleteByBooking(booking.getId());
-                            if (availabilityCacheEvictor != null) {
-                                availabilityCacheEvictor.evictAvailability();
+                    boolean isOptimisticConflict = e instanceof org.springframework.dao.OptimisticLockingFailureException;
+                    Booking currentPersisted = bookingRepository.findById(booking.getId()).orElse(null);
+                    boolean persistedCancelledOrExpired = currentPersisted != null
+                            && ("cancelled".equalsIgnoreCase(currentPersisted.getStatus())
+                                || "expired".equalsIgnoreCase(currentPersisted.getStatus()));
+                    boolean hasPriorPaid = previousPaidAmount.compareTo(BigDecimal.ZERO) > 0
+                            || (currentPersisted != null && currentPersisted.getPaidAmount() != null
+                                && currentPersisted.getPaidAmount().compareTo(BigDecimal.ZERO) > 0);
+                    boolean holdStillValid = previousExpiresAt != null && previousExpiresAt.isAfter(Instant.now());
+
+                    if (persistedCancelledOrExpired || (isOptimisticConflict && !hasPriorPaid)) {
+                        if (suiteNightRepository != null) {
+                            try {
+                                suiteNightRepository.deleteByBooking(booking.getId());
+                                if (availabilityCacheEvictor != null) {
+                                    availabilityCacheEvictor.evictAvailability();
+                                }
+                            } catch (Exception ex) {
+                                // Log y continuar propagando la excepción
                             }
-                        } catch (Exception ex) {
-                            // Log y continuar propagando la excepción
                         }
+                    } else if (bookingService != null) {
+                        bookingService.rollbackUnpersistedConfirmedSuiteNights(
+                                booking,
+                                holdStillValid ? previousExpiresAt : null
+                        );
                     }
                 }
 

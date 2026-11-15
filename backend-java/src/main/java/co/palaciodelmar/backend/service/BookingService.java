@@ -2093,6 +2093,7 @@ public class BookingService {
                 .build());
         booking.setUpdatedAt(Instant.now());
 
+        Instant previousExpiresAt = booking.getExpiresAt();
         if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
             booking.setExpiresAt(null);
             confirmBookingSuiteNights(booking);
@@ -2107,7 +2108,8 @@ public class BookingService {
                     }
                 } catch (RuntimeException saveEx) {
                     if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
-                        releaseUnpersistedConfirmedSuiteNights(booking);
+                        booking.setExpiresAt(previousExpiresAt);
+                        rollbackUnpersistedConfirmedSuiteNights(booking, previousExpiresAt);
                     }
                     throw saveEx;
                 }
@@ -2190,9 +2192,43 @@ public class BookingService {
     }
 
     public void releaseUnpersistedConfirmedSuiteNights(Booking booking) {
+        rollbackUnpersistedConfirmedSuiteNights(booking, null);
+    }
+
+    public void rollbackUnpersistedConfirmedSuiteNights(Booking booking, Instant previousExpiresAt) {
         if (booking == null || booking.getId() == null || booking.getId().isBlank() || suiteNightRepository == null) {
             return;
         }
+        Instant now = Instant.now();
+        Booking persistedBooking = (bookingRepository != null)
+                ? bookingRepository.findById(booking.getId()).orElse(null)
+                : null;
+        Instant effectiveExpiry = previousExpiresAt;
+        if (effectiveExpiry == null && persistedBooking != null && "pending".equalsIgnoreCase(persistedBooking.getStatus())) {
+            effectiveExpiry = persistedBooking.getExpiresAt();
+        }
+        boolean stillActivePendingHold = effectiveExpiry != null && effectiveExpiry.isAfter(now)
+                && (persistedBooking == null || "pending".equalsIgnoreCase(persistedBooking.getStatus()));
+
+        if (stillActivePendingHold) {
+            try {
+                java.util.List<co.palaciodelmar.backend.model.SuiteNight> nights = suiteNightRepository.findByBooking(booking.getId());
+                if (nights != null) {
+                    for (co.palaciodelmar.backend.model.SuiteNight sn : nights) {
+                        if (sn == null) continue;
+                        if (!"held".equalsIgnoreCase(sn.getStatus()) || !effectiveExpiry.equals(sn.getExpiresAt())) {
+                            sn.setStatus("held");
+                            sn.setExpiresAt(effectiveExpiry);
+                            suiteNightRepository.save(sn);
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("No se pudieron revertir SuiteNights a held para reserva {}: {}", booking.getId(), ex.getMessage());
+            }
+            return;
+        }
+
         try {
             suiteNightRepository.deleteByBooking(booking.getId());
             java.util.List<co.palaciodelmar.backend.model.SuiteNight> remaining = suiteNightRepository.findByBooking(booking.getId());

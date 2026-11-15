@@ -2446,7 +2446,8 @@ class AuditCriticalBugFixesTest {
                 paymentService.confirmPayment("u-sn-1", "pi_save_fail_sn", "tok_ok"));
 
         assertEquals("refunded", payment.getStatus());
-        assertTrue(nightsStore.isEmpty(), "Las SuiteNights no deben quedar bloqueadas sin vencimiento tras reembolsar el cobro");
+        assertTrue(nightsStore.isEmpty() || nightsStore.stream().allMatch(sn -> "held".equals(sn.getStatus()) && sn.getExpiresAt() != null),
+                "Las SuiteNights no deben quedar bloqueadas sin vencimiento tras reembolsar el cobro");
     }
 
     @Test
@@ -2637,6 +2638,118 @@ class AuditCriticalBugFixesTest {
 
         assertEquals("refunded", secondPayment.getStatus());
         assertEquals(1, confirmedNights.size(), "El inventario válido de la reserva ya confirmada no debe borrarse si falla un abono adicional");
+        verify(suiteNightRepository, never()).deleteByBooking(anyString());
+        verify(suiteNightRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("49. Si falla un segundo abono parcial de una reserva pending vigente, se devuelve ese abono pero se conserva el bloqueo held previo")
+    void secondPartialPaymentFailureOnPendingBookingPreservesActiveHeldSuiteNights() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentService, "suiteNightRepository", suiteNightRepository);
+
+        LocalDate checkIn = LocalDate.now().plusDays(14);
+        LocalDate checkOut = checkIn.plusDays(1);
+        Instant activeHoldExpiry = Instant.now().plusSeconds(600);
+
+        Booking pendingPartialBooking = Booking.builder()
+                .id("bk-pend-part-1")
+                .user("u-pend-1")
+                .suite("suite-pend-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("pending")
+                .paymentStatus("partial")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(new BigDecimal("100000"))
+                .balanceDue(new BigDecimal("200000"))
+                .expiresAt(activeHoldExpiry)
+                .processedPaymentIds(new java.util.ArrayList<>(java.util.List.of("pay-part-1")))
+                .build();
+
+        Payment secondPartialPayment = Payment.builder()
+                .id("pay-part-2")
+                .booking("bk-pend-part-1")
+                .user("u-pend-1")
+                .intentId("pi_part_2")
+                .amount(new BigDecimal("100000"))
+                .status("pending")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> heldNights = new java.util.ArrayList<>();
+        heldNights.add(co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-pend-1")
+                .suite("suite-pend-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-pend-part-1")
+                .status("held")
+                .expiresAt(activeHoldExpiry)
+                .build());
+
+        when(paymentRepository.findByIntentId("pi_part_2")).thenReturn(Optional.of(secondPartialPayment));
+        when(paymentRepository.findById("pay-part-2")).thenReturn(Optional.of(secondPartialPayment));
+        when(bookingRepository.findById("bk-pend-part-1")).thenReturn(Optional.of(pendingPartialBooking));
+        when(suiteNightRepository.findByBooking("bk-pend-part-1")).thenReturn(heldNights);
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+        org.mockito.Mockito.doAnswer(inv -> {
+            heldNights.clear();
+            return null;
+        }).when(suiteNightRepository).deleteByBooking("bk-pend-part-1");
+        org.mockito.Mockito.doAnswer(inv -> {
+            heldNights.clear();
+            return null;
+        }).when(suiteNightRepository).deleteAll(any());
+
+        when(paymentGateway.confirmIntent("pi_part_2", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_part_2", "succeeded", null));
+        when(paymentGateway.refund(eq("tx_part_2"), eq(new BigDecimal("100000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_part_2", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenThrow(new RuntimeException("Simulated DB write failure on second partial payment"));
+
+        assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment("u-pend-1", "pi_part_2", "tok_ok"));
+
+        assertEquals("refunded", secondPartialPayment.getStatus());
+        assertEquals(1, heldNights.size(), "El bloqueo held de la reserva pending con abono previo y plazo vigente no debe eliminarse");
+        assertEquals("held", heldNights.get(0).getStatus());
+        assertEquals(activeHoldExpiry, heldNights.get(0).getExpiresAt());
         verify(suiteNightRepository, never()).deleteByBooking(anyString());
         verify(suiteNightRepository, never()).deleteAll(any());
     }
