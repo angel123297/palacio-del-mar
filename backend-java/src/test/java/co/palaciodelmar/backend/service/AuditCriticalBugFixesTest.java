@@ -3031,4 +3031,105 @@ class AuditCriticalBugFixesTest {
         verify(paymentGateway, times(1)).refund(eq("tx_admin_race_1"), eq(new BigDecimal("300000")));
         verify(suiteNightRepository, never()).deleteByBooking(anyString());
     }
+
+    @Test
+    @DisplayName("52. Reintento de alerta maintenance.alert tras fallo parcial en segundo destinatario no duplica entrega ni cambia eventId al primero")
+    void partialFailureOnSecondWebhookSubscriberDoesNotDuplicateFirstSubscriberOnRetry() {
+        co.palaciodelmar.backend.repository.ReviewRepository reviewRepository = mock(co.palaciodelmar.backend.repository.ReviewRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        co.palaciodelmar.backend.repository.WebhookSubscriptionRepository subRepo = mock(co.palaciodelmar.backend.repository.WebhookSubscriptionRepository.class);
+        co.palaciodelmar.backend.repository.WebhookDeliveryRepository deliveryRepo = mock(co.palaciodelmar.backend.repository.WebhookDeliveryRepository.class);
+        co.palaciodelmar.backend.webhook.RedisWebhookStreamService streamService = mock(co.palaciodelmar.backend.webhook.RedisWebhookStreamService.class);
+        co.palaciodelmar.backend.webhook.SsrfProtectionValidator ssrfValidator = mock(co.palaciodelmar.backend.webhook.SsrfProtectionValidator.class);
+
+        co.palaciodelmar.backend.webhook.WebhookDispatcher realDispatcher =
+                new co.palaciodelmar.backend.webhook.WebhookDispatcher(subRepo, deliveryRepo, null, null, ssrfValidator);
+        realDispatcher.setRedisWebhookStreamService(streamService);
+
+        ReviewService reviewService = new ReviewService(reviewRepository, bookingRepository, userRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(reviewService, "webhookDispatcher", realDispatcher);
+
+        Booking booking = Booking.builder()
+                .id("bk-multi-1")
+                .user("u-multi-1")
+                .suite("suite-multi-1")
+                .propertyId("prop-multi-1")
+                .status("checked_out")
+                .build();
+
+        co.palaciodelmar.backend.model.WebhookSubscription sub1 = co.palaciodelmar.backend.model.WebhookSubscription.builder()
+                .id("sub-1")
+                .propertyId("prop-multi-1")
+                .ownerId("host-1")
+                .url("https://example.com/hook-1")
+                .events(java.util.List.of("maintenance.alert"))
+                .active(true)
+                .build();
+        co.palaciodelmar.backend.model.WebhookSubscription sub2 = co.palaciodelmar.backend.model.WebhookSubscription.builder()
+                .id("sub-2")
+                .propertyId("prop-multi-1")
+                .ownerId("host-1")
+                .url("https://example.com/hook-2")
+                .events(java.util.List.of("maintenance.alert"))
+                .active(true)
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.Review> savedReviews = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.List<co.palaciodelmar.backend.model.WebhookDelivery> deliveryStore = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.concurrent.atomic.AtomicBoolean failSub2Once = new java.util.concurrent.atomic.AtomicBoolean(true);
+
+        when(bookingRepository.findById("bk-multi-1")).thenReturn(Optional.of(booking));
+        when(reviewRepository.existsByBookingId("bk-multi-1")).thenAnswer(inv -> !savedReviews.isEmpty());
+        when(reviewRepository.findByBookingId("bk-multi-1")).thenAnswer(inv -> savedReviews.stream().findFirst());
+        when(reviewRepository.save(any(co.palaciodelmar.backend.model.Review.class))).thenAnswer(inv -> {
+            co.palaciodelmar.backend.model.Review r = inv.getArgument(0);
+            if (r.getId() == null) {
+                r.setId("rev-multi-1");
+                savedReviews.add(r);
+            }
+            return r;
+        });
+
+        when(subRepo.findByPropertyIdAndActiveTrue("prop-multi-1")).thenReturn(java.util.List.of(sub1, sub2));
+        when(deliveryRepo.existsBySubscriptionIdAndEventId(anyString(), anyString())).thenAnswer(inv -> {
+            String sid = inv.getArgument(0);
+            String eid = inv.getArgument(1);
+            return deliveryStore.stream().anyMatch(d -> sid.equals(d.getSubscriptionId()) && eid.equals(d.getEventId()));
+        });
+        when(deliveryRepo.save(any(co.palaciodelmar.backend.model.WebhookDelivery.class))).thenAnswer(inv -> {
+            co.palaciodelmar.backend.model.WebhookDelivery d = inv.getArgument(0);
+            if ("sub-2".equals(d.getSubscriptionId()) && failSub2Once.compareAndSet(true, false)) {
+                throw new RuntimeException("Simulated failure on second recipient");
+            }
+            if (d.getId() == null) {
+                d.setId("del-" + (deliveryStore.size() + 1));
+            }
+            deliveryStore.add(d);
+            return d;
+        });
+        when(streamService.enqueueDelivery(anyString(), anyString(), eq("maintenance.alert"))).thenReturn(true);
+
+        // Primer intento: sub-1 se encola y sub-2 falla -> reseña queda con maintenanceWebhookDispatched=false
+        co.palaciodelmar.backend.dto.ReviewDTO dto1 = reviewService.addVerifiedReview(
+                "bk-multi-1", "u-multi-1", 2, "El aire acondicionado hace ruido y fallo");
+        assertNotNull(dto1);
+        assertEquals(1, savedReviews.size());
+        assertFalse(Boolean.TRUE.equals(savedReviews.get(0).getMaintenanceWebhookDispatched()));
+        assertEquals(1, deliveryStore.size());
+        assertEquals("sub-1", deliveryStore.get(0).getSubscriptionId());
+        String firstEventId = deliveryStore.get(0).getEventId();
+        assertEquals("evt_maint_rev-multi-1", firstEventId);
+
+        // Reintento: recupera sub-2 con el mismo eventId y NO duplica sub-1
+        co.palaciodelmar.backend.dto.ReviewDTO dto2 = reviewService.addVerifiedReview(
+                "bk-multi-1", "u-multi-1", 2, "El aire acondicionado hace ruido y fallo");
+        assertNotNull(dto2);
+        assertTrue(Boolean.TRUE.equals(savedReviews.get(0).getMaintenanceWebhookDispatched()));
+        assertEquals(2, deliveryStore.size(), "No debe duplicarse la entrega de sub-1 en el reintento");
+        assertEquals(1, deliveryStore.stream().filter(d -> "sub-1".equals(d.getSubscriptionId())).count());
+        assertEquals(1, deliveryStore.stream().filter(d -> "sub-2".equals(d.getSubscriptionId())).count());
+        assertEquals(firstEventId, deliveryStore.get(1).getEventId());
+        verify(streamService, times(2)).enqueueDelivery(anyString(), eq(firstEventId), eq("maintenance.alert"));
+    }
 }

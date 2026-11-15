@@ -116,9 +116,10 @@ public class WebhookDispatcher {
             return;
         }
 
+        String deterministicEventId = resolveDeterministicEventId(eventType, data);
         for (WebhookSubscription sub : activeSubscriptions) {
             if (isSubscribed(sub, eventType)) {
-                createAndDispatchDelivery(sub, eventType, data);
+                createAndDispatchDelivery(sub, eventType, data, deterministicEventId);
             }
         }
     }
@@ -128,7 +129,18 @@ public class WebhookDispatcher {
      * Si Redis no está disponible o no está configurado (p.ej. tests unitarios), ejecuta sincrónicamente como fallback.
      */
     public WebhookDelivery createAndDispatchDelivery(WebhookSubscription sub, String eventType, Object data) {
-        WebhookDelivery saved = createPendingDelivery(sub, eventType, data);
+        return createAndDispatchDelivery(sub, eventType, data, null);
+    }
+
+    private WebhookDelivery createAndDispatchDelivery(WebhookSubscription sub, String eventType, Object data, String explicitEventId) {
+        String effectiveEventId = (explicitEventId != null && !explicitEventId.isBlank()) ? explicitEventId.trim() : null;
+        if (effectiveEventId != null && sub.getId() != null
+                && deliveryRepository.existsBySubscriptionIdAndEventId(sub.getId(), effectiveEventId)) {
+            log.debug("Entrega de webhook {} ya registrada para suscripción {}; omitiendo duplicado en reintento.",
+                    effectiveEventId, sub.getId());
+            return null;
+        }
+        WebhookDelivery saved = createPendingDelivery(sub, eventType, data, effectiveEventId);
         if (redisWebhookStreamService != null && saved.getId() != null
                 && redisWebhookStreamService.enqueueDelivery(saved.getId(), saved.getEventId(), saved.getEventType())) {
             return saved;
@@ -141,13 +153,15 @@ public class WebhookDispatcher {
      * Crea y ejecuta sincrónicamente la entrega (usado en pruebas interactivas desde el panel de anfitrión).
      */
     public WebhookDelivery createAndExecuteDelivery(WebhookSubscription sub, String eventType, Object data) {
-        WebhookDelivery saved = createPendingDelivery(sub, eventType, data);
+        WebhookDelivery saved = createPendingDelivery(sub, eventType, data, null);
         executeDelivery(saved, sub.getSecret());
         return saved;
     }
 
-    private WebhookDelivery createPendingDelivery(WebhookSubscription sub, String eventType, Object data) {
-        String eventId = "evt_" + UUID.randomUUID().toString().replace("-", "");
+    private WebhookDelivery createPendingDelivery(WebhookSubscription sub, String eventType, Object data, String explicitEventId) {
+        String eventId = (explicitEventId != null && !explicitEventId.isBlank())
+                ? explicitEventId.trim()
+                : "evt_" + UUID.randomUUID().toString().replace("-", "");
         String payloadJson = buildPayloadJson(eventId, eventType, sub.getPropertyId(), data);
 
         WebhookDelivery delivery = WebhookDelivery.builder()
@@ -165,6 +179,30 @@ public class WebhookDispatcher {
                 .build();
 
         return deliveryRepository.save(delivery);
+    }
+
+    private String resolveDeterministicEventId(String eventType, Object data) {
+        if (data instanceof Map<?, ?> map) {
+            Object explicit = map.get("eventId");
+            if (explicit instanceof String eid && !eid.isBlank()) {
+                return eid.trim();
+            }
+            if ("maintenance.alert".equals(eventType)) {
+                Object reviewId = map.get("reviewId");
+                if (reviewId instanceof String rid && !rid.isBlank()) {
+                    return "evt_maint_" + rid.trim();
+                }
+                Object bookingId = map.get("bookingId");
+                if (bookingId instanceof String bid && !bid.isBlank()) {
+                    return "evt_maint_bk_" + bid.trim();
+                }
+            }
+        }
+        if ("payout.processed".equals(eventType) && data instanceof co.palaciodelmar.backend.dto.HostPayoutDTO payoutDto
+                && payoutDto.getId() != null && !payoutDto.getId().isBlank()) {
+            return "evt_payout_" + payoutDto.getId().trim();
+        }
+        return null;
     }
 
     public void executeDelivery(WebhookDelivery delivery, String secret) {
