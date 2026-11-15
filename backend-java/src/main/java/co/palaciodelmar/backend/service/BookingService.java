@@ -2093,6 +2093,7 @@ public class BookingService {
                 .build());
         booking.setUpdatedAt(Instant.now());
 
+        Long previousVersion = booking.getVersion();
         Instant previousExpiresAt = booking.getExpiresAt();
         if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
             booking.setExpiresAt(null);
@@ -2107,11 +2108,28 @@ public class BookingService {
                         booking.setVersion(saved.getVersion());
                     }
                 } catch (RuntimeException saveEx) {
-                    if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
-                        booking.setExpiresAt(previousExpiresAt);
-                        rollbackUnpersistedConfirmedSuiteNights(booking, previousExpiresAt);
+                    Booking persistedCheck = null;
+                    try {
+                        persistedCheck = bookingRepository.findById(booking.getId()).orElse(null);
+                    } catch (Exception ignored) {
                     }
-                    throw saveEx;
+                    boolean dbCommittedNewState = persistedCheck != null
+                            && persistedCheck != booking
+                            && newStatus.name().equalsIgnoreCase(persistedCheck.getStatus())
+                            && (previousVersion == null || !previousVersion.equals(persistedCheck.getVersion()));
+                    if (dbCommittedNewState) {
+                        log.warn("bookingRepository.save lanzó excepción para reserva {} pero el estado {} sí se aplicó en BD; tratando guardado como exitoso.",
+                                booking.getId(), newStatus.name());
+                        if (persistedCheck.getVersion() != null) {
+                            booking.setVersion(persistedCheck.getVersion());
+                        }
+                    } else {
+                        if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
+                            booking.setExpiresAt(previousExpiresAt);
+                            rollbackUnpersistedConfirmedSuiteNights(booking, previousExpiresAt);
+                        }
+                        throw saveEx;
+                    }
                 }
             }
         }
@@ -2203,6 +2221,14 @@ public class BookingService {
         Booking persistedBooking = (bookingRepository != null)
                 ? bookingRepository.findById(booking.getId()).orElse(null)
                 : null;
+        if (persistedBooking == booking) {
+            persistedBooking = null;
+        }
+        if (persistedBooking != null && ("confirmed".equalsIgnoreCase(persistedBooking.getStatus())
+                || "checked_in".equalsIgnoreCase(persistedBooking.getStatus())
+                || "checked_out".equalsIgnoreCase(persistedBooking.getStatus()))) {
+            return;
+        }
         Instant effectiveExpiry = previousExpiresAt;
         if (effectiveExpiry == null && persistedBooking != null && "pending".equalsIgnoreCase(persistedBooking.getStatus())) {
             effectiveExpiry = persistedBooking.getExpiresAt();

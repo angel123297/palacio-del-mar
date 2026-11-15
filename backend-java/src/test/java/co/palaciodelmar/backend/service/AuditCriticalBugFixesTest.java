@@ -2441,7 +2441,6 @@ class AuditCriticalBugFixesTest {
                 .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_save_fail_sn", "refunded", null));
         when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
         when(bookingRepository.save(any(Booking.class))).thenThrow(new RuntimeException("Simulated Mongo crash on Booking save"));
-
         assertThrows(IllegalStateException.class, () ->
                 paymentService.confirmPayment("u-sn-1", "pi_save_fail_sn", "tok_ok"));
 
@@ -2750,6 +2749,155 @@ class AuditCriticalBugFixesTest {
         assertEquals(1, heldNights.size(), "El bloqueo held de la reserva pending con abono previo y plazo vigente no debe eliminarse");
         assertEquals("held", heldNights.get(0).getStatus());
         assertEquals(activeHoldExpiry, heldNights.get(0).getExpiresAt());
+        verify(suiteNightRepository, never()).deleteByBooking(anyString());
+        verify(suiteNightRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("50. Si bookingRepository.save aplica el cambio en BD pero se pierde la confirmación (lanza excepción), no reembolsa ni borra inventario")
+    void confirmPaymentLostAckAfterCommitDoesNotRefundOrDeleteInventory() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentService, "suiteNightRepository", suiteNightRepository);
+
+        LocalDate checkIn = LocalDate.now().plusDays(16);
+        LocalDate checkOut = checkIn.plusDays(1);
+
+        Booking initialBooking = Booking.builder()
+                .id("bk-lost-ack-1")
+                .version(1L)
+                .user("u-ack-1")
+                .suite("suite-ack-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        java.util.concurrent.atomic.AtomicReference<Booking> dbBooking = new java.util.concurrent.atomic.AtomicReference<>(initialBooking);
+
+        Payment payment = Payment.builder()
+                .id("pay-lost-ack-1")
+                .booking("bk-lost-ack-1")
+                .user("u-ack-1")
+                .intentId("pi_lost_ack_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> nightsStore = new java.util.ArrayList<>();
+        nightsStore.add(co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-ack-1")
+                .suite("suite-ack-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-lost-ack-1")
+                .status("held")
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build());
+
+        when(paymentRepository.findByIntentId("pi_lost_ack_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-lost-ack-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-lost-ack-1")).thenAnswer(inv -> {
+            Booking b = dbBooking.get();
+            return Optional.of(Booking.builder()
+                    .id(b.getId())
+                    .version(b.getVersion())
+                    .user(b.getUser())
+                    .suite(b.getSuite())
+                    .branch(b.getBranch())
+                    .unitSlot(b.getUnitSlot())
+                    .checkIn(b.getCheckIn())
+                    .checkOut(b.getCheckOut())
+                    .nights(b.getNights())
+                    .status(b.getStatus())
+                    .paymentStatus(b.getPaymentStatus())
+                    .totalPrice(b.getTotalPrice())
+                    .paidAmount(b.getPaidAmount())
+                    .balanceDue(b.getBalanceDue())
+                    .expiresAt(b.getExpiresAt())
+                    .processedPaymentIds(b.getProcessedPaymentIds() != null ? new java.util.ArrayList<>(b.getProcessedPaymentIds()) : null)
+                    .build());
+        });
+        when(suiteNightRepository.findByBooking("bk-lost-ack-1")).thenAnswer(inv -> new java.util.ArrayList<>(nightsStore));
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentGateway.confirmIntent("pi_lost_ack_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_lost_ack_1", "succeeded", null));
+
+        // Simula que el guardado en MongoDB SÍ se aplica, pero la respuesta/ack se pierde con excepción de red
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
+            Booking arg = inv.getArgument(0);
+            Booking committed = Booking.builder()
+                    .id(arg.getId())
+                    .version(2L)
+                    .user(arg.getUser())
+                    .suite(arg.getSuite())
+                    .branch(arg.getBranch())
+                    .unitSlot(arg.getUnitSlot())
+                    .checkIn(arg.getCheckIn())
+                    .checkOut(arg.getCheckOut())
+                    .nights(arg.getNights())
+                    .status(arg.getStatus())
+                    .paymentStatus(arg.getPaymentStatus())
+                    .totalPrice(arg.getTotalPrice())
+                    .paidAmount(arg.getPaidAmount())
+                    .balanceDue(arg.getBalanceDue())
+                    .expiresAt(arg.getExpiresAt())
+                    .processedPaymentIds(arg.getProcessedPaymentIds() != null ? new java.util.ArrayList<>(arg.getProcessedPaymentIds()) : null)
+                    .build();
+            dbBooking.set(committed);
+            throw new org.springframework.dao.DataAccessResourceFailureException("Simulated lost ack after MongoDB write committed");
+        });
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment("u-ack-1", "pi_lost_ack_1", "tok_ok");
+        assertNotNull(result);
+        assertEquals("completed", payment.getStatus());
+        assertEquals("confirmed", dbBooking.get().getStatus());
+        assertEquals("paid", dbBooking.get().getPaymentStatus());
+        assertEquals(1, nightsStore.size());
+        assertEquals("confirmed", nightsStore.get(0).getStatus());
+        assertNull(nightsStore.get(0).getExpiresAt());
+        verify(paymentGateway, never()).refund(anyString(), any(BigDecimal.class));
+        verify(paymentGateway, never()).refund(anyString(), any(BigDecimal.class), anyString());
         verify(suiteNightRepository, never()).deleteByBooking(anyString());
         verify(suiteNightRepository, never()).deleteAll(any());
     }
