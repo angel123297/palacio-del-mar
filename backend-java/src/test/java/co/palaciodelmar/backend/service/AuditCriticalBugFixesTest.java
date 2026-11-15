@@ -2091,4 +2091,140 @@ class AuditCriticalBugFixesTest {
         assertThrows(SecurityException.class, () -> streamController.streamBookings(preAuth));
         assertEquals(0, sseService.getActiveSubscribersCount());
     }
+
+    @Test
+    @DisplayName("43. confirmPayment no reembolsa el cobro si falla la publicación del evento después de persistir Booking como confirmada y pagada")
+    void confirmPaymentDoesNotRefundWhenEventPublishFailsAfterBookingIsPersisted() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        org.springframework.context.ApplicationEventPublisher eventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+        realBookingService.setEventPublisher(eventPublisher);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-evt-fail-1")
+                .user("u-1")
+                .suite("suite-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-evt-fail-1")
+                .booking("bk-evt-fail-1")
+                .user("u-1")
+                .intentId("pi_evt_fail_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_evt_fail_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-evt-fail-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-evt-fail-1")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_evt_fail_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_evt_fail_1", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(new RuntimeException("Simulated event bus failure after booking save"))
+                .when(eventPublisher).publishEvent(any());
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment("u-1", "pi_evt_fail_1", "tok_ok");
+
+        assertNotNull(result);
+        assertEquals("completed", payment.getStatus());
+        assertEquals("tx_evt_fail_1", payment.getTransactionId());
+        assertEquals("confirmed", booking.getStatus());
+        assertEquals("paid", booking.getPaymentStatus());
+        assertEquals(0, new BigDecimal("300000").compareTo(booking.getPaidAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getBalanceDue()));
+        verify(paymentGateway, never()).refund(anyString(), any(BigDecimal.class));
+        verify(paymentGateway, never()).refund(anyString(), any(BigDecimal.class), anyString());
+    }
+
+    @Test
+    @DisplayName("44. exportBookingsCsv neutraliza inyección de fórmulas CSV (=, +, -, @) en campos de texto")
+    void exportBookingsCsvNeutralizesFormulaInjectionInTextFields() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+
+        AdminService adminService = new AdminService(
+                bookingRepository,
+                suiteRepository,
+                userRepository,
+                promotionRepository,
+                suiteNightRepository,
+                bookingService,
+                null,
+                null,
+                null
+        );
+
+        Booking maliciousBooking = Booking.builder()
+                .id("bk-csv-inj")
+                .bookingCode("=CMD|' /C calc'!A0")
+                .guestDetails(Booking.GuestDetails.builder()
+                        .fullName("=HYPERLINK(\"http://evil.example\",\"Click\")")
+                        .email("@SUM(1+1)")
+                        .phone("-2+3")
+                        .build())
+                .checkIn(LocalDate.of(2026, 12, 1))
+                .checkOut(LocalDate.of(2026, 12, 3))
+                .nights(2)
+                .guests(2)
+                .totalPrice(new BigDecimal("400000"))
+                .paidAmount(new BigDecimal("400000"))
+                .balanceDue(BigDecimal.ZERO)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .createdAt(Instant.parse("2026-11-14T15:00:00Z"))
+                .build();
+
+        when(bookingRepository.findAll(any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(java.util.List.of(maliciousBooking));
+
+        byte[] csvBytes = adminService.exportBookingsCsv();
+        String csv = new String(csvBytes, java.nio.charset.StandardCharsets.UTF_8);
+
+        assertTrue(csv.contains("'=CMD|' /C calc'!A0"));
+        assertTrue(csv.contains("\"'=HYPERLINK(\"\"http://evil.example\"\",\"\"Click\"\")\""));
+        assertTrue(csv.contains("'@SUM(1+1)"));
+        assertTrue(csv.contains("'-2+3"));
+    }
 }

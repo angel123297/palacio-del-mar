@@ -413,22 +413,42 @@ public class PaymentService {
 
         if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
              if (redisLockService != null) {
-                 redisLockService.releaseSuiteHold(
-                         updatedBooking.getSuite(),
-                         updatedBooking.getUnitSlot(),
-                         updatedBooking.getCheckIn(),
-                         updatedBooking.getCheckOut(),
-                         updatedBooking.getId()
-                 );
+                 try {
+                     redisLockService.releaseSuiteHold(
+                             updatedBooking.getSuite(),
+                             updatedBooking.getUnitSlot(),
+                             updatedBooking.getCheckIn(),
+                             updatedBooking.getCheckOut(),
+                             updatedBooking.getId()
+                     );
+                 } catch (Exception ex) {
+                     log.warn("Error liberando hold Redis tras pago de reserva {}: {}", updatedBooking.getId(), ex.getMessage());
+                 }
              }
              if (socialProofService != null) {
-                 socialProofService.recordBookingActivity(updatedBooking.getSuite(), null, "paid:" + updatedBooking.getId());
+                 try {
+                     socialProofService.recordBookingActivity(updatedBooking.getSuite(), null, "paid:" + updatedBooking.getId());
+                 } catch (Exception ex) {
+                     log.warn("Error registrando social proof tras pago de reserva {}: {}", updatedBooking.getId(), ex.getMessage());
+                 }
              }
              if (availabilityCacheEvictor != null) {
-                 availabilityCacheEvictor.evictAvailability();
+                 try {
+                     availabilityCacheEvictor.evictAvailability();
+                 } catch (Exception ex) {
+                     log.warn("Error limpiando caché de disponibilidad tras pago de reserva {}: {}", updatedBooking.getId(), ex.getMessage());
+                 }
              }
-             emailService.sendBookingConfirmation(updatedBooking);
-             emailService.sendHostBookingNotification(updatedBooking);
+             try {
+                 emailService.sendBookingConfirmation(updatedBooking);
+             } catch (Exception ex) {
+                 log.warn("Error enviando email de confirmación para reserva {}: {}", updatedBooking.getId(), ex.getMessage());
+             }
+             try {
+                 emailService.sendHostBookingNotification(updatedBooking);
+             } catch (Exception ex) {
+                 log.warn("Error enviando notificación al anfitrión para reserva {}: {}", updatedBooking.getId(), ex.getMessage());
+             }
         }
 
         java.util.Map<String, Object> returnMap = new java.util.HashMap<>();

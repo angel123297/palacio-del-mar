@@ -618,9 +618,19 @@ public class AdminService {
 
     private String escapeCsv(String value) {
         if (value == null) return "";
-        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
+        String sanitized = value;
+        String trimmed = sanitized.stripLeading();
+        if (!sanitized.isEmpty()) {
+            char first = sanitized.charAt(0);
+            char firstNonWs = trimmed.isEmpty() ? first : trimmed.charAt(0);
+            if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r'
+                    || firstNonWs == '=' || firstNonWs == '+' || firstNonWs == '-' || firstNonWs == '@') {
+                sanitized = "'" + sanitized;
+            }
         }
-        return value;
+        if (sanitized.contains(",") || sanitized.contains("\"") || sanitized.contains("\n") || sanitized.contains("\r")) {
+            return "\"" + sanitized.replace("\"", "\"\"") + "\"";
+        }
+        return sanitized;
     }
 }

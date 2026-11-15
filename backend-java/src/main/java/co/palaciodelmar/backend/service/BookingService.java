@@ -52,6 +52,7 @@ public class BookingService {
     private final PricingService pricingService;
     private final PaymentGateway paymentGateway;
 
+    @lombok.Setter
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
@@ -2106,19 +2107,31 @@ public class BookingService {
         }
 
         if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
-            java.util.List<co.palaciodelmar.backend.model.SuiteNight> nights = suiteNightRepository != null
-                    ? suiteNightRepository.findByBooking(booking.getId())
-                    : java.util.List.of();
-            for (co.palaciodelmar.backend.model.SuiteNight sn : nights) {
-                sn.setExpiresAt(null);
-                sn.setStatus("confirmed");
-                suiteNightRepository.save(sn);
+            try {
+                java.util.List<co.palaciodelmar.backend.model.SuiteNight> nights = suiteNightRepository != null
+                        ? suiteNightRepository.findByBooking(booking.getId())
+                        : java.util.List.of();
+                for (co.palaciodelmar.backend.model.SuiteNight sn : nights) {
+                    sn.setExpiresAt(null);
+                    sn.setStatus("confirmed");
+                    suiteNightRepository.save(sn);
+                }
+            } catch (Exception ex) {
+                log.warn("No se pudieron actualizar SuiteNights a confirmed para reserva {}: {}", booking.getId(), ex.getMessage());
             }
             if (redisLockService != null) {
-                redisLockService.releaseSuiteHold(booking.getSuite(), booking.getUnitSlot(), booking.getCheckIn(), booking.getCheckOut(), booking.getId());
+                try {
+                    redisLockService.releaseSuiteHold(booking.getSuite(), booking.getUnitSlot(), booking.getCheckIn(), booking.getCheckOut(), booking.getId());
+                } catch (Exception ex) {
+                    log.warn("Error liberando hold Redis para reserva {}: {}", booking.getId(), ex.getMessage());
+                }
             }
             if (socialProofService != null) {
-                socialProofService.recordBookingActivity(booking.getSuite(), null, booking.getId());
+                try {
+                    socialProofService.recordBookingActivity(booking.getSuite(), null, booking.getId());
+                } catch (Exception ex) {
+                    log.warn("Error registrando actividad social proof para reserva {}: {}", booking.getId(), ex.getMessage());
+                }
             }
         }
 
@@ -2127,7 +2140,11 @@ public class BookingService {
         }
 
         if (availabilityCacheEvictor != null) {
-            availabilityCacheEvictor.evictAvailability();
+            try {
+                availabilityCacheEvictor.evictAvailability();
+            } catch (Exception ex) {
+                log.warn("Error limpiando caché de disponibilidad tras cambio de estado de reserva {}: {}", booking.getId(), ex.getMessage());
+            }
         }
     }
 
@@ -2142,13 +2159,17 @@ public class BookingService {
             default -> null;
         };
         if (eventType != null) {
-            eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
-                    eventType,
-                    booking.getId(),
-                    booking.getPropertyId(),
-                    toDTO(booking),
-                    Instant.now()
-            ));
+            try {
+                eventPublisher.publishEvent(new co.palaciodelmar.backend.event.BookingDomainEvent(
+                        eventType,
+                        booking.getId(),
+                        booking.getPropertyId(),
+                        toDTO(booking),
+                        Instant.now()
+                ));
+            } catch (Exception ex) {
+                log.warn("Error publicando evento de dominio {} para reserva {}: {}", eventType, booking.getId(), ex.getMessage());
+            }
         }
     }
 
