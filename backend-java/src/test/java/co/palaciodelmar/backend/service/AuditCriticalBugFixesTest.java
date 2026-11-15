@@ -2901,4 +2901,134 @@ class AuditCriticalBugFixesTest {
         verify(suiteNightRepository, never()).deleteByBooking(anyString());
         verify(suiteNightRepository, never()).deleteAll(any());
     }
+
+    @Test
+    @DisplayName("51. Una confirmación administrativa intercalada (OptimisticLockingFailureException) no se confunde con la aplicación del cobro ni marca el pago como completed")
+    void interleavedAdminConfirmationCausesOptimisticFailureAndRefundsPaymentWithoutMarkingCompleted() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentService, "suiteNightRepository", suiteNightRepository);
+
+        LocalDate checkIn = LocalDate.now().plusDays(18);
+        LocalDate checkOut = checkIn.plusDays(1);
+
+        Booking initialPendingBooking = Booking.builder()
+                .id("bk-admin-race-1")
+                .version(1L)
+                .user("u-race-1")
+                .suite("suite-race-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        // Copia en BD actualizada concurrentemente por ADMIN (status=confirmed, version=2L, paidAmount=0)
+        Booking adminConfirmedInDb = Booking.builder()
+                .id("bk-admin-race-1")
+                .version(2L)
+                .user("u-race-1")
+                .suite("suite-race-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("confirmed")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .statusHistory(java.util.List.of(Booking.StatusHistoryEntry.builder()
+                        .status("confirmed")
+                        .changedBy("ADMIN")
+                        .reason("Cambio administrativo de estado")
+                        .timestamp(Instant.now())
+                        .build()))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-admin-race-1")
+                .booking("bk-admin-race-1")
+                .user("u-race-1")
+                .intentId("pi_admin_race_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> nightsStore = new java.util.ArrayList<>();
+        nightsStore.add(co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-race-1")
+                .suite("suite-race-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-admin-race-1")
+                .status("confirmed")
+                .expiresAt(null)
+                .build());
+
+        when(paymentRepository.findByIntentId("pi_admin_race_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-admin-race-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-admin-race-1"))
+                .thenReturn(Optional.of(initialPendingBooking))
+                .thenReturn(Optional.of(initialPendingBooking))
+                .thenReturn(Optional.of(adminConfirmedInDb));
+        when(suiteNightRepository.findByBooking("bk-admin-race-1")).thenAnswer(inv -> new java.util.ArrayList<>(nightsStore));
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentGateway.confirmIntent("pi_admin_race_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_admin_race_1", "succeeded", null));
+        when(paymentGateway.refund(eq("tx_admin_race_1"), eq(new BigDecimal("300000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_admin_race_1", "refunded", null));
+        when(bookingRepository.save(any(Booking.class)))
+                .thenThrow(new org.springframework.dao.OptimisticLockingFailureException("Concurrent admin confirmation bumped version"));
+
+        assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment("u-race-1", "pi_admin_race_1", "tok_ok"));
+
+        assertEquals("refunded", payment.getStatus());
+        assertEquals(0, BigDecimal.ZERO.compareTo(adminConfirmedInDb.getPaidAmount()));
+        assertEquals(1, nightsStore.size(), "El inventario de la reserva confirmada por ADMIN no debe borrarse");
+        assertEquals("confirmed", nightsStore.get(0).getStatus());
+        verify(paymentGateway, times(1)).refund(eq("tx_admin_race_1"), eq(new BigDecimal("300000")));
+        verify(suiteNightRepository, never()).deleteByBooking(anyString());
+    }
 }

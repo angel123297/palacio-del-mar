@@ -374,13 +374,20 @@ public class PaymentService {
                     } catch (Exception ignored) {
                     }
                 }
-                boolean writeAppliedDespiteException = persistedAfterError != null
+                boolean isOptimisticConflict = e instanceof org.springframework.dao.OptimisticLockingFailureException;
+                boolean paymentIdPersisted = payment.getId() != null
+                        && persistedAfterError != null
+                        && persistedAfterError.getProcessedPaymentIds() != null
+                        && persistedAfterError.getProcessedPaymentIds().contains(payment.getId());
+                boolean fallbackPaidConfirmed = payment.getId() == null
+                        && persistedAfterError != null
+                        && wasPending
+                        && "confirmed".equalsIgnoreCase(persistedAfterError.getStatus())
+                        && "paid".equalsIgnoreCase(persistedAfterError.getPaymentStatus());
+                boolean writeAppliedDespiteException = !isOptimisticConflict
+                        && persistedAfterError != null
                         && persistedAfterError != booking
-                        && ((payment.getId() != null
-                                && persistedAfterError.getProcessedPaymentIds() != null
-                                && persistedAfterError.getProcessedPaymentIds().contains(payment.getId()))
-                            || (wasPending && "confirmed".equalsIgnoreCase(persistedAfterError.getStatus())
-                                && "paid".equalsIgnoreCase(persistedAfterError.getPaymentStatus())));
+                        && (paymentIdPersisted || fallbackPaidConfirmed);
                 if (writeAppliedDespiteException) {
                     log.warn("El guardado de Booking {} sí se aplicó en BD pese a excepción post-escritura ({}); completando Payment {} sin reembolsar ni borrar inventario.",
                             booking.getId(), e.getMessage(), payment.getId());
@@ -424,8 +431,12 @@ public class PaymentService {
                     paymentRepository.save(payment);
 
                     if (wasPending && booking.getId() != null) {
-                        boolean isOptimisticConflict = e instanceof org.springframework.dao.OptimisticLockingFailureException;
                         Booking currentPersisted = persistedAfterError;
+                        boolean persistedAlreadyConfirmed = currentPersisted != null
+                                && currentPersisted != booking
+                                && ("confirmed".equalsIgnoreCase(currentPersisted.getStatus())
+                                    || "checked_in".equalsIgnoreCase(currentPersisted.getStatus())
+                                    || "checked_out".equalsIgnoreCase(currentPersisted.getStatus()));
                         boolean persistedCancelledOrExpired = currentPersisted != null
                                 && ("cancelled".equalsIgnoreCase(currentPersisted.getStatus())
                                     || "expired".equalsIgnoreCase(currentPersisted.getStatus()));
@@ -434,7 +445,7 @@ public class PaymentService {
                                     && currentPersisted.getPaidAmount().compareTo(BigDecimal.ZERO) > 0);
                         boolean holdStillValid = previousExpiresAt != null && previousExpiresAt.isAfter(Instant.now());
 
-                        if (persistedCancelledOrExpired || (isOptimisticConflict && !hasPriorPaid)) {
+                        if (!persistedAlreadyConfirmed && (persistedCancelledOrExpired || (isOptimisticConflict && !hasPriorPaid))) {
                             if (suiteNightRepository != null) {
                                 try {
                                     suiteNightRepository.deleteByBooking(booking.getId());
@@ -445,7 +456,7 @@ public class PaymentService {
                                     // Log y continuar propagando la excepción
                                 }
                             }
-                        } else if (bookingService != null) {
+                        } else if (!persistedAlreadyConfirmed && bookingService != null) {
                             bookingService.rollbackUnpersistedConfirmedSuiteNights(
                                     booking,
                                     holdStillValid ? previousExpiresAt : null

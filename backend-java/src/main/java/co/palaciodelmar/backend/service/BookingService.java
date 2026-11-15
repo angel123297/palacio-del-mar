@@ -2113,10 +2113,27 @@ public class BookingService {
                         persistedCheck = bookingRepository.findById(booking.getId()).orElse(null);
                     } catch (Exception ignored) {
                     }
-                    boolean dbCommittedNewState = persistedCheck != null
+                    boolean isOptimistic = saveEx instanceof org.springframework.dao.OptimisticLockingFailureException;
+                    boolean paymentsMatch = booking.getProcessedPaymentIds() == null || booking.getProcessedPaymentIds().isEmpty()
+                            || (persistedCheck != null && persistedCheck.getProcessedPaymentIds() != null
+                                && persistedCheck.getProcessedPaymentIds().containsAll(booking.getProcessedPaymentIds()));
+                    boolean paidAmountMatches = booking.getPaidAmount() == null
+                            || (persistedCheck != null && persistedCheck.getPaidAmount() != null
+                                && persistedCheck.getPaidAmount().compareTo(booking.getPaidAmount()) == 0);
+                    boolean historyMatches = persistedCheck == null || persistedCheck.getStatusHistory() == null
+                            || persistedCheck.getStatusHistory().isEmpty()
+                            || persistedCheck.getStatusHistory().stream().anyMatch(h ->
+                                newStatus.name().equalsIgnoreCase(h.getStatus())
+                                && java.util.Objects.equals(changedBy, h.getChangedBy())
+                                && java.util.Objects.equals(reason, h.getReason()));
+                    boolean dbCommittedNewState = !isOptimistic
+                            && persistedCheck != null
                             && persistedCheck != booking
                             && newStatus.name().equalsIgnoreCase(persistedCheck.getStatus())
-                            && (previousVersion == null || !previousVersion.equals(persistedCheck.getVersion()));
+                            && (previousVersion == null || !previousVersion.equals(persistedCheck.getVersion()))
+                            && paymentsMatch
+                            && paidAmountMatches
+                            && historyMatches;
                     if (dbCommittedNewState) {
                         log.warn("bookingRepository.save lanzó excepción para reserva {} pero el estado {} sí se aplicó en BD; tratando guardado como exitoso.",
                                 booking.getId(), newStatus.name());
