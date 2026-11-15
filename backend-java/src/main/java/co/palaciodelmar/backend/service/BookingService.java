@@ -2095,6 +2095,7 @@ public class BookingService {
 
         if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
             booking.setExpiresAt(null);
+            confirmBookingSuiteNights(booking);
         }
 
         if (persistAndPublish) {
@@ -2107,18 +2108,6 @@ public class BookingService {
         }
 
         if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
-            try {
-                java.util.List<co.palaciodelmar.backend.model.SuiteNight> nights = suiteNightRepository != null
-                        ? suiteNightRepository.findByBooking(booking.getId())
-                        : java.util.List.of();
-                for (co.palaciodelmar.backend.model.SuiteNight sn : nights) {
-                    sn.setExpiresAt(null);
-                    sn.setStatus("confirmed");
-                    suiteNightRepository.save(sn);
-                }
-            } catch (Exception ex) {
-                log.warn("No se pudieron actualizar SuiteNights a confirmed para reserva {}: {}", booking.getId(), ex.getMessage());
-            }
             if (redisLockService != null) {
                 try {
                     redisLockService.releaseSuiteHold(booking.getSuite(), booking.getUnitSlot(), booking.getCheckIn(), booking.getCheckOut(), booking.getId());
@@ -2144,6 +2133,51 @@ public class BookingService {
                 availabilityCacheEvictor.evictAvailability();
             } catch (Exception ex) {
                 log.warn("Error limpiando caché de disponibilidad tras cambio de estado de reserva {}: {}", booking.getId(), ex.getMessage());
+            }
+        }
+    }
+
+    public void confirmBookingSuiteNights(Booking booking) {
+        if (booking == null || booking.getId() == null || booking.getId().isBlank() || suiteNightRepository == null) {
+            return;
+        }
+        String suiteId = booking.getSuite();
+        boolean isStandalone = suiteId == null || suiteId.isBlank() || "standalone-experience".equalsIgnoreCase(suiteId);
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> existingNights = suiteNightRepository.findByBooking(booking.getId());
+        if (existingNights == null) {
+            existingNights = java.util.List.of();
+        }
+
+        java.util.Set<LocalDate> coveredDates = new java.util.HashSet<>();
+        for (co.palaciodelmar.backend.model.SuiteNight sn : existingNights) {
+            if (sn == null) continue;
+            if (sn.getDates() != null) {
+                coveredDates.addAll(sn.getDates());
+            }
+            if (!"confirmed".equalsIgnoreCase(sn.getStatus()) || sn.getExpiresAt() != null) {
+                sn.setExpiresAt(null);
+                sn.setStatus("confirmed");
+                suiteNightRepository.save(sn);
+            }
+        }
+
+        if (!isStandalone && booking.getCheckIn() != null && booking.getCheckOut() != null
+                && booking.getCheckIn().isBefore(booking.getCheckOut())) {
+            int slot = (booking.getUnitSlot() != null && booking.getUnitSlot() > 0) ? booking.getUnitSlot() : 1;
+            for (LocalDate d = booking.getCheckIn(); d.isBefore(booking.getCheckOut()); d = d.plusDays(1)) {
+                if (!coveredDates.contains(d)) {
+                    SuiteNight recreated = SuiteNight.builder()
+                            .suite(suiteId)
+                            .branch(booking.getBranch())
+                            .unitSlot(slot)
+                            .dates(java.util.Collections.singletonList(d))
+                            .booking(booking.getId())
+                            .status("confirmed")
+                            .expiresAt(null)
+                            .createdAt(Instant.now())
+                            .build();
+                    suiteNightRepository.save(recreated);
+                }
             }
         }
     }

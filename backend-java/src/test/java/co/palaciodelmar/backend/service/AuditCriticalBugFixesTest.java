@@ -2227,4 +2227,118 @@ class AuditCriticalBugFixesTest {
         assertTrue(csv.contains("'@SUM(1+1)"));
         assertTrue(csv.contains("'-2+3"));
     }
+
+    @Test
+    @DisplayName("45. Si falla el guardado de SuiteNight en confirmPayment, no queda reserva confirmada con bloqueo temporal y repetir el pago repara/confirma el inventario")
+    void confirmPaymentInventorySaveFailureDoesNotLeaveUnconfirmedSuiteNightsAndReplayRepairsIt() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        LocalDate checkIn = LocalDate.now().plusDays(10);
+        LocalDate checkOut = checkIn.plusDays(1);
+
+        Booking booking = Booking.builder()
+                .id("bk-inv-fail-1")
+                .user("u-inv-1")
+                .suite("suite-inv-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-inv-fail-1")
+                .booking("bk-inv-fail-1")
+                .user("u-inv-1")
+                .intentId("pi_inv_fail_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        co.palaciodelmar.backend.model.SuiteNight heldNight = co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-inv-1")
+                .suite("suite-inv-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-inv-fail-1")
+                .status("held")
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_inv_fail_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-inv-fail-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-inv-fail-1")).thenReturn(Optional.of(booking));
+        when(suiteNightRepository.findByBooking("bk-inv-fail-1")).thenReturn(java.util.List.of(heldNight));
+        when(paymentGateway.confirmIntent("pi_inv_fail_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_inv_fail_1", "succeeded", null));
+        when(paymentGateway.refund(eq("tx_inv_fail_1"), eq(new BigDecimal("300000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_comp_inv_1", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // 1. Falla el guardado de SuiteNight: no debe persistirse Booking como confirmada y se compensa el pago
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class)))
+                .thenThrow(new RuntimeException("Simulated SuiteNight DB write failure"));
+
+        assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment("u-inv-1", "pi_inv_fail_1", "tok_ok"));
+        verify(bookingRepository, never()).save(any(Booking.class));
+        assertEquals("refunded", payment.getStatus());
+
+        // 2. Además, si una reserva ya confirmada/pagada tuviera un SuiteNight aún en 'held' (o expirado),
+        // repetir confirmPayment sobre un pago completed repara el inventario a 'confirmed' sin expiresAt.
+        booking.setStatus("confirmed");
+        booking.setPaymentStatus("paid");
+        booking.setBalanceDue(BigDecimal.ZERO);
+        booking.setPaidAmount(new BigDecimal("300000"));
+        payment.setStatus("completed");
+        heldNight.setStatus("held");
+        heldNight.setExpiresAt(Instant.now().plusSeconds(300));
+
+        org.mockito.Mockito.reset(suiteNightRepository);
+        when(suiteNightRepository.findByBooking("bk-inv-fail-1")).thenReturn(java.util.List.of(heldNight));
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        paymentService.confirmPayment("u-inv-1", "pi_inv_fail_1", "tok_ok");
+        assertEquals("confirmed", heldNight.getStatus());
+        assertNull(heldNight.getExpiresAt());
+    }
 }

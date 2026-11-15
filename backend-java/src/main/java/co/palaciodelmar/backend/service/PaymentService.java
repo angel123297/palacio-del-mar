@@ -226,6 +226,9 @@ public class PaymentService {
                 || "refunded".equalsIgnoreCase(currentPayStatus)
                 || "requires_refund".equalsIgnoreCase(currentPayStatus);
         if (alreadyFinalizedOrRefunded) {
+            if ("completed".equalsIgnoreCase(currentPayStatus) && "confirmed".equalsIgnoreCase(booking.getStatus())) {
+                bookingService.confirmBookingSuiteNights(booking);
+            }
             java.util.Map<String, Object> replayMap = new java.util.HashMap<>();
             replayMap.put("payment", toDTO(payment));
             replayMap.put("booking", bookingService.toDTO(booking));
@@ -317,6 +320,9 @@ public class PaymentService {
         if (alreadyCreditedToBooking) {
             log.info("Payment {} ya fue acreditado previamente en Booking {} (processedPaymentIds); evitando doble abono y finalizando Payment.",
                     payment.getId(), booking.getId());
+            if ("confirmed".equalsIgnoreCase(booking.getStatus())) {
+                bookingService.confirmBookingSuiteNights(booking);
+            }
             updatedBooking = booking;
         } else {
             booking.setPaidAmount((booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO).add(payment.getAmount()));
