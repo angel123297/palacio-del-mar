@@ -1,5 +1,32 @@
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-11-15 — Revisión diaria de Vibe: sin cambios funcionales en la rama de trabajo; actividad intensa en `proyecto-angular-java`
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** El único commit en la ventana es el reporte de QA de ayer ([1f3f0ca — docs(qa): reporte diario 2026-11-14](https://github.com/angel123297/palacio-del-mar/commit/1f3f0ca3100236810eff9d81014d1f6844fd7655), 14 nov 14:05 UTC). La rama de trabajo no registra commits funcionales ni de los agentes (Antigravity/Jules).
+
+**Actividad relevante en `proyecto-angular-java` (rama original, 14 nov):** 10 commits, incluyendo 2 PRs fusionados:
+- [PR #27 — Fix/critical audit bugs](https://github.com/angel123297/palacio-del-mar/pull/27) (fusionado 16:58 UTC): correcciones UX de auditoría en checkout, auth, host y admin ([fbf8322](https://github.com/angel123297/palacio-del-mar/commit/fbf8322b3ec7522b81339f48eb8526533d1a3a93)) y fixes críticos de negocio/reembolso/concurrencia/auth ([0672bb7](https://github.com/angel123297/palacio-del-mar/commit/0672bb7edecf007633f6ff5138e51be0234651f2)).
+- [PR #28 — fix(payments): refund double-count, guarantee balance, partial refund, pending payout recovery](https://github.com/angel123297/palacio-del-mar/pull/28) (fusionado 17:39 UTC): [fa4d29f](https://github.com/angel123297/palacio-del-mar/commit/fa4d29faf368b3269397049e24c432222358e632) + merge [d226428](https://github.com/angel123297/palacio-del-mar/commit/d22642871aa415b780eb40d1f3de91962f3b7e0f).
+- 5 commits de S4mu0 (20:07-23:19 UTC): build web de Flutter sincronizado ([1176346](https://github.com/angel123297/palacio-del-mar/commit/117634607acd1ad9adf950e0de2b8a339d5c995d)), docs móvil ([911204b](https://github.com/angel123297/palacio-del-mar/commit/911204bcb4be6206c96d70b3d4d4cb8459f97c16)), CSP de Flutter Web ([dca5198](https://github.com/angel123297/palacio-del-mar/commit/dca5198433f1117cfaf133e58579796a5b7805d8)), montajes Docker + orquestación ngrok ([ecb6c51](https://github.com/angel123297/palacio-del-mar/commit/ecb6c519130d79e1f990841ffc79eb0055baa606)) y nginx.conf como plantilla ([1ce6faf](https://github.com/angel123297/palacio-del-mar/commit/1ce6faf667dc46f26b2f6d512d58ada323866c85)).
+
+**Pull requests abiertos (sin cambios):**
+- [#25 — Add System Audit Report](https://github.com/angel123297/palacio-del-mar/pull/25) (draft, base `plan/marketplace-webhooks`, sin actividad desde 29 oct).
+- [#23 — Cleanup unused frontend code and dependencies](https://github.com/angel123297/palacio-del-mar/pull/23) (draft, base `proyecto-angular-java`, sin actividad desde 26 oct).
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones). Fases 1-4 completadas. Sin avance medible en la rama de trabajo.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios; corregidos y activados desde el 16 oct (commit 1dbd8ee). El PR #28 refuerza aún más el área de reembolsos/pagos (doble conteo de reembolso, balance garantizado), relacionado con los hallazgos de pagos de la auditoría.
+
+**Tests esperados en verde:** sin corridas nuevas en la rama de trabajo. Se mantiene la expectativa: conteo post-R1-R9 (claim 594/594 según commit 945f935) + 20 tests intensivos de Vibe activos. Los fixes de #27/#28 se aplicaron en `proyecto-angular-java`, no en `plan/marketplace-webhooks`.
+
+**Riesgos / problemas detectados:**
+- ⚠️ **Divergencia de ramas:** los PRs #27 y #28 y 5 commits de S4mu0 aterrizaron en `proyecto-angular-java` (rama original que NO debe modificarse), mientras `plan/marketplace-webhooks` quedó estancada en el reporte de QA. Se necesita re-sincronizar la rama de trabajo con main.
+- ⚠️ Orquestación de túnel ngrok (ecb6c51): riesgo de exposición pública de servicios locales; verificar que el túnel sea efímero y autenticado.
+- ⚠️ Conteo de tests (594/594) sin verificación de Vibe contra el pipeline de CI.
+- ⚠️ PRs draft antiguos (#25, #23) siguen acumulando polvo; decidir cerrar o re-basificar.
+- ⚠️ Hallazgos de AUDITORIA_SEGURIDAD.md aún sin confirmar: PDM-04, PDM-05, PDM-07, PDM-08.
+
+
 ### 📅 2026-11-14 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** ninguno. HEAD sigue en [477d3df — docs(qa): reporte diario 2026-11-13](https://github.com/angel123297/palacio-del-mar/commit/477d3dfd5f419056a7f1f1eba48278d956104af4) (13 nov, 14:22 UTC), es decir, la rama no avanzó desde el reporte de ayer.
@@ -745,3 +772,4 @@
 - `docs/CORRECCIONES.md` — bitácora de correcciones
 - `PLAN_MARKETPLACE.md` — plan aprobado (5 fases)
 - `AGENTS.md` — reglas para agentes de IA
+
