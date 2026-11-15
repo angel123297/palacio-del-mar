@@ -3132,4 +3132,71 @@ class AuditCriticalBugFixesTest {
         assertEquals(firstEventId, deliveryStore.get(1).getEventId());
         verify(streamService, times(2)).enqueueDelivery(anyString(), eq(firstEventId), eq("maintenance.alert"));
     }
+
+    @Test
+    @DisplayName("53. Dos despachos simultáneos del mismo evento maintenance.alert no duplican guardado ni encolado")
+    void concurrentWebhookDispatchForSameDeterministicEventIdDeduplicatesSaveAndEnqueue() throws Exception {
+        co.palaciodelmar.backend.repository.WebhookSubscriptionRepository subRepo = mock(co.palaciodelmar.backend.repository.WebhookSubscriptionRepository.class);
+        co.palaciodelmar.backend.repository.WebhookDeliveryRepository deliveryRepo = mock(co.palaciodelmar.backend.repository.WebhookDeliveryRepository.class);
+        co.palaciodelmar.backend.webhook.RedisWebhookStreamService streamService = mock(co.palaciodelmar.backend.webhook.RedisWebhookStreamService.class);
+        co.palaciodelmar.backend.webhook.SsrfProtectionValidator ssrfValidator = mock(co.palaciodelmar.backend.webhook.SsrfProtectionValidator.class);
+
+        co.palaciodelmar.backend.webhook.WebhookDispatcher realDispatcher =
+                new co.palaciodelmar.backend.webhook.WebhookDispatcher(subRepo, deliveryRepo, null, null, ssrfValidator);
+        realDispatcher.setRedisWebhookStreamService(streamService);
+
+        co.palaciodelmar.backend.model.WebhookSubscription sub1 = co.palaciodelmar.backend.model.WebhookSubscription.builder()
+                .id("sub-conc-1")
+                .propertyId("prop-conc-1")
+                .ownerId("host-1")
+                .url("https://example.com/hook-conc")
+                .events(java.util.List.of("maintenance.alert"))
+                .active(true)
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.WebhookDelivery> deliveryStore = new java.util.concurrent.CopyOnWriteArrayList<>();
+        when(subRepo.findByPropertyIdAndActiveTrue("prop-conc-1")).thenReturn(java.util.List.of(sub1));
+        when(deliveryRepo.existsBySubscriptionIdAndEventId(anyString(), anyString())).thenAnswer(inv -> {
+            String sid = inv.getArgument(0);
+            String eid = inv.getArgument(1);
+            return deliveryStore.stream().anyMatch(d -> sid.equals(d.getSubscriptionId()) && eid.equals(d.getEventId()));
+        });
+        when(deliveryRepo.save(any(co.palaciodelmar.backend.model.WebhookDelivery.class))).thenAnswer(inv -> {
+            Thread.sleep(30);
+            co.palaciodelmar.backend.model.WebhookDelivery d = inv.getArgument(0);
+            if (d.getId() == null) {
+                d.setId("del-conc-" + (deliveryStore.size() + 1));
+            }
+            deliveryStore.add(d);
+            return d;
+        });
+        when(streamService.enqueueDelivery(anyString(), anyString(), eq("maintenance.alert"))).thenReturn(true);
+
+        java.util.Map<String, Object> alertPayload = java.util.Map.of(
+                "reviewId", "rev-conc-1",
+                "bookingId", "bk-conc-1",
+                "alert", "Aire acondicionado"
+        );
+
+        java.util.concurrent.CountDownLatch startLatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.Future<?> f1 = pool.submit(() -> {
+            startLatch.await();
+            realDispatcher.dispatchToProperty("prop-conc-1", "maintenance.alert", alertPayload);
+            return null;
+        });
+        java.util.concurrent.Future<?> f2 = pool.submit(() -> {
+            startLatch.await();
+            realDispatcher.dispatchToProperty("prop-conc-1", "maintenance.alert", alertPayload);
+            return null;
+        });
+        startLatch.countDown();
+        f1.get();
+        f2.get();
+        pool.shutdown();
+
+        assertEquals(1, deliveryStore.size(), "Solo debe persistirse una entrega para el mismo (subscriptionId, eventId)");
+        assertEquals("evt_maint_rev-conc-1", deliveryStore.get(0).getEventId());
+        verify(streamService, times(1)).enqueueDelivery(anyString(), eq("evt_maint_rev-conc-1"), eq("maintenance.alert"));
+    }
 }

@@ -62,6 +62,9 @@ public class WebhookDispatcher {
     @Value("${palacio.webhooks.retry.backoff-attempt-3:1800}")
     private long backoffAttempt3Seconds = 1800; // 30 minutos por defecto
 
+    private static final int DEDUP_LOCK_STRIPES = 256;
+    private final Object[] dedupStripes = new Object[DEDUP_LOCK_STRIPES];
+
     @org.springframework.beans.factory.annotation.Autowired
     public WebhookDispatcher(
             WebhookSubscriptionRepository subscriptionRepository,
@@ -97,6 +100,9 @@ public class WebhookDispatcher {
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
         this.ssrfProtectionValidator = ssrfProtectionValidator != null ? ssrfProtectionValidator : new SsrfProtectionValidator();
+        for (int i = 0; i < DEDUP_LOCK_STRIPES; i++) {
+            this.dedupStripes[i] = new Object();
+        }
     }
 
     @EventListener
@@ -134,13 +140,26 @@ public class WebhookDispatcher {
 
     private WebhookDelivery createAndDispatchDelivery(WebhookSubscription sub, String eventType, Object data, String explicitEventId) {
         String effectiveEventId = (explicitEventId != null && !explicitEventId.isBlank()) ? explicitEventId.trim() : null;
-        if (effectiveEventId != null && sub.getId() != null
-                && deliveryRepository.existsBySubscriptionIdAndEventId(sub.getId(), effectiveEventId)) {
-            log.debug("Entrega de webhook {} ya registrada para suscripción {}; omitiendo duplicado en reintento.",
-                    effectiveEventId, sub.getId());
-            return null;
+        WebhookDelivery saved;
+        if (effectiveEventId != null && sub.getId() != null) {
+            int stripeIndex = Math.floorMod((sub.getId() + "::" + effectiveEventId).hashCode(), DEDUP_LOCK_STRIPES);
+            synchronized (dedupStripes[stripeIndex]) {
+                if (deliveryRepository.existsBySubscriptionIdAndEventId(sub.getId(), effectiveEventId)) {
+                    log.debug("Entrega de webhook {} ya registrada para suscripción {}; omitiendo duplicado en reintento.",
+                            effectiveEventId, sub.getId());
+                    return null;
+                }
+                try {
+                    saved = createPendingDelivery(sub, eventType, data, effectiveEventId);
+                } catch (org.springframework.dao.DuplicateKeyException dupEx) {
+                    log.debug("Entrega de webhook {} ya registrada concurrentemente para suscripción {}; omitiendo duplicado.",
+                            effectiveEventId, sub.getId());
+                    return null;
+                }
+            }
+        } else {
+            saved = createPendingDelivery(sub, eventType, data, null);
         }
-        WebhookDelivery saved = createPendingDelivery(sub, eventType, data, effectiveEventId);
         if (redisWebhookStreamService != null && saved.getId() != null
                 && redisWebhookStreamService.enqueueDelivery(saved.getId(), saved.getEventId(), saved.getEventType())) {
             return saved;
