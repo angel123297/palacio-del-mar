@@ -2533,4 +2533,111 @@ class AuditCriticalBugFixesTest {
         assertEquals(1, successes);
         assertEquals(1, savedReviews.size());
     }
+
+    @Test
+    @DisplayName("48. Si falla un abono adicional de una reserva ya confirmada, se reembolsa el abono pero NO se elimina su inventario SuiteNight válido")
+    void additionalPaymentFailureOnAlreadyConfirmedBookingPreservesConfirmedSuiteNights() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentService, "suiteNightRepository", suiteNightRepository);
+
+        LocalDate checkIn = LocalDate.now().plusDays(15);
+        LocalDate checkOut = checkIn.plusDays(2);
+
+        Booking confirmedBooking = Booking.builder()
+                .id("bk-already-conf-1")
+                .user("u-conf-1")
+                .suite("suite-conf-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(2)
+                .status("confirmed")
+                .paymentStatus("partial")
+                .totalPrice(new BigDecimal("450000"))
+                .paidAmount(new BigDecimal("300000"))
+                .balanceDue(new BigDecimal("150000"))
+                .processedPaymentIds(new java.util.ArrayList<>(java.util.List.of("pay-initial-1")))
+                .build();
+
+        Payment secondPayment = Payment.builder()
+                .id("pay-second-1")
+                .booking("bk-already-conf-1")
+                .user("u-conf-1")
+                .intentId("pi_second_1")
+                .amount(new BigDecimal("150000"))
+                .status("pending")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> confirmedNights = new java.util.ArrayList<>();
+        confirmedNights.add(co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-conf-1")
+                .suite("suite-conf-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-already-conf-1")
+                .status("confirmed")
+                .expiresAt(null)
+                .build());
+
+        when(paymentRepository.findByIntentId("pi_second_1")).thenReturn(Optional.of(secondPayment));
+        when(paymentRepository.findById("pay-second-1")).thenReturn(Optional.of(secondPayment));
+        when(bookingRepository.findById("bk-already-conf-1")).thenReturn(Optional.of(confirmedBooking));
+        when(suiteNightRepository.findByBooking("bk-already-conf-1")).thenReturn(confirmedNights);
+        org.mockito.Mockito.doAnswer(inv -> {
+            confirmedNights.clear();
+            return null;
+        }).when(suiteNightRepository).deleteByBooking("bk-already-conf-1");
+        org.mockito.Mockito.doAnswer(inv -> {
+            confirmedNights.clear();
+            return null;
+        }).when(suiteNightRepository).deleteAll(any());
+
+        when(paymentGateway.confirmIntent("pi_second_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_second_1", "succeeded", null));
+        when(paymentGateway.refund(eq("tx_second_1"), eq(new BigDecimal("150000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_second_1", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenThrow(new RuntimeException("Simulated DB write failure on additional payment"));
+
+        assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment("u-conf-1", "pi_second_1", "tok_ok"));
+
+        assertEquals("refunded", secondPayment.getStatus());
+        assertEquals(1, confirmedNights.size(), "El inventario válido de la reserva ya confirmada no debe borrarse si falla un abono adicional");
+        verify(suiteNightRepository, never()).deleteByBooking(anyString());
+        verify(suiteNightRepository, never()).deleteAll(any());
+    }
 }

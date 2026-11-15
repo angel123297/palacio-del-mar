@@ -341,8 +341,8 @@ public class PaymentService {
             BigDecimal balance = booking.resolveEffectiveTotalPrice().subtract(netPaid);
             booking.setBalanceDue(balance.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : balance);
 
+            boolean wasPending = "pending".equalsIgnoreCase(booking.getStatus());
             try {
-                boolean wasPending = "pending".equalsIgnoreCase(booking.getStatus());
                 boolean shouldConfirm = booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0 && wasPending;
                 if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
                     booking.setPaymentStatus("paid");
@@ -395,7 +395,7 @@ public class PaymentService {
                         : "Conflicto o fallo de persistencia tras cobro síncrono. Requiere reembolso manual.");
                 paymentRepository.save(payment);
 
-                if (booking.getId() != null) {
+                if (wasPending && booking.getId() != null) {
                     if (bookingService != null) {
                         bookingService.releaseUnpersistedConfirmedSuiteNights(booking);
                     }

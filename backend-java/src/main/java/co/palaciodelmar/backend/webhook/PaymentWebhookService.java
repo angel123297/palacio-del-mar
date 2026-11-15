@@ -394,7 +394,7 @@ public class PaymentWebhookService {
                                 booking.getId(), eventId, attempt);
                         continue;
                     }
-                    if (bookingService != null) {
+                    if (bookingService != null && confirmedNow) {
                         bookingService.releaseUnpersistedConfirmedSuiteNights(booking);
                     }
                     throw ole;
