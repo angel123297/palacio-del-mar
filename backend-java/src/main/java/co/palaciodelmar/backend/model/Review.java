@@ -48,6 +48,7 @@ public class Review {
     // Seguimiento de la alerta de mantenimiento por parte del anfitrión
     private Instant maintenanceResolvedAt;
     private String maintenanceResolvedBy;
+    private Boolean maintenanceWebhookDispatched;
 
     @Builder.Default
     private Boolean approved = true;

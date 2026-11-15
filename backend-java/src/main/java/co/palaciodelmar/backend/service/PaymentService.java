@@ -317,6 +317,7 @@ public class PaymentService {
         }
 
         Booking updatedBooking;
+        boolean newlyConfirmedInThisCall = false;
         if (alreadyCreditedToBooking) {
             log.info("Payment {} ya fue acreditado previamente en Booking {} (processedPaymentIds); evitando doble abono y finalizando Payment.",
                     payment.getId(), booking.getId());
@@ -347,6 +348,7 @@ public class PaymentService {
                     booking.setPaymentStatus("paid");
                     if (wasPending) {
                         bookingService.changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CONFIRMED, "System", "Pago completado");
+                        newlyConfirmedInThisCall = true;
                     }
                 } else {
                     booking.setPaymentStatus("partial");
@@ -393,8 +395,11 @@ public class PaymentService {
                         : "Conflicto o fallo de persistencia tras cobro síncrono. Requiere reembolso manual.");
                 paymentRepository.save(payment);
 
-                if (e instanceof org.springframework.dao.OptimisticLockingFailureException) {
-                    if (suiteNightRepository != null && booking.getId() != null) {
+                if (booking.getId() != null) {
+                    if (bookingService != null) {
+                        bookingService.releaseUnpersistedConfirmedSuiteNights(booking);
+                    }
+                    if (suiteNightRepository != null) {
                         try {
                             suiteNightRepository.deleteByBooking(booking.getId());
                             if (availabilityCacheEvictor != null) {
@@ -404,6 +409,9 @@ public class PaymentService {
                             // Log y continuar propagando la excepción
                         }
                     }
+                }
+
+                if (e instanceof org.springframework.dao.OptimisticLockingFailureException) {
                     throw new IllegalStateException("Conflicto al procesar el pago. La reserva fue modificada o cancelada simultáneamente.", e);
                 }
 

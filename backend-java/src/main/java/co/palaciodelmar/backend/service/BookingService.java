@@ -2100,9 +2100,16 @@ public class BookingService {
 
         if (persistAndPublish) {
             if (booking.getId() != null && bookingRepository != null) {
-                Booking saved = bookingRepository.save(booking);
-                if (saved != null && saved.getVersion() != null) {
-                    booking.setVersion(saved.getVersion());
+                try {
+                    Booking saved = bookingRepository.save(booking);
+                    if (saved != null && saved.getVersion() != null) {
+                        booking.setVersion(saved.getVersion());
+                    }
+                } catch (RuntimeException saveEx) {
+                    if (newStatus == co.palaciodelmar.backend.model.BookingStatus.CONFIRMED) {
+                        releaseUnpersistedConfirmedSuiteNights(booking);
+                    }
+                    throw saveEx;
                 }
             }
         }
@@ -2178,6 +2185,41 @@ public class BookingService {
                             .build();
                     suiteNightRepository.save(recreated);
                 }
+            }
+        }
+    }
+
+    public void releaseUnpersistedConfirmedSuiteNights(Booking booking) {
+        if (booking == null || booking.getId() == null || booking.getId().isBlank() || suiteNightRepository == null) {
+            return;
+        }
+        try {
+            suiteNightRepository.deleteByBooking(booking.getId());
+            java.util.List<co.palaciodelmar.backend.model.SuiteNight> remaining = suiteNightRepository.findByBooking(booking.getId());
+            if (remaining != null && !remaining.isEmpty()) {
+                suiteNightRepository.deleteAll(remaining);
+            }
+        } catch (Exception ex) {
+            log.warn("No se pudieron liberar SuiteNights tras fallo al persistir reserva {}: {}", booking.getId(), ex.getMessage());
+        }
+        if (redisLockService != null) {
+            try {
+                redisLockService.releaseSuiteHold(
+                        booking.getSuite(),
+                        booking.getUnitSlot(),
+                        booking.getCheckIn(),
+                        booking.getCheckOut(),
+                        booking.getId()
+                );
+            } catch (Exception ex) {
+                log.warn("Error liberando hold Redis tras fallo al persistir reserva {}: {}", booking.getId(), ex.getMessage());
+            }
+        }
+        if (availabilityCacheEvictor != null) {
+            try {
+                availabilityCacheEvictor.evictAvailability();
+            } catch (Exception ex) {
+                log.warn("Error limpiando caché de disponibilidad tras liberar SuiteNights de reserva {}: {}", booking.getId(), ex.getMessage());
             }
         }
     }

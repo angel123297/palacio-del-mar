@@ -46,22 +46,22 @@ public class ReviewService {
         if (bookingId == null || bookingId.isBlank()) {
             return action.get();
         }
-        Object monitor = REVIEW_LOCKS.computeIfAbsent(bookingId, k -> new Object());
-        synchronized (monitor) {
-            try {
-                if (redisLockService != null) {
-                    return redisLockService.executeWithLock(
-                            "review:booking:" + bookingId,
-                            java.time.Duration.ofSeconds(10),
-                            java.time.Duration.ofSeconds(4),
-                            action
-                    );
-                }
+        String normalizedBookingId = bookingId.trim();
+        Object monitor = REVIEW_LOCKS.computeIfAbsent(normalizedBookingId, k -> new Object());
+        java.util.function.Supplier<T> synchronizedAction = () -> {
+            synchronized (monitor) {
                 return action.get();
-            } finally {
-                REVIEW_LOCKS.remove(bookingId, monitor);
             }
+        };
+        if (redisLockService != null) {
+            return redisLockService.executeWithLock(
+                    "review:booking:" + normalizedBookingId,
+                    java.time.Duration.ofSeconds(10),
+                    java.time.Duration.ofSeconds(4),
+                    synchronizedAction
+            );
         }
+        return synchronizedAction.get();
     }
 
     public List<ReviewDTO> getSuiteReviews(String suiteId) {
@@ -141,6 +141,19 @@ public class ReviewService {
             }
 
             if (reviewRepository.existsByBookingId(bookingId)) {
+                Review existing = reviewRepository.findByBookingId(bookingId).orElse(null);
+                if (existing != null && existing.getMaintenanceAlert() != null && !existing.getMaintenanceAlert().isBlank()
+                        && !Boolean.TRUE.equals(existing.getMaintenanceWebhookDispatched())) {
+                    boolean recovered = tryDispatchMaintenanceWebhook(booking, existing, bookingId);
+                    if (recovered) {
+                        existing.setMaintenanceWebhookDispatched(true);
+                        try {
+                            existing = reviewRepository.save(existing);
+                        } catch (Exception ignored) {
+                        }
+                    }
+                    return toDTO(existing);
+                }
                 throw new IllegalStateException("Ya has enviado una reseña para esta reserva");
             }
 
@@ -166,6 +179,7 @@ public class ReviewService {
                     .sentimentScore(analysis.score())
                     .keyHighlights(analysis.highlights())
                     .maintenanceAlert(analysis.maintenanceAlert())
+                    .maintenanceWebhookDispatched(analysis.maintenanceAlert() == null)
                     .approved(true)
                     .createdAt(Instant.now())
                     .build();
@@ -174,24 +188,46 @@ public class ReviewService {
             Review saved = reviewRepository.save(review);
             ReviewDTO dto = toDTO(saved);
 
-            // Si se detectó alerta de mantenimiento, despachar webhook automático al anfitrión
-            if (analysis.maintenanceAlert() != null && webhookDispatcher != null) {
-                String propId = booking.getPropertyId() != null ? booking.getPropertyId() : booking.getBranch();
-                if (propId != null) {
-                    Map<String, Object> alertPayload = new java.util.LinkedHashMap<>();
-                    alertPayload.put("reviewId", saved.getId() != null ? saved.getId() : "");
-                    alertPayload.put("bookingId", booking.getId() != null ? booking.getId() : bookingId);
-                    alertPayload.put("suiteId", saved.getSuite() != null ? saved.getSuite() : "");
-                    alertPayload.put("alert", analysis.maintenanceAlert());
-                    alertPayload.put("comment", saved.getComment() != null ? saved.getComment() : "");
-                    alertPayload.put("rating", saved.getRating());
-                    alertPayload.put("createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : Instant.now().toString());
-                    webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", alertPayload);
+            // Si se detectó alerta de mantenimiento, despachar webhook automático al anfitrión (sin abortar la creación de la reseña)
+            if (analysis.maintenanceAlert() != null) {
+                boolean dispatched = tryDispatchMaintenanceWebhook(booking, saved, bookingId);
+                if (dispatched) {
+                    saved.setMaintenanceWebhookDispatched(true);
+                    try {
+                        reviewRepository.save(saved);
+                    } catch (Exception ignored) {
+                    }
                 }
             }
 
             return dto;
         });
+    }
+
+    private boolean tryDispatchMaintenanceWebhook(Booking booking, Review saved, String fallbackBookingId) {
+        if (webhookDispatcher == null || booking == null || saved == null || saved.getMaintenanceAlert() == null) {
+            return false;
+        }
+        String propId = booking.getPropertyId() != null ? booking.getPropertyId() : booking.getBranch();
+        if (propId == null || propId.isBlank()) {
+            return true;
+        }
+        try {
+            Map<String, Object> alertPayload = new java.util.LinkedHashMap<>();
+            alertPayload.put("reviewId", saved.getId() != null ? saved.getId() : "");
+            alertPayload.put("bookingId", booking.getId() != null ? booking.getId() : fallbackBookingId);
+            alertPayload.put("suiteId", saved.getSuite() != null ? saved.getSuite() : "");
+            alertPayload.put("alert", saved.getMaintenanceAlert());
+            alertPayload.put("comment", saved.getComment() != null ? saved.getComment() : "");
+            alertPayload.put("rating", saved.getRating());
+            alertPayload.put("createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : Instant.now().toString());
+            webhookDispatcher.dispatchToProperty(propId, "maintenance.alert", alertPayload);
+            return true;
+        } catch (Exception ex) {
+            log.warn("No se pudo despachar webhook maintenance.alert para reseña {} (reserva {}): {}",
+                    saved.getId(), fallbackBookingId, ex.getMessage());
+            return false;
+        }
     }
 
     /**

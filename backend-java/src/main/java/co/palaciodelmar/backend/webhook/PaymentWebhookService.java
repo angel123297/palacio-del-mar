@@ -394,7 +394,15 @@ public class PaymentWebhookService {
                                 booking.getId(), eventId, attempt);
                         continue;
                     }
+                    if (bookingService != null) {
+                        bookingService.releaseUnpersistedConfirmedSuiteNights(booking);
+                    }
                     throw ole;
+                } catch (RuntimeException rex) {
+                    if (bookingService != null && confirmedNow) {
+                        bookingService.releaseUnpersistedConfirmedSuiteNights(booking);
+                    }
+                    throw rex;
                 }
             } else {
                 try {
