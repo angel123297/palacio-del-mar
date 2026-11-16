@@ -96,7 +96,7 @@ public class HostWebhookService {
         WebhookSubscription saved = subscriptionRepository.save(subscription);
         log.info("Suscripción de webhook creada: {} para propiedad: {} por anfitrión: {}",
                 saved.getId(), property.getId(), currentUser.getId());
-        return toSubscriptionDTO(saved);
+        return toSubscriptionDTO(saved, true);
     }
 
     public WebhookSubscriptionDTO updateSubscription(User currentUser, String subscriptionId, WebhookSubscriptionRequest request) {
@@ -120,7 +120,7 @@ public class HostWebhookService {
         sub.setUpdatedAt(Instant.now());
 
         WebhookSubscription saved = subscriptionRepository.save(sub);
-        return toSubscriptionDTO(saved);
+        return toSubscriptionDTO(saved, true);
     }
 
     private String validateWebhookUrl(String rawUrl) {
@@ -155,7 +155,7 @@ public class HostWebhookService {
 
         if (isAdmin(currentUser)) {
             return deliveryRepository.findAll().stream()
-                    .sorted(Comparator.comparing(WebhookDelivery::getCreatedAt).reversed())
+                    .sorted(Comparator.comparing(WebhookDelivery::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                     .map(this::toDeliveryDTO)
                     .toList();
         }
@@ -200,7 +200,8 @@ public class HostWebhookService {
         Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alojamiento no encontrado"));
 
-        if (!isAdmin(currentUser) && !property.getOwnerId().equals(currentUser.getId())) {
+        String currentUserId = currentUser != null ? currentUser.getId() : null;
+        if (!isAdmin(currentUser) && !java.util.Objects.equals(property.getOwnerId(), currentUserId)) {
             // Anti-IDOR: No revelar la existencia a anfitriones no autorizados
             throw new ResourceNotFoundException("Alojamiento no encontrado");
         }
@@ -208,13 +209,15 @@ public class HostWebhookService {
     }
 
     private void assertSubscriptionOwnership(WebhookSubscription sub, User currentUser) {
-        if (!isAdmin(currentUser) && !sub.getOwnerId().equals(currentUser.getId())) {
+        String currentUserId = currentUser != null ? currentUser.getId() : null;
+        if (!isAdmin(currentUser) && !java.util.Objects.equals(sub.getOwnerId(), currentUserId)) {
             throw new ResourceNotFoundException("Suscripción de webhook no encontrada");
         }
     }
 
     private void assertDeliveryOwnership(WebhookDelivery delivery, User currentUser) {
-        if (!isAdmin(currentUser) && !delivery.getOwnerId().equals(currentUser.getId())) {
+        String currentUserId = currentUser != null ? currentUser.getId() : null;
+        if (!isAdmin(currentUser) && !java.util.Objects.equals(delivery.getOwnerId(), currentUserId)) {
             throw new ResourceNotFoundException("Entrega de webhook no encontrada");
         }
     }
@@ -223,14 +226,25 @@ public class HostWebhookService {
         return user != null && "admin".equalsIgnoreCase(user.getRole());
     }
 
+    public static String maskSecret(String secret) {
+        if (secret == null || secret.isBlank()) return secret;
+        if (secret.length() <= 10) return "whsec_***";
+        return secret.substring(0, 6) + "..." + secret.substring(secret.length() - 4);
+    }
+
     public WebhookSubscriptionDTO toSubscriptionDTO(WebhookSubscription sub) {
+        return toSubscriptionDTO(sub, false);
+    }
+
+    public WebhookSubscriptionDTO toSubscriptionDTO(WebhookSubscription sub, boolean revealSecret) {
         if (sub == null) return null;
+        String secretValue = revealSecret ? sub.getSecret() : maskSecret(sub.getSecret());
         return WebhookSubscriptionDTO.builder()
                 .id(sub.getId())
                 .propertyId(sub.getPropertyId())
                 .ownerId(sub.getOwnerId())
                 .url(sub.getUrl())
-                .secret(sub.getSecret())
+                .secret(secretValue)
                 .events(sub.getEvents())
                 .active(sub.getActive())
                 .description(sub.getDescription())

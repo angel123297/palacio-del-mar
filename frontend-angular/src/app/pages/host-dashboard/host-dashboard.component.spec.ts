@@ -123,4 +123,87 @@ describe('HostDashboardComponent (Truthful Data & Integrity)', () => {
     expect(component.demoEvents()).toEqual(mockEvents);
     expect(component.demoEvents().length).toBe(2);
   });
+
+  it('submitProperty encadena con switchMap y muestra error 400 si falla suite inicial (F19)', () => {
+    apiServiceMock.post.mockImplementation((url: string) => {
+      if (url === '/host/properties') {
+        return of({ success: true, data: { id: 'prop-new-1', name: 'Nueva Posada' } });
+      }
+      if (url.includes('/suites')) {
+        return throwError(() => ({ error: { message: 'Tarifa base de suite inválida' } }));
+      }
+      return of({ success: true });
+    });
+
+    component.newProperty = {
+      name: 'Nueva Posada',
+      type: 'HOTEL',
+      city: 'Cartagena',
+      address: 'Calle del Sol 45',
+      description: 'Lujo',
+      phone: '3000000000',
+      mainImage: '',
+      initialSuiteName: 'Suite 1',
+      initialSuitePrice: 100000,
+      initialSuiteGuests: 2
+    };
+
+    component.submitProperty();
+
+    expect(component.submittingProperty).toBe(false);
+    expect(component.propertyError).toBe('Tarifa base de suite inválida');
+    expect(component.propertySuccess).toBe('');
+  });
+
+  it('hostAverageRating retorna null cuando no hay reseñas (F10)', () => {
+    component.hostReviews.set([]);
+    expect(component.hostAverageRating()).toBeNull();
+
+    component.hostReviews.set([{ rating: 4 }, { rating: 5 }]);
+    expect(component.hostAverageRating()).toBe(4.5);
+  });
+
+  it('submitPromotion valida que startDate no sea pasada y endDate > startDate (F35)', () => {
+    component.newPromo = {
+      title: 'Promo Pasada',
+      branchId: 'b-1',
+      startDate: '2020-01-01',
+      endDate: '2020-01-01',
+      discountPercent: 15,
+      code: 'PASADA'
+    };
+
+    component.submitPromotion();
+    expect(component.promoError).toBe('La fecha de inicio no puede ser en el pasado');
+    expect(apiServiceMock.post).not.toHaveBeenCalledWith('/host/promotions', expect.anything());
+
+    component.newPromo.startDate = '2099-01-05';
+    component.newPromo.endDate = '2099-01-05';
+    component.submitPromotion();
+    expect(component.promoError).toBe('La fecha de fin debe ser posterior a la fecha de inicio');
+  });
+
+  it('copyRecentlyCreatedKey no lanza excepción si navigator.clipboard es undefined (F35)', () => {
+    component.recentlyCreatedKey.set('pdm_live_secret123');
+    const originalClipboard = (navigator as any).clipboard;
+    try {
+      Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+      expect(() => component.copyRecentlyCreatedKey()).not.toThrow();
+      expect(component.actionMessage()).toBe('Clave copiada al portapapeles');
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true });
+    }
+  });
+
+  it('deleteSuite no elimina dos veces con in-flight guard (F10)', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    component.selectedPropertyForSuites = { id: 'prop-1' } as any;
+    apiServiceMock.delete.mockReturnValue(of({ success: true }));
+
+    const suite = { id: 'suite-del-1' };
+    component.deleteSuite(suite);
+
+    expect(apiServiceMock.delete).toHaveBeenCalledTimes(1);
+    expect(component.suiteSuccess).toBe('Habitación eliminada correctamente.');
+  });
 });

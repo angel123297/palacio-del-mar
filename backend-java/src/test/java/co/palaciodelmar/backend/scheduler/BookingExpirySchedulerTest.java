@@ -33,6 +33,7 @@ class BookingExpirySchedulerTest {
 
         BookingExpiryScheduler scheduler = new BookingExpiryScheduler(bookingRepository, suiteNightRepository, bookingService);
         scheduler.setRedisLockService(redisLockService);
+        scheduler.setClock(java.time.Clock.fixed(java.time.Instant.parse("2026-11-16T15:00:00Z"), java.time.ZoneId.of("America/Bogota")));
 
         Booking expiredBooking = Booking.builder()
                 .id("B-EXPIRED-1")
@@ -79,6 +80,7 @@ class BookingExpirySchedulerTest {
 
         BookingExpiryScheduler scheduler = new BookingExpiryScheduler(bookingRepository, suiteNightRepository, bookingService);
         scheduler.setRedisLockService(new RedisLockService(null));
+        scheduler.setClock(java.time.Clock.fixed(java.time.Instant.parse("2026-11-16T15:00:00Z"), java.time.ZoneId.of("America/Bogota")));
 
         Booking staleSnapshot = Booking.builder()
                 .id("B-RACE-1")

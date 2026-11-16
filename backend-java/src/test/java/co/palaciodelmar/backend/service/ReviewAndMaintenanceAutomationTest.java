@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.ReviewDTO;
+import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Review;
 import co.palaciodelmar.backend.repository.BookingRepository;
@@ -50,6 +51,7 @@ class ReviewAndMaintenanceAutomationTest {
         ReflectionTestUtils.setField(reviewService, "webhookDispatcher", webhookDispatcher);
 
         invitationScheduler = new ReviewInvitationScheduler(bookingRepository, emailService);
+        invitationScheduler.setClock(java.time.Clock.fixed(java.time.Instant.parse("2026-11-16T15:00:00Z"), java.time.ZoneId.of("America/Bogota")));
     }
 
     @Test
@@ -154,7 +156,7 @@ class ReviewAndMaintenanceAutomationTest {
     @Test
     @DisplayName("Invitación automática a reseña: El scheduler envía correo al huésped para reservas finalizadas")
     void testReviewInvitationScheduler() {
-        LocalDate today = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+        LocalDate today = LocalDate.of(2026, 11, 16);
 
         Booking booking = Booking.builder()
                 .id("bk-finished-1")
@@ -182,7 +184,7 @@ class ReviewAndMaintenanceAutomationTest {
         co.palaciodelmar.backend.model.Property property = co.palaciodelmar.backend.model.Property.builder().id("prop-own").ownerId("host-1").build();
         when(propertyRepository.findById("prop-own")).thenReturn(Optional.of(property));
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 reviewService.addReview("suite-own", "host-1", "Host 1", 5, "Mi propia suite es fantástica")
         );
     }

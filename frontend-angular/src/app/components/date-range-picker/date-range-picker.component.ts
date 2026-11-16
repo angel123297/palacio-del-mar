@@ -1,5 +1,6 @@
-import { Component, Input, Output, EventEmitter, ElementRef, HostListener, OnInit, OnChanges, SimpleChanges, computed, signal, effect, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ElementRef, HostListener, OnInit, OnChanges, SimpleChanges, computed, signal, effect, inject, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../services/api.service';
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -76,10 +77,12 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
     effect(() => {
       if (this.open()) {
         const v = this.view();
-        this.loadMonth(v.year, v.month);
-        this.loadPromos(v.year, v.month);
-        this.loadPeak(v.year);
-        this.loadPeak(v.year - 1);
+        untracked(() => {
+          this.loadMonth(v.year, v.month);
+          this.loadPromos(v.year, v.month);
+          this.loadPeak(v.year);
+          this.loadPeak(v.year - 1);
+        });
       }
     });
   }
@@ -125,35 +128,31 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
       const params: any = { year, month, guests: this.guests };
       if (this.branch) params.branch = this.branch;
       if (this.suiteId) params.suiteId = this.suiteId;
-      this.api.get<any>('/availability/monthly', params).subscribe({
-        next: (res) => {
-          if (this.reqId !== currentReq) return;
-          const days = res?.data?.calendar || res?.calendar || [];
-          const nextSoldOut = { ...this.soldOut() };
-          const nextAvail = { ...this.dayAvailability() };
-          days.forEach((d: any) => {
-            if (d.soldOut && (d.totalSuites === undefined || d.totalSuites > 0)) {
-              nextSoldOut[d.date] = true;
-            }
-            nextAvail[d.date] = {
-              soldOut: !!d.soldOut && (d.totalSuites === undefined || d.totalSuites > 0),
-              availableSuites: d.availableSuites,
-              totalSuites: d.totalSuites,
-              occupancyRate: d.occupancyRate
-            };
-          });
-          this.soldOut.set(nextSoldOut);
-          this.dayAvailability.set(nextAvail);
-          this.loaded.set({ ...this.loaded(), [key]: true });
-          this.loading.set(false);
-        },
-        error: () => {
-          if (this.reqId !== currentReq) return;
-          this.loading.set(false);
+      const res = await firstValueFrom(this.api.get<any>('/availability/monthly', params));
+      if (this.reqId !== currentReq) return;
+      const days = res?.data?.calendar || res?.calendar || [];
+      const nextSoldOut = { ...this.soldOut() };
+      const nextAvail = { ...this.dayAvailability() };
+      days.forEach((d: any) => {
+        if (d.soldOut && (d.totalSuites === undefined || d.totalSuites > 0)) {
+          nextSoldOut[d.date] = true;
         }
+        nextAvail[d.date] = {
+          soldOut: !!d.soldOut && (d.totalSuites === undefined || d.totalSuites > 0),
+          availableSuites: d.availableSuites,
+          totalSuites: d.totalSuites,
+          occupancyRate: d.occupancyRate
+        };
       });
+      this.soldOut.set(nextSoldOut);
+      this.dayAvailability.set(nextAvail);
+      this.loaded.set({ ...this.loaded(), [key]: true });
     } catch {
-      this.loading.set(false);
+      // error handled cleanly
+    } finally {
+      if (this.reqId === currentReq) {
+        this.loading.set(false);
+      }
     }
   }
 
@@ -163,7 +162,12 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
     this.peakYears.set({ ...this.peakYears(), [year]: true });
     this.api.get<any>('/availability/peak-dates', { year }).subscribe({
       next: (res) => {
-        if (this.reqId !== currentReq) return;
+        if (this.reqId !== currentReq) {
+          const next = { ...this.peakYears() };
+          delete next[year];
+          this.peakYears.set(next);
+          return;
+        }
         const d = res?.data || res || {};
         const rawRanges = [...(d.highSeason || []), ...(d.peakSeason || [])];
         const ranges = rawRanges.map((r: any) => ({
@@ -182,7 +186,6 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
         this.holidays.set([...this.holidays(), ...holidays]);
       },
       error: () => {
-        if (this.reqId !== currentReq) return;
         const next = { ...this.peakYears() };
         delete next[year];
         this.peakYears.set(next);
@@ -199,12 +202,16 @@ export class DateRangePickerComponent implements OnInit, OnChanges {
     if (this.branch) params.branch = this.branch;
     this.api.get<any>('/availability/promotions', params).subscribe({
       next: (res) => {
-        if (this.reqId !== currentReq) return;
+        if (this.reqId !== currentReq) {
+          const next = { ...this.promoMonths() };
+          delete next[key];
+          this.promoMonths.set(next);
+          return;
+        }
         const p = Array.isArray(res?.data) ? res.data : (res?.data?.promotions || res?.promotions || (Array.isArray(res) ? res : []));
         this.promoMonths.set({ ...this.promoMonths(), [key]: p });
       },
       error: () => {
-        if (this.reqId !== currentReq) return;
         const next = { ...this.promoMonths() };
         delete next[key];
         this.promoMonths.set(next);

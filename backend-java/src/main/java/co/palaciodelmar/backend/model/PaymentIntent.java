@@ -37,12 +37,13 @@ public class PaymentIntent {
     @Indexed
     private String bookingId;
 
+    @Indexed
     private String userId;
 
     @Builder.Default
     private String paymentMethod = "card";
 
-    @Indexed(sparse = true)
+    @Indexed(unique = true, sparse = true)
     private String idempotencyKey;
 
     @Builder.Default
@@ -54,6 +55,7 @@ public class PaymentIntent {
 
     private Instant claimExpiresAt;
 
+    @Indexed
     @Builder.Default
     private Boolean webhookDelivered = false;
 
@@ -62,7 +64,7 @@ public class PaymentIntent {
     @org.springframework.data.annotation.Transient
     private String paymentToken;
 
-    @Indexed(sparse = true)
+    @Indexed(unique = true, sparse = true)
     private String transactionId; // "ch_..."
 
     private String failureMessage;

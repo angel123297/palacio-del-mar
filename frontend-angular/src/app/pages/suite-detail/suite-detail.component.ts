@@ -1,8 +1,9 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
 import { DateRangePickerComponent } from '../../components/date-range-picker/date-range-picker.component';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
@@ -40,6 +41,8 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   lightboxIndex = 0;
   suite: Suite | null = null;
   loading = true;
+  loadError = false;
+  isNotFound = false;
   step = 1;
 
   // Redis Social Proof & Geo Nearby
@@ -48,6 +51,8 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   private viewerPingTimer: ReturnType<typeof setInterval> | null = null;
   private bookingIdempotencyKey = '';
   private bookingFingerprint = '';
+  private routeSub?: Subscription;
+  private currentIdOrSlug = '';
   
   // Step 1: Basic Booking Info
   today = bogotaTodayIso();
@@ -88,6 +93,11 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   isOwnSuite = false;
   checkingOwnership = false;
   availabilityConflict = '';
+  selectedImage = '';
+
+  selectImage(img: string): void {
+    this.selectedImage = img;
+  }
   
   openAuth() {
     this.authModalOpen = true;
@@ -123,7 +133,17 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private sanitizer: DomSanitizer,
     private router: Router
-  ) {}
+  ) {
+    effect(() => {
+      const user = this.auth.currentUser();
+      if (user) {
+        this.guestName = user.name || '';
+        this.guestEmail = user.email || '';
+        this.guestPhone = user.profile?.phone || user.phone || '';
+      }
+      this.checkOwnSuite();
+    });
+  }
 
   get mapUrl(): SafeResourceUrl {
     const address = (typeof this.suite?.branch === 'object' ? this.suite.branch?.address : null) || 'Cartagena, Colombia';
@@ -158,7 +178,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
 
   getSuiteImage(suite: Suite | null): string {
     const brokenIds = ['photo-1591088398332', 'photo-1595526114035', 'photo-1522771739844', 'photo-1566665797739'];
-    const raw = suite?.mainImage || '';
+    const raw = this.selectedImage || suite?.mainImage || '';
     if (!raw || brokenIds.some(id => raw.includes(id))) {
       return 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
     }
@@ -194,49 +214,69 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     if (filters.checkOut) this.checkOut = filters.checkOut;
     if (filters.adults) this.guests = filters.adults;
 
-    if (this.auth.isLoggedIn()) {
-       const user = this.auth.currentUserValue;
-       if (user) {
-         this.guestName = user.name || '';
-         this.guestEmail = user.email || '';
-         this.guestPhone = user.profile?.phone || user.phone || '';
-       }
+    if (this.route.paramMap) {
+      this.routeSub = this.route.paramMap.subscribe(params => {
+        const idOrSlug = params.get('idOrSlug');
+        if (idOrSlug && idOrSlug !== this.currentIdOrSlug) {
+          this.currentIdOrSlug = idOrSlug;
+          this.loadSuiteData(idOrSlug);
+        }
+      });
+    } else {
+      const idOrSlug = this.route.snapshot?.paramMap?.get('idOrSlug');
+      if (idOrSlug) {
+        this.currentIdOrSlug = idOrSlug;
+        this.loadSuiteData(idOrSlug);
+      }
     }
 
-    const idOrSlug = this.route.snapshot.paramMap.get('idOrSlug');
-    if (idOrSlug) {
-      this.api.get<any>(`/suites/${idOrSlug}`).subscribe({
-        next: (res) => {
-          this.suite = res.data || res;
-          this.loading = false;
-          this.checkOwnSuite();
-          this.fetchLiveQuote();
-          this.initSocialProofPing(idOrSlug);
-          this.fetchNearbyGeoPlaces(idOrSlug);
-          const sId = this.suite ? (this.suite.id || this.suite._id) : idOrSlug;
-          this.loadReviews(sId || idOrSlug);
-          this.cdr.detectChanges();
-        },
-        error: () => {
-          this.suite = null;
-          this.loading = false;
-          if (this.viewerPingTimer) {
-            clearInterval(this.viewerPingTimer);
-            this.viewerPingTimer = null;
-          }
-          this.cdr.detectChanges();
-        }
-      });
-      
-      this.api.get<any>('/experiences').subscribe({
-        next: (res) => {
-           this.experiences = res.data || res;
-        }
-      });
+    this.api.get<any>('/experiences').subscribe({
+      next: (res) => {
+        this.experiences = res.data || res;
+      }
+    });
+  }
+
+  reloadCurrentSuite(): void {
+    if (this.currentIdOrSlug) {
+      this.loadSuiteData(this.currentIdOrSlug);
     }
   }
 
+  loadSuiteData(idOrSlug: string): void {
+    this.loading = true;
+    this.loadError = false;
+    this.isNotFound = false;
+    this.api.get<any>(`/suites/${idOrSlug}`).subscribe({
+      next: (res) => {
+        this.suite = res.data || res;
+        this.loading = false;
+        this.checkOwnSuite();
+        this.fetchLiveQuote();
+        this.initSocialProofPing(idOrSlug);
+        this.fetchNearbyGeoPlaces(idOrSlug);
+        const sId = this.suite ? (this.suite.id || this.suite._id) : idOrSlug;
+        this.loadReviews(sId || idOrSlug);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.suite = null;
+        this.loading = false;
+        this.loadError = true;
+        this.isNotFound = err?.status === 404;
+        if (this.viewerPingTimer) {
+          clearInterval(this.viewerPingTimer);
+          this.viewerPingTimer = null;
+        }
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
   ngOnDestroy(): void {
+    if (this.routeSub) {
+      this.routeSub.unsubscribe();
+    }
     if (this.viewerPingTimer) {
       clearInterval(this.viewerPingTimer);
       this.viewerPingTimer = null;
@@ -441,7 +481,6 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     } else if (delta > 0) {
       this.selectedExperiences.push({ exp, qty: 1 });
     }
-    this.fetchLiveQuote();
   }
 
   getExperienceQty(exp: Experience): number {
@@ -473,7 +512,6 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     } else {
       this.selectedExperiences.push({ exp, qty: 1 });
     }
-    this.fetchLiveQuote();
   }
 
   isExperienceSelected(exp: Experience): boolean {
@@ -590,6 +628,15 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   }
 
   private submitBooking(): void {
+    if (this.wantFood && this.foodType === 'other' && (!this.customFood || !this.customFood.trim())) {
+      this.bookingBusy = false;
+      this.message = 'Por favor especifica tu pedido gastronómico personalizado en el paso 3.';
+      this.isError = true;
+      this.goToStep(3);
+      this.cdr.detectChanges();
+      return;
+    }
+
     const foodOrders = [];
     if (this.wantFood && this.foodType) {
        const selectedDish = this.foodType === 'other' ? this.customFood : this.foodOptions.find(f => f.id === this.foodType)?.name;

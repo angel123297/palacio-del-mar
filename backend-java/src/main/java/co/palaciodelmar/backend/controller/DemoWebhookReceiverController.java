@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 @Slf4j
 @RestController
@@ -22,7 +22,7 @@ public class DemoWebhookReceiverController {
     private static final java.util.regex.Pattern SENSITIVE_JSON_FIELD_PATTERN =
             java.util.regex.Pattern.compile("(\"(?:guestPhone|phone|smartLockPin|documentId|documentNumber|accountNumber)\"\\s*:\\s*\")([^\"]+)(\")");
 
-    private final List<Map<String, Object>> receivedEvents = new CopyOnWriteArrayList<>();
+    private final ConcurrentLinkedDeque<Map<String, Object>> receivedEvents = new ConcurrentLinkedDeque<>();
     private volatile boolean simulateFailure = false;
 
     @GetMapping
@@ -31,7 +31,7 @@ public class DemoWebhookReceiverController {
                 "status", "ONLINE",
                 "simulateFailure", simulateFailure,
                 "receivedEventsCount", receivedEvents.size(),
-                "recentEvents", receivedEvents,
+                "recentEvents", new ArrayList<>(receivedEvents),
                 "usage", "Este endpoint recibe peticiones POST con cabecera X-Palacio-Signature para registrar entregas de webhooks en vivo."
         )));
     }
@@ -42,9 +42,14 @@ public class DemoWebhookReceiverController {
             @RequestHeader(value = "X-Palacio-Event-Id", required = false) String eventId,
             @RequestHeader(value = "X-Palacio-Event-Type", required = false) String eventType,
             @RequestHeader(value = "X-Palacio-Timestamp", required = false) String timestamp,
+            @RequestHeader(value = "X-Palacio-Secret", required = false) String secretHeader,
             @RequestParam(required = false) String secret,
             @RequestBody(required = false) String rawBody
     ) {
+        if (secret != null && !secret.isBlank() && (secretHeader == null || secretHeader.isBlank())) {
+            log.warn("Receptor Demo: El parámetro ?secret en query string está deprecado por seguridad. Utilice la cabecera 'X-Palacio-Secret'.");
+        }
+        String effectiveSecret = (secretHeader != null && !secretHeader.isBlank()) ? secretHeader : secret;
         if (rawBody != null && rawBody.length() > MAX_DEMO_PAYLOAD_CHARS) {
             return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                     .body(ApiResponse.error("El payload excede el tamaño máximo permitido (16 KB) en el receptor de demostración"));
@@ -57,8 +62,8 @@ public class DemoWebhookReceiverController {
         }
 
         boolean signatureValid = false;
-        if (secret != null && signature != null && rawBody != null) {
-            signatureValid = WebhookSigner.verify(rawBody, secret, signature);
+        if (effectiveSecret != null && signature != null && rawBody != null) {
+            signatureValid = WebhookSigner.verify(rawBody, effectiveSecret, signature);
         }
 
         String sanitizedPayload = sanitizePayloadPii(rawBody);
@@ -75,13 +80,24 @@ public class DemoWebhookReceiverController {
         record.put("payload", sanitizedPayload);
         record.put("receivedAt", Instant.now().toString());
 
-        receivedEvents.add(0, record);
-        if (receivedEvents.size() > 50) {
-            receivedEvents.remove(receivedEvents.size() - 1);
+        receivedEvents.addFirst(record);
+        while (receivedEvents.size() > 50) {
+            receivedEvents.pollLast();
         }
 
         log.info("Receptor Demo: Evento {} ({}) recibido exitosamente", eventId, eventType);
         return ResponseEntity.ok(ApiResponse.ok("Evento recibido y registrado en receptor demo", record));
+    }
+
+    public ResponseEntity<ApiResponse<Map<String, Object>>> receiveWebhook(
+            String signature,
+            String eventId,
+            String eventType,
+            String timestamp,
+            String secret,
+            String rawBody
+    ) {
+        return receiveWebhook(signature, eventId, eventType, timestamp, null, secret, rawBody);
     }
 
     @GetMapping("/events")
@@ -89,7 +105,7 @@ public class DemoWebhookReceiverController {
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
                 "simulateFailure", simulateFailure,
                 "count", receivedEvents.size(),
-                "events", receivedEvents
+                "events", new ArrayList<>(receivedEvents)
         )));
     }
 

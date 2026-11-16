@@ -34,6 +34,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     public static final String PROXY_TOKEN_HEADER = "X-Palacio-Proxy-Token";
     private static final java.util.Set<String> FORBIDDEN_PROXY_TOKENS = java.util.Set.of(
             "pdm_internal_trusted_proxy_token_2026",
+            "palacio_proxy_secret_token_dev_auth_trusted_2026",
             "whsec_simulated_secret_key_palacio_2026",
             "super_secret_jwt_key_palacio_del_mar_2026_dev_min32chars"
     );
@@ -61,7 +62,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String path = request.getRequestURI();
+        String rawUri = request.getRequestURI();
+        String path = (rawUri != null ? rawUri : "")
+                .replaceAll(";[^/]*", "")
+                .replaceAll("/{2,}", "/")
+                .toLowerCase(java.util.Locale.ROOT);
+        if (path.length() > 1 && path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+        }
         String method = request.getMethod();
 
         RateLimitService.RateLimitResult result = null;
@@ -152,12 +160,21 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
     }
 
+    public static String canonicalizeIp(String ip) {
+        if (!isValidIpLiteral(ip)) return ip;
+        try {
+            return InetAddress.getByName(ip.trim()).getHostAddress();
+        } catch (Exception e) {
+            return ip.trim();
+        }
+    }
+
     public String resolveClientIp(HttpServletRequest request) {
         String remoteAddr = request.getRemoteAddr();
         if (remoteAddr == null || remoteAddr.isBlank()) {
             return "unknown";
         }
-        remoteAddr = remoteAddr.trim();
+        remoteAddr = canonicalizeIp(remoteAddr);
 
         // 1. Si la conexión socket directa NO proviene de un proxy confiable autorizado (loopback o red interna de contenedores),
         // ignoramos cualquier encabezado de reenvío para prevenir falsificación directa de IP.
@@ -182,7 +199,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (xRealIp != null && !xRealIp.isBlank()) {
             String candidate = xRealIp.trim();
             if (isValidIpLiteral(candidate)) {
-                return candidate;
+                return canonicalizeIp(candidate);
             }
         }
 
@@ -192,7 +209,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             String[] hops = xForwardedFor.split(",");
             String rightmost = hops[hops.length - 1].trim();
             if (isValidIpLiteral(rightmost)) {
-                return rightmost;
+                return canonicalizeIp(rightmost);
             }
         }
 

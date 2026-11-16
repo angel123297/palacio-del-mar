@@ -4,12 +4,15 @@ import co.palaciodelmar.backend.dto.IntegrationAvailabilityRequest;
 import co.palaciodelmar.backend.dto.IntegrationRoomRequest;
 import co.palaciodelmar.backend.exception.ResourceNotFoundException;
 import co.palaciodelmar.backend.model.ApiKey;
+import co.palaciodelmar.backend.model.Property;
 import co.palaciodelmar.backend.model.Suite;
 import co.palaciodelmar.backend.model.SuiteNight;
+import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteNightRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DuplicateKeyException;
@@ -27,18 +30,40 @@ public class IntegrationService {
 
     private final SuiteRepository suiteRepository;
     private final SuiteNightRepository suiteNightRepository;
+    private final PropertyRepository propertyRepository;
+    private final Object[] localLocks;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private AvailabilityCacheEvictor availabilityCacheEvictor;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private RedisLockService redisLockService;
 
-    private final java.util.concurrent.ConcurrentHashMap<String, Object> localUpsertLocks = new java.util.concurrent.ConcurrentHashMap<>();
-
-    public IntegrationService(SuiteRepository suiteRepository, SuiteNightRepository suiteNightRepository) {
+    @Autowired
+    public IntegrationService(SuiteRepository suiteRepository,
+                              SuiteNightRepository suiteNightRepository,
+                              @Autowired(required = false) PropertyRepository propertyRepository) {
         this.suiteRepository = suiteRepository;
         this.suiteNightRepository = suiteNightRepository;
+        this.propertyRepository = propertyRepository;
+        this.localLocks = new Object[64];
+        for (int i = 0; i < localLocks.length; i++) {
+            localLocks[i] = new Object();
+        }
+    }
+
+    public IntegrationService(SuiteRepository suiteRepository, SuiteNightRepository suiteNightRepository) {
+        this(suiteRepository, suiteNightRepository, null);
+    }
+
+    private void validatePropertyActiveAndApproved(String propertyId) {
+        if (propertyRepository != null && propertyId != null) {
+            Property property = propertyRepository.findById(propertyId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Propiedad no encontrada para esta API key"));
+            if (!Boolean.TRUE.equals(property.getActive()) || !"APPROVED".equalsIgnoreCase(property.getStatus())) {
+                throw new IllegalStateException("La propiedad no está activa o aprobada para gestionar habitaciones o disponibilidad");
+            }
+        }
     }
 
     @Caching(evict = {
@@ -55,6 +80,7 @@ public class IntegrationService {
         }
 
         String propertyId = apiKey.getPropertyId();
+        validatePropertyActiveAndApproved(propertyId);
         String externalId = request.getExternalId().trim();
         String lockKey = "integration:room:" + propertyId + ":" + externalId;
 
@@ -146,18 +172,15 @@ public class IntegrationService {
         if (redisLockService != null) {
             return redisLockService.executeWithLock(lockKey, java.time.Duration.ofSeconds(10), java.time.Duration.ofSeconds(2), action);
         }
-        Object monitor = localUpsertLocks.computeIfAbsent(lockKey, k -> new Object());
-        synchronized (monitor) {
-            try {
-                return action.get();
-            } finally {
-                localUpsertLocks.remove(lockKey, monitor);
-            }
+        int index = Math.abs(lockKey.hashCode() % localLocks.length);
+        synchronized (localLocks[index]) {
+            return action.get();
         }
     }
 
     public Map<String, Object> manageAvailability(ApiKey apiKey, IntegrationAvailabilityRequest request) {
         String propertyId = apiKey.getPropertyId();
+        validatePropertyActiveAndApproved(propertyId);
         String externalId = request.getExternalId().trim();
 
         Suite suite = suiteRepository.findByPropertyIdAndExternalId(propertyId, externalId)
@@ -171,6 +194,9 @@ public class IntegrationService {
         }
 
         long nights = ChronoUnit.DAYS.between(start, end);
+        if (nights > 365) {
+            throw new IllegalArgumentException("El rango de fechas no puede superar los 365 días");
+        }
         int totalUnits = suite.getTotalUnits() != null && suite.getTotalUnits() > 0 ? suite.getTotalUnits() : 1;
         if (request.getUnitSlot() != null && (request.getUnitSlot() < 1 || request.getUnitSlot() > totalUnits)) {
             throw new IllegalArgumentException("El unitSlot (" + request.getUnitSlot() + ") debe estar entre 1 y el total de unidades de la habitación (" + totalUnits + ")");
@@ -218,30 +244,35 @@ public class IntegrationService {
                 }
 
                 String blockRef = "EXT_BLOCK_" + UUID.randomUUID().toString().substring(0, 8);
+                List<SuiteNight> toInsert = new ArrayList<>();
+                for (int i = 0; i < nights; i++) {
+                    LocalDate date = start.plusDays(i);
+
+                    // Verificar si ya está bloqueado en esa fecha para ese slot
+                    boolean alreadyBlocked = occupied.stream().anyMatch(sn ->
+                            sn.getUnitSlot() != null && sn.getUnitSlot() == slot &&
+                            sn.getDates() != null && sn.getDates().contains(date) &&
+                            "blocked".equalsIgnoreCase(sn.getStatus())
+                    );
+
+                    if (!alreadyBlocked) {
+                        SuiteNight sn = SuiteNight.builder()
+                                .suite(suite.getId())
+                                .branch(suite.getBranch())
+                                .unitSlot(slot)
+                                .dates(Collections.singletonList(date))
+                                .booking(blockRef)
+                                .status("blocked")
+                                .createdAt(Instant.now())
+                                .build();
+                        toInsert.add(sn);
+                    }
+                }
+
                 List<SuiteNight> inserted = new ArrayList<>();
                 try {
-                    for (int i = 0; i < nights; i++) {
-                        LocalDate date = start.plusDays(i);
-
-                        // Verificar si ya está bloqueado en esa fecha para ese slot
-                        boolean alreadyBlocked = occupied.stream().anyMatch(sn ->
-                                sn.getUnitSlot() != null && sn.getUnitSlot() == slot &&
-                                sn.getDates() != null && sn.getDates().contains(date) &&
-                                "blocked".equalsIgnoreCase(sn.getStatus())
-                        );
-
-                        if (!alreadyBlocked) {
-                            SuiteNight sn = SuiteNight.builder()
-                                    .suite(suite.getId())
-                                    .branch(suite.getBranch())
-                                    .unitSlot(slot)
-                                    .dates(Collections.singletonList(date))
-                                    .booking(blockRef)
-                                    .status("blocked")
-                                    .createdAt(Instant.now())
-                                    .build();
-                            inserted.add(suiteNightRepository.save(sn));
-                        }
+                    if (!toInsert.isEmpty()) {
+                        inserted.addAll(suiteNightRepository.saveAll(toInsert));
                     }
                 } catch (DuplicateKeyException e) {
                     suiteNightRepository.deleteAll(inserted);

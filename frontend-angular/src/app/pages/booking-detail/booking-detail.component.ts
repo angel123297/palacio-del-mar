@@ -1,8 +1,9 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { CurrencyService } from '../../services/currency.service';
@@ -319,7 +320,7 @@ import { Booking } from '../../models/types';
             </div>
             
             <div style="border: 1px solid rgba(212,175,55,0.2); border-radius: 12px; overflow: hidden; height: 300px;">
-              <iframe [src]="getSafeEmbedMapUrl()" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+              <iframe [src]="getSafeEmbedMapUrl()" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Mapa de ubicación del hotel"></iframe>
             </div>
           </div>
 
@@ -438,7 +439,7 @@ import { Booking } from '../../models/types';
     }
   `]
 })
-export class BookingDetailComponent implements OnInit {
+export class BookingDetailComponent implements OnInit, OnDestroy {
   booking: any = null;
   loading = true;
   pinCopied = false;
@@ -466,7 +467,18 @@ export class BookingDetailComponent implements OnInit {
   modifyLoading = false;
   modifyError = '';
   modifySuccess = '';
-  minDate = new Date().toISOString().substring(0, 10);
+
+  private getTodayBogota(): string {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    } catch {
+      const t = new Date();
+      return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    }
+  }
+
+  minDate = this.getTodayBogota();
+  private routeSub?: Subscription;
 
   constructor(
     private sanitizer: DomSanitizer,
@@ -478,32 +490,57 @@ export class BookingDetailComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.api.get<any>(`/bookings/${id}`).subscribe({
-        next: (res) => {
-          this.booking = res.data || res;
-          this.loading = false;
-          if (this.booking?.documentNumber) {
-            this.preCheckInDoc = this.booking.documentNumber;
-          }
-          if (this.booking?.companionGuests) {
-            this.preCheckInCompanions = this.booking.companionGuests;
-          }
-          if (this.booking?.status === 'checked_out' || this.booking?.status === 'completed') {
-            this.fetchBookingReview(this.booking._id || this.booking.id || id);
-          }
-          this.cdr.detectChanges();
-        },
-        error: () => {
+    if (this.route.paramMap) {
+      this.routeSub = this.route.paramMap.subscribe(params => {
+        const id = params.get('id');
+        if (id) {
+          this.loading = true;
+          this.loadBookingById(id);
+        } else {
           this.loading = false;
           this.cdr.detectChanges();
         }
       });
     } else {
-      this.loading = false;
-      this.cdr.detectChanges();
+      const id = this.route.snapshot?.paramMap?.get('id');
+      if (id) {
+        this.loading = true;
+        this.loadBookingById(id);
+      } else {
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
     }
+  }
+
+  ngOnDestroy(): void {
+    if (this.routeSub) {
+      this.routeSub.unsubscribe();
+    }
+  }
+
+  private loadBookingById(id: string): void {
+    this.api.get<any>(`/bookings/${id}`).subscribe({
+      next: (res) => {
+        this.booking = res.data || res;
+        this.loading = false;
+        if (this.booking?.documentNumber) {
+          this.preCheckInDoc = this.booking.documentNumber;
+        }
+        if (this.booking?.companionGuests) {
+          this.preCheckInCompanions = this.booking.companionGuests;
+        }
+        if (this.booking?.status === 'checked_out' || this.booking?.status === 'completed') {
+          this.fetchBookingReview(this.booking._id || this.booking.id || id);
+        }
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.booking = null;
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   fetchBookingReview(bookingId: string): void {

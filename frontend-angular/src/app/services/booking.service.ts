@@ -9,7 +9,11 @@ export class BookingService {
   /** GET /bookings devuelve solo las reservas del usuario autenticado (filtro del backend). */
   getMyBookings(): Observable<Booking[]> {
     return this.api.get<any>('/bookings').pipe(
-      map(res => (res?.data || res) as Booking[])
+      map(res => {
+        if (Array.isArray(res?.data)) return res.data as Booking[];
+        if (Array.isArray(res)) return res as Booking[];
+        return [];
+      })
     );
   }
   createBooking(booking: any, idempotencyKey?: string): Observable<Booking> {

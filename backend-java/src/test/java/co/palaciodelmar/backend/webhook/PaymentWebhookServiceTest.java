@@ -63,6 +63,47 @@ class PaymentWebhookServiceTest {
     }
 
     @Test
+    void lateFailureCannotOverwriteSettledPayments() throws Exception {
+        for (String state : List.of("completed", "refunded", "partially_refunded", "requires_refund")) {
+            Payment payment = Payment.builder().id("p").intentId("pi_1").booking("b").status(state).build();
+            when(paymentRepository.findByIntentId("pi_1")).thenReturn(Optional.of(payment));
+            String eventId = "evt_" + state;
+            String body = objectMapper.writeValueAsString(Map.of("eventId", eventId,
+                    "eventType", "payment.failed", "data", Map.of("intentId", "pi_1")));
+            webhookService.processWebhook(body, WebhookSigner.sign(body, secret), eventId,
+                    String.valueOf(Instant.now().getEpochSecond()));
+            assertEquals(state, payment.getStatus());
+        }
+        verify(paymentRepository, never()).save(any());
+        verifyNoInteractions(bookingRepository, emailService);
+    }
+
+    @Test
+    void missingEventTypeIsRejectedBeforeMutatingPayment() {
+        String body = "{\"eventId\":\"evt_missing_type\",\"eventType\":null,\"data\":{\"intentId\":\"pi_1\"}}";
+        assertThrows(IllegalArgumentException.class, () -> webhookService.processWebhook(body,
+                WebhookSigner.sign(body, secret), "evt_missing_type", String.valueOf(Instant.now().getEpochSecond())));
+        verifyNoInteractions(paymentRepository, bookingRepository, emailService);
+    }
+
+    @Test
+    void failureUsesPaymentThenBookingLocks() throws Exception {
+        var locks = spy(new co.palaciodelmar.backend.service.RedisLockService(null));
+        ReflectionTestUtils.setField(webhookService, "redisLockService", locks);
+        Payment payment = Payment.builder().intentId("pi_lock").booking("b_lock").status("processing").build();
+        Booking booking = Booking.builder().id("b_lock").status("pending").paymentStatus("pending").build();
+        when(paymentRepository.findByIntentId("pi_lock")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("b_lock")).thenReturn(Optional.of(booking));
+        String body = objectMapper.writeValueAsString(Map.of("eventType", "payment.failed", "data", Map.of("intentId", "pi_lock")));
+        webhookService.processWebhook(body, WebhookSigner.sign(body, secret), "evt_lock", String.valueOf(Instant.now().getEpochSecond()));
+        assertEquals("failed", payment.getStatus());
+        assertEquals("failed", booking.getPaymentStatus());
+        var order = inOrder(locks);
+        order.verify(locks).executeWithLock(eq("payment:pi_lock"), any(), any(), any());
+        order.verify(locks).executeWithLock(eq("booking:b_lock"), any(), any(), any());
+    }
+
+    @Test
     void testValidWebhookPaymentSucceededConfirmsBooking() {
         String eventId = "evt_test_1001";
         String intentId = "pi_test_intent";

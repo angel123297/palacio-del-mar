@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { CommonModule } from '@angular/common';
@@ -10,10 +10,11 @@ import { CommonModule } from '@angular/common';
   templateUrl: './verify-email.html',
   styleUrl: './verify-email.scss',
 })
-export class VerifyEmail implements OnInit {
+export class VerifyEmail implements OnInit, OnDestroy {
   status = signal<'loading' | 'success' | 'error'>('loading');
   message = signal<string>('Verificando tu correo electrónico...');
   returnUrl = signal<string>('/');
+  private redirectTimer: any = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -23,7 +24,7 @@ export class VerifyEmail implements OnInit {
 
   ngOnInit() {
     const rawReturn = this.route.snapshot.queryParamMap.get('returnUrl');
-    if (rawReturn && rawReturn.startsWith('/')) {
+    if (rawReturn && rawReturn.startsWith('/') && !rawReturn.startsWith('//')) {
       this.returnUrl.set(rawReturn);
     }
 
@@ -47,14 +48,21 @@ export class VerifyEmail implements OnInit {
             targetUrl = '/anfitrion';
           }
         }
-        setTimeout(() => {
+        this.redirectTimer = setTimeout(() => {
           this.router.navigateByUrl(targetUrl);
         }, 2000);
       },
       error: (err) => {
         this.status.set('error');
-        this.message.set('Error: Enlace inválido o expirado');
+        this.message.set(err?.error?.message || err?.message || 'Error: Enlace inválido o expirado');
       }
     });
+  }
+
+  ngOnDestroy() {
+    if (this.redirectTimer) {
+      clearTimeout(this.redirectTimer);
+      this.redirectTimer = null;
+    }
   }
 }

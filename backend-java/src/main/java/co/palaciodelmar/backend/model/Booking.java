@@ -81,6 +81,7 @@ public class Booking {
     @Builder.Default
     private BigDecimal pendingRefundAmount = BigDecimal.ZERO;
 
+    @Indexed
     private String pendingRefundIdempotencyKey;
 
     @Builder.Default
@@ -135,6 +136,7 @@ public class Booking {
     private String appliedPromotionName;
     private BigDecimal appliedPromotionDiscountPercent;
 
+    @Indexed
     private Instant expiresAt;
 
     @Builder.Default

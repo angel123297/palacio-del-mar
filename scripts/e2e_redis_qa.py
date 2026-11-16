@@ -15,6 +15,9 @@ import json
 import subprocess
 import sys
 import time
+from datetime import date, timedelta
+import os
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -24,11 +27,16 @@ BACKEND_URL = "http://127.0.0.1:5000"
 NGINX_URL = "http://127.0.0.1:4200"
 
 def get_env_var(var_name: str) -> str:
+    val = os.getenv(var_name)
+    if val:
+        return val
+    env_path = Path(__file__).resolve().parent.parent / ".env"
     try:
-        with open("/home/angel19/Notas/palacio-del-mar/.env") as f:
+        with open(env_path) as f:
             for line in f:
+                line = line.strip()
                 if line.startswith(var_name + "="):
-                    return line.strip().split("=", 1)[1]
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
     except Exception:
         pass
     return ""
@@ -122,7 +130,8 @@ def run_suite():
         JSON.stringify(p ? { id: String(p._id), ownerId: p.ownerId, branch: p.branchId || 'bocagrande' } : null);
     """)
     prop_info = json.loads(prop_json)
-    assert_true(prop_info is not None, f"Propiedad aprobada base localizada ({prop_info['id']})")
+    assert_true(prop_info is not None, "Propiedad aprobada base localizada")
+    prop_id = prop_info.get("id") or prop_info.get("_id")
 
     temp_suite_slug = f"e2e-suite-redis-{run_id}"
     inserted_suite_id = mongosh_eval(f"""
@@ -487,14 +496,16 @@ def run_suite():
 
     # 12. M-11: Cotización con Desglose de Huéspedes Adicionales
     print("\n[12] Red Team M-11 — Cotización Consistente con Huéspedes Extra...")
+    calc_checkin = (date.today() + timedelta(days=5)).isoformat()
+    calc_checkout = (date.today() + timedelta(days=7)).isoformat()
     st_calc, res_calc, _ = http_req(
         NGINX_URL,
         "/api/suites/calculate-price",
         method="POST",
         body={
             "suiteId": inserted_suite_id,
-            "checkIn": "2026-11-10",
-            "checkOut": "2026-11-12",
+            "checkIn": calc_checkin,
+            "checkOut": calc_checkout,
             "guests": 4,
             "includeExperiences": False
         }

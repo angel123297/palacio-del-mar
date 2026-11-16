@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.BookingRequest;
+import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.BookingRepository;
@@ -93,7 +94,7 @@ class BookingOwnershipSecurityTest {
         when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(victimBooking()));
         BookingRequest request = new BookingRequest();
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 bookingService.modifyBooking("b-victim", "user-attacker", request));
     }
 
@@ -102,7 +103,7 @@ class BookingOwnershipSecurityTest {
     void testCancelBookingOfAnotherUserFails() {
         when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(victimBooking()));
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 bookingService.cancelBooking("b-victim", "user-attacker", "porque sí"));
     }
 
@@ -111,7 +112,7 @@ class BookingOwnershipSecurityTest {
     void testAddExperienceToAnotherUserBookingFails() {
         when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(victimBooking()));
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 bookingService.addExperienceToBooking("b-victim", "user-attacker", "exp-1"));
     }
 
@@ -120,7 +121,7 @@ class BookingOwnershipSecurityTest {
     void testRemoveExperienceFromAnotherUserBookingFails() {
         when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(victimBooking()));
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 bookingService.removeExperienceFromBooking("b-victim", "user-attacker", "exp-1"));
     }
 
@@ -129,7 +130,7 @@ class BookingOwnershipSecurityTest {
     void testPreCheckInOfAnotherUserBookingFails() {
         when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(victimBooking()));
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 bookingService.performPreCheckIn("b-victim", "user-attacker", "123456789", ""));
     }
 
@@ -139,7 +140,7 @@ class BookingOwnershipSecurityTest {
         when(bookingRepository.findById("b-victim")).thenReturn(Optional.of(victimBooking()));
         User attacker = User.builder().id("user-attacker").email("a@a.com").role("user").build();
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 bookingService.getBookingByIdSecure("b-victim", attacker));
     }
 
@@ -173,7 +174,7 @@ class BookingOwnershipSecurityTest {
         User host = User.builder().id("host-1").email("h@a.com").role("host")
                 .branches(List.of("branch-other")).build();
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 bookingService.getBookingByIdSecure("b-victim", host));
     }
 
@@ -210,7 +211,7 @@ class BookingOwnershipSecurityTest {
         User hostSinSedes = User.builder().id("host-1").email("h@a.com").role("host")
                 .branches(new ArrayList<>()).build();
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 bookingService.getBookingByIdSecure("b-victim", hostSinSedes));
     }
 
@@ -490,7 +491,7 @@ class BookingOwnershipSecurityTest {
         User guest = User.builder().id("user-victim").email("anaperez@example.com").build();
         when(userRepository.findById("user-victim")).thenReturn(Optional.of(guest));
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 bookingService.performPreCheckIn("b-victim", null, "123456789", ""));
 
         co.palaciodelmar.backend.dto.BookingDTO anonDto = bookingService.getBookingByCodeSecure("PDM-PII1", null);

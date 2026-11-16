@@ -74,14 +74,30 @@ public class BookingService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private AvailabilityCacheEvictor availabilityCacheEvictor;
 
+    @lombok.Setter
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private java.time.Clock clock = java.time.Clock.system(BOGOTA_ZONE);
+
+    private LocalDate today() {
+        return clock.instant().atZone(BOGOTA_ZONE).toLocalDate();
+    }
+
+    private LocalTime nowTime() {
+        return clock.instant().atZone(BOGOTA_ZONE).toLocalTime();
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private co.palaciodelmar.backend.repository.PaymentRepository paymentRepository;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
 
-    private static final java.util.concurrent.ConcurrentHashMap<String, Object> BOOKING_MONITORS =
-            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Object[] BOOKING_STRIPED_MONITORS = new Object[64];
+    static {
+        for (int i = 0; i < BOOKING_STRIPED_MONITORS.length; i++) {
+            BOOKING_STRIPED_MONITORS[i] = new Object();
+        }
+    }
     private static final Object CRIB_MONITOR = new Object();
 
     public void setPaymentRepository(co.palaciodelmar.backend.repository.PaymentRepository paymentRepository) {
@@ -121,7 +137,7 @@ public class BookingService {
         if (booking == null || booking.getCheckIn() == null) {
             return false;
         }
-        Instant effectiveNow = now != null ? now : Instant.now();
+        Instant effectiveNow = now != null ? now : clock.instant();
         Instant checkInInstant = booking.getCheckIn()
                 .atTime(resolveCheckInTime(booking))
                 .atZone(BOGOTA_ZONE)
@@ -166,8 +182,8 @@ public class BookingService {
             throw new IllegalArgumentException("Debes seleccionar al menos una actividad o experiencia válida");
         }
 
-        LocalDate actDate = request.getCheckIn() != null ? request.getCheckIn() : LocalDate.now(BOGOTA_ZONE);
-        if (actDate.isBefore(LocalDate.now(BOGOTA_ZONE))) {
+        LocalDate actDate = request.getCheckIn() != null ? request.getCheckIn() : today();
+        if (actDate.isBefore(today())) {
             throw new IllegalArgumentException("La fecha de la experiencia no puede ser anterior a la fecha actual");
         }
 
@@ -281,13 +297,16 @@ public class BookingService {
             throw new IllegalArgumentException("Las fechas de check-in y check-out son obligatorias");
         }
 
-        if (request.getCheckIn().isBefore(LocalDate.now(BOGOTA_ZONE))) {
+        if (request.getCheckIn().isBefore(today())) {
             throw new IllegalArgumentException("La fecha de check-in no puede ser anterior a la fecha actual");
         }
 
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
         if (nights <= 0) {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
+        }
+        if (nights > 365) {
+            throw new IllegalArgumentException("La reserva no puede superar los 365 días");
         }
 
         final String resolvedUserId = userId;
@@ -432,7 +451,6 @@ public class BookingService {
 
             // Block nights con reintento automático en el siguiente slot disponible si hay colisión concurrente
             boolean nightsLocked = false;
-            cleanExpiredHeldNights(suite.getId(), request.getCheckIn(), request.getCheckOut());
 
             for (int candidateSlot : availableSlots) {
                 List<SuiteNight> insertedNights = new java.util.ArrayList<>();
@@ -496,7 +514,7 @@ public class BookingService {
 
     public BookingDTO modifyBooking(String bookingId, String userId, BookingRequest request) {
         Booking booking = getBookingEntityById(bookingId);
-        if (!booking.getUser().equals(userId)) {
+        if (!java.util.Objects.equals(booking.getUser(), userId)) {
             throw new ForbiddenAccessException("No tienes permiso para modificar esta reserva");
         }
 
@@ -527,13 +545,16 @@ public class BookingService {
             throw new IllegalArgumentException("Las fechas de check-in y check-out son obligatorias");
         }
 
-        if (request.getCheckIn().isBefore(LocalDate.now(BOGOTA_ZONE))) {
+        if (request.getCheckIn().isBefore(today())) {
             throw new IllegalArgumentException("La fecha de check-in no puede ser anterior a la fecha actual");
         }
 
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
         if (nights <= 0) {
             throw new IllegalArgumentException("La fecha de check-out debe ser posterior al check-in");
+        }
+        if (nights > 365) {
+            throw new IllegalArgumentException("La reserva no puede superar los 365 días");
         }
 
         String resolvedBookingId = booking.getId() != null ? booking.getId() : bookingId;
@@ -542,7 +563,7 @@ public class BookingService {
         Booking modifiedBooking = executeWithBookingLock(resolvedBookingId, () -> executeWithSuiteLock(suite.getId(), () -> executeWithCribLock(needsCribLockForModify, () -> {
             java.time.Instant now = java.time.Instant.now();
             Booking freshBooking = bookingRepository.findById(resolvedBookingId).orElse(booking);
-            if (!freshBooking.getUser().equals(userId)) {
+            if (!java.util.Objects.equals(freshBooking.getUser(), userId)) {
                 throw new ForbiddenAccessException("No tienes permiso para modificar esta reserva");
             }
             if (!"pending".equalsIgnoreCase(freshBooking.getStatus()) && !"confirmed".equalsIgnoreCase(freshBooking.getStatus())) {
@@ -779,7 +800,7 @@ public class BookingService {
     }
 
     public List<BookingDTO> getUpcomingBookings(String userId) {
-        LocalDate today = LocalDate.now(BOGOTA_ZONE);
+        LocalDate today = today();
         return bookingRepository.findByUserOrderByCreatedAtDesc(userId).stream()
                 .filter(b -> b.getCheckIn() != null && !b.getCheckIn().isBefore(today))
                 .filter(b -> !"cancelled".equalsIgnoreCase(b.getStatus()) && !"expired".equalsIgnoreCase(b.getStatus()))
@@ -804,11 +825,11 @@ public class BookingService {
             boolean isHost = "HOST".equalsIgnoreCase(user.getRole());
             if (isHost) {
                 validateHostAccessToBooking(user, booking);
-            } else if (!isAdmin && !booking.getUser().equals(user.getId())) {
+            } else if (!isAdmin && !java.util.Objects.equals(booking.getUser(), user.getId())) {
                 throw new ForbiddenAccessException("No tienes permiso para acceder a esta reserva");
             }
         } else {
-            boolean isGuestBooking = userRepository.findById(booking.getUser())
+            boolean isGuestBooking = booking.getUser() == null || userRepository.findById(booking.getUser())
                     .map(u -> u.getPassword() == null || u.getPassword().isBlank())
                     .orElse(true);
             if (!isGuestBooking) {
@@ -830,11 +851,11 @@ public class BookingService {
             boolean isHost = "HOST".equalsIgnoreCase(user.getRole());
             if (isHost) {
                 validateHostAccessToBooking(user, booking);
-            } else if (!isAdmin && !booking.getUser().equals(user.getId())) {
+            } else if (!isAdmin && !java.util.Objects.equals(booking.getUser(), user.getId())) {
                 throw new ForbiddenAccessException("No tienes permiso para acceder a esta reserva");
             }
         } else {
-            boolean isGuestBooking = userRepository.findById(booking.getUser())
+            boolean isGuestBooking = booking.getUser() == null || userRepository.findById(booking.getUser())
                     .map(u -> u.getPassword() == null || u.getPassword().isBlank())
                     .orElse(true);
             if (!isGuestBooking) {
@@ -931,14 +952,14 @@ public class BookingService {
 
     public BookingDTO cancelBooking(String bookingId, String userId, String reason) {
         Booking outerBooking = getBookingEntityById(bookingId);
-        if (!outerBooking.getUser().equals(userId)) {
+        if (!java.util.Objects.equals(outerBooking.getUser(), userId)) {
             throw new ForbiddenAccessException("No tienes permiso para cancelar esta reserva");
         }
         String resolvedBookingId = outerBooking.getId() != null ? outerBooking.getId() : bookingId;
 
         java.util.function.Supplier<BookingDTO> cancelCriticalSection = () -> executeWithSuiteLock(outerBooking.getSuite(), () -> {
             Booking booking = bookingRepository.findById(resolvedBookingId).orElse(outerBooking);
-            if (!booking.getUser().equals(userId)) {
+            if (!java.util.Objects.equals(booking.getUser(), userId)) {
                 throw new ForbiddenAccessException("No tienes permiso para cancelar esta reserva");
             }
             if (booking.getCheckIn() == null) {
@@ -949,7 +970,7 @@ public class BookingService {
             }
             reconcilePendingRefundBeforeChange(booking, resolvedBookingId);
 
-            long daysUntilCheckIn = ChronoUnit.DAYS.between(LocalDate.now(BOGOTA_ZONE), booking.getCheckIn());
+            long daysUntilCheckIn = ChronoUnit.DAYS.between(today(), booking.getCheckIn());
             BigDecimal paidAmount = booking.getPaidAmount() != null
                     ? booking.getPaidAmount().max(BigDecimal.ZERO)
                     : BigDecimal.ZERO;
@@ -961,7 +982,7 @@ public class BookingService {
             // El depósito de garantía no es ingreso: la penalidad se calcula sobre el total sin él.
             BigDecimal cancelDeposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
             BigDecimal retentionBase = booking.getTotalPrice().subtract(cancelDeposit).max(BigDecimal.ZERO);
-            if (isWithinHoursOfCheckIn(booking, 48, Instant.now())) {
+            if (isWithinHoursOfCheckIn(booking, 48, clock.instant())) {
                 // RN-F03 (No-Show estricto < 48 horas): Cancelación tardía con penalidad del 100%.
                 retention = retentionBase;
             } else if (daysUntilCheckIn < 7) {
@@ -1034,7 +1055,8 @@ public class BookingService {
 
     public static Object getBookingMonitor(String bookingId) {
         String key = (bookingId != null && !bookingId.isBlank()) ? bookingId.trim() : "__default__";
-        return BOOKING_MONITORS.computeIfAbsent(key, k -> new Object());
+        int index = Math.abs(key.hashCode() % BOOKING_STRIPED_MONITORS.length);
+        return BOOKING_STRIPED_MONITORS[index];
     }
 
     public <T> T executeWithBookingLock(String bookingId, java.util.function.Supplier<T> action) {
@@ -1317,10 +1339,10 @@ public class BookingService {
 
     public BookingDTO guestCheckOut(String bookingId, String userId) {
         Booking booking = getBookingEntityById(bookingId);
-        if (!booking.getUser().equals(userId)) {
+        if (!java.util.Objects.equals(booking.getUser(), userId)) {
             throw new ForbiddenAccessException("No tienes permiso para finalizar esta reserva");
         }
-        return processCheckOut(bookingId, userId, "Check-out realizado por el huésped", true);
+        return processCheckOut(bookingId, userId, "Check-out realizado por el huésped", false);
     }
 
     public BookingDTO processCheckOut(String bookingId, String performedBy, String reason, boolean isAutomatic) {
@@ -1335,9 +1357,8 @@ public class BookingService {
                 throw new IllegalStateException("No se puede realizar check-out desde el estado " + booking.getStatus());
             }
 
-            java.time.ZoneId bogota = java.time.ZoneId.of("America/Bogota");
-            LocalDate today = LocalDate.now(bogota);
-            LocalTime nowTime = LocalTime.now(bogota);
+            LocalDate today = today();
+            LocalTime nowTime = nowTime();
 
             // Evaluate late check-out únicamente para check-outs manuales; el automático de la 1:00 PM cierra a tiempo sin penalizar depósito
             boolean isLate = !isAutomatic && booking.getCheckOut() != null
@@ -1345,10 +1366,15 @@ public class BookingService {
 
             boolean pinActive = booking.getSmartLockPin() != null && !booking.getSmartLockPin().isBlank();
 
-            if (isLate && pinActive && booking.getPricePerNight() != null) {
+            BigDecimal effectivePricePerNight = booking.getPricePerNight();
+            if (effectivePricePerNight == null && booking.getSubtotal() != null && booking.getNights() != null && booking.getNights() > 0) {
+                effectivePricePerNight = booking.getSubtotal().divide(BigDecimal.valueOf(booking.getNights()), 2, RoundingMode.HALF_UP);
+            }
+
+            if (isLate && pinActive && effectivePricePerNight != null) {
                 BigDecimal currentTotal = booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO;
                 BigDecimal currentBalance = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
-                BigDecimal recargo = booking.getPricePerNight().multiply(new BigDecimal("0.50")).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal recargo = effectivePricePerNight.multiply(new BigDecimal("0.50")).setScale(2, RoundingMode.HALF_UP);
 
                 booking.setTotalPrice(currentTotal.add(recargo));
                 booking.setBalanceDue(currentBalance.add(recargo));
@@ -1654,7 +1680,7 @@ public class BookingService {
         String resolvedBookingId = outerBooking.getId() != null ? outerBooking.getId() : bookingId;
         return executeWithBookingLock(resolvedBookingId, () -> {
             Booking booking = bookingRepository.findById(resolvedBookingId).orElse(outerBooking);
-            if (!booking.getUser().equals(userId)) {
+            if (!java.util.Objects.equals(booking.getUser(), userId)) {
                 throw new ForbiddenAccessException("No tienes permiso para modificar esta reserva");
             }
             assertBookingCanBeModified(booking);
@@ -1726,7 +1752,7 @@ public class BookingService {
         String resolvedBookingId = outerBooking.getId() != null ? outerBooking.getId() : bookingId;
         return executeWithBookingLock(resolvedBookingId, () -> {
             Booking booking = bookingRepository.findById(resolvedBookingId).orElse(outerBooking);
-            if (!booking.getUser().equals(userId)) {
+            if (!java.util.Objects.equals(booking.getUser(), userId)) {
                 throw new ForbiddenAccessException("No tienes permiso para modificar esta reserva");
             }
             assertBookingCanBeModified(booking);
@@ -1763,7 +1789,7 @@ public class BookingService {
             BigDecimal refundDiff = netPaid.subtract(newTotal).max(BigDecimal.ZERO);
 
             if (refundDiff.compareTo(BigDecimal.ZERO) > 0
-                    && isWithinHoursOfCheckIn(booking, 48, Instant.now())) {
+                    && isWithinHoursOfCheckIn(booking, 48, clock.instant())) {
                 throw new IllegalArgumentException("No se permiten reembolsos por eliminación de experiencias con menos de 48 horas de anticipación al check-in");
             }
 
@@ -1926,7 +1952,7 @@ public class BookingService {
         String status = booking.getStatus() != null ? booking.getStatus() : "pending";
         boolean isCancelable = "pending".equalsIgnoreCase(status) || "confirmed".equalsIgnoreCase(status);
         boolean isStandalone = "standalone-experience".equalsIgnoreCase(booking.getSuite());
-        boolean isModifiable = isCancelable && !isStandalone && (booking.getCheckIn() == null || !booking.getCheckIn().isBefore(LocalDate.now(BOGOTA_ZONE)));
+        boolean isModifiable = isCancelable && !isStandalone && (booking.getCheckIn() == null || !booking.getCheckIn().isBefore(today()));
 
         String code = booking.getBookingCode();
         if (code == null || code.trim().isEmpty()) {
@@ -2353,16 +2379,6 @@ public class BookingService {
                 .orElse(null);
     }
 
-    private Promotion findActiveBranchPromotionEntity(String branchId, LocalDate checkIn, LocalDate checkOut) {
-        if (branchId == null || checkIn == null || checkOut == null) return null;
-        List<Promotion> promotions = promotionRepository.findByBranchAndActiveTrue(branchId);
-        return promotions.stream()
-                .filter(p -> p.getDiscountPercent() != null && p.getDiscountPercent() > 0)
-                .filter(p -> (p.getStartDate() == null || !p.getStartDate().isAfter(checkOut.minusDays(1))) &&
-                             (p.getEndDate() == null || !p.getEndDate().isBefore(checkIn)))
-                .max(java.util.Comparator.comparing(Promotion::getDiscountPercent))
-                .orElse(null);
-    }
 
 
     public BookingDTO performPreCheckIn(String bookingId, String userId, String documentNumber, String companionGuests) {

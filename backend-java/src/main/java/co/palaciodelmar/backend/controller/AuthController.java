@@ -58,7 +58,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody AuthRequest request, jakarta.servlet.http.HttpServletResponse httpResponse, jakarta.servlet.http.HttpServletRequest httpRequest) {
+    public ResponseEntity<Map<String, Object>> login(@jakarta.validation.Valid @RequestBody AuthRequest request, jakarta.servlet.http.HttpServletResponse httpResponse, jakarta.servlet.http.HttpServletRequest httpRequest) {
         AuthResponse response = authService.login(request);
         addJwtCookie(httpResponse, response.getToken(), httpRequest);
 

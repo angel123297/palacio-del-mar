@@ -33,6 +33,7 @@ class AutoStayLifecycleSchedulerTest {
         bookingRepository = mock(BookingRepository.class);
         bookingService = mock(BookingService.class);
         scheduler = new AutoStayLifecycleScheduler(bookingRepository, bookingService);
+        scheduler.setClock(java.time.Clock.fixed(java.time.Instant.parse("2026-11-16T20:30:00Z"), BOGOTA)); // 15:30 COT
         ReflectionTestUtils.setField(scheduler, "autoCheckInHour", 15);
         ReflectionTestUtils.setField(scheduler, "autoCheckOutHour", 12);
     }
@@ -40,7 +41,7 @@ class AutoStayLifecycleSchedulerTest {
     @Test
     @DisplayName("Self Check-in automático: Activa PIN y pasa a CHECKED_IN a la hora de llegada oficial (15:00)")
     void testAutoCheckInExecution() {
-        LocalDate today = LocalDate.now(BOGOTA);
+        LocalDate today = LocalDate.of(2026, 11, 16);
 
         Booking booking = Booking.builder()
                 .id("bk-checkin-1")
@@ -66,7 +67,7 @@ class AutoStayLifecycleSchedulerTest {
     @Test
     @DisplayName("Auto Check-out programado: A la hora de salida (12:00) devuelve depósito y pasa a CHECKED_OUT")
     void testAutoCheckOutExecution() {
-        LocalDate today = LocalDate.now(BOGOTA);
+        LocalDate today = LocalDate.of(2026, 11, 16);
 
         Booking booking = Booking.builder()
                 .id("bk-checkout-1")
@@ -96,7 +97,7 @@ class AutoStayLifecycleSchedulerTest {
     @Test
     @DisplayName("Late Check-out: Si el PIN sigue activo pasadas las 13:00 antes de cerrar, se aplica recargo del 50%")
     void testLateCheckOutPenaltyAppliedWhenPinActiveAfter13() {
-        LocalDate today = LocalDate.now(BOGOTA);
+        LocalDate today = LocalDate.of(2026, 11, 16);
 
         Booking booking = Booking.builder()
                 .id("bk-late-1")
@@ -130,7 +131,7 @@ class AutoStayLifecycleSchedulerTest {
     @Test
     @DisplayName("C-2: AutoStayLifecycle ignora reservas cuyo estado ya cambió concurrentemente al re-leer")
     void testSkipsStaleBookingWhenFreshStatusChanged() {
-        LocalDate today = LocalDate.now(BOGOTA);
+        LocalDate today = LocalDate.of(2026, 11, 16);
 
         Booking stale = Booking.builder()
                 .id("bk-stale-1")

@@ -95,4 +95,19 @@ class AvailabilityControllerTest {
 
         verifyNoInteractions(availabilityService);
     }
+
+    @Test
+    void invalidMonthOrYearReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/availability/monthly")
+                        .param("year", "2026")
+                        .param("month", "13"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/availability/promotions")
+                        .param("year", "1999")
+                        .param("month", "5"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(availabilityService);
+    }
 }

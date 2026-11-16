@@ -28,6 +28,17 @@ class SecurityConfigCorsTest {
     }
 
     @Test
+    void rejectsPublicTunnelSubdomainsButKeepsPermanentProjectTunnel() {
+        CorsConfiguration config = buildCorsConfig("http://localhost:4200");
+        assertNull(config.checkOrigin("https://evil.ngrok-free.dev"));
+        assertNull(config.checkOrigin("https://evil.ngrok.app"));
+        assertNull(config.checkOrigin("https://evil.loca.lt"));
+        String trusted = "https://rehab-perceive-landline.ngrok-free.dev";
+        assertEquals(trusted, config.checkOrigin(trusted));
+        assertEquals(Boolean.TRUE, config.getAllowCredentials());
+    }
+
+    @Test
     @DisplayName("CORS permite orígenes locales de desarrollo (localhost y 127.0.0.1)")
     void testAllowsLocalhostOrigins() {
         CorsConfiguration config = buildCorsConfig("http://localhost:4200");

@@ -16,7 +16,7 @@ public class HostPayoutScheduler {
     /**
      * Ejecuta la liquidación automática de anfitriones cada hora (o a la medianoche en producción).
      */
-    @Scheduled(fixedRateString = "${palacio.payouts.check.interval.ms:3600000}")
+    @Scheduled(fixedDelayString = "${palacio.payouts.check.interval.ms:3600000}")
     public void runAutomatedPayoutSettlement() {
         try {
             log.info("Iniciando tarea programada de liquidación de anfitriones...");

@@ -6,6 +6,7 @@ import co.palaciodelmar.backend.repository.*;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -15,6 +16,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 public class AdminService {
 
@@ -154,9 +156,6 @@ public class AdminService {
             }
 
             bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado", false);
-            if (!targetStatus.name().equalsIgnoreCase(fresh.getStatus())) {
-                bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado");
-            }
             Booking saved = bookingRepository.save(fresh);
             bookingService.publishBookingStatusEvent(saved, targetStatus);
 
@@ -188,10 +187,16 @@ public class AdminService {
                         saved = bookingRepository.save(saved);
                     }
                 } catch (RuntimeException ex) {
+                    log.warn("Fallo ejecutando reembolso automático para reserva {}: {}", saved.getId(), ex.getMessage());
+                    saved.setPaymentStatus("requires_refund");
                     if (saved.getPendingRefundAmount() == null || saved.getPendingRefundAmount().compareTo(BigDecimal.ZERO) <= 0) {
-                        saved.setPaymentStatus("requires_refund");
                         saved.setPendingRefundAmount(netPaid);
                         saved.setPendingRefundIdempotencyKey(idemKey);
+                    }
+                    try {
+                        saved = bookingRepository.save(saved);
+                    } catch (Exception saveEx) {
+                        log.error("Fallo persistiendo requires_refund para reserva {}: {}", saved.getId(), saveEx.getMessage());
                     }
                 }
             }

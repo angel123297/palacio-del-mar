@@ -1,0 +1,425 @@
+Plan de remediación de auditoría — 2026-11-16
+Ejecución: inline, guía executing-plans. Revisión por Antigravity de cada bloque.
+Especificación: AUDITORIA_BUGS_VERIFICADOS.md y reglas explícitas del usuario en esta conversación.
+Objetivo: corregir los 97 hallazgos con evidencia por identificador.
+Arquitectura: conservar Spring/Angular/REST; agrupar cambios por flujos y verificar integraciones.
+Restricciones:
+- Rama fix/payment-refund-payout-edge-cases; no merges ni cambios en main/proyecto-angular-java.
+- Pagos simulados inmediatos; correo solo confirmado con PIN, PDF e ICS.
+- Payout: anfitrión responde solo por alojamiento neto; excluir impuestos y depósitos.
+- Verificación obligatoria aunque SMTP falle; reenviar invalida todos los tokens anteriores.
+- Ngrok https://rehab-perceive-landline.ngrok-free.dev habilitado explícitamente.
+- Bearer para Flutter/scripts continúa funcionando aunque navegador use cookies.
+- Sanear datos ANTES de índices únicos; migrar credenciales en todos los consumidores coordinadamente.
+- Solo README.md raíz versionado en Markdown; documentos de trabajo .txt.
+- No dar por cerrado un bloque sin tests, build, HTTP real y revisión Antigravity.
+Focos de revisión:
+1. Carrera verificación/reenvío: token anterior no puede consumir una solicitud posterior.
+2. Reembolsos mixtos: depósitos/impuestos no reducen alojamiento neto del anfitrión.
+3. Doble envío/webhooks tardíos: una sola transición válida y un solo correo confirmado.
+4. Sesión móvil Bearer y navegador cookie detrás de Ngrok siguen funcionando.
+5. Volúmenes existentes: migración de credenciales/índices conserva datos y arranque.
+Orden de bloques:
+1. Autenticación y autorización: B1-B4,B8-B9,B12,B17,B29,B33,T1,I1,I2,I5; sesiones frontend F1-F3,F24,F27,F29,F30,F37.
+2. Integridad financiera: B5,B7,B13-B16,B20,B22-B23; F20-F22,F33.
+3. Backend robustez: B6,B10-B11,B18-B19,B21,B24-B28,B30-B32,B34-B35.
+4. Frontend restante: todos los F pendientes, T2,T4.
+5. Infraestructura/migraciones: I3-I4,I6-I13.
+6. Calidad restante T3,T5,T6, regresión global y revisión.
+Contrato por tarea:
+[ ] Leer todos los consumidores de los archivos indicados; registrar causa comprobada.
+[ ] Crear prueba de regresión que afirme el resultado requerido y observar fallo anterior.
+[ ] Implementar corrección y ajustar consumidores del mismo contrato.
+[ ] Ejecutar regresión focalizada; ejecutar ./mvnw test y npm test -- --watch=false por bloque.
+[ ] npm run build; HTTP real contra entorno de prueba aislado, sin modificar datos del servicio público.
+[ ] Enviar diff y evidencias a Antigravity en modo revisión de solo lectura; corregir observaciones.
+[ ] Registrar evidencia y estado por ID; no marcar completo por lectura estática solamente.
+
+Tareas concretas (rutas y soluciones de la auditoría; la regla del usuario prevalece sobre la sugerencia):
+[ ] B1. CORS con credenciales abierto a cualquier subdominio ngrok — CRÍTICO `[EN VIVO]`
+- **Dónde:** `backend-java/src/main/java/co/palaciodelmar/backend/config/SecurityConfig.java:127-153`
+- **Fix sugerido:** eliminar patrones de sufijo público; listar únicamente origins exactos (el túnel propio del proyecto + `appBaseUrl` + localhost). Mantener `allowCredentials(true)` solo con origins exactos.
+
+[ ] B2. `POST /api/auth/logout` acepta tokens falsos y rellena Mongo/Redis sin auth — CRÍTICO `[EN VIVO]`
+- **Dónde:** `controller/AuthController.java:163-185`, `security/TokenBlacklistService.java:49-98`, `config/SecurityConfig.java:77` (`permitAll`)
+- **Fix sugerido:** validar firma/expiración del JWT antes de blacklistear; ignorar o responder `401` ante tokens inválidos.
+
+[ ] B3. `POST /api/auth/login` con `{}` devuelve 500 (NPE) — ALTO `[EN VIVO]`
+- **Dónde:** `controller/AuthController.java:61` (sin `@Valid`), `service/AuthService.java:211`
+- **Fix sugerido:** añadir `@Valid` + `@NotBlank` en `AuthRequest` (`email`/`password`) → `HTTP 400`.
+
+[ ] B4. `RateLimitFilter` se salta con `;x=1` (mitigado por `StrictHttpFirewall`) — MEDIO `[EN VIVO]`
+- **Dónde:** `security/RateLimitFilter.java:71`
+- **Fix sugerido:** normalizar el path eliminando segmentos `;...` antes de comparar (manteniendo el firewall activo).
+
+[ ] B5. Precios inconsistentes entre `/api/availability/monthly` y `/api/availability` — ALTO `[EN VIVO]`
+- **Dónde:** `service/AvailabilityService.java:254` vs `:404-418`
+- **Fix sugerido:** derivar `pricePerNight` del mismo desglose nocturno de `PricingService` que calcula el total.
+
+[ ] B6. `DemoExternalHotelController` hardcodea `localhost` (bug en vivo) + Swagger público (decisión de política) — MEDIO `[EN VIVO / POLÍTICA]`
+- **Dónde:** `controller/DemoExternalHotelController.java:36, 47-48`; `config/SecurityConfig.java:93, 96`
+- **Fix sugerido:** derivar `apiBase`/links del origen actual o configuración; decidir si Swagger debe gatearse por perfil `dev`.
+
+[ ] B7. `HostController.updateBankAccount` guarda `"***1234"` como cuenta real si no había cuenta previa — ALTO `[JUNIT 5]`
+- **Dónde:** `controller/HostController.java:524-538`
+- **Fix sugerido:** rechazar con `400` valores con prefijo `***` cuando `existing == null`.
+
+[ ] B8. `UserPrincipal.isEnabled()` ignora `deletedAt` — MEDIO `[LATENTE — JUNIT 5 A NIVEL CLASE]`
+- **Dónde:** `security/UserPrincipal.java:62-76`
+- **Fix sugerido:** comprobar `deletedAt == null` en `isEnabled()` y en consultas de carga de usuario.
+
+[ ] B9. `AuthService.register()` falla en usuario no verificado con password en vez de invalidar y reenviar — ALTO `[JUNIT 5]`
+- **Dónde:** `service/AuthService.java:100, 149-151`
+- **Fix sugerido:** si `!emailVerified`, invalidar token anterior, actualizar datos permitidos/password y reenviar verificación (sin permitir cambio de rol).
+
+[ ] B10. `ReviewController.addReview` lanza `ClassCastException` con tipos inválidos — MEDIO `[JUNIT 5]`
+- **Dónde:** `controller/ReviewController.java:30-42, 56-58`
+- **Fix sugerido:** usar DTO tipado con `@Valid` (`@NotNull @Min(1) @Max(5) Integer rating`) en lugar de `Map<String, Object>`.
+
+[ ] B11. `BookingService`: NPE si `booking.getUser()` es `null` en `cancelBooking` y `modifyBooking` — MEDIO `[JUNIT 5]`
+- **Dónde:** `service/BookingService.java:497-499, 545, 807, 833, 933-941, 1320, 1657, 1729`
+- **Fix sugerido:** usar `Objects.equals(userId, booking.getUser())` en todos los checks de propiedad.
+
+[ ] B12. Falta `@EnableMethodSecurity` en `SecurityConfig` (`@PreAuthorize` es código muerto) — CRÍTICO `[JUNIT 5]`
+- **Dónde:** `config/SecurityConfig.java:28-30`, `controller/ReviewController.java:80`, `controller/HostApiKeyController.java:22`
+- **Fix sugerido:** añadir `@EnableMethodSecurity` a `SecurityConfig`.
+
+[ ] B13. `PaymentWebhookService.handlePaymentFailed` sobrescribe pagos `completed` sin lock ni guard de estado — CRÍTICO `[JUNIT 5]`
+- **Dónde:** `webhook/PaymentWebhookService.java:450-464`
+- **Fix sugerido:** adquirir locks (`payment:`/`booking:`), ignorar `payment.failed` si ya está `completed`/`refunded`/`partially_refunded`, y validar `payment.getBooking() != null`.
+
+[ ] B14. `HostPayoutService` ignora `refundedAmount` y liquida el 100% al anfitrión — CRÍTICO `[JUNIT 5]`
+- **Dónde:** `service/HostPayoutService.java:209-211, 281-292`
+- **Fix sugerido:** descontar `refundedAmount` al calcular neto, bruto y comisión en `recomputePayoutTotals`.
+
+[ ] B15. `BookingService.guestCheckOut` nunca aplica el recargo del 50% por late checkout — CRÍTICO `[JUNIT 5]`
+- **Dónde:** `service/BookingService.java:1323, 1343-1359`, `scheduler/AutoStayLifecycleScheduler.java:29-30, 134-139`
+- **Fix sugerido:** pasar `isAutomatic = false` en `guestCheckOut` y alinear la regla de recargo con el scheduler.
+
+[ ] B16. `IdempotencyService.saveCompleted` omite el script Lua CAS atómico — CRÍTICO `[JUNIT 5]`
+- **Dónde:** `service/IdempotencyService.java:58-69, 240-251`
+- **Fix sugerido:** invocar `CONDITIONAL_SET_COMPLETED_SCRIPT` atómicamente en `saveCompleted`.
+
+[ ] B17. `AuthService.register()` permite takeover de cuentas sin contraseña, escalada a `host` y auto-verificación fail-open — ALTO `[JUNIT 5]`
+- **Dónde:** `service/AuthService.java:99-148, 178`, `service/EmailService.java:823-829`
+- **Fix sugerido:** exigir verificación/token antes de reclamar cuentas sin password, prohibir cambio de rol al reactivar, y limitar el auto-verify a perfiles `dev`/`test`.
+
+[ ] B18. `BookingSseService`: fuga en suscripciones multicanal y eventos hardcodeados como `booking_confirmed` — CRÍTICO `[JUNIT 5]`
+- **Dónde:** `service/BookingSseService.java:57-99, 114-116`, `controller/BookingStreamController.java:94-112`, `listener/BookingEventListener.java:18-35`
+- **Fix sugerido:** añadir `subscribe(List<String> channels, SseEmitter emitter)` con limpieza única para todos los canales y propagar `event.getEventType()` como nombre del evento SSE.
+
+[ ] B19. `IntegrationService`: bucle ilimitado (DoS) `[JUNIT 5]` + sin check de `Property` activa ni índice único `(propertyId, externalId)` `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `service/IntegrationService.java:49-110, 149-245`, `model/Suite.java:39-46`, `dto/IntegrationAvailabilityRequest.java:21-26`
+- **Fix sugerido:** limitar rango (`<= 365` noches) con `saveAll()`, validar `Property` activa/aprobada, añadir `@CompoundIndex` único sparse `(propertyId, externalId)` y usar locks striped.
+
+[ ] B20. `PaymentWebhookService.processWebhook` lanza `NullPointerException` (500) si `eventType` es `null` — ALTO `[JUNIT 5]`
+- **Dónde:** `webhook/PaymentWebhookService.java:159, 169`
+- **Fix sugerido:** validar `eventType != null && !eventType.isBlank()` antes del `switch` y devolver `400`.
+
+[ ] B21. `PropertyService.toSlug` devuelve `""` en entrada no latina `[JUNIT 5]` + carrera check-then-act `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `service/PropertyService.java:426-450`
+- **Fix sugerido:** usar fallback `"alojamiento-" + random` / `"suite-" + random` si queda vacío y reintentar ante `DuplicateKeyException`.
+
+[ ] B22. `AdminService.updateBookingStatus` omite `save()` en `catch` de reembolso `[JUNIT 5]` + `findAll()` en memoria `[ESTÁTICO]` — MEDIO `[MIXTO]`
+- **Dónde:** `service/AdminService.java:80-103, 190-196, 263-271, 587`
+- **Fix sugerido:** persistir `saved` en el `catch` y paginar/agregar en MongoDB.
+
+[ ] B23. `PricingService` NPE con `basePrice == null` `[JUNIT 5]` + `SuiteService` ignora `fx-` y disponibilidad de experiencias `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `service/PricingService.java:41`, `service/SuiteService.java:219-244`
+- **Fix sugerido:** validar `basePrice != null`, lanzar `IllegalArgumentException` si `!checkOut.isAfter(checkIn)` y validar experiencias activas.
+
+[ ] B24. `HostWebhookService`: NPE con `createdAt == null` y `secret` en texto plano `[JUNIT 5]` + NPE `ownerId`/`principal` y falta `@Valid` `[ESTÁTICO]` — MEDIO `[MIXTO]`
+- **Dónde:** `webhook/HostWebhookService.java:158, 203, 211, 217, 233`, `controller/HostWebhookController.java:49, 72, 81`, `controller/HostPropertyController.java:40+`, `service/ApiKeyService.java:52, 85, 108`
+- **Fix sugerido:** usar `Comparator.nullsLast(...)`, `Objects.equals(...)`, validar `principal != null`, enmascarar `secret` tras creación y validar actualización.
+
+[ ] B25. Brechas de validación Jakarta Bean Validation en DTOs y controladores — ALTO `[ESTÁTICO]`
+- **Dónde:** `dto/PaymentRequest.java:10-14`, `dto/CalculatePriceRequest.java:11-15`, `dto/BookingRequest.java:22-41`, `dto/HostSuiteRequest.java:20-45`, `controller/AuthController.java:238`, `controller/AdminController.java:42, 131`, `dto/WebhookSubscriptionRequest.java`, `dto/PropertyRequest.java`
+- **Fix sugerido:** usar DTOs dedicados con `@Valid` y constraints completos.
+
+[ ] B26. `DemoWebhookReceiverController`: `secret` en query string y carrera en `CopyOnWriteArrayList` — MEDIO `[ESTÁTICO]`
+- **Dónde:** `controller/DemoWebhookReceiverController.java:45, 78-81`
+- **Fix sugerido:** pasar `secret` en header y usar `ConcurrentLinkedDeque` acotada/sincronizada.
+
+[ ] B27. Índices MongoDB faltantes o defectuosos (`SuiteNight` sin `partialFilterExpression`) — MEDIO `[ESTÁTICO]`
+- **Dónde:** `model/SuiteNight.java:24`, `model/User.java:34`, `model/Booking.java`, `model/PaymentIntent.java`, `model/WebhookDelivery.java`
+- **Fix sugerido:** añadir el `partialFilterExpression` y los `@Indexed`/`@CompoundIndex` faltantes.
+
+[ ] B28. `BookingService.createBooking` sin tope de noches (`<= 365`) y mapas en memoria sin evicción — ALTO `[ESTÁTICO]`
+- **Dónde:** `service/BookingService.java:83-84, 275-292, 1035-1038`, `service/SimulatedPaymentGateway.java:39`, `service/ReviewService.java:42-43`, `service/BookingSseService.java:30-31`
+- **Fix sugerido:** validar `nights <= 365` y usar striped locks o caches acotados con TTL.
+
+[ ] B29. Lookup público por código (`BK-2026-001`), métodos HTTP abiertos en `/availability` y `SecurityException` crudo — ALTO `[ESTÁTICO / POLÍTICA]`
+- **Dónde:** `config/SecurityConfig.java:86, 92, 100`, `config/DataInitializer.java:703`, `controller/BookingStreamController.java:46, 61, 66, 71, 74, 79, 82, 88, 118`
+- **Fix sugerido:** exigir auth o factor secundario (email/PIN) en `/bookings/code/**`, restringir `/availability/**` a `GET` y usar `ResponseStatusException`/`ForbiddenAccessException`.
+
+[ ] B30. Fuga de socket/FD en `WebhookDispatcher` si falla el handshake TLS — MEDIO `[ESTÁTICO]`
+- **Dónde:** `webhook/WebhookDispatcher.java:332-353`
+- **Fix sugerido:** cerrar `rawSocket` dentro de `try-with-resources` o `catch`/`finally`.
+
+[ ] B31. Full-collection scans, N+1 queries y conteo inconsistente de suites — MEDIO `[ESTÁTICO]`
+- **Dónde:** `scheduler/ReviewInvitationScheduler.java:35-38`, `service/HostPayoutService.java:77-80`, `service/AvailabilityService.java:193, 223`, `service/BookingService.java:775-778, 1901-1914`, `service/PropertyService.java:215-239, 399`, `controller/HostPropertyController.java:155-170`, `controller/HostController.java:260-278`
+- **Fix sugerido:** consultar en MongoDB con `IsNull`, hacer batch-fetch o `countByPropertyId`, y unificar conteo.
+
+[ ] B32. `SimulatedPaymentGateway` bloquea pool de 2 hilos con HTTP síncrono y schedulers con `fixedRateString` — MEDIO `[ESTÁTICO]`
+- **Dónde:** `service/SimulatedPaymentGateway.java:90, 508`, `scheduler/AutoStayLifecycleScheduler.java:58`, `scheduler/BookingExpiryScheduler.java:44`, `scheduler/HostPayoutScheduler.java:19`, `scheduler/ReviewInvitationScheduler.java:30`
+- **Fix sugerido:** despachar webhooks sin bloquear el pool y cambiar a `fixedDelayString`.
+
+[ ] B33. `verifyEmail()` no atómico, JWT en query param SSE y `ForbiddenAccessException` hereda `IllegalArgumentException` — MEDIO/BAJO `[ESTÁTICO]`
+- **Dónde:** `service/AuthService.java:302-324`, `security/JwtAuthenticationFilter.java:40-41`, `exception/ForbiddenAccessException.java:3`
+- **Fix sugerido:** usar `mongoTemplate.findAndModify`, autenticar SSE vía cookie `HttpOnly` o ticket corto, y heredar `RuntimeException`.
+
+[ ] B34. `EmailService` silencia fallos de correo, `AsyncConfig` incompleto y hardcodea 92% — BAJO `[ESTÁTICO]`
+- **Dónde:** `config/AsyncConfig.java:14-23`, `service/EmailService.java:131+, 309, 324`
+- **Fix sugerido:** implementar `AsyncConfigurer`, añadir reintentos/alerta y derivar porcentaje de `commissionRate`.
+
+[ ] B35. Higiene y deuda técnica menor en backend — BAJO `[ESTÁTICO]`
+- **Dónde:** `service/BookingService.java:431, 435, 2356-2365`, `service/SuiteService.java:54, 114`, `service/PropertyService.java:376-393`, `service/HostPayoutService.java:128`, `security/RateLimitFilter.java:132-133`, `security/TokenBlacklistService.java:150-154`, `service/AdminService.java:156-159`, `resources/application.properties:3`
+- **Fix sugerido:** limpiar código muerto/duplicado, validar reservas futuras antes de desactivar suites y eliminar dependencias circulares.
+
+[ ] F1. `BookingStreamService`: token en URL, reintento infinito, sin reconexión tras login — ALTO `[VITEST]`
+- **Dónde:** `services/booking-stream.service.ts:21-25, 41, 52-58`
+- **Fix sugerido:** autenticar SSE por cookie/ticket corto; backoff exponencial con tope; reconectar en `effect` al pasar `currentUser()` a no-null.
+
+[ ] F2. Guards síncronos confían en `localStorage`; `*MatchGuard` recorta query params — ALTO `[VITEST]`
+- **Dónde:** `guards/auth.guard.ts:25-56`; `services/auth.service.ts:22-24`
+- **Fix sugerido:** esperar hidratación real `/auth/me` para validar sesión/rol y preservar URL completa en `returnUrl`.
+
+[ ] F3. Carrera en `AuthService.fetchMe()`: restaura usuario tras `clearLocalData()` — ALTO `[VITEST]`
+- **Dónde:** `services/auth.service.ts:46-67`
+- **Fix sugerido:** usar epoch/generación en `fetchMe` o cancelar con `takeUntil` ligado a `logout`/`clearLocalData`.
+
+[ ] F4. `SearchStateService`: fechas inválidas → `nights()=1`; guests negativos aceptados — MEDIO `[VITEST]`
+- **Dónde:** `services/search-state.service.ts:47-87`
+- **Fix sugerido:** retornar `0` en fechas inválidas y clampear `adults >= 1`, `children >= 0`.
+
+[ ] F5. `CurrencyService.formatPrice`: `'US$ 0 USD'`, `'€ 0 EUR'`, `'$ NaN COP'` — MEDIO `[VITEST]`
+- **Dónde:** `services/currency.service.ts:40-51`
+- **Fix sugerido:** guard `Number.isFinite` y mostrar 2 decimales en USD/EUR para importes bajos.
+
+[ ] F6. `BookingService`/`BranchService` emiten el wrapper si no hay `data` — MEDIO `[VITEST]`
+- **Dónde:** `services/booking.service.ts:12, 18`, `services/branch.service.ts:8-11`
+- **Fix sugerido:** usar `res?.data ?? []` validando `Array.isArray(...)`.
+
+[ ] F18. `SearchComponent.fetchResults()` lanza `TypeError` si `suite` es `null` — CRÍTICO `[VITEST]`
+- **Dónde:** `pages/search/search.component.ts:336-341`
+- **Fix sugerido:** filtrar `.filter(a => !!a?.suite)` y construir objeto inmutable `{ ...a.suite, totalPrice: a.totalPrice, pricePerNight: a.pricePerNight }`.
+
+[ ] F19. `HostDashboardComponent.submitProperty()` silencia error HTTP 400 al crear la suite inicial — CRÍTICO `[VITEST]`
+- **Dónde:** `pages/host-dashboard/host-dashboard.component.ts:1862-1875`
+- **Fix sugerido:** encadenar con `switchMap` y mostrar error real en `propertyError`/`actionError`.
+
+[ ] F20. `CheckoutComponent.loadBooking()` marca `alreadyPaid = true` en reserva `pending` con `balanceDue === 0` — ALTO `[VITEST]`
+- **Dónde:** `pages/checkout/checkout.ts:395-404`
+- **Fix sugerido:** exigir `status !== 'pending'` (o `paymentStatus === 'paid'`) antes de activar `alreadyPaid`.
+
+[ ] F21. `CheckoutComponent` dispara `/payments/checkout` + `/payments/confirm` tras expirar el timer (15m TTL) — ALTO `[VITEST]`
+- **Dónde:** `pages/checkout/checkout.ts:489-618` (`:522-533`)
+- **Fix sugerido:** bloquear doble submit con `if (this.processing) return;` y revalidar `timerSeconds > 0` antes de enviar.
+
+[ ] F22. `ReceiptComponent` deja `taxesDisplay = 0` e infla `vipExtrasTotal` — ALTO `[VITEST]`
+- **Dónde:** `pages/receipt/receipt.component.ts:330-360`
+- **Fix sugerido:** derivar impuestos de forma consistente cuando falte `taxes` y restar `discount` solo sobre `subtotal` pre-descuento.
+
+[ ] F23. `MyBookingsComponent` oculta HTTP 500 como estado vacío `[VITEST]` + `setTimeout` sin limpiar `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `pages/my-bookings/my-bookings.component.ts:210-232`
+- **Fix sugerido:** añadir estado `loadError` con botón Reintentar y limpiar el timeout al destruir.
+
+[ ] F24. `VerifyEmail`: acepta `returnUrl=//evil.com` e ignora error del backend `[VITEST]` + timer sin limpiar `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `pages/verify-email/verify-email.ts:25-28, 50-57`
+- **Fix sugerido:** validar `rawReturn.startsWith('/') && !rawReturn.startsWith('//')`, mostrar el error del servidor y limpiar timeout.
+
+[ ] F25. `HotelMapComponent`: crash `<250ms` y fuga sin `ngOnDestroy` `[VITEST]` + archivos huérfanos / HTML crudo `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `components/hotel-map/hotel-map.component.ts:11, 136, 171-258, 272-294, 327-356`, `hotel-map.component.html`, `hotel-map.component.scss`
+- **Fix sugerido:** `@ViewChild`, guard `if (!this.map) return;`, `ngOnDestroy` limpiando timeout y `map.remove()`, borrar huérfanos, mover CSS al bundle y escapar HTML.
+
+[ ] F26. `LightboxModalComponent` con `images=[]` renderiza `<img src="">` / `"1 / 0"` e ignora `Escape` `[VITEST]` — ALTO
+- **Dónde:** `components/lightbox-modal/lightbox-modal.component.ts:9-53`
+- **Fix sugerido:** validar `images.length > 0`, acotar `currentIndex`, soportar `Escape`/flechas/backdrop y no mutar `@Input()`.
+
+[ ] F27. `AuthModalComponent` conserva error al pasar a `forgot`, omite `a[href]` en `trapFocus` y acepta `//evil.com` — ALTO `[VITEST]`
+- **Dónde:** `components/auth-modal/auth-modal.component.ts:75, 216, 222, 342-344, 484-489, 575`
+- **Fix sugerido:** usar `switchToForgot()`/`switchToLogin()` limpiando estado, incluir `a[href]` en `trapFocus` y rechazar `returnUrl.startsWith('//')`.
+
+[ ] F28. `DateRangePickerComponent.loadMonth()` resuelve `Promise` antes del HTTP `[VITEST]` + `effect()` con señales `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `components/date-range-picker/date-range-picker.component.ts:76-84, 119-213`
+- **Fix sugerido:** usar `firstValueFrom` en métodos `async` y `untracked(...)` en `effect()`.
+
+[ ] F29. `AuthService.updateCurrentUser()` descarta usuarios que solo tienen `_id` — ALTO `[VITEST]`
+- **Dónde:** `services/auth.service.ts:75-82`, `models/types.ts:85-86`
+- **Fix sugerido:** verificar `if (updated && (updated.id || updated._id))`.
+
+[ ] F30. `authInterceptor` en HTTP 429 descarta el mensaje si `error.error` es string — ALTO `[VITEST]`
+- **Dónde:** `interceptors/auth.interceptor.ts:38-44`
+- **Fix sugerido:** normalizar el mensaje en un `HttpErrorResponse` aunque `error.error` sea string/null.
+
+[ ] F31. `NavbarComponent`: `scrollTo()` acumula `setInterval` y sus suscripciones filtran al destruir — MEDIO `[VITEST]`
+- **Dónde:** `components/navbar/navbar.component.ts:196-203, 281-290`
+- **Fix sugerido:** limpiar el intervalo previo y usar `takeUntilDestroyed()`.
+
+[ ] F32. `RoomsSection` y `SearchComponent`: rating `★ 4.9` fijo, filtro case-sensitive y fechas invertidas — MEDIO `[VITEST]`
+- **Dónde:** `components/rooms-section/rooms-section.component.ts:110-141, 189-203, 238`, `pages/search/search.component.ts:29-37, 140-172, 275-283`
+- **Fix sugerido:** mostrar rating real, comparar `toLowerCase()` y validar fechas antes de consultar `/availability`.
+
+[ ] F33. `SuiteDetailComponent`: `fetchLiveQuote` doble-contea `d.total` y `500` muestra `"no existe"` `[VITEST]` + muta `mainImage` `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `pages/suite-detail/suite-detail.component.ts:220-228, 314-316`, `pages/suite-detail/suite-detail.component.html:42`
+- **Fix sugerido:** asignar `dynamicQuoteTotal` solo desde `d?.roomTotal`, diferenciar error 500 vs 404 y usar propiedad de componente para imagen activa.
+
+[ ] F34. `CheckoutComponent.pollPaymentStatus` deja observables HTTP en vuelo tras destruir — ALTO `[VITEST]`
+- **Dónde:** `pages/checkout/checkout.ts:371-380, 689-733`
+- **Fix sugerido:** usar `takeUntilDestroyed()` en las llamadas HTTP del polling y resetear timers en cambio de ruta.
+
+[ ] F35. `AdminDashboard` y `HostDashboard`: doble clic sin guard, `clipboard` sin guard, promos pasadas `[VITEST]` + código muerto `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `pages/admin-dashboard/admin-dashboard.component.ts:40-122, 945, 978, 993, 1010-1015, 1113, 1152`, `pages/host-dashboard/host-dashboard.component.ts:494, 540, 569, 1569, 1608-1614, 1704, 1950-1963, 2127, 2161, 2169-2222`
+- **Fix sugerido:** flags `busy` por acción, validar fechas de promoción, verificar `navigator.clipboard` y reemplazar `confirm()` por modales.
+
+[ ] F36. `Profile` y `ExternalHotel`: 401 silenciado y fechas inválidas en sync `[VITEST]` + UX/a11y `[ESTÁTICO]` — ALTO `[MIXTO]`
+- **Dónde:** `pages/profile/profile.ts:148-151, 179-183, 205, 231, 256`, `pages/external-hotel/external-hotel.component.ts:47-135, 231-258`
+- **Fix sugerido:** mostrar error ante 401 en `/auth/me`, validar `endDate > startDate`, añadir confirmación de contraseña y `for`/`id`.
+
+[ ] F37. `SearchStateService.today` estático tras medianoche y `logoutAllDevices()` inconsistente `[VITEST]` + JWT en `localStorage` `[ESTÁTICO]` — MEDIO `[MIXTO]`
+- **Dónde:** `services/search-state.service.ts:15-23`, `services/auth.service.ts:90, 108, 125, 154-174`, `interceptors/auth.interceptor.ts:12`
+- **Fix sugerido:** calcular `today` dinámicamente, usar `finalize()` en logout y confiar en la cookie `HttpOnly`.
+
+[ ] F38. `ConciergeChat` ignora `suiteName` y `Calendar` días sin `aria-label` — MEDIO/BAJO `[VITEST]`
+- **Dónde:** `components/concierge-chat/concierge-chat.component.ts:22-26`, `pages/calendar/calendar.ts:77-91`
+- **Fix sugerido:** incluir `?text=...` con `suiteName` y añadir `aria-label` descriptivo por día.
+
+[ ] F7. `SuiteDetailComponent`: 4 problemas adicionales — MEDIO `[ESTÁTICO]`
+- **Dónde:** `pages/suite-detail/suite-detail.component.ts:96-104, 198-206, 299-315, 468-477, 594-601`
+- **Fix sugerido:** usar `effect` sobre `auth.currentUser()`, quitar `fetchLiveQuote()` de `toggleExperience`, validar `customFood` y suscribirse a `paramMap`.
+
+[ ] F8. `BookingDetail`/`Receipt`: `minDate` UTC + sin recarga — PARCIAL `[ESTÁTICO]`
+- **Dónde:** `pages/booking-detail/booking-detail.component.ts:469, 481`, `pages/receipt/receipt.component.ts:242`
+- **Fix sugerido:** usar zona horaria `America/Bogota` en `BookingDetail` y suscribirse a `paramMap` en ambos.
+
+[ ] F9. Fugas de suscripciones en `Checkout` y `Navbar` — MEDIO `[ESTÁTICO / CONFIRMADO EN F31 Y F34]`
+- **Dónde:** `pages/checkout/checkout.ts:372-380, 466-471`; `components/navbar/navbar.component.ts:196-203`
+- **Fix sugerido:** usar `takeUntilDestroyed()` en ambos.
+
+[ ] F10. Dashboards: errores silenciosos, rating falso `5.0`, doble DELETE — MEDIO `[ESTÁTICO]`
+- **Dónde:** `pages/admin-dashboard/admin-dashboard.component.ts:927-934, 1073-1081, 1130-1140`; `pages/host-dashboard/host-dashboard.component.ts:1276-1282, 1532-1539, 1780-1791, 1991-2009, 2104-2111`
+- **Fix sugerido:** manejar `error` en `actionError`, retornar `null`/`"—"` sin reseñas, añadir modal de confirmación y flag `deleting`.
+
+[ ] F11. `MyBookings`: factura oculta en `checked_in`, badge `cancelled` amarillo — BAJO `[ESTÁTICO]`
+- **Dónde:** `pages/my-bookings/my-bookings.component.ts:62-70`
+- **Fix sugerido:** mostrar factura también en `checked_in`/`checked_out`/`completed` y colorear canceladas en rojo.
+
+[ ] F12. `Calendar`: `checkOut = día+2` sin validar noche intermedia — MEDIO `[ESTÁTICO]`
+- **Dónde:** `pages/calendar/calendar.ts:165-176`
+- **Fix sugerido:** validar disponibilidad de noches intermedias antes de fijar el rango.
+
+[ ] F13. `ExperiencesSection`: error invisible + a11y del modal — BAJO `[ESTÁTICO]`
+- **Dónde:** `components/experiences-section/experiences-section.component.ts:68-161`
+- **Fix sugerido:** mostrar estado de error/vacío, añadir ARIA del diálogo y asociar `for`/`id`.
+
+[ ] F14. `ContactSection`: `sentSuccess=true` con campos vacíos — BAJO `[ESTÁTICO]`
+- **Dónde:** `components/contact-section/contact-section.component.ts:124-139`
+- **Fix sugerido:** validar campos requeridos antes de abrir `mailto:`.
+
+[ ] F15. `DateRangePicker`: `peakYears` queda bloqueado si `reqId` cambia en vuelo — MEDIO `[ESTÁTICO]`
+- **Dónde:** `components/date-range-picker/date-range-picker.component.ts:92-190`
+- **Fix sugerido:** limpiar el flag si la respuesta se descarta por `reqId`.
+
+[ ] F16. `home.component.html` es un archivo huérfano con código TypeScript — BAJO `[ESTÁTICO]`
+- **Dónde:** `pages/home/home.component.html:1-5`, `pages/home/home.component.scss:1-8`
+- **Fix sugerido:** eliminarlo tras confirmar con grep que nada lo referencia.
+
+[ ] F39. TypeScript `strict` y `strictTemplates` desactivados en `tsconfig.json` — ALTO `[HARDENING / POLÍTICA]`
+- **Dónde:** `frontend-angular/tsconfig.json:5-21`, `models/types.ts:1-179`
+- **Fix sugerido:** habilitar ambos flags y tipar interfaces en `types.ts`.
+
+[ ] F40. `styles.scss` monolítico con reglas duplicadas y `!important` global en inputs/focus — MEDIO `[ESTÁTICO]`
+- **Dónde:** `frontend-angular/src/styles.scss:386, 841, 1548, 1727, 1780, 1985, 2077, 2191, 2436-2523`
+- **Fix sugerido:** limpiar reglas muertas, encapsular por componente y evitar `outline: none !important`.
+
+[ ] F41. URL de ngrok hardcodeada en `index.html`, `scrollPositionRestoration: 'top'` y `environment.prod.ts` localhost — MEDIO/BAJO `[ESTÁTICO / CONFIG]`
+- **Dónde:** `frontend-angular/src/index.html:13-20`, `app/app.config.ts:15`, `environments/environment.prod.ts:6`
+- **Fix sugerido:** externalizar dominio OG/canonical, usar `scrollPositionRestoration: 'enabled'` y parametrizar `demoWebhookUrl`.
+
+[ ] F42. `qr.ts` con `@ts-nocheck`, `BookingBar` imports muertos/children sin UI y `setTimeout` sin limpiar — BAJO/MEDIO `[ESTÁTICO]`
+- **Dónde:** `app/utils/qr.ts:1, 644`, `components/booking-bar/booking-bar.component.ts:1, 3, 13, 15, 25`, `components/hero/hero.component.ts:38`
+- **Fix sugerido:** tipar `qr.ts`, alinear offset sticky, añadir selector de niños y limpiar timers.
+
+[ ] F43. Accesibilidad (A11y) y responsive adicional en páginas y componentes — MEDIO `[ESTÁTICO]`
+- **Dónde:** `pages/suite-detail/suite-detail.component.html:35, 204`, `pages/booking-detail/booking-detail.component.ts:322`, `pages/admin-dashboard/admin-dashboard.component.ts:602-707`, `pages/search/search.component.ts:140, 172`, `pages/reset-password/reset-password.component.ts:22, 26`, `pages/reset-password/reset-password.component.scss:131-140`, `components/contact-section/contact-section.component.ts:53`, `components/date-range-picker/date-range-picker.component.html:17, 57, 68` y `.scss:212`
+- **Fix sugerido:** añadir roles/ARIA/tamaños táctiles ≥44px y corregir anidamiento interactivo.
+
+[ ] F44. Higiene menor de servicios y componentes frontend — BAJO `[ESTÁTICO]`
+- **Dónde:** `services/api.service.ts:8, 24-38`, `components/branch-selector/branch-selector.component.ts:1, 211-225`, `app/app.scss:1`
+- **Fix sugerido:** centralizar fallbacks de sucursales, limpiar imports/archivos vacíos y permitir opciones de timeout por llamada.
+
+[ ] I1. Nginx elimina security headers en `/api/`, `/app/` y `.apk` — CRÍTICO `[ESTÁTICO]`
+- **Dónde:** `frontend-angular/nginx.conf:24-28, 49-57, 103-114`
+- **Fix sugerido:** incluir los 5 security headers en esas 3 `location` (o usar un `include` común).
+
+[ ] I2. `PALACIO_PROXY_TOKEN` duplicado en `.env.example` con valor público — CRÍTICO `[ESTÁTICO]`
+- **Dónde:** `.env.example:8, 16`; `.github/workflows/ci.yml:49`; `security/RateLimitFilter.java:35-39`
+- **Fix sugerido:** quitar la línea duplicada, bloquear ese token en `FORBIDDEN_PROXY_TOKENS` y mover secretos de CI a GitHub Secrets.
+
+[ ] I3. MongoDB y Redis sin autenticación en `docker-compose.yml` — ALTO `[HARDENING / ESTÁTICO]`
+- **Dónde:** `docker-compose.yml:5-23, 39-40, 67-84`
+- **Fix sugerido:** añadir credenciales y actualizar URIs en `backend-java`.
+
+[ ] I4. Nginx `upstream` cachea la IP DNS del backend — ALTO `[ESTÁTICO]`
+- **Dónde:** `frontend-angular/nginx.conf:1-4`
+- **Fix sugerido:** usar `resolver` + variable en `proxy_pass`.
+
+[ ] I5. Nginx sobrescribe CORS del backend con `Access-Control-Allow-Origin *` en `/api/` — ALTO `[ESTÁTICO]`
+- **Dónde:** `frontend-angular/nginx.conf:51-57`
+- **Fix sugerido:** quitar el override y dejar pasar el CORS del backend (una vez corregido `B1`).
+
+[ ] I6. Contenedores corren como `root` y Maven traga errores (`|| true`) — ALTO `[HARDENING / ESTÁTICO]`
+- **Dónde:** `backend-java/Dockerfile:6-15`, `frontend-angular/Dockerfile:18-24`
+- **Fix sugerido:** quitar `|| true`, añadir usuario no-root y `HEALTHCHECK`.
+
+[ ] I7. GitHub Actions sin fijar por SHA y sin `permissions:` — MEDIO `[HARDENING / POLÍTICA]`
+- **Dónde:** `.github/workflows/ci.yml:31-70`, `.github/workflows/mobile-build.yml:22-49`
+- **Fix sugerido:** fijar por SHA de commit y restringir `permissions`.
+
+[ ] I8. `render.yaml` incompleto: sin `APP_BASE_URL` ni `SPRING_MAIL_*` — ALTO `[ESTÁTICO]`
+- **Dónde:** `render.yaml:10-28`
+- **Fix sugerido:** declarar `APP_BASE_URL` y `SPRING_MAIL_USERNAME`/`PASSWORD` (`sync: false`).
+
+[ ] I9. Scripts de seed destructivos con puerto y ruta Windows rotos — ALTO `[EN VIVO + ESTÁTICO]`
+- **Dónde:** `scripts/seed_100_users_22510_bookings.py:25, 89-90, 330`, `scripts/seed_22510_users.py:24, 227`
+- **Fix sugerido:** requerir `--yes`, parametrizar URI y usar ruta relativa a `Path(__file__)`.
+
+[ ] I10. `scripts/e2e_redis_qa.py` roto — MEDIO `[ESTÁTICO]`
+- **Dónde:** `scripts/e2e_redis_qa.py:28, 103, 124-125, 496-497`
+- **Fix sugerido:** parametrizar `.env`/fechas relativas, evitar hash fijo y validar `prop_info is not None` antes de indexar.
+
+[ ] I11. Emails inválidos con espacios en datasets — MEDIO `[PYTHON3]`
+- **Dónde:** `data/users_100_gmail_verified.json` (y seeds)
+- **Fix sugerido:** corregir los 3 emails o regenerar el dataset.
+
+[ ] I12. `mongoimport --jsonArray` roto en `data/README.md` — MEDIO `[PYTHON3]`
+- **Dónde:** `data/README.md:38-39`
+- **Fix sugerido:** quitar `--jsonArray` y actualizar al puerto `27018`.
+
+[ ] I13. Imagen Nginx sin `/app/` ni `.apk`; 41 MB de datos y credenciales en Git — ALTO `[ESTÁTICO]`
+- **Dónde:** `frontend-angular/Dockerfile:21`, `data/`, `.gitignore:16`
+- **Fix sugerido:** alinear `Dockerfile`/`nginx.conf`, untrackear `data/` (rotar credenciales si corresponden a cuentas reales) y resolver estado de `jmeter/`.
+
+[ ] T1. `AuthServiceTest` y `CrearUsuarioUnitTest` pasan con `emailVerified=true` sin quererlo — ALTO `[JUNIT + ESTÁTICO]`
+- **Dónde:** `service/AuthServiceTest.java:72-100`, `service/CrearUsuarioUnitTest.java:81-114`
+- **Fix sugerido:** stubbear `when(emailService.isConfigured()).thenReturn(true)` y afirmar `emailVerified=false`, probando el caso `false` aparte.
+
+[ ] T2. `httpMock.match(() => true)` antes de `verify()` — ALTO `[ESTÁTICO]`
+- **Dónde:** `frontend-angular/src/app/redis-features.spec.ts:57`
+- **Fix sugerido:** eliminar `match(() => true)` y hacer match específico por URL.
+
+[ ] T3. `BackendApplicationTests.contextLoads()` tautológico — ALTO `[ESTÁTICO]`
+- **Dónde:** `backend-java/src/test/java/co/palaciodelmar/backend/BackendApplicationTests.java:8-11`
+- **Fix sugerido:** cargar contexto o renombrar el test según lo que realmente verifica.
+
+[ ] T4. `accessibility.spec.ts`: aserciones que no validan tamaño táctil ni contraste — MEDIO `[ESTÁTICO]`
+- **Dónde:** `frontend-angular/src/app/accessibility.spec.ts:82-197`
+- **Fix sugerido:** añadir aserciones reales (`getBoundingClientRect()`) y `afterEach(() => localStorage.clear())`.
+
+[ ] T5. `PerformanceAndLoadUnitTest` mide `p95` sobre mocks y traga excepciones — MEDIO `[ESTÁTICO]`
+- **Dónde:** `loadtest/PerformanceAndLoadUnitTest.java:68-193`
+- **Fix sugerido:** quitar aserción SLO sobre mocks o probar contra integración real registrando excepciones.
+
+[ ] T6. Dependencias de reloj/tiempo en 5 clases de test — MEDIO `[ESTÁTICO]`
+- **Dónde:** `CancellationPolicyBoundaryTest.java:101, 121-123`, `AutoStayLifecycleSchedulerTest.java:43, 69, 99, 133`, `JwtServiceTest.java:127`, `RedisLockServiceTest.java:114`, `AuditCriticalBugFixesTest.java:69, 165-171`
+- **Fix sugerido:** inyectar `java.time.Clock` fija y usar esperas deterministas en lugar de `Thread.sleep`.

@@ -157,9 +157,12 @@ public class PaymentWebhookService {
         }
 
         String eventType = payload.getEventType();
+        if (eventType == null || eventType.isBlank()) {
+            throw new IllegalArgumentException("El tipo de evento es obligatorio");
+        }
         PaymentWebhookPayload.PaymentWebhookData data = payload.getData();
 
-        if (data == null || data.getIntentId() == null) {
+        if (data == null || data.getIntentId() == null || data.getIntentId().isBlank()) {
             throw new IllegalArgumentException("El evento no contiene información del intento de pago (intentId)");
         }
 
@@ -448,18 +451,47 @@ public class PaymentWebhookService {
     }
 
     private void handlePaymentFailed(PaymentWebhookPayload.PaymentWebhookData data, String eventId) {
-        Payment payment = paymentRepository.findByIntentId(data.getIntentId()).orElse(null);
-        if (payment != null) {
-            payment.setStatus("failed");
-            payment.setNotes(data.getFailureMessage() != null ? data.getFailureMessage() : "Pago rechazado por pasarela");
-            payment.setUpdatedAt(Instant.now());
-            paymentRepository.save(payment);
+        if (redisLockService != null) {
+            redisLockService.executeWithLock("payment:" + data.getIntentId().trim(),
+                    java.time.Duration.ofSeconds(15), java.time.Duration.ofSeconds(5), () -> {
+                        doHandlePaymentFailed(data);
+                        return null;
+                    });
+        } else {
+            doHandlePaymentFailed(data);
+        }
+    }
 
-            Booking booking = bookingRepository.findById(payment.getBooking()).orElse(null);
-            if (booking != null && "pending".equalsIgnoreCase(booking.getStatus())) {
-                booking.setPaymentStatus("failed");
-                bookingRepository.save(booking);
-            }
+    private void doHandlePaymentFailed(PaymentWebhookPayload.PaymentWebhookData data) {
+        Payment payment = paymentRepository.findByIntentId(data.getIntentId()).orElse(null);
+        if (payment == null || !java.util.Set.of("pending", "processing").contains(
+                payment.getStatus() == null ? "" : payment.getStatus().toLowerCase(java.util.Locale.ROOT))) {
+            return;
+        }
+        payment.setStatus("failed");
+        payment.setNotes(data.getFailureMessage() != null ? data.getFailureMessage() : "Pago rechazado por pasarela");
+        payment.setUpdatedAt(Instant.now());
+        paymentRepository.save(payment);
+        if (payment.getBooking() == null || payment.getBooking().isBlank()) {
+            return;
+        }
+        if (redisLockService != null) {
+            redisLockService.executeWithLock("booking:" + payment.getBooking().trim(),
+                    java.time.Duration.ofSeconds(15), java.time.Duration.ofSeconds(5), () -> {
+                        markPendingBookingPaymentFailed(payment.getBooking());
+                        return null;
+                    });
+        } else {
+            markPendingBookingPaymentFailed(payment.getBooking());
+        }
+    }
+
+    private void markPendingBookingPaymentFailed(String bookingId) {
+        Booking booking = bookingRepository.findById(bookingId).orElse(null);
+        if (booking != null && "pending".equalsIgnoreCase(booking.getStatus())
+                && (booking.getPaidAmount() == null || booking.getPaidAmount().signum() == 0)) {
+            booking.setPaymentStatus("failed");
+            bookingRepository.save(booking);
         }
     }
 

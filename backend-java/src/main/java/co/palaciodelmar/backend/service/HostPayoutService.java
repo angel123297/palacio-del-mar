@@ -74,8 +74,13 @@ public class HostPayoutService {
         List<HostPayoutDTO> generated = new ArrayList<>();
         recoverPendingPayouts(generated, today, eligibleStatuses);
 
-        List<Booking> candidates = bookingRepository.findByStatusIn(eligibleStatuses).stream()
-                .filter(b -> b.getPayoutId() == null)
+        List<Booking> candidates = bookingRepository.findByStatusInAndPayoutIdIsNull(eligibleStatuses);
+        if (candidates == null || candidates.isEmpty()) {
+            candidates = bookingRepository.findByStatusIn(eligibleStatuses).stream()
+                    .filter(b -> b.getPayoutId() == null)
+                    .toList();
+        }
+        candidates = candidates.stream()
                 .filter(b -> isBookingEligibleForPayout(b, today, eligibleStatuses))
                 .toList();
 
@@ -125,7 +130,7 @@ public class HostPayoutService {
             String ownerId = property != null && property.getOwnerId() != null ? property.getOwnerId() : "system";
             String propName = property != null ? property.getName() : "Alojamiento (" + propId + ")";
 
-            String payoutCode = "PO-" + datePrefix + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+            String payoutCode = "PO-" + datePrefix + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
             HostPayout payout = HostPayout.builder()
                     .payoutCode(payoutCode)
                     .propertyId(propId)
@@ -285,6 +290,19 @@ public class HostPayoutService {
             BigDecimal roomPrice = (b.getPlatformFee() != null && b.getHostPayout() != null)
                     ? bookingFee.add(bookingNet)
                     : fallbackRoom;
+
+            BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
+            if (refunded.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal total = b.getTotalPrice() != null && b.getTotalPrice().compareTo(BigDecimal.ZERO) > 0
+                        ? b.getTotalPrice()
+                        : (b.getPaidAmount() != null && b.getPaidAmount().compareTo(BigDecimal.ZERO) > 0 ? b.getPaidAmount() : roomPrice);
+                BigDecimal lodgingRefund = (total.compareTo(BigDecimal.ZERO) > 0 && roomPrice.compareTo(BigDecimal.ZERO) > 0)
+                        ? refunded.multiply(roomPrice).divide(total, 2, RoundingMode.HALF_UP).min(roomPrice)
+                        : refunded.min(roomPrice);
+                roomPrice = roomPrice.subtract(lodgingRefund).max(BigDecimal.ZERO);
+                bookingFee = roomPrice.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+                bookingNet = roomPrice.subtract(bookingFee);
+            }
 
             gross = gross.add(roomPrice);
             fee = fee.add(bookingFee);

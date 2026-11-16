@@ -54,30 +54,32 @@ public class BookingSseService {
         return subscribe(userId, new SseEmitter(SSE_TIMEOUT));
     }
 
+    public SseEmitter subscribe(List<String> channels) {
+        return subscribe(channels, new SseEmitter(SSE_TIMEOUT));
+    }
+
     public SseEmitter subscribe(String userId, SseEmitter emitter) {
-        if (userId == null || emitter == null) {
+        return subscribe(userId != null ? List.of(userId) : List.of(), emitter);
+    }
+
+    public SseEmitter subscribe(List<String> channels, SseEmitter emitter) {
+        if (channels == null || channels.isEmpty() || emitter == null) {
             return emitter;
         }
         Long authSeq = CURRENT_AUTH_SEQ.get();
-        userEmitters.compute(userId, (k, existing) -> {
-            if (authSeq != null && isSessionRevoked(userId, authSeq)) {
-                throw new SecurityException("La sesión fue revocada antes de abrir el canal de eventos");
-            }
-            List<SseEmitter> list = existing != null ? existing : new CopyOnWriteArrayList<>();
-            list.add(emitter);
-            return list;
-        });
-
-        if (authSeq != null && isSessionRevoked(userId, authSeq)) {
-            removeEmitter(userId, emitter);
-            try {
-                emitter.complete();
-            } catch (Exception ignored) {
-            }
-            throw new SecurityException("La sesión fue revocada antes de abrir el canal de eventos");
+        for (String channel : channels) {
+            if (channel == null || channel.isBlank()) continue;
+            userEmitters.compute(channel, (k, existing) -> {
+                if (authSeq != null && isSessionRevoked(channel, authSeq)) {
+                    throw new SecurityException("La sesión fue revocada antes de abrir el canal de eventos");
+                }
+                List<SseEmitter> list = existing != null ? existing : new CopyOnWriteArrayList<>();
+                list.add(emitter);
+                return list;
+            });
         }
 
-        Runnable cleanup = () -> removeEmitter(userId, emitter);
+        Runnable cleanup = () -> removeEmitterFromAllChannels(emitter);
         emitter.onCompletion(cleanup);
         emitter.onTimeout(cleanup);
         emitter.onError(e -> cleanup.run());
@@ -88,10 +90,10 @@ public class BookingSseService {
                     .name("connected")
                     .data(Map.of(
                             "message", "Conectado al flujo de eventos en tiempo real de Palacio del Mar",
-                            "userId", userId
+                            "channels", channels
                     )));
         } catch (IOException e) {
-            log.warn("Error enviando handshake SSE a usuario {}: {}", userId, e.getMessage());
+            log.warn("Error enviando handshake SSE en canales {}: {}", channels, e.getMessage());
             cleanup.run();
         }
 
@@ -99,6 +101,10 @@ public class BookingSseService {
     }
 
     public void emitBookingUpdate(String userId, BookingDTO booking) {
+        emitBookingUpdate(userId, booking, null);
+    }
+
+    public void emitBookingUpdate(String userId, BookingDTO booking, String eventType) {
         if (userId == null || booking == null) return;
 
         List<SseEmitter> emitters = userEmitters.get(userId);
@@ -107,12 +113,16 @@ public class BookingSseService {
             return;
         }
 
+        String eventName = (eventType != null && !eventType.isBlank())
+                ? eventType.replace('.', '_')
+                : (booking.getStatus() != null ? "booking_" + booking.getStatus().toLowerCase() : "booking_updated");
+
         List<SseEmitter> deadEmitters = new ArrayList<>();
 
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event()
-                        .name("booking_confirmed")
+                        .name(eventName)
                         .data(booking));
             } catch (Exception ex) {
                 log.warn("Fallo al emitir evento SSE a cliente de {}: {}", userId, ex.getMessage());
@@ -144,7 +154,7 @@ public class BookingSseService {
         });
     }
 
-    private void removeEmitterFromAllChannels(SseEmitter emitter) {
+    public void removeEmitterFromAllChannels(SseEmitter emitter) {
         if (emitter == null) {
             return;
         }
@@ -164,6 +174,11 @@ public class BookingSseService {
         long revSeq = UserPrincipal.nextAuthSequence();
         userRevokedSeq.put(userId, revSeq);
         userRevokedAt.put(userId, Instant.now());
+        if (userRevokedAt.size() > 5000) {
+            Instant cutoff = Instant.now().minus(java.time.Duration.ofHours(24));
+            userRevokedAt.entrySet().removeIf(e -> e.getValue().isBefore(cutoff));
+            userRevokedSeq.keySet().retainAll(userRevokedAt.keySet());
+        }
         List<SseEmitter> removed = userEmitters.remove(userId);
         if (removed != null) {
             for (SseEmitter emitter : removed) {

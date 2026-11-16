@@ -13,7 +13,9 @@ logs/
 # Testing artifacts
 frontend/playwright-report/
 frontend/test-results/
-jmeter/
+jmeter/*.log
+jmeter/*.jtl
+jmeter/results/
 
 # Backend
 backend-java/target/
@@ -24,6 +26,9 @@ frontend-angular/.angular/
 frontend-angular/.vite/
 frontend-angular/dist/
 
+# Data and seed datasets
+data/
+
 # Analysis, agent scratches and diagram working directories
 .archify/
 graphify-out/
@@ -33,6 +38,7 @@ scratch/
 skills-lock.json
 AGENTS.md
 README-AUDITORIA-LOCAL.md
+AUDITORIA_BUGS_VERIFICADOS.md
 *.delivery.json
 docs/*.delivery.json
 docs/*.md

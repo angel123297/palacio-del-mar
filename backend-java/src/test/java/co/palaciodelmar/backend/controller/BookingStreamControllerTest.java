@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -52,11 +53,11 @@ class BookingStreamControllerTest {
         when(userRepository.findByEmail("guest@palaciodelmar.co")).thenReturn(Optional.of(user));
 
         SseEmitter mockEmitter = new SseEmitter();
-        when(bookingSseService.subscribe("usr_999")).thenReturn(mockEmitter);
+        when(bookingSseService.subscribe(anyList())).thenReturn(mockEmitter);
 
         SseEmitter result = bookingStreamController.streamBookings(authentication);
         assertNotNull(result);
         assertEquals(mockEmitter, result);
-        verify(bookingSseService, times(1)).subscribe("usr_999");
+        verify(bookingSseService, times(1)).subscribe(eq(List.of("usr_999")));
     }
 }

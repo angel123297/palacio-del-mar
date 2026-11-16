@@ -197,4 +197,43 @@ class PropertyServiceTest {
         assertFalse(suite.getAvailable());
         verify(suiteRepository).save(suite);
     }
+
+    @Test
+    @DisplayName("B21: toSlug devuelve fallback 'alojamiento-...' ante caracteres no latinos (ej. 日本語)")
+    void createPropertyWithNonLatinCharactersGeneratesValidSlug() {
+        PropertyRequest req = PropertyRequest.builder()
+                .name("日本語!!!")
+                .city("Cartagena")
+                .type("HOTEL")
+                .build();
+
+        when(propertyRepository.findBySlug(any())).thenReturn(Optional.empty());
+        when(propertyRepository.save(any(Property.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PropertyDTO result = propertyService.createProperty("host-1", req, false);
+
+        assertNotNull(result.getSlug());
+        assertFalse(result.getSlug().isBlank());
+        assertTrue(result.getSlug().startsWith("alojamiento-"));
+    }
+
+    @Test
+    @DisplayName("B21: createProperty reintenta ante DuplicateKeyException generando slug alternativo")
+    void createPropertyRetriesOnDuplicateKeyException() {
+        PropertyRequest req = PropertyRequest.builder()
+                .name("Villa Palmeras")
+                .city("Cartagena")
+                .type("VILLA")
+                .build();
+
+        when(propertyRepository.findBySlug(any())).thenReturn(Optional.empty());
+        when(propertyRepository.save(any(Property.class)))
+                .thenThrow(new org.springframework.dao.DuplicateKeyException("Duplicate slug"))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        PropertyDTO result = propertyService.createProperty("host-1", req, false);
+
+        assertNotNull(result);
+        verify(propertyRepository, times(2)).save(any(Property.class));
+    }
 }

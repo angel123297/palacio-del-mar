@@ -21,8 +21,8 @@ from bson import ObjectId
 import pymongo
 
 # Configuración de Conexión
-MONGO_URI = "mongodb://localhost:27017/"
-DB_NAME = "palacio_db"
+MONGO_URI = os.getenv("MONGODB_URI", os.getenv("SPRING_DATA_MONGODB_URI", "mongodb://localhost:27018/"))
+DB_NAME = os.getenv("MONGODB_DATABASE", "palacio_db")
 COLLECTION_NAME = "users"
 TOTAL_DOCS = 22510
 
@@ -223,6 +223,16 @@ def main():
         print(f"--> CANTIDAD ACTUAL EN '{COLLECTION_NAME}': {conteo_inicial:,} documentos.")
 
         # [PASO 2] Borrar registros existentes
+        if "--yes" not in sys.argv and "-y" not in sys.argv:
+            try:
+                confirm = input("\n⚠️ ADVERTENCIA: Este script borrará los usuarios existentes en MongoDB. Escribe 'si' para continuar: ")
+                if confirm.strip().lower() not in ["si", "sí", "yes", "y"]:
+                    print("Operación cancelada por el usuario.")
+                    sys.exit(0)
+            except (EOFError, io.UnsupportedOperation):
+                print("❌ Operación no interactiva sin bandera --yes. Cancelando borrado.")
+                sys.exit(1)
+
         print("\n[PASO 2] Ejecutando borrado total de la colección para inicialización limpia...")
         delete_result = col.delete_many({})
         print(f"--> REGISTROS BORRADOS: {delete_result.deleted_count:,}")

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -91,26 +92,29 @@ public class BookingStreamController {
         log.info("Usuario {} ({}) suscrito a canal SSE de reservas", email, userId);
         BookingSseService.setCurrentAuthSequence(authSeq);
         try {
-            SseEmitter emitter = bookingSseService.subscribe(userId);
+            List<String> channels = new ArrayList<>();
+            channels.add(userId);
 
             // Si el usuario es ADMIN, suscribir al canal global admin.
             // Si es HOST, suscribir ÚNICAMENTE a los canales de sus propiedades para aislar tenants (RN-SSE multi-inquilino)
             if (user != null && user.getRole() != null) {
                 String roleLower = user.getRole().toLowerCase();
                 if ("admin".equals(roleLower)) {
-                    bookingSseService.subscribe("admin", emitter);
+                    channels.add("admin");
                 } else if ("host".equals(roleLower) && propertyRepository != null && user.getId() != null) {
                     List<Property> properties = propertyRepository.findByOwnerId(user.getId());
                     if (properties != null) {
                         for (Property prop : properties) {
                             if (prop.getId() != null) {
-                                bookingSseService.subscribe("prop_" + prop.getId(), emitter);
+                                channels.add("prop_" + prop.getId());
                                 log.debug("Host {} suscrito al canal reactivo de propiedad {}", user.getId(), prop.getId());
                             }
                         }
                     }
                 }
             }
+
+            SseEmitter emitter = bookingSseService.subscribe(channels);
 
             if (bookingSseService.isSessionRevoked(userId, authSeq)
                     || (email != null && bookingSseService.isSessionRevoked(email, authSeq))) {

@@ -44,8 +44,8 @@ const addDaysIso = (iso: string, days: number): string => {
           <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Configuración de la Conexión</h2>
           <div class="grid grid-cols-1 gap-4">
             <div>
-              <label class="block text-xs text-slate-400 mb-1">Clave de Conexión del Hotel (Clave de Sincronización)</label>
-              <input [(ngModel)]="apiKey" type="text" placeholder="pdm_live_..." class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-amber-300 focus:outline-none focus:border-amber-400">
+              <label for="ext-hotel-api-key" class="block text-xs text-slate-400 mb-1">Clave de Conexión del Hotel (Clave de Sincronización)</label>
+              <input id="ext-hotel-api-key" [(ngModel)]="apiKey" type="text" placeholder="pdm_live_..." class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-amber-300 focus:outline-none focus:border-amber-400">
             </div>
           </div>
           <p class="text-xs text-slate-500">Copia tu clave desde el Panel del Anfitrión (Pestaña "Conexión PMS / Integración"). El servidor destino se toma de la configuración del entorno.</p>
@@ -66,26 +66,26 @@ const addDaysIso = (iso: string, days: number): string => {
 
               <form (ngSubmit)="syncRoom()" class="space-y-3 text-xs">
                 <div>
-                  <label class="block text-slate-400 mb-1">Código de Habitación en tu Sistema (ID) *</label>
-                  <input [(ngModel)]="room.externalId" name="rExtId" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
+                  <label for="room-ext-id" class="block text-slate-400 mb-1">Código de Habitación en tu Sistema (ID) *</label>
+                  <input id="room-ext-id" [(ngModel)]="room.externalId" name="rExtId" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
                 </div>
                 <div>
-                  <label class="block text-slate-400 mb-1">Nombre de la Habitación *</label>
-                  <input [(ngModel)]="room.name" name="rName" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+                  <label for="room-ext-name" class="block text-slate-400 mb-1">Nombre de la Habitación *</label>
+                  <input id="room-ext-name" [(ngModel)]="room.name" name="rName" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-slate-400 mb-1">Precio por Noche (COP) *</label>
-                    <input [(ngModel)]="room.basePrice" name="rPrice" type="number" step="10000" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
+                    <label for="room-ext-price" class="block text-slate-400 mb-1">Precio por Noche (COP) *</label>
+                    <input id="room-ext-price" [(ngModel)]="room.basePrice" name="rPrice" type="number" step="10000" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
                   </div>
                   <div>
-                    <label class="block text-slate-400 mb-1">Capacidad Huéspedes</label>
-                    <input [(ngModel)]="room.maxGuests" name="rGuests" type="number" min="1" max="10" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
+                    <label for="room-ext-guests" class="block text-slate-400 mb-1">Capacidad Huéspedes</label>
+                    <input id="room-ext-guests" [(ngModel)]="room.maxGuests" name="rGuests" type="number" min="1" max="10" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
                   </div>
                 </div>
                 <div>
-                  <label class="block text-slate-400 mb-1">URL Imagen</label>
-                  <input [(ngModel)]="room.mainImage" name="rImg" type="url" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-300 text-[11px]">
+                  <label for="room-ext-img" class="block text-slate-400 mb-1">URL Imagen</label>
+                  <input id="room-ext-img" [(ngModel)]="room.mainImage" name="rImg" type="url" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-300 text-[11px]">
                 </div>
                 <button type="submit" [disabled]="loadingRoom" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded uppercase tracking-wider text-xs transition mt-2">
                   {{ loadingRoom ? 'Enviando...' : 'Publicar / Actualizar en Marketplace' }}
@@ -109,30 +109,30 @@ const addDaysIso = (iso: string, days: number): string => {
 
               <form (ngSubmit)="syncAvailability()" class="space-y-3 text-xs">
                 <div>
-                  <label class="block text-slate-400 mb-1">Código de Habitación (ID) *</label>
-                  <input [(ngModel)]="avail.externalId" name="aExtId" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
+                  <label for="avail-ext-id" class="block text-slate-400 mb-1">Código de Habitación (ID) *</label>
+                  <input id="avail-ext-id" [(ngModel)]="avail.externalId" name="aExtId" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-slate-400 mb-1">Check-in *</label>
-                    <input [(ngModel)]="avail.startDate" name="aStart" type="date" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
+                    <label for="avail-start-date" class="block text-slate-400 mb-1">Check-in *</label>
+                    <input id="avail-start-date" [(ngModel)]="avail.startDate" name="aStart" type="date" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
                   </div>
                   <div>
-                    <label class="block text-slate-400 mb-1">Check-out *</label>
-                    <input [(ngModel)]="avail.endDate" name="aEnd" type="date" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
+                    <label for="avail-end-date" class="block text-slate-400 mb-1">Check-out *</label>
+                    <input id="avail-end-date" [(ngModel)]="avail.endDate" name="aEnd" type="date" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-slate-400 mb-1">Acción</label>
-                    <select [(ngModel)]="avail.action" name="aAction" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
+                    <label for="avail-action" class="block text-slate-400 mb-1">Acción</label>
+                    <select id="avail-action" [(ngModel)]="avail.action" name="aAction" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 font-mono text-slate-200">
                       <option value="BLOCK">🔒 BLOCK (Bloquear)</option>
                       <option value="UNBLOCK">🔓 UNBLOCK (Liberar)</option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-slate-400 mb-1">Motivo / Canal</label>
-                    <input [(ngModel)]="avail.reason" name="aReason" type="text" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+                    <label for="avail-reason" class="block text-slate-400 mb-1">Motivo / Canal</label>
+                    <input id="avail-reason" [(ngModel)]="avail.reason" name="aReason" type="text" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
                   </div>
                 </div>
                 <button type="submit" [disabled]="loadingAvail" class="w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded uppercase tracking-wider text-xs transition mt-2">
@@ -232,6 +232,18 @@ export class ExternalHotelComponent implements OnInit {
     if (!this.apiKey) {
       this.availSuccess.set(false);
       this.availResult.set('✖ Por favor ingresa tu API Key en la barra superior.');
+      return;
+    }
+
+    if (!this.avail.externalId || !this.avail.startDate || !this.avail.endDate) {
+      this.availSuccess.set(false);
+      this.availResult.set('✖ Por favor completa todos los campos requeridos.');
+      return;
+    }
+
+    if (this.avail.endDate <= this.avail.startDate) {
+      this.availSuccess.set(false);
+      this.availResult.set('✖ La fecha de check-out debe ser posterior a la fecha de check-in.');
       return;
     }
 

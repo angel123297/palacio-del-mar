@@ -49,16 +49,21 @@ public class AutoStayLifecycleScheduler {
     @Autowired(required = false)
     private co.palaciodelmar.backend.service.PaymentGateway paymentGateway;
 
+    @Setter
+    @Autowired(required = false)
+    private java.time.Clock clock = java.time.Clock.system(BOGOTA);
+
     @Value("${palacio.lifecycle.autocheckin.hour:15}")
     private int autoCheckInHour = 15;
 
     @Value("${palacio.lifecycle.autocheckout.hour:13}")
     private int autoCheckOutHour = 13;
 
-    @Scheduled(fixedRateString = "${palacio.lifecycle.check.interval.ms:60000}")
+    @Scheduled(fixedDelayString = "${palacio.lifecycle.check.interval.ms:60000}")
     public void processStayLifecycleTransitions() {
-        LocalDate today = LocalDate.now(BOGOTA);
-        LocalTime nowTime = LocalTime.now(BOGOTA);
+        java.time.ZonedDateTime nowZdt = clock.instant().atZone(BOGOTA);
+        LocalDate today = nowZdt.toLocalDate();
+        LocalTime nowTime = nowZdt.toLocalTime();
 
         processAutoCheckIns(today, nowTime);
         processAutoCheckOuts(today, nowTime);

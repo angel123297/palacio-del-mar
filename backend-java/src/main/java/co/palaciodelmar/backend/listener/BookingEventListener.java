@@ -24,13 +24,13 @@ public class BookingEventListener {
         
         // 1. Emitir al usuario huésped titular
         if (event.getBooking().getUser() != null) {
-            bookingSseService.emitBookingUpdate(event.getBooking().getUser(), event.getBooking());
+            bookingSseService.emitBookingUpdate(event.getBooking().getUser(), event.getBooking(), event.getEventType());
         }
 
         // 2. Broadcast a los canales de monitorización en tiempo real (admin y canal específico de la propiedad del anfitrión)
-        bookingSseService.emitBookingUpdate("admin", event.getBooking());
+        bookingSseService.emitBookingUpdate("admin", event.getBooking(), event.getEventType());
         if (event.getPropertyId() != null) {
-            bookingSseService.emitBookingUpdate("prop_" + event.getPropertyId(), event.getBooking());
+            bookingSseService.emitBookingUpdate("prop_" + event.getPropertyId(), event.getBooking(), event.getEventType());
         }
     }
 }

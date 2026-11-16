@@ -11,6 +11,7 @@ import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -68,7 +69,7 @@ public class PropertyService {
      * Crea una nueva propiedad asociada al anfitrión autenticado.
      */
     public PropertyDTO createProperty(String ownerId, PropertyRequest req, boolean autoApprove) {
-        String baseSlug = toSlug(req.getName());
+        String baseSlug = toSlug(req.getName(), "alojamiento");
         String slug = ensureUniqueSlug(baseSlug);
 
         Property property = Property.builder()
@@ -91,7 +92,20 @@ public class PropertyService {
                 .updatedAt(Instant.now())
                 .build();
 
-        Property saved = propertyRepository.save(property);
+        Property saved = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                if (attempt > 0) {
+                    slug = ensureUniqueSlug(baseSlug + "-" + UUID.randomUUID().toString().substring(0, 4));
+                    property.setSlug(slug);
+                }
+                saved = propertyRepository.save(property);
+                break;
+            } catch (DuplicateKeyException e) {
+                log.warn("Colisión de clave única al guardar propiedad con slug '{}', reintentando intento {}", slug, attempt + 1);
+                if (attempt == 4) throw e;
+            }
+        }
         syncCachesAndGeo();
         return toDTO(saved);
     }
@@ -271,7 +285,8 @@ public class PropertyService {
     public Suite createSuiteForProperty(String propertyId, String ownerId, HostSuiteRequest req, boolean isAdmin) {
         Property property = getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
 
-        String suiteSlug = ensureUniqueSuiteSlug(toSlug(property.getName() + " " + req.getName()));
+        String baseSuiteSlug = toSlug(property.getName() + " " + req.getName(), "suite");
+        String suiteSlug = ensureUniqueSuiteSlug(baseSuiteSlug);
 
         String mainImage = (req.getMainImage() != null && !req.getMainImage().isBlank())
                 ? req.getMainImage().trim()
@@ -304,7 +319,20 @@ public class PropertyService {
                 .updatedAt(Instant.now())
                 .build();
 
-        Suite saved = suiteRepository.save(suite);
+        Suite saved = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                if (attempt > 0) {
+                    suiteSlug = ensureUniqueSuiteSlug(baseSuiteSlug + "-" + UUID.randomUUID().toString().substring(0, 4));
+                    suite.setSlug(suiteSlug);
+                }
+                saved = suiteRepository.save(suite);
+                break;
+            } catch (DuplicateKeyException e) {
+                log.warn("Colisión de clave única al guardar suite con slug '{}', reintentando intento {}", suiteSlug, attempt + 1);
+                if (attempt == 4) throw e;
+            }
+        }
         if (availabilityCacheEvictor != null) {
             availabilityCacheEvictor.evictAll();
         }
@@ -383,6 +411,17 @@ public class PropertyService {
             throw new ResourceNotFoundException("Habitación no pertenece a esta propiedad");
         }
 
+        if (suiteNightRepository != null && suite.getId() != null) {
+            java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+            List<co.palaciodelmar.backend.model.SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(2));
+            boolean hasFutureBookings = futureNights.stream()
+                    .anyMatch(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus())
+                            && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(Instant.now())));
+            if (hasFutureBookings) {
+                throw new IllegalStateException("No se puede desactivar la habitación porque existen reservas activas o futuras");
+            }
+        }
+
         suite.setActive(false);
         suite.setAvailable(false);
         suite.setUpdatedAt(Instant.now());
@@ -396,7 +435,7 @@ public class PropertyService {
 
     public PropertyDTO toDTO(Property p) {
         if (p == null) return null;
-        long count = p.getId() != null ? suiteRepository.findByPropertyId(p.getId()).size() : 0;
+        long count = p.getId() != null ? suiteRepository.countByPropertyId(p.getId()) : 0;
         return PropertyDTO.builder()
                 .id(p.getId())
                 ._id(p.getId())
@@ -424,11 +463,22 @@ public class PropertyService {
     }
 
     private String toSlug(String input) {
-        if (input == null) return "alojamiento-" + UUID.randomUUID().toString().substring(0, 8);
+        return toSlug(input, "alojamiento");
+    }
+
+    private String toSlug(String input, String defaultPrefix) {
+        String prefix = (defaultPrefix != null && !defaultPrefix.isBlank()) ? defaultPrefix : "item";
+        if (input == null || input.isBlank()) {
+            return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
+        }
         String nowhitespace = WHITESPACE.matcher(input.trim()).replaceAll("-");
         String normalized = Normalizer.normalize(nowhitespace, Normalizer.Form.NFD);
         String slug = NONLATIN.matcher(normalized).replaceAll("").toLowerCase(Locale.ENGLISH);
-        return slug.replaceAll("-+", "-");
+        slug = slug.replaceAll("-+", "-").replaceAll("^-|-$", "");
+        if (slug.isBlank()) {
+            return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
+        }
+        return slug;
     }
 
     private String ensureUniqueSlug(String base) {

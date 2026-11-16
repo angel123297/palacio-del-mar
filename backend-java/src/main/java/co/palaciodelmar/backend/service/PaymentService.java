@@ -2,7 +2,6 @@ package co.palaciodelmar.backend.service;
 
 import co.palaciodelmar.backend.dto.BookingDTO;
 import co.palaciodelmar.backend.dto.PaymentDTO;
-import co.palaciodelmar.backend.dto.PaymentRequest;
 import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Payment;
@@ -507,15 +506,17 @@ public class PaymentService {
                      log.warn("Error limpiando caché de disponibilidad tras pago de reserva {}: {}", updatedBooking.getId(), ex.getMessage());
                  }
              }
-             try {
-                 emailService.sendBookingConfirmation(updatedBooking);
-             } catch (Exception ex) {
-                 log.warn("Error enviando email de confirmación para reserva {}: {}", updatedBooking.getId(), ex.getMessage());
-             }
-             try {
-                 emailService.sendHostBookingNotification(updatedBooking);
-             } catch (Exception ex) {
-                 log.warn("Error enviando notificación al anfitrión para reserva {}: {}", updatedBooking.getId(), ex.getMessage());
+             if (newlyConfirmedInThisCall) {
+                 try {
+                     emailService.sendBookingConfirmation(updatedBooking);
+                 } catch (Exception ex) {
+                     log.warn("Error enviando email de confirmación para reserva {}: {}", updatedBooking.getId(), ex.getMessage());
+                 }
+                 try {
+                     emailService.sendHostBookingNotification(updatedBooking);
+                 } catch (Exception ex) {
+                     log.warn("Error enviando notificación al anfitrión para reserva {}: {}", updatedBooking.getId(), ex.getMessage());
+                 }
              }
         }
 

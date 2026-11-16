@@ -36,7 +36,18 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     private final ScheduledExecutorService scheduler;
     private final HttpClient httpClient;
     private final java.util.Set<String> inFlightIntents = java.util.concurrent.ConcurrentHashMap.newKeySet();
-    private static final java.util.concurrent.ConcurrentHashMap<String, Object> INTENT_LOCKS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Object[] INTENT_STRIPED_LOCKS = new Object[64];
+    static {
+        for (int i = 0; i < INTENT_STRIPED_LOCKS.length; i++) {
+            INTENT_STRIPED_LOCKS[i] = new Object();
+        }
+    }
+
+    private static Object getIntentMonitor(String key) {
+        String safeKey = (key != null && !key.isBlank()) ? key.trim() : "__default__";
+        int index = Math.abs(safeKey.hashCode() % INTENT_STRIPED_LOCKS.length);
+        return INTENT_STRIPED_LOCKS[index];
+    }
     private final String instanceId = "pdm_gw_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -87,7 +98,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
         this.paymentIntentRepository = paymentIntentRepository;
         this.paymentWebhookService = paymentWebhookService;
         this.objectMapper = objectMapper != null ? objectMapper.copy().findAndRegisterModules() : new ObjectMapper().findAndRegisterModules();
-        this.scheduler = Executors.newScheduledThreadPool(2);
+        this.scheduler = Executors.newScheduledThreadPool(4);
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(3))
                 .build();
@@ -95,17 +106,30 @@ public class SimulatedPaymentGateway implements PaymentGateway {
 
     @Override
     public PaymentIntentResponse createIntent(Booking booking, String method, String idempotencyKey) {
+        if (booking == null) {
+            throw new IllegalArgumentException("La reserva no puede ser nula para crear la intención de pago");
+        }
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             Optional<PaymentIntent> existing = paymentIntentRepository.findByIdempotencyKey(idempotencyKey);
             if (existing.isPresent()) {
                 PaymentIntent intent = existing.get();
+                if (intent.getBookingId() != null && !intent.getBookingId().equals(booking.getId())) {
+                    throw new IllegalArgumentException("La clave de idempotencia ya fue utilizada para otra reserva");
+                }
                 return new PaymentIntentResponse(intent.getId(), intent.getClientSecret(), intent.getAmount(), intent.getCurrency(), intent.getStatus());
             }
         }
 
+        BigDecimal amount = booking.getBalanceDue();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            amount = booking.getTotalPrice();
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("El monto a pagar debe ser mayor a cero");
+        }
+
         String intentId = "pi_" + UUID.randomUUID().toString().replace("-", "");
         String clientSecret = intentId + "_secret_" + UUID.randomUUID().toString().substring(0, 8);
-        BigDecimal amount = booking.getBalanceDue();
 
         PaymentIntent intent = PaymentIntent.builder()
                 .id(intentId)
@@ -267,7 +291,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                         && !Boolean.TRUE.equals(intent.getWebhookDelivered())) {
                     boolean isFailure = "failed".equalsIgnoreCase(intent.getStatus());
                     String eventType = isFailure ? "payment.failed" : "payment.succeeded";
-                    String eventId = "evt_" + UUID.randomUUID().toString().replace("-", "");
+                    String eventId = "evt_pi_" + intentId + (isFailure ? "_fail" : "");
                     PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
                             .eventId(eventId)
                             .eventType(eventType)
@@ -293,7 +317,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                                 .set("updatedAt", Instant.now());
                         mongoTemplate.updateFirst(qDelivered, uDelivered, PaymentIntent.class);
                     } else {
-                        Object monitor = INTENT_LOCKS.computeIfAbsent(intentId, k -> new Object());
+                        Object monitor = getIntentMonitor(intentId);
                         synchronized (monitor) {
                             PaymentIntent fresh = paymentIntentRepository.findById(intentId).orElse(intent);
                             fresh.setWebhookDelivered(delivered);
@@ -373,7 +397,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
             }
 
             // Generar y emitir el webhook
-            String eventId = "evt_" + UUID.randomUUID().toString().replace("-", "");
+            String eventId = "evt_pi_" + intentId + (isFailure ? "_fail" : "");
             PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
                     .eventId(eventId)
                     .eventType(eventType)
@@ -399,7 +423,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                         .set("updatedAt", Instant.now());
                 mongoTemplate.updateFirst(qDelivered, uDelivered, PaymentIntent.class);
             } else {
-                Object monitor = INTENT_LOCKS.computeIfAbsent(intentId, k -> new Object());
+                Object monitor = getIntentMonitor(intentId);
                 synchronized (monitor) {
                     PaymentIntent fresh = paymentIntentRepository.findById(intentId).orElse(intent);
                     fresh.setWebhookDelivered(delivered);
@@ -505,7 +529,9 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                         .build();
 
                 try {
-                    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                    HttpResponse<String> response = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                            .orTimeout(2, TimeUnit.SECONDS)
+                            .join();
                     if (response.statusCode() >= 200 && response.statusCode() < 300) {
                         log.info("Webhook {} entregado exitosamente (HTTP {})", eventId, response.statusCode());
                         return true;
@@ -550,7 +576,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                 : transactionId.trim();
 
         java.util.function.Supplier<PaymentRefundResponse> refundAction = () -> {
-            Object localMonitor = INTENT_LOCKS.computeIfAbsent(lockId, k -> new Object());
+            Object localMonitor = getIntentMonitor(lockId);
             synchronized (localMonitor) {
                 return executeRefundCriticalSection(transactionId, initialIntent, amount, idempotencyKey);
             }
@@ -713,7 +739,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
             if (intentId == null || refundId == null) {
                 return;
             }
-            Object localMonitor = INTENT_LOCKS.computeIfAbsent(intentId, k -> new Object());
+            Object localMonitor = getIntentMonitor(intentId);
             PaymentIntent intent;
             PaymentIntent.RefundRecord targetRecord = null;
             synchronized (localMonitor) {

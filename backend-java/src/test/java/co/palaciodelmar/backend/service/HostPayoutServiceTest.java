@@ -272,4 +272,42 @@ class HostPayoutServiceTest {
         assertEquals("***3210", dto.getDestinationAccountMasked());
         assertEquals("María Anfitriona", dto.getDestinationHolder());
     }
+
+    @Test
+    @DisplayName("B14: HostPayout descuenta correctamente el monto reembolsado proporcional al alojamiento")
+    void testProcessAutomatedPayoutsAccountsForRefundedAmount() {
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+
+        Booking b1 = Booking.builder()
+                .id("b-refund")
+                .propertyId("prop-refund")
+                .status("completed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("1190000.00")) // 1.000.000 habitación + 190.000 IVA (19%)
+                .paidAmount(new BigDecimal("1190000.00"))
+                .refundedAmount(new BigDecimal("595000.00")) // 50% reembolsado
+                .subtotal(new BigDecimal("1000000.00"))
+                .platformFee(new BigDecimal("80000.00"))
+                .hostPayout(new BigDecimal("920000.00"))
+                .checkIn(today.minusDays(3))
+                .checkOut(today.minusDays(1))
+                .build();
+
+        when(bookingRepository.findByStatusIn(anyList())).thenReturn(List.of(b1));
+        when(bookingRepository.findById("b-refund")).thenReturn(Optional.of(b1));
+        when(propertyRepository.findById("prop-refund")).thenReturn(Optional.of(
+                Property.builder().id("prop-refund").name("Suite Sol").ownerId("host-refund").build()
+        ));
+        when(hostPayoutRepository.save(any(HostPayout.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        List<HostPayoutDTO> payouts = hostPayoutService.processAutomatedPayouts();
+
+        assertEquals(1, payouts.size());
+        HostPayoutDTO dto = payouts.get(0);
+        // Base alojamiento reducida a 500.000:
+        // Gross = 500.000, Fee = 40.000 (8%), Net = 460.000 (92%)
+        assertEquals(new BigDecimal("500000.00"), dto.getGrossTotal());
+        assertEquals(new BigDecimal("40000.00"), dto.getPlatformFee());
+        assertEquals(new BigDecimal("460000.00"), dto.getNetAmount());
+    }
 }

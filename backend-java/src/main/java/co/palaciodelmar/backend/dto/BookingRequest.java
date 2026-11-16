@@ -36,6 +36,7 @@ public class BookingRequest {
     private Boolean needsCrib;
 
     private String guestName;
+    @Email(message = "El formato de correo electrónico no es válido")
     private String guestEmail;
 
     private String guestPhone;

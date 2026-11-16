@@ -5,7 +5,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { CurrencyService } from '../../services/currency.service';
 import { Booking } from '../../models/types';
-import { finalize, switchMap } from 'rxjs';
+import { finalize, switchMap, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-checkout',
@@ -348,6 +348,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     return Math.max(0, taxableTotal - this.checkoutSubtotal);
   }
 
+  private routeSub?: Subscription;
+
   get paymentAmount(): number {
     return this.balanceDue;
   }
@@ -369,7 +371,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.route.paramMap.subscribe(params => {
+    this.routeSub = this.route.paramMap.subscribe(params => {
       this.bookingId = params.get('bookingId');
       if (this.bookingId) {
         this.loadBooking();
@@ -398,7 +400,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         if (this.booking && isTerminalBlocked) {
           this.unavailableStatusMsg = `Esta reserva ya no admite pagos porque su estado actual es ${this.booking.status}.`;
           this.booking = null;
-        } else if (this.booking && (this.booking.balanceDue === 0 || (this.booking.paymentStatus === 'paid' && !hasBalanceDue))) {
+        } else if (this.booking && status !== 'pending' && (!hasBalanceDue || this.booking.paymentStatus === 'paid')) {
           this.booking = null;
           this.alreadyPaid = true;
         } else if (this.booking) {
@@ -464,6 +466,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.routeSub) this.routeSub.unsubscribe();
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.pollingInterval) clearInterval(this.pollingInterval);
     this.pendingTimeouts.forEach(t => clearTimeout(t));
@@ -487,6 +490,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   processPSE() {
+    if (this.processing) return;
     if (!this.pseBank) return;
     if (this.timerSeconds <= 0) {
       this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
@@ -499,6 +503,12 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
     
     this.scheduleTimeout(() => {
+      if (this.timerSeconds <= 0) {
+        this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+        this.processing = false;
+        this.cdr.detectChanges();
+        return;
+      }
       this.processingMessage = `Esperando autorización de débito en ${this.pseBank}...`;
       this.cdr.detectChanges();
       this.scheduleTimeout(() => {
@@ -508,6 +518,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   processNequi() {
+    if (this.processing) return;
     if (this.timerSeconds <= 0) {
       this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
       this.cdr.detectChanges();
@@ -525,6 +536,12 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
     
     this.scheduleTimeout(() => {
+      if (this.timerSeconds <= 0) {
+        this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+        this.processing = false;
+        this.cdr.detectChanges();
+        return;
+      }
       this.processingMessage = 'Esperando confirmación en tu aplicación Nequi...';
       this.cdr.detectChanges();
       this.scheduleTimeout(() => {
@@ -556,6 +573,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   processPayment() {
+    if (this.processing) return;
     if (this.timerSeconds <= 0) {
       this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
       this.cdr.detectChanges();
@@ -618,6 +636,12 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   private executePaymentPayload(methodPayload: any) {
+    if (this.timerSeconds <= 0) {
+      this.errorMsg = 'El tiempo de reserva de 15 minutos ha expirado. Por favor realiza una nueva reserva.';
+      this.processing = false;
+      this.cdr.detectChanges();
+      return;
+    }
     if (!this.booking) {
       this.errorMsg = 'No hay una reserva activa para procesar';
       this.processing = false;

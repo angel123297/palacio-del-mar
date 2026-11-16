@@ -58,7 +58,26 @@ class IdempotencyServiceTest {
             return 0L;
         });
 
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), anyString(), anyString(), anyString()))
+                .thenAnswer(inv -> {
+                    java.util.List<String> keys = inv.getArgument(1);
+                    String owner = inv.getArgument(2);
+                    String result = inv.getArgument(3);
+                    String current = fakeRedisMap.get(keys.get(0));
+                    if (current == null || !current.contains(owner)) return 0L;
+                    fakeRedisMap.put(keys.get(0), result);
+                    return 1L;
+                });
+
         idempotencyService = new IdempotencyService(redisTemplate, new ObjectMapper());
+    }
+
+    @Test
+    void completionUsesAtomicCompareAndSetWithoutUnconditionalWrite() {
+        idempotencyService.execute("payments:confirm", "u", "atomic-key", Map.of("intentId", "p"),
+                Map.class, () -> Map.of("ok", true));
+        verify(redisTemplate.opsForValue(), never()).set(anyString(), anyString(), any(Duration.class));
+        verify(redisTemplate).execute(any(RedisScript.class), anyList(), anyString(), anyString(), anyString());
     }
 
     @Test

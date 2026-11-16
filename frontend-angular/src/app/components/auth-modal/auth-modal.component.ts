@@ -72,7 +72,7 @@ import { environment } from '../../../environments/environment';
           </div>
 
           <div style="text-align: right; margin-bottom: 1rem;">
-            <button type="button" class="link-btn" (click)="mode = 'forgot'" style="background: none; border: none; color: var(--gold); font-size: 0.85rem; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center;">
+            <button type="button" class="link-btn" (click)="switchToForgot()" style="background: none; border: none; color: var(--gold); font-size: 0.85rem; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center;">
               ¿Olvidaste tu contraseña?
             </button>
           </div>
@@ -213,13 +213,13 @@ import { environment } from '../../../environments/environment';
             <a *ngIf="sentForgot && resetUrl" [href]="resetUrl" (click)="close()" style="background: rgba(46, 204, 113, 0.18); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.45); padding: 8px 16px; border-radius: 4px; font-weight: 600; text-decoration: none; font-size: 0.85rem; margin-top: 4px;">
               Abrir Enlace de Recuperación →
             </a>
-            <button *ngIf="sentForgot" type="button" (click)="mode = 'login'" style="background: var(--gold); color: var(--dark); border: none; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 0.85rem; margin-top: 4px;">
+            <button *ngIf="sentForgot" type="button" (click)="switchToLogin()" style="background: var(--gold); color: var(--dark); border: none; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 0.85rem; margin-top: 4px;">
               Ir a Iniciar Sesión →
             </button>
           </p>
 
           <p class="auth-switch" style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem;">
-            <button type="button" class="link-btn" (click)="mode = 'login'" style="background: none; border: none; color: var(--gold); cursor: pointer; min-height: 44px; display: inline-flex; align-items: center;">
+            <button type="button" class="link-btn" (click)="switchToLogin()" style="background: none; border: none; color: var(--gold); cursor: pointer; min-height: 44px; display: inline-flex; align-items: center;">
               ← Volver a iniciar sesión
             </button>
           </p>
@@ -340,7 +340,7 @@ export class AuthModalComponent implements OnChanges {
   private trapFocus(event: KeyboardEvent): void {
     if (!this.modalContainer) return;
     const focusable = this.modalContainer.nativeElement.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
     );
     if (!focusable.length) return;
 
@@ -401,6 +401,14 @@ export class AuthModalComponent implements OnChanges {
   switchToLogin(): void {
     this.mode = 'login';
     this.selectedPortal = this.registerRole === 'host' ? 'host' : 'guest';
+    this.message = '';
+    this.showResendVerification = false;
+    this.busyResend = false;
+    this.cdr.markForCheck();
+  }
+
+  switchToForgot(): void {
+    this.mode = 'forgot';
     this.message = '';
     this.showResendVerification = false;
     this.busyResend = false;
@@ -483,7 +491,7 @@ export class AuthModalComponent implements OnChanges {
    */
   private navigateToReturnUrl(): void {
     const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-    if (returnUrl && returnUrl.startsWith('/')) {
+    if (returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//')) {
       this.router.navigateByUrl(returnUrl);
     }
   }
@@ -572,7 +580,7 @@ export class AuthModalComponent implements OnChanges {
         this.busy = false;
         this.close();
         const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-        if (returnUrl && returnUrl.startsWith('/') && returnUrl !== '/') {
+        if (returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//') && returnUrl !== '/') {
           this.router.navigateByUrl(returnUrl);
         } else if (role === 'admin') {
           this.router.navigate(['/admin']);

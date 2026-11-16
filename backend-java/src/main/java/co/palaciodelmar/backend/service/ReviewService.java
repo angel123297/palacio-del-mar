@@ -39,15 +39,20 @@ public class ReviewService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private RedisLockService redisLockService;
 
-    private static final java.util.concurrent.ConcurrentHashMap<String, Object> REVIEW_LOCKS =
-            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Object[] REVIEW_STRIPED_LOCKS = new Object[64];
+    static {
+        for (int i = 0; i < REVIEW_STRIPED_LOCKS.length; i++) {
+            REVIEW_STRIPED_LOCKS[i] = new Object();
+        }
+    }
 
     private <T> T executeWithReviewLock(String bookingId, java.util.function.Supplier<T> action) {
         if (bookingId == null || bookingId.isBlank()) {
             return action.get();
         }
         String normalizedBookingId = bookingId.trim();
-        Object monitor = REVIEW_LOCKS.computeIfAbsent(normalizedBookingId, k -> new Object());
+        int index = Math.abs(normalizedBookingId.hashCode() % REVIEW_STRIPED_LOCKS.length);
+        Object monitor = REVIEW_STRIPED_LOCKS[index];
         java.util.function.Supplier<T> synchronizedAction = () -> {
             synchronized (monitor) {
                 return action.get();

@@ -77,6 +77,7 @@ const bogotaTodayIso = (): string => {
             <button *ngFor="let day of calendarDays"
                  type="button"
                  [disabled]="day.isPast || !day.available"
+                 [attr.aria-label]="getDayAriaLabel(day)"
                  (click)="selectDayForBooking(day)"
                  style="border: none; border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); padding: 1.25rem 0.5rem; position: relative; transition: all 0.2s;"
                  [style.cursor]="(!day.isPast && day.available) ? 'pointer' : 'default'"
@@ -165,7 +166,15 @@ export class CalendarComponent implements OnInit {
   selectDayForBooking(day: any) {
     if (!day || day.isPast || !day.available) return;
     const [y, m, d] = day.dateStr.split('-').map(Number);
-    const checkOutIso = new Date(Date.UTC(y, m - 1, d + 2)).toISOString().slice(0, 10);
+    const nextDayDate = new Date(Date.UTC(y, m - 1, d + 1));
+    const nextDayIso = nextDayDate.toISOString().slice(0, 10);
+    const dayAfterDate = new Date(Date.UTC(y, m - 1, d + 2));
+    const dayAfterIso = dayAfterDate.toISOString().slice(0, 10);
+
+    // F12: Validar que la noche intermedia esté disponible antes de poner 2 noches
+    const canDoTwoNights = this.availabilityData[nextDayIso] === true;
+    const checkOutIso = canDoTwoNights ? dayAfterIso : nextDayIso;
+
     this.searchState.updateRawDates(day.dateStr, checkOutIso);
     if (this.selectedSuiteId) {
       const target = this.suites.find(s => (s.id || s._id) === this.selectedSuiteId);
@@ -182,18 +191,33 @@ export class CalendarComponent implements OnInit {
     this.loadData();
   }
 
+  getDayAriaLabel(day: any): string {
+    const status = day.isPast ? 'Pasado' : (day.available ? `Disponible, ${day.availableSuites || ''} habitaciones` : 'Agotado');
+    return `${day.date} de ${this.monthName} de ${this.year}, ${status}`;
+  }
+
+  private activeReqId = 0;
+
   loadData() {
+    const reqId = ++this.activeReqId;
     this.loading = true;
     this.loadError = false;
-    const params: any = { year: this.year, month: this.month };
+    const reqYear = this.year;
+    const reqMonth = this.month;
+    const params: any = { year: reqYear, month: reqMonth };
     if (this.selectedSuiteId) params.suiteId = this.selectedSuiteId;
     this.api.get<any>('/availability/monthly', params).pipe(
       finalize(() => {
-        this.loading = false;
-        this.cdr.detectChanges();
+        if (reqId === this.activeReqId) {
+          this.loading = false;
+          this.cdr.detectChanges();
+        }
       })
     ).subscribe({
       next: (res) => {
+        if (reqId !== this.activeReqId || this.year !== reqYear || this.month !== reqMonth) {
+          return;
+        }
         const data = res.data || res;
         const calendarArray = data.calendar || [];
         this.availabilityData = {};
@@ -207,6 +231,9 @@ export class CalendarComponent implements OnInit {
         this.cdr.detectChanges();
       },
       error: () => {
+        if (reqId !== this.activeReqId || this.year !== reqYear || this.month !== reqMonth) {
+          return;
+        }
         // C6: ante error mostramos estado de fallo real; nunca "todo ocupado".
         this.availabilityData = {};
         this.loadError = true;

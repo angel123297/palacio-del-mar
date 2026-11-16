@@ -42,6 +42,21 @@ class AuthControllerTest {
     }
 
     @Test
+    void loginRejectsMissingFieldsBeforeAuthentication() throws Exception {
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void loginRejectsBlankPasswordAndInvalidEmail() throws Exception {
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"invalid\",\"password\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(authService);
+    }
+
+    @Test
     void loginSetsSecureHttpOnlyLaxCookieWhenForwardedOverHttps() throws Exception {
         when(authService.login(any(AuthRequest.class))).thenReturn(AuthResponse.builder()
                 .token("jwt-token")

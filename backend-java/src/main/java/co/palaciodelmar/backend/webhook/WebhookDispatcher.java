@@ -330,22 +330,38 @@ public class WebhookDispatcher {
         java.net.InetAddress boundAddress = java.net.InetAddress.getByAddress(target.host(), target.pinnedAddress().getAddress());
 
         java.net.Socket rawSocket = new java.net.Socket();
-        rawSocket.connect(new java.net.InetSocketAddress(boundAddress, target.port()), timeoutMs);
-        rawSocket.setSoTimeout(timeoutMs);
+        java.net.Socket activeSocket = null;
+        try {
+            rawSocket.connect(new java.net.InetSocketAddress(boundAddress, target.port()), timeoutMs);
+            rawSocket.setSoTimeout(timeoutMs);
 
-        java.net.Socket activeSocket = rawSocket;
-        if (target.https()) {
-            javax.net.ssl.SSLSocketFactory sslFactory = (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
-            javax.net.ssl.SSLSocket sslSocket = (javax.net.ssl.SSLSocket) sslFactory.createSocket(
-                    rawSocket, target.host(), target.port(), true);
-            javax.net.ssl.SSLParameters sslParams = sslSocket.getSSLParameters();
-            sslParams.setEndpointIdentificationAlgorithm("HTTPS");
-            if (!co.palaciodelmar.backend.security.RateLimitFilter.isValidIpLiteral(target.host())) {
-                sslParams.setServerNames(List.of(new javax.net.ssl.SNIHostName(target.host())));
+            activeSocket = rawSocket;
+            if (target.https()) {
+                javax.net.ssl.SSLSocketFactory sslFactory = (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
+                javax.net.ssl.SSLSocket sslSocket = (javax.net.ssl.SSLSocket) sslFactory.createSocket(
+                        rawSocket, target.host(), target.port(), true);
+                javax.net.ssl.SSLParameters sslParams = sslSocket.getSSLParameters();
+                sslParams.setEndpointIdentificationAlgorithm("HTTPS");
+                if (!co.palaciodelmar.backend.security.RateLimitFilter.isValidIpLiteral(target.host())) {
+                    sslParams.setServerNames(List.of(new javax.net.ssl.SNIHostName(target.host())));
+                }
+                sslSocket.setSSLParameters(sslParams);
+                sslSocket.startHandshake();
+                activeSocket = sslSocket;
             }
-            sslSocket.setSSLParameters(sslParams);
-            sslSocket.startHandshake();
-            activeSocket = sslSocket;
+        } catch (Throwable t) {
+            try {
+                if (activeSocket != null) {
+                    activeSocket.close();
+                } else {
+                    rawSocket.close();
+                }
+            } catch (Throwable ignored) {
+            }
+            if (t instanceof java.io.IOException ioe) {
+                throw ioe;
+            }
+            throw new java.io.IOException("Socket initialization failed: " + t.getMessage(), t);
         }
 
         try (java.net.Socket sock = activeSocket;
@@ -595,9 +611,19 @@ public class WebhookDispatcher {
 
         try {
             return objectMapper.writeValueAsString(payloadMap);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.error("Error serializando payload para webhook: {}", e.getMessage());
-            return "{\"eventId\":\"" + eventId + "\",\"eventType\":\"" + eventType + "\"}";
+            Map<String, Object> fallback = new LinkedHashMap<>();
+            fallback.put("eventId", eventId != null ? eventId : "");
+            fallback.put("eventType", eventType != null ? eventType : "");
+            fallback.put("propertyId", propertyId);
+            fallback.put("timestamp", Instant.now().toString());
+            fallback.put("error", "Serialization failure");
+            try {
+                return objectMapper.writeValueAsString(fallback);
+            } catch (Exception ex) {
+                return "{\"eventId\":\"" + (eventId != null ? eventId.replace("\"", "\\\"") : "") + "\",\"eventType\":\"" + (eventType != null ? eventType.replace("\"", "\\\"") : "") + "\"}";
+            }
         }
     }
 

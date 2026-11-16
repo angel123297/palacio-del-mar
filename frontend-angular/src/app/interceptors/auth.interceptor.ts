@@ -40,6 +40,19 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         const msg = `Demasiadas solicitudes consecutivas. Por favor espera ${retryAfter} segundos antes de volver a intentarlo.`;
         if (error.error && typeof error.error === 'object') {
           error.error.message = error.error.message || msg;
+        } else {
+          const newErrorBody = {
+            message: typeof error.error === 'string' && error.error ? error.error : msg,
+            retryAfterSeconds: Number(retryAfter) || 60
+          };
+          const normalizedError = new HttpErrorResponse({
+            error: newErrorBody,
+            headers: error.headers,
+            status: error.status,
+            statusText: error.statusText,
+            url: error.url || undefined
+          });
+          return throwError(() => normalizedError);
         }
       }
       return throwError(() => error);

@@ -71,6 +71,8 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return !"inactive".equalsIgnoreCase(user.getStatus());
+        return user != null && user.getDeletedAt() == null
+                && !"inactive".equalsIgnoreCase(user.getStatus())
+                && !"suspended".equalsIgnoreCase(user.getStatus());
     }
 }

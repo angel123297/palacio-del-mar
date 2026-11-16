@@ -11,6 +11,7 @@ import co.palaciodelmar.backend.service.ICalService;
 import co.palaciodelmar.backend.service.SocialProofService;
 import co.palaciodelmar.backend.service.SuiteService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -59,7 +60,7 @@ public class SuiteController {
 
     @PostMapping("/calculate-price")
     public ResponseEntity<ApiResponse<CalculatePriceResponseDTO>> calculatePrice(
-            @RequestBody CalculatePriceRequest request) {
+            @Valid @RequestBody CalculatePriceRequest request) {
         CalculatePriceResponseDTO result = suiteService.calculatePrice(request);
         return ResponseEntity.ok(ApiResponse.ok(result));
     }

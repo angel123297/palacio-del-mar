@@ -7,13 +7,16 @@ import co.palaciodelmar.backend.repository.WebhookSubscriptionRepository;
 import co.palaciodelmar.backend.service.RedisLockService;
 import co.palaciodelmar.backend.webhook.WebhookDispatcher;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,9 +32,13 @@ public class WebhookRetryScheduler {
     @Autowired(required = false)
     private RedisLockService redisLockService;
 
+    @Setter
+    @Autowired(required = false)
+    private Clock clock = Clock.system(ZoneId.of("America/Bogota"));
+
     @Scheduled(fixedDelay = 30000) // cada 30 segundos (red de respaldo para Redis Streams ZSET)
     public void processPendingRetries() {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         List<WebhookDelivery> pendingDeliveries = new java.util.ArrayList<>(
                 deliveryRepository.findByStatusAndNextRetryAtBefore("PENDING", now)
         );

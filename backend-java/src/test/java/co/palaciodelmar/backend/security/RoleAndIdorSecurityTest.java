@@ -4,6 +4,7 @@ import co.palaciodelmar.backend.controller.AdminController;
 import co.palaciodelmar.backend.controller.HostPropertyController;
 import co.palaciodelmar.backend.dto.PropertyDTO;
 import co.palaciodelmar.backend.dto.PropertyRequest;
+import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.exception.GlobalExceptionHandler;
 import co.palaciodelmar.backend.exception.ResourceNotFoundException;
 import co.palaciodelmar.backend.model.Booking;
@@ -292,7 +293,7 @@ class RoleAndIdorSecurityTest {
                 .branches(List.of())
                 .build();
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 realBookingService.getBookingByIdSecure("bk-target-1", attackerHost)
         );
 

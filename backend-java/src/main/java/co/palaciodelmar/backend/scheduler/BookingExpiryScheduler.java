@@ -37,13 +37,17 @@ public class BookingExpiryScheduler {
     @Autowired(required = false)
     private AvailabilityCacheEvictor availabilityCacheEvictor;
 
+    @Setter
+    @Autowired(required = false)
+    private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("America/Bogota"));
+
     /**
      * Limpia periódicamente las reservas en estado "pending" que no completaron el pago
      * dentro del tiempo límite de 15 minutos (expiresAt < now), liberando el inventario de suites.
      */
-    @Scheduled(fixedRateString = "${booking.expiry.check.interval.ms:60000}")
+    @Scheduled(fixedDelayString = "${booking.expiry.check.interval.ms:60000}")
     public void cleanupExpiredBookings() {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         // Incluir también reservas pending con pago parcial cuyo tiempo de retención expiró
         List<Booking> expiredBookings = bookingRepository.findByStatusAndExpiresAtBefore("pending", now).stream()
                 .filter(b -> !"paid".equalsIgnoreCase(b.getPaymentStatus()))

@@ -528,7 +528,10 @@ public class HostController {
         final String effectiveAccountNumber;
         final String effectiveMasked;
 
-        if (rawAccount != null && rawAccount.startsWith("***") && existing != null && existing.getAccountNumber() != null) {
+        if (rawAccount != null && rawAccount.startsWith("***")) {
+            if (existing == null || existing.getAccountNumber() == null || existing.getAccountNumber().isBlank()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("No se puede registrar una cuenta bancaria con un valor enmascarado"));
+            }
             // Se reenvió el valor ya enmascarado; preservar el número real original
             effectiveAccountNumber = existing.getAccountNumber();
             effectiveMasked = existing.getAccountNumberMasked() != null ? existing.getAccountNumberMasked() : maskAccountNumber(effectiveAccountNumber);

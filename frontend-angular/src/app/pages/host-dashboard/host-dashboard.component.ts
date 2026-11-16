@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, inject, signal, effect, computed } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Subscription, of } from 'rxjs';
+import { switchMap, map } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -491,7 +492,7 @@ export interface HostPromotionItem {
 
                 <!-- Create Room Form -->
                 <div class="p-4 bg-[rgba(255,255,255,0.02)] border border-[rgba(201,169,110,0.2)] rounded-lg">
-                  <h4 class="text-sm font-semibold text-[#c9a96e] uppercase tracking-wider mb-3">➕ Añadir Nueva Habitación</h4>
+                  <h4 class="text-sm font-semibold text-[#c9a96e] uppercase tracking-wider mb-3">{{ editingSuiteId ? '✏️ Editando Habitación' : '➕ Añadir Nueva Habitación' }}</h4>
                   <form (ngSubmit)="submitSuite()" class="space-y-3">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
@@ -535,9 +536,12 @@ export interface HostPromotionItem {
                       </div>
                     </div>
 
-                    <div class="flex justify-end pt-2">
+                    <div class="flex items-center justify-end gap-2 pt-2">
+                      <button *ngIf="editingSuiteId" type="button" (click)="cancelEditSuite()" class="min-h-[44px] px-4 py-2.5 bg-transparent hover:bg-white/10 text-white/70 rounded uppercase tracking-wider text-xs border border-white/20 transition cursor-pointer">
+                        Cancelar Edición
+                      </button>
                       <button type="submit" [disabled]="submittingSuite" class="min-h-[44px] px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded uppercase tracking-wider text-xs transition duration-200 cursor-pointer">
-                        {{ submittingSuite ? 'Guardando...' : '➕ Guardar Habitación' }}
+                        {{ submittingSuite ? 'Guardando...' : (editingSuiteId ? '💾 Actualizar Habitación' : '➕ Guardar Habitación') }}
                       </button>
                     </div>
                   </form>
@@ -1144,7 +1148,7 @@ export interface HostPromotionItem {
               <div class="flex items-center gap-4">
                 <div class="bg-[rgba(201,169,110,0.12)] border border-[rgba(201,169,110,0.3)] px-4 py-2 rounded-lg flex items-center gap-2">
                   <span class="text-[#f1c40f] text-lg">★</span>
-                  <span class="text-base font-bold text-white">{{ hostAverageRating() }} / 5</span>
+                  <span class="text-base font-bold text-white">{{ hostAverageRating() !== null ? hostAverageRating() + ' / 5' : '—' }}</span>
                   <span class="text-xs opacity-75">({{ hostReviews().length }} reseñas)</span>
                 </div>
                 <button (click)="fetchHostReviews()" class="min-h-[44px] px-4 py-2 bg-[#c9a96e] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider rounded-md hover:bg-[#d8b87d] transition cursor-pointer">
@@ -1273,15 +1277,17 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
   payouts = signal<any[]>([]);
   hostReviews = signal<any[]>([]);
   loadingReviews = signal<boolean>(false);
-  hostAverageRating = computed(() => {
+  hostAverageRating = computed<number | null>(() => {
     const revs = this.hostReviews();
-    if (!revs.length) return 5.0;
+    if (!revs.length) return null;
     const sum = revs.reduce((acc, r) => acc + (r.rating || 5), 0);
     return Number((sum / revs.length).toFixed(1));
   });
   loading = signal(true);
   actionMessage = signal<string>('');
   actionError = signal<string>('');
+  processingBookingId = signal<string | null>(null);
+  deletingSuiteId = signal<string | null>(null);
 
   fetchPayouts() {
     this.api.get<ApiResponse<any[]>>('/host/properties/payouts').subscribe({
@@ -1534,6 +1540,10 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         const list = res?.data || (res as any) || [];
         this.apiKeys.set(Array.isArray(list) ? list : []);
+      },
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al obtener claves de conexión');
+        this.apiKeys.set([]);
       }
     });
   }
@@ -1606,8 +1616,11 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
   }
 
   copyRecentlyCreatedKey() {
-    if (this.recentlyCreatedKey()) {
-      navigator.clipboard.writeText(this.recentlyCreatedKey());
+    const key = this.recentlyCreatedKey();
+    if (key) {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(key).catch(() => {});
+      }
       this.actionMessage.set('Clave copiada al portapapeles');
       setTimeout(() => this.actionMessage.set(''), 3000);
     }
@@ -1773,6 +1786,9 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
         const data = res?.data || (res as any);
         const list = data?.events ?? (Array.isArray(data) ? data : []);
         this.demoEvents.set(Array.isArray(list) ? list : []);
+      },
+      error: () => {
+        this.demoEvents.set([]);
       }
     });
   }
@@ -1786,6 +1802,10 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
         if (propList.length > 0 && !this.newPromo.branchId) {
           this.newPromo.branchId = propList[0].id || (propList[0] as any)._id || '';
         }
+      },
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al obtener alojamientos');
+        this.properties.set([]);
       }
     });
   }
@@ -1852,29 +1872,28 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
       ? this.api.put<ApiResponse<Property>>(`/host/properties/${editId}`, payload)
       : this.api.post<ApiResponse<Property>>('/host/properties', payload);
 
-    req$.subscribe({
-      next: (res) => {
-        this.submittingProperty = false;
+    req$.pipe(
+      switchMap((res) => {
         const createdProp = res?.data || (res as any);
         const propId = createdProp?.id || createdProp?._id || editId;
 
-        // Si se configuró la tarifa inicial de la primera habitación, crearla automáticamente
         if (!editId && this.newProperty.initialSuitePrice && propId) {
-          this.api.post<any>(`/host/properties/${propId}/suites`, {
+          return this.api.post<any>(`/host/properties/${propId}/suites`, {
             name: this.newProperty.initialSuiteName || `Suite Principal - ${this.newProperty.name}`,
             type: 'Suite Deluxe',
             basePrice: this.newProperty.initialSuitePrice,
             maxGuests: this.newProperty.initialSuiteGuests || 2,
             size: 35,
             mainImage: this.newProperty.mainImage || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'
-          }).subscribe({
-            next: () => {
-              this.fetchProperties();
-            },
-            error: () => {}
-          });
+          }).pipe(
+            map(() => res)
+          );
         }
-
+        return of(res);
+      })
+    ).subscribe({
+      next: (res) => {
+        this.submittingProperty = false;
         this.propertySuccess = editId
           ? '¡Alojamiento actualizado exitosamente!'
           : '¡Alojamiento registrado exitosamente! En revisión por administración.';
@@ -1962,6 +1981,21 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
     };
   }
 
+  cancelEditSuite() {
+    this.editingSuiteId = null;
+    this.newSuite = {
+      name: '',
+      type: 'Habitación',
+      basePrice: 250000,
+      maxGuests: 2,
+      size: 28,
+      description: '',
+      mainImage: ''
+    };
+    this.suiteError = '';
+    this.suiteSuccess = '';
+  }
+
   toggleSuiteActive(s: any) {
     if (!this.selectedPropertyForSuites) return;
     const propId = this.selectedPropertyForSuites.id || this.selectedPropertyForSuites._id;
@@ -1993,8 +2027,13 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
     const propId = this.selectedPropertyForSuites.id || this.selectedPropertyForSuites._id;
     const suiteId = s.id || s._id;
     if (!propId || !suiteId) return;
+    if (this.deletingSuiteId() === suiteId) return;
+    if (!confirm('¿Estás seguro de que deseas eliminar esta habitación?')) return;
+
+    this.deletingSuiteId.set(suiteId);
     this.api.delete<ApiResponse<any>>(`/host/properties/${propId}/suites/${suiteId}`).subscribe({
       next: () => {
+        this.deletingSuiteId.set(null);
         if (this.editingSuiteId === suiteId) {
           this.editingSuiteId = null;
         }
@@ -2003,7 +2042,9 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
         this.fetchProperties();
       },
       error: (err) => {
+        this.deletingSuiteId.set(null);
         this.suiteError = err?.error?.message || 'No se pudo eliminar la habitación.';
+        this.actionError.set(this.suiteError);
       }
     });
   }
@@ -2106,6 +2147,10 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         const list = res.data || res || [];
         this.promotions.set(Array.isArray(list) ? list : []);
+      },
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al obtener promociones');
+        this.promotions.set([]);
       }
     });
   }
@@ -2124,7 +2169,13 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.newPromo.endDate < this.newPromo.startDate) {
+    const today = new Date().toISOString().split('T')[0];
+    if (this.newPromo.startDate < today) {
+      this.promoError = 'La fecha de inicio no puede ser en el pasado';
+      return;
+    }
+
+    if (this.newPromo.endDate <= this.newPromo.startDate) {
       this.promoError = 'La fecha de fin debe ser posterior a la fecha de inicio';
       return;
     }
@@ -2162,14 +2213,20 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
     this.api.delete<any>(`/host/promotions/${id}`).subscribe({
       next: () => {
         this.fetchPromotions();
+      },
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al eliminar la promoción');
       }
     });
   }
 
   markCheckIn(b: Booking) {
     const id = b.id || b._id;
+    if (!id || this.processingBookingId() === id) return;
+    this.processingBookingId.set(id);
     this.api.post<any>(`/host/bookings/${id}/checkin`, {}).subscribe({
       next: () => {
+        this.processingBookingId.set(null);
         // L9: el estado real lo decide el servidor; refrescamos en vez de inventarlo localmente.
         this.fetchBookings();
         this.fetchMetrics();
@@ -2177,6 +2234,7 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
         setTimeout(() => this.actionMessage.set(''), 4000);
       },
       error: (err) => {
+        this.processingBookingId.set(null);
         this.actionError.set(err?.error?.message || 'Error al registrar check-in');
         setTimeout(() => this.actionError.set(''), 5000);
       }
@@ -2185,15 +2243,18 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
 
   markCheckOut(b: Booking) {
     const id = b.id || b._id;
+    if (!id || this.processingBookingId() === id) return;
+    this.processingBookingId.set(id);
     this.api.post<any>(`/host/bookings/${id}/checkout`, {}).subscribe({
       next: () => {
-        // L9: refrescamos desde el servidor (estado, depósito y liquidación los calcula el backend).
+        this.processingBookingId.set(null);
         this.fetchBookings();
         this.fetchMetrics();
-        this.actionMessage.set('Check-out completado. Habitación liberada para aseo.');
+        this.actionMessage.set(`Check-out registrado con éxito para ${b.guestName || 'el huésped'}.`);
         setTimeout(() => this.actionMessage.set(''), 4000);
       },
       error: (err) => {
+        this.processingBookingId.set(null);
         this.actionError.set(err?.error?.message || 'Error al registrar check-out');
         setTimeout(() => this.actionError.set(''), 5000);
       }

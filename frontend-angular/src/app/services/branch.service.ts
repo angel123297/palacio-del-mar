@@ -8,7 +8,11 @@ export class BranchService {
   constructor(private api: ApiService) {}
   getBranches(): Observable<Branch[]> {
     return this.api.get<any>('/branches').pipe(
-      map(res => (res?.data || res) as Branch[])
+      map(res => {
+        if (Array.isArray(res?.data)) return res.data as Branch[];
+        if (Array.isArray(res)) return res as Branch[];
+        return [];
+      })
     );
   }
 }

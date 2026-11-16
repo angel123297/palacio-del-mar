@@ -57,6 +57,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(emailService.isConfigured()).thenReturn(true);
         registerRequest = RegisterRequest.builder()
                 .name("Juan")
                 .lastName("Pérez")
@@ -90,13 +91,58 @@ class AuthServiceTest {
         assertNotNull(saved);
         assertEquals("user", saved.getRole(), "Por defecto el rol debe ser user");
         // Se verifica que emailVerified sea consistente con la configuracion del servicio
-        assertNotNull(saved.getEmailVerified());
+        assertFalse(saved.getEmailVerified());
         assertNotNull(saved.getVerificationTokenHash(), "Debe guardarse el hash del token de verificación");
         assertNotNull(saved.getVerificationTokenExpiresAt());
         assertNull(response.getToken(), "No debe entregarse un token JWT hasta que se verifique el correo");
         assertNotNull(response.getUser());
         assertEquals("juan.perez@example.com", response.getUser().getEmail());
         verify(emailService).sendVerificationEmail(eq("juan.perez@example.com"), any());
+    }
+
+    @Test
+    void registerNeverVerifiesWhenSmtpThrows() {
+        when(passwordEncoder.encode("password123")).thenReturn("hashedPassword");
+        doThrow(new IllegalStateException("SMTP unavailable"))
+                .when(emailService).sendVerificationEmail(anyString(), anyString());
+        AuthResponse response = authService.register(registerRequest);
+        assertFalse(response.getUser().getEmailVerified());
+        assertNull(response.getToken());
+    }
+
+    @Test
+    void repeatedRegistrationRotatesVerificationWithoutChangingIdentityOrPassword() {
+        testUser.setVerificationTokenHash("old-token-hash");
+        testUser.setStatus("active");
+        when(userRepository.existsByEmail(testUser.getEmail())).thenReturn(true);
+        when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        registerRequest.setRole("host");
+        registerRequest.setName("Attacker");
+        AuthResponse response = authService.register(registerRequest);
+        assertNotEquals("old-token-hash", testUser.getVerificationTokenHash());
+        assertEquals("hashedPassword", testUser.getPassword());
+        assertEquals("Juan", testUser.getName());
+        assertEquals("user", testUser.getRole());
+        assertFalse(testUser.getEmailVerified());
+        assertNull(response.getToken());
+        verify(emailService).sendVerificationEmail(eq(testUser.getEmail()), anyString());
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void passwordlessAccountCannotBeClaimedThroughPublicRegistration() {
+        testUser.setPassword(null);
+        testUser.setVerificationTokenHash("old-token-hash");
+        testUser.setStatus("active");
+        when(userRepository.existsByEmail(testUser.getEmail())).thenReturn(true);
+        when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        registerRequest.setRole("host");
+        authService.register(registerRequest);
+        assertNull(testUser.getPassword());
+        assertEquals("user", testUser.getRole());
+        assertFalse(testUser.getEmailVerified());
+        assertNotEquals("old-token-hash", testUser.getVerificationTokenHash());
+        verifyNoInteractions(passwordEncoder);
     }
 
     @Test
@@ -204,17 +250,36 @@ class AuthServiceTest {
         testUser.setVerificationTokenExpiresAt(Instant.now().plus(2, ChronoUnit.HOURS));
 
         when(userRepository.findByVerificationTokenHash(hashedToken)).thenReturn(Optional.of(testUser));
-        when(userRepository.save(any(User.class))).thenReturn(testUser);
+        User verified = User.builder().id(testUser.getId()).email(testUser.getEmail()).role("user")
+                .status("active").emailVerified(true).build();
+        when(mongoTemplate.findAndModify(any(Query.class), any(Update.class), any(FindAndModifyOptions.class), eq(User.class)))
+                .thenReturn(verified);
         when(jwtService.generateToken(any())).thenReturn("mock-jwt-token");
 
         AuthResponse res = authService.verifyEmail(token);
 
         assertNotNull(res);
         assertEquals("mock-jwt-token", res.getToken());
-        assertTrue(testUser.getEmailVerified());
-        assertNull(testUser.getVerificationTokenHash());
-        assertNull(testUser.getVerificationTokenExpiresAt());
-        verify(userRepository).save(testUser);
+        assertTrue(res.getUser().getEmailVerified());
+        assertNull(verified.getVerificationTokenHash());
+        assertNull(verified.getVerificationTokenExpiresAt());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void verificationCannotConsumeTokenReplacedAfterRead() {
+        String token = "replaced-token";
+        testUser.setVerificationTokenHash(authService.hashToken(token));
+        testUser.setVerificationTokenExpiresAt(Instant.now().plusSeconds(600));
+        when(userRepository.findByVerificationTokenHash(anyString())).thenReturn(Optional.of(testUser));
+        // Mongo reports that the token/expiry predicate no longer matches.
+        assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail(token));
+        verifyNoInteractions(jwtService);
+        verify(userRepository, never()).save(any());
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).findAndModify(query.capture(), any(Update.class), any(FindAndModifyOptions.class), eq(User.class));
+        assertEquals(authService.hashToken(token), query.getValue().getQueryObject().get("verificationTokenHash"));
+        assertTrue(query.getValue().getQueryObject().containsKey("verificationTokenExpiresAt"));
     }
 
     @Test
@@ -365,7 +430,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerAllowsClaimingStubUserWithoutPassword() {
+    void registerResendsForStubWithoutAssigningPassword() {
         testUser.setPassword(null);
         testUser.setEmailVerified(false);
         String oldHash = "old-hash-99999";
@@ -373,7 +438,6 @@ class AuthServiceTest {
 
         when(userRepository.existsByEmail("juan.perez@example.com")).thenReturn(true);
         when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
-        when(passwordEncoder.encode(anyString())).thenReturn("newHashedPassword");
         when(userRepository.save(any(User.class))).thenReturn(testUser);
 
         registerRequest.setPassword("newSecretPassword123");
@@ -387,14 +451,46 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerRejectsWhenUserExistsWithPasswordEvenIfUnverified() {
+    void registerResendsWhenExistingPasswordAccountIsUnverified() {
         testUser.setEmailVerified(false);
         testUser.setPassword("existingHashedPassword");
         when(userRepository.existsByEmail("juan.perez@example.com")).thenReturn(true);
         when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(registerRequest));
-        assertEquals("El email ya está registrado", ex.getMessage());
-        verify(userRepository, never()).save(any());
+        AuthResponse response = authService.register(registerRequest);
+        assertNull(response.getToken());
+        assertNull(response.getUser(), "No se debe exponer el perfil PII del usuario existente");
+        assertEquals("existingHashedPassword", testUser.getPassword());
+        verify(emailService).sendVerificationEmail(eq(testUser.getEmail()), anyString());
+    }
+
+    @Test
+    void resendVerificationHandlesSmtpFailureGracefully() {
+        testUser.setEmailVerified(false);
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenReturn(testUser);
+        doThrow(new RuntimeException("SMTP connection failed"))
+                .when(emailService).sendVerificationEmail(anyString(), anyString());
+
+        assertDoesNotThrow(() -> authService.resendVerification("juan.perez@example.com"));
+    }
+
+    @Test
+    void resendVerificationBlocksSuspendedOrAdminUser() {
+        testUser.setEmailVerified(false);
+        testUser.setRole("admin");
+        when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(testUser));
+        assertThrows(IllegalArgumentException.class, () -> authService.resendVerification("admin@example.com"));
+
+        testUser.setRole("user");
+        testUser.setStatus("suspended");
+        when(userRepository.findByEmail("suspended@example.com")).thenReturn(Optional.of(testUser));
+        assertThrows(IllegalArgumentException.class, () -> authService.resendVerification("suspended@example.com"));
+    }
+
+    @Test
+    void verifyEmailRejectsNullOrBlankToken() {
+        assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail(null));
+        assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail("   "));
     }
 }

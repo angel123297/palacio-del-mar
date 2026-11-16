@@ -21,7 +21,7 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "suitenights")
 @CompoundIndexes({
-        @CompoundIndex(name = "suite_unit_dates_idx", def = "{'suite': 1, 'unitSlot': 1, 'dates': 1}", unique = true)
+        @CompoundIndex(name = "suite_unit_dates_idx", def = "{'suite': 1, 'unitSlot': 1, 'dates': 1}", unique = true, partialFilter = "{'status': {'$ne': 'cancelled'}}")
 })
 public class SuiteNight {
 

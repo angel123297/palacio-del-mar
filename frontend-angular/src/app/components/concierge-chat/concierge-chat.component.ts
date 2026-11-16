@@ -22,6 +22,11 @@ export class ConciergeChatComponent {
   @Input() suiteName?: string;
 
   get whatsAppUrl(): string {
-    return 'https://wa.me/573009876543';
+    const base = 'https://wa.me/573009876543';
+    if (this.suiteName) {
+      const text = encodeURIComponent(`Hola, tengo una consulta sobre la suite ${this.suiteName} en Palacio del Mar.`);
+      return `${base}?text=${text}`;
+    }
+    return base;
   }
 }

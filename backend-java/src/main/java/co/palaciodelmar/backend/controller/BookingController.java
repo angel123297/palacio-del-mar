@@ -107,7 +107,7 @@ public class BookingController {
     public ResponseEntity<ApiResponse<BookingDTO>> modifyBooking(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id,
-            @RequestBody BookingRequest request
+            @Valid @RequestBody BookingRequest request
     ) {
         if (request == null) {
             throw new IllegalArgumentException("El cuerpo de la solicitud no puede estar vacío");

@@ -1,7 +1,8 @@
-import { Component, ViewChild, OnInit, HostListener } from '@angular/core';
+import { Component, ViewChild, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router, ActivatedRoute, NavigationEnd } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { CurrencyService, Currency } from '../../services/currency.service';
@@ -163,13 +164,18 @@ import { AuthModalComponent } from '../auth-modal/auth-modal.component';
     <app-auth-modal #authModal [initialPortal]="authPortal" [initialMode]="authMode" [isOpen]="authModalOpen" (closeEvent)="onAuthClose()"></app-auth-modal>
   `
 })
-export class NavbarComponent implements OnInit {
+export class NavbarComponent implements OnInit, OnDestroy {
   @ViewChild('authModal') authModal?: AuthModalComponent;
 
   authModalOpen = false;
   authMode: 'login' | 'register' = 'login';
   authPortal: 'guest' | 'host' | 'admin' = 'guest';
   mobileMenuOpen = false;
+
+  private subs = new Subscription();
+  private scrollInterval: any = null;
+  private scrollTimeout: any = null;
+  private authTimeout: any = null;
 
   constructor(
     public auth: AuthService,
@@ -183,7 +189,10 @@ export class NavbarComponent implements OnInit {
       const returnUrl = params['returnUrl'];
       const sessionExpired = params['sessionExpired'] === 'true';
       if ((returnUrl || sessionExpired) && !this.auth.isLoggedIn()) {
-        setTimeout(() => {
+        if (this.authTimeout) {
+          clearTimeout(this.authTimeout);
+        }
+        this.authTimeout = setTimeout(() => {
           this.openAuth('login', 'guest');
           if (sessionExpired && this.authModal) {
             this.authModal.message = 'Tu sesión ha expirado por seguridad. Inicia sesión para continuar directamente donde estabas.';
@@ -193,14 +202,34 @@ export class NavbarComponent implements OnInit {
       }
     };
 
-    this.route.queryParams.subscribe(params => handleParams(params));
+    this.subs.add(
+      this.route.queryParams.subscribe(params => handleParams(params))
+    );
 
-    this.router.events.pipe(
-      filter(event => event instanceof NavigationEnd)
-    ).subscribe(() => {
-      const tree = this.router.parseUrl(this.router.url);
-      handleParams(tree.queryParams);
-    });
+    this.subs.add(
+      this.router.events.pipe(
+        filter(event => event instanceof NavigationEnd)
+      ).subscribe(() => {
+        const tree = this.router.parseUrl(this.router.url);
+        handleParams(tree.queryParams);
+      })
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.subs.unsubscribe();
+    if (this.scrollInterval) {
+      clearInterval(this.scrollInterval);
+      this.scrollInterval = null;
+    }
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout);
+      this.scrollTimeout = null;
+    }
+    if (this.authTimeout) {
+      clearTimeout(this.authTimeout);
+      this.authTimeout = null;
+    }
   }
 
   toggleMobileMenu(): void {
@@ -276,23 +305,34 @@ export class NavbarComponent implements OnInit {
     const rawPath = this.router.url.split('?')[0].split('#')[0];
     const targetId = hash.startsWith('#') ? hash.slice(1) : hash;
 
+    if (this.scrollInterval) {
+      clearInterval(this.scrollInterval);
+      this.scrollInterval = null;
+    }
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout);
+      this.scrollTimeout = null;
+    }
+
     const doScroll = () => {
       let attempts = 0;
-      const interval = setInterval(() => {
+      this.scrollInterval = setInterval(() => {
         attempts++;
         const el = document.getElementById(targetId) || document.querySelector(hash);
         if (el) {
           el.scrollIntoView({ behavior: 'smooth' });
-          clearInterval(interval);
+          clearInterval(this.scrollInterval);
+          this.scrollInterval = null;
         } else if (attempts >= 15) {
-          clearInterval(interval);
+          clearInterval(this.scrollInterval);
+          this.scrollInterval = null;
         }
       }, 60);
     };
 
     if (rawPath !== '/' && rawPath !== '') {
       this.router.navigate(['/'], { fragment: targetId }).then(() => {
-        setTimeout(doScroll, 100);
+        this.scrollTimeout = setTimeout(doScroll, 100);
       });
       return;
     }

@@ -1,6 +1,6 @@
-import { Component, OnInit, inject, effect, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { SearchStateService } from '../../services/search-state.service';
@@ -10,9 +10,9 @@ import { DateRangePickerComponent } from '../date-range-picker/date-range-picker
 @Component({
   selector: 'app-booking-bar',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, DateRangePickerComponent],
+  imports: [CommonModule, FormsModule, DateRangePickerComponent],
   template: `
-    <div id="booking-bar" role="search" aria-label="Buscador de suites y disponibilidad" class="bg-[#161311] border-b-2 border-[rgba(201,169,110,0.3)] shadow-2xl sticky top-[57px] z-[190] px-0 relative w-full">
+    <div id="booking-bar" role="search" aria-label="Buscador de suites y disponibilidad" class="bg-[#161311] border-b-2 border-[rgba(201,169,110,0.3)] shadow-2xl sticky top-[68px] z-[190] px-0 relative w-full">
       
       <form class="flex flex-col md:flex-row items-stretch w-full" (ngSubmit)="submit()" aria-label="Filtros de búsqueda de disponibilidad">
         

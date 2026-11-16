@@ -51,8 +51,13 @@ public class SuiteService {
         Map<String, Property> propMap = propertyRepository.findAll().stream()
                 .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
 
-        List<Suite> suites = suiteRepository.findAll().stream()
-                .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+        List<Suite> suites = suiteRepository.findByActiveTrue();
+        if (suites == null || suites.isEmpty()) {
+            suites = suiteRepository.findAll().stream()
+                    .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+                    .toList();
+        }
+        suites = suites.stream()
                 .filter(s -> {
                     if (s.getPropertyId() == null) {
                         return true;
@@ -111,8 +116,13 @@ public class SuiteService {
         Map<String, Property> propMap = propertyRepository.findAll().stream()
                 .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
 
-        return suiteRepository.findAll().stream()
-                .filter(s -> targetId.equals(s.getBranch()) && !Boolean.FALSE.equals(s.getActive()))
+        List<Suite> branchSuites = suiteRepository.findByBranchAndActiveTrue(targetId);
+        if (branchSuites == null || branchSuites.isEmpty()) {
+            branchSuites = suiteRepository.findAll().stream()
+                    .filter(s -> targetId.equals(s.getBranch()) && !Boolean.FALSE.equals(s.getActive()))
+                    .toList();
+        }
+        return branchSuites.stream()
                 .filter(s -> {
                     if (s.getPropertyId() == null) {
                         return true;
@@ -216,10 +226,10 @@ public class SuiteService {
             }
         }
 
-        long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
-        if (nights <= 0) {
-            nights = 1;
+        if (request.getCheckIn() == null || request.getCheckOut() == null || !request.getCheckOut().isAfter(request.getCheckIn())) {
+            throw new IllegalArgumentException("La fecha de check-out debe ser estrictamente posterior a la fecha de check-in.");
         }
+        long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
 
         BigDecimal branchPromoPercent = findActiveSuitePromotion(suite, request.getCheckIn(), request.getCheckOut());
         Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
@@ -234,10 +244,13 @@ public class SuiteService {
         BigDecimal experiencesTotal = BigDecimal.ZERO;
         if (Boolean.TRUE.equals(request.getIncludeExperiences()) && request.getExperienceIds() != null) {
             for (String expId : request.getExperienceIds()) {
-                if (expId != null && !expId.isBlank() && !expId.startsWith("fx-")) {
+                if (expId != null && !expId.isBlank()) {
                     Optional<Experience> exp = experienceRepository.findById(expId);
-                    if (exp.isPresent() && exp.get().getPrice() != null) {
-                        experiencesTotal = experiencesTotal.add(exp.get().getPrice());
+                    if (exp.isPresent()) {
+                        Experience e = exp.get();
+                        if (Boolean.TRUE.equals(e.getActive()) && Boolean.TRUE.equals(e.getAvailable()) && e.getPrice() != null) {
+                            experiencesTotal = experiencesTotal.add(e.getPrice());
+                        }
                     }
                 }
             }

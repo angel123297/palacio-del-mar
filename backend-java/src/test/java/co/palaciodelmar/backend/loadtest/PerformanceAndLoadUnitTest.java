@@ -17,7 +17,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,6 +51,9 @@ class PerformanceAndLoadUnitTest {
 
     @InjectMocks
     private SuiteController suiteController;
+
+    private static final ZoneId BOGOTA = ZoneId.of("America/Bogota");
+    private Clock clock = Clock.fixed(Instant.parse("2026-11-16T12:00:00Z"), BOGOTA);
 
     private SuiteResponseDTO sampleSuite;
 
@@ -151,12 +157,15 @@ class PerformanceAndLoadUnitTest {
         CountDownLatch doneLatch = new CountDownLatch(totalRequests);
 
         AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failureCount = new AtomicInteger(0);
+        List<Throwable> exceptions = Collections.synchronizedList(new ArrayList<>());
         List<Long> latencies = Collections.synchronizedList(new ArrayList<>(totalRequests));
 
+        LocalDate baseDate = clock.instant().atZone(BOGOTA).toLocalDate();
         CalculatePriceRequest request = CalculatePriceRequest.builder()
                 .suiteId("suite-perf-101")
-                .checkIn(LocalDate.now().plusDays(2))
-                .checkOut(LocalDate.now().plusDays(5))
+                .checkIn(baseDate.plusDays(2))
+                .checkOut(baseDate.plusDays(5))
                 .build();
 
         for (int i = 0; i < totalRequests; i++) {
@@ -170,9 +179,12 @@ class PerformanceAndLoadUnitTest {
 
                     if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                         successCount.incrementAndGet();
+                    } else {
+                        failureCount.incrementAndGet();
                     }
                 } catch (Exception e) {
-                    // ignore for metric
+                    failureCount.incrementAndGet();
+                    exceptions.add(e);
                 } finally {
                     doneLatch.countDown();
                 }
@@ -184,11 +196,14 @@ class PerformanceAndLoadUnitTest {
         executor.shutdown();
 
         assertThat(completed).isTrue();
+        assertThat(failureCount.get()).isZero();
+        assertThat(exceptions).isEmpty();
         assertThat(successCount.get()).isEqualTo(totalRequests);
 
         Collections.sort(latencies);
         long p95 = latencies.get((int) (latencies.size() * 0.95));
-        System.out.printf("[BENCHMARK COTIZADOR] Solicitudes: %d | Éxitos: %d | P95: %d ms%n", totalRequests, successCount.get(), p95);
+        System.out.printf("[BENCHMARK COTIZADOR] Solicitudes: %d | Éxitos: %d | Fallos: %d | P95: %d ms%n",
+                totalRequests, successCount.get(), failureCount.get(), p95);
         assertThat(p95).isLessThan(200);
     }
 }

@@ -41,7 +41,7 @@ public class BranchService {
 
         // Unificar con propiedades aprobadas del marketplace (anfitriones externos como 'waos')
         Set<String> existingSlugs = branches.stream()
-                .map(b -> b.getSlug().toLowerCase())
+                .map(b -> b.getSlug() != null ? b.getSlug().toLowerCase() : (b.getId() != null ? b.getId().toLowerCase() : ""))
                 .collect(Collectors.toSet());
 
         List<Property> approvedProperties = propertyRepository.findByStatus("APPROVED").stream()
