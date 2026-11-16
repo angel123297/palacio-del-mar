@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
+  static const String defaultTunnelUrl = 'https://rehab-perceive-landline.ngrok-free.dev/api';
   static const String _overrideUrl = String.fromEnvironment('API_URL');
   static String? _runtimeBaseUrl;
 
@@ -26,8 +27,8 @@ class ApiConfig {
       return 'http://localhost:5000/api';
     }
     if (defaultTargetPlatform == TargetPlatform.android) {
-      // Por defecto en dispositivo físico usa la IP LAN del equipo servidor
-      return 'https://unbroke-unsized-zandra.ngrok-free.dev/api';
+      // Por defecto en dispositivo físico usa el túnel ngrok permanente oficial del proyecto
+      return defaultTunnelUrl;
     }
     return 'http://localhost:5000/api';
   }

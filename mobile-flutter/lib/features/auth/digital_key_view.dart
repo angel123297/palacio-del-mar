@@ -120,6 +120,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
 
         if (!mounted) return;
         if (verified == true) {
+          await authProvider.checkAuthStatus();
           _loadBookings();
         } else {
           setState(() {
