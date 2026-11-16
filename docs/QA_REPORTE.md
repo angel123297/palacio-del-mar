@@ -1,5 +1,28 @@
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-11-16 — Revisión diaria de Vibe: sin cambios en el día
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** El único commit en la ventana es el propio reporte de QA de ayer ([0b70033 — docs(qa): reporte diario 2026-11-15](https://github.com/angel123297/palacio-del-mar/commit/0b70033daaf7a602c6db92ba27a4159ac07d0325), 15 nov 14:46 UTC). La rama de trabajo no registra commits funcionales ni de los agentes (Antigravity/Jules).
+
+**Pull requests abiertos (sin cambios):**
+- [#25 — Add System Audit Report](https://github.com/angel123297/palacio-del-mar/pull/25) (draft, base `plan/marketplace-webhooks`, sin actividad desde 29 oct).
+- [#23 — Cleanup unused frontend code and dependencies](https://github.com/angel123297/palacio-del-mar/pull/23) (draft, base `proyecto-angular-java`, sin actividad desde 26 oct; base protegida: NO fusionar sin decisión explícita).
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones). Fases 0-4 completadas. Sin avance medible en la rama de trabajo.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios; corregidos y activados desde el 16 oct (commit [1dbd8ee](https://github.com/angel123297/palacio-del-mar/commit/1dbd8ee9434ed6ec78af4918d1e97e7f43dc0773)).
+
+**Tests esperados en verde:** sin corridas nuevas hoy. Se mantiene la expectativa de la bitácora: suite de backend post-R1-R9 (claim 594/594 según commit 945f935, cifra reportada por agentes y aún sin verificar por Vibe en CI) + 20 tests intensivos de Vibe activos. Sin fallos nuevos detectados en la revisión.
+
+**Riesgos / problemas detectados (persisten):**
+- ⚠️ **Divergencia de ramas:** los fixes del 14 nov (PRs #27/#28, commits de S4mu0) aterrizaron en `proyecto-angular-java` y no fueron re-sincronizados hacia `plan/marketplace-webhooks`; la rama de trabajo lleva 3 días estancada.
+- ⚠️ Conteo de tests (594/594) sin verificación contra el pipeline `.github/workflows/ci.yml`.
+- ⚠️ PRs draft antiguos (#25, #23) acumulan polvo; decidir cerrar o re-basificar.
+- ⚠️ Hallazgos de AUDITORIA_SEGURIDAD.md aún sin confirmar: PDM-04, PDM-05, PDM-07, PDM-08.
+- ⚠️ Orquestación de túnel ngrok (commit ecb6c51): verificar que sea efímero y autenticado.
+
+
+
 ### 📅 2026-11-15 — Revisión diaria de Vibe: sin cambios funcionales en la rama de trabajo; actividad intensa en `proyecto-angular-java`
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** El único commit en la ventana es el reporte de QA de ayer ([1f3f0ca — docs(qa): reporte diario 2026-11-14](https://github.com/angel123297/palacio-del-mar/commit/1f3f0ca3100236810eff9d81014d1f6844fd7655), 14 nov 14:05 UTC). La rama de trabajo no registra commits funcionales ni de los agentes (Antigravity/Jules).
