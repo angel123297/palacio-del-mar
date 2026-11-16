@@ -707,34 +707,44 @@ public class BookingService {
 
             cleanExpiredHeldNights(suite.getId(), request.getCheckIn(), request.getCheckOut());
 
-            for (int candidateSlot : availableSlots) {
-                List<SuiteNight> insertedNights = new java.util.ArrayList<>();
-                try {
-                    for (int i = 0; i < nights; i++) {
-                        LocalDate date = request.getCheckIn().plusDays(i);
-                        SuiteNight suiteNight = SuiteNight.builder()
-                                .suite(suite.getId())
-                                .branch(suite.getBranch())
-                                .unitSlot(candidateSlot)
-                                .dates(java.util.Collections.singletonList(date))
-                                .booking(resolvedBookingId)
-                                .status(isPending ? "held" : "confirmed")
-                                .expiresAt(nightExpiry)
-                                .createdAt(Instant.now())
-                                .build();
-                        insertedNights.add(suiteNightRepository.save(suiteNight));
+            try {
+                for (int candidateSlot : availableSlots) {
+                    List<SuiteNight> insertedNights = new java.util.ArrayList<>();
+                    try {
+                        for (int i = 0; i < nights; i++) {
+                            LocalDate date = request.getCheckIn().plusDays(i);
+                            SuiteNight suiteNight = SuiteNight.builder()
+                                    .suite(suite.getId())
+                                    .branch(suite.getBranch())
+                                    .unitSlot(candidateSlot)
+                                    .dates(java.util.Collections.singletonList(date))
+                                    .booking(resolvedBookingId)
+                                    .status(isPending ? "held" : "confirmed")
+                                    .expiresAt(nightExpiry)
+                                    .createdAt(Instant.now())
+                                    .build();
+                            insertedNights.add(suiteNightRepository.save(suiteNight));
+                        }
+                        freshBooking.setUnitSlot(candidateSlot);
+                        committedNewNights = insertedNights;
+                        nightsLocked = true;
+                        break;
+                    } catch (org.springframework.dao.DuplicateKeyException e) {
+                        suiteNightRepository.deleteAll(insertedNights);
+                    } catch (Exception e) {
+                        suiteNightRepository.deleteAll(insertedNights);
+                        throw e;
                     }
-                    freshBooking.setUnitSlot(candidateSlot);
-                    committedNewNights = insertedNights;
-                    nightsLocked = true;
-                    break;
-                } catch (org.springframework.dao.DuplicateKeyException e) {
-                    suiteNightRepository.deleteAll(insertedNights);
                 }
-            }
-            if (!nightsLocked) {
-                restoreSuiteNights(originalNights);
-                throw new IllegalStateException("Hubo una colisión concurrente al modificar. Las fechas ya no están disponibles.");
+                if (!nightsLocked) {
+                    restoreSuiteNights(originalNights);
+                    throw new IllegalStateException("Hubo una colisión concurrente al modificar. Las fechas ya no están disponibles.");
+                }
+            } catch (Exception e) {
+                if (!nightsLocked) {
+                    restoreSuiteNights(originalNights);
+                }
+                throw (e instanceof RuntimeException re) ? re : new RuntimeException(e);
             }
 
             String preparedModRefundIdemKey = null;

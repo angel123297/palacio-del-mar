@@ -211,6 +211,12 @@ public class HostPayoutService {
         if (b.getBalanceDue() != null && b.getBalanceDue().compareTo(BigDecimal.ZERO) > 0) {
             return false;
         }
+        if ("requires_refund".equalsIgnoreCase(b.getPaymentStatus())) {
+            return false;
+        }
+        if (b.getPendingRefundAmount() != null && b.getPendingRefundAmount().compareTo(BigDecimal.ZERO) > 0) {
+            return false;
+        }
         BigDecimal paid = b.getPaidAmount();
         BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
         return paid.subtract(refunded).compareTo(BigDecimal.ZERO) > 0;
@@ -291,16 +297,25 @@ public class HostPayoutService {
                     ? bookingFee.add(bookingNet)
                     : fallbackRoom;
 
+            BigDecimal feeRatio = (roomPrice.compareTo(BigDecimal.ZERO) > 0 && bookingFee.compareTo(BigDecimal.ZERO) > 0)
+                    ? bookingFee.divide(roomPrice, 4, RoundingMode.HALF_UP)
+                    : new BigDecimal("0.08");
+
             BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
-            if (refunded.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal depositPortion = (Boolean.TRUE.equals(b.getGuaranteeRefunded()) && b.getGuaranteeDeposit() != null)
+                    ? b.getGuaranteeDeposit()
+                    : BigDecimal.ZERO;
+            BigDecimal nonDepositRefund = refunded.subtract(depositPortion).max(BigDecimal.ZERO);
+
+            if (nonDepositRefund.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal total = b.getTotalPrice() != null && b.getTotalPrice().compareTo(BigDecimal.ZERO) > 0
                         ? b.getTotalPrice()
                         : (b.getPaidAmount() != null && b.getPaidAmount().compareTo(BigDecimal.ZERO) > 0 ? b.getPaidAmount() : roomPrice);
                 BigDecimal lodgingRefund = (total.compareTo(BigDecimal.ZERO) > 0 && roomPrice.compareTo(BigDecimal.ZERO) > 0)
-                        ? refunded.multiply(roomPrice).divide(total, 2, RoundingMode.HALF_UP).min(roomPrice)
-                        : refunded.min(roomPrice);
+                        ? nonDepositRefund.multiply(roomPrice).divide(total, 2, RoundingMode.HALF_UP).min(roomPrice)
+                        : nonDepositRefund.min(roomPrice);
                 roomPrice = roomPrice.subtract(lodgingRefund).max(BigDecimal.ZERO);
-                bookingFee = roomPrice.multiply(new BigDecimal("0.08")).setScale(2, RoundingMode.HALF_UP);
+                bookingFee = roomPrice.multiply(feeRatio).setScale(2, RoundingMode.HALF_UP);
                 bookingNet = roomPrice.subtract(bookingFee);
             }
 

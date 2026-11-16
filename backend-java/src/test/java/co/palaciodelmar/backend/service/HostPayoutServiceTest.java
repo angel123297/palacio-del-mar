@@ -310,4 +310,77 @@ class HostPayoutServiceTest {
         assertEquals(new BigDecimal("40000.00"), dto.getPlatformFee());
         assertEquals(new BigDecimal("460000.00"), dto.getNetAmount());
     }
+
+    @Test
+    @DisplayName("Devolución normal de depósito de garantía NO reduce la liquidación del alojamiento")
+    void testDepositRefundDoesNotReduceHostLodgingPayout() {
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+
+        Booking b1 = Booking.builder()
+                .id("b-deposit-refund")
+                .propertyId("prop-deposit")
+                .status("checked_out")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("1290000.00")) // 1.000.000 habitación + 190.000 IVA + 100.000 depósito
+                .paidAmount(new BigDecimal("1290000.00"))
+                .guaranteeDeposit(new BigDecimal("100000.00"))
+                .guaranteeRefunded(true)
+                .refundedAmount(new BigDecimal("100000.00")) // Solo se devolvió el depósito al huésped
+                .subtotal(new BigDecimal("1000000.00"))
+                .platformFee(new BigDecimal("80000.00"))
+                .hostPayout(new BigDecimal("920000.00"))
+                .checkIn(today.minusDays(3))
+                .checkOut(today.minusDays(1))
+                .build();
+
+        when(bookingRepository.findByStatusIn(anyList())).thenReturn(List.of(b1));
+        when(bookingRepository.findById("b-deposit-refund")).thenReturn(Optional.of(b1));
+        when(propertyRepository.findById("prop-deposit")).thenReturn(Optional.of(
+                Property.builder().id("prop-deposit").name("Suite Caribe").ownerId("host-deposit").build()
+        ));
+        when(hostPayoutRepository.save(any(HostPayout.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        List<HostPayoutDTO> payouts = hostPayoutService.processAutomatedPayouts();
+
+        assertEquals(1, payouts.size());
+        HostPayoutDTO dto = payouts.get(0);
+        // El anfitrión debe recibir íntegramente sus 920.000 COP pactados para el alojamiento
+        assertEquals(new BigDecimal("1000000.00"), dto.getGrossTotal());
+        assertEquals(new BigDecimal("80000.00"), dto.getPlatformFee());
+        assertEquals(new BigDecimal("920000.00"), dto.getNetAmount());
+    }
+
+    @Test
+    @DisplayName("Reserva con reembolso pendiente (requires_refund o pendingRefundAmount > 0) NO es elegible para liquidación")
+    void testBookingWithPendingRefundIsIneligible() {
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+
+        Booking bRequiresRefund = Booking.builder()
+                .id("b-req-ref")
+                .propertyId("prop-test")
+                .status("checked_out")
+                .paymentStatus("requires_refund")
+                .paidAmount(new BigDecimal("1000000"))
+                .subtotal(new BigDecimal("1000000"))
+                .checkIn(today.minusDays(3))
+                .checkOut(today.minusDays(1))
+                .build();
+
+        Booking bPendingAmt = Booking.builder()
+                .id("b-pending-amt")
+                .propertyId("prop-test")
+                .status("checked_out")
+                .paymentStatus("paid")
+                .paidAmount(new BigDecimal("1000000"))
+                .pendingRefundAmount(new BigDecimal("200000"))
+                .subtotal(new BigDecimal("1000000"))
+                .checkIn(today.minusDays(3))
+                .checkOut(today.minusDays(1))
+                .build();
+
+        when(bookingRepository.findByStatusIn(anyList())).thenReturn(List.of(bRequiresRefund, bPendingAmt));
+
+        List<HostPayoutDTO> payouts = hostPayoutService.processAutomatedPayouts();
+        assertTrue(payouts.isEmpty(), "No se debe liquidar reservas con reembolsos en trámite");
+    }
 }
