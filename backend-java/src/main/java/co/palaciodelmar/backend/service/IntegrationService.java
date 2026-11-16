@@ -33,6 +33,7 @@ public class IntegrationService {
     private final PropertyRepository propertyRepository;
     private final Object[] localLocks;
 
+    @lombok.Setter
     @Autowired(required = false)
     private AvailabilityCacheEvictor availabilityCacheEvictor;
 
@@ -274,8 +275,15 @@ public class IntegrationService {
                     if (!toInsert.isEmpty()) {
                         inserted.addAll(suiteNightRepository.saveAll(toInsert));
                     }
-                } catch (DuplicateKeyException e) {
-                    suiteNightRepository.deleteAll(inserted);
+                } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                    try {
+                        suiteNightRepository.deleteByBooking(blockRef);
+                    } catch (Exception ex) {
+                        log.warn("Error al revertir noches del bloque externo {}: {}", blockRef, ex.getMessage());
+                    }
+                    if (availabilityCacheEvictor != null) {
+                        availabilityCacheEvictor.evictAvailability();
+                    }
                     throw new IllegalStateException("Colisión de concurrencia al bloquear fechas. Intente nuevamente.");
                 }
 

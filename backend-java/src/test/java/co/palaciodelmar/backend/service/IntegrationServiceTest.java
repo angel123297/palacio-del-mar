@@ -324,4 +324,38 @@ class IntegrationServiceTest {
                 () -> serviceWithProp.manageAvailability(apiKey, req));
         assertTrue(ex.getMessage().contains("no está activa o aprobada"));
     }
+
+    @Test
+    void testManageAvailabilityRollsBackViaDeleteByBookingAndEvictsCacheOnDuplicateKey() {
+        AvailabilityCacheEvictor evictor = mock(AvailabilityCacheEvictor.class);
+        integrationService.setAvailabilityCacheEvictor(evictor);
+
+        Suite suite = Suite.builder()
+                .id("suite_01")
+                .propertyId("prop_hotel_01")
+                .externalId("PMS-101")
+                .totalUnits(2)
+                .build();
+
+        when(suiteRepository.findByPropertyIdAndExternalId("prop_hotel_01", "PMS-101"))
+                .thenReturn(Optional.of(suite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(eq("suite_01"), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(Collections.emptyList());
+        when(suiteNightRepository.saveAll(anyList()))
+                .thenThrow(new org.springframework.dao.DuplicateKeyException("E11000 duplicate key error"));
+
+        IntegrationAvailabilityRequest req = IntegrationAvailabilityRequest.builder()
+                .externalId("PMS-101")
+                .startDate(LocalDate.now().plusDays(1))
+                .endDate(LocalDate.now().plusDays(4))
+                .action("BLOCK")
+                .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> integrationService.manageAvailability(apiKey, req));
+
+        assertTrue(ex.getMessage().contains("Colisión de concurrencia"));
+        verify(suiteNightRepository).deleteByBooking(argThat(b -> b != null && b.startsWith("EXT_BLOCK_")));
+        verify(evictor).evictAvailability();
+    }
 }
