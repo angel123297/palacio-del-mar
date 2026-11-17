@@ -56,6 +56,20 @@ import { DateRangePickerComponent } from '../date-range-picker/date-range-picker
             </div>
           </div>
 
+          <!-- Niños -->
+          <div class="flex-1 min-w-[110px] px-4 py-3 md:py-0 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center">
+            <label for="booking-children" class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1">Niños</label>
+            <div class="relative flex items-center w-full">
+              <select id="booking-children" [ngModel]="searchState.filters().children" (ngModelChange)="updateChildren($event)" name="children" aria-label="Cantidad de niños acompañantes" class="booking-select pr-5">
+                <option [ngValue]="0" class="bg-[#161311]">0 niños</option>
+                <option [ngValue]="1" class="bg-[#161311]">1 niño</option>
+                <option [ngValue]="2" class="bg-[#161311]">2 niños</option>
+                <option [ngValue]="3" class="bg-[#161311]">3 niños</option>
+              </select>
+              <svg class="w-3.5 h-3.5 text-[#c9a96e] absolute right-0 pointer-events-none opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+          </div>
+
           <!-- Filtro por ambiente / Experiencia -->
           <div class="flex-1 min-w-[140px] px-4 py-3 md:py-0 border-b md:border-b-0 md:border-r border-[rgba(201,169,110,0.18)] hover:bg-[rgba(201,169,110,0.05)] transition flex flex-col justify-center">
             <label for="booking-vibe" class="text-[10px] tracking-[0.22em] uppercase text-[#c9a96e] font-semibold mb-1">Experiencia</label>
@@ -157,6 +171,10 @@ export class BookingBarComponent implements OnInit {
 
   updateAdults(val: number) {
     this.searchState.updateGuests(val, this.searchState.filters().children);
+  }
+
+  updateChildren(val: number) {
+    this.searchState.updateGuests(this.searchState.filters().adults, val);
   }
 
   get canSearch(): boolean {

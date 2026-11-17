@@ -332,10 +332,10 @@ import { Booking } from '../../models/types';
                aria-labelledby="modify-dates-title">
             <div style="background: #141414; border: 1px solid var(--gold); border-radius: 10px; max-width: 480px; width: 100%; padding: 2rem; box-shadow: 0 10px 40px rgba(0,0,0,0.8); box-sizing: border-box;">
               <h3 id="modify-dates-title" style="color: var(--gold); margin: 0 0 0.5rem 0; font-family: var(--font-title); font-size: 1.5rem;">
-                Cambiar Fechas de Reserva
+                Modificar Reserva
               </h3>
               <p style="color: #aaa; font-size: 0.88rem; margin: 0 0 1.5rem 0; line-height: 1.4;">
-                Ajusta las fechas de tu estancia en <strong>{{ suiteName }}</strong>. El valor total y balance pendiente se actualizarán automáticamente.
+                Ajusta las fechas o cantidad de huéspedes de tu estancia en <strong>{{ suiteName }}</strong>. El valor total y balance pendiente se actualizarán automáticamente.
               </p>
 
               <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
@@ -346,6 +346,20 @@ import { Booking } from '../../models/types';
                 <div>
                   <label for="modify-checkout" style="display: block; font-size: 0.8rem; color: #ccc; margin-bottom: 4px;">Nueva Fecha de Salida (Check-out)</label>
                   <input id="modify-checkout" type="date" [(ngModel)]="modifyCheckOut" [min]="modifyCheckIn || minDate" class="luxury-input" style="width: 100%; box-sizing: border-box;" />
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                  <div>
+                    <label for="modify-guests" style="display: block; font-size: 0.8rem; color: #ccc; margin-bottom: 4px;">Adultos</label>
+                    <select id="modify-guests" [(ngModel)]="modifyGuests" class="luxury-input" style="width: 100%; box-sizing: border-box; background: #1a1714; color: #f5f0e8; border: 1px solid rgba(201,169,110,0.3); padding: 8px 12px; border-radius: 4px;">
+                      <option *ngFor="let n of [1,2,3,4,5,6,7,8]" [ngValue]="n">{{n}} {{ n === 1 ? 'adulto' : 'adultos' }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="modify-children" style="display: block; font-size: 0.8rem; color: #ccc; margin-bottom: 4px;">Niños</label>
+                    <select id="modify-children" [(ngModel)]="modifyChildren" class="luxury-input" style="width: 100%; box-sizing: border-box; background: #1a1714; color: #f5f0e8; border: 1px solid rgba(201,169,110,0.3); padding: 8px 12px; border-radius: 4px;">
+                      <option *ngFor="let n of [0,1,2,3,4,5,6]" [ngValue]="n">{{n}} {{ n === 1 ? 'niño' : 'niños' }}</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -460,10 +474,12 @@ export class BookingDetailComponent implements OnInit, OnDestroy {
   selfCheckOutLoading = false;
   selfCheckOutError = '';
 
-  // Modificar fechas
+  // Modificar fechas y huéspedes
   showModifyModal = false;
   modifyCheckIn = '';
   modifyCheckOut = '';
+  modifyGuests = 1;
+  modifyChildren = 0;
   modifyLoading = false;
   modifyError = '';
   modifySuccess = '';
@@ -748,6 +764,8 @@ export class BookingDetailComponent implements OnInit, OnDestroy {
     if (!this.booking) return;
     this.modifyCheckIn = this.booking.checkIn ? String(this.booking.checkIn).substring(0, 10) : '';
     this.modifyCheckOut = this.booking.checkOut ? String(this.booking.checkOut).substring(0, 10) : '';
+    this.modifyGuests = this.booking.guests ? Number(this.booking.guests) : 1;
+    this.modifyChildren = this.booking.children ? Number(this.booking.children) : 0;
     this.modifyError = '';
     this.modifySuccess = '';
     this.showModifyModal = true;
@@ -777,7 +795,9 @@ export class BookingDetailComponent implements OnInit, OnDestroy {
     const id = this.booking._id || this.booking.id;
     this.api.put<any>(`/bookings/${id}/modify`, {
       checkIn: this.modifyCheckIn,
-      checkOut: this.modifyCheckOut
+      checkOut: this.modifyCheckOut,
+      guests: Number(this.modifyGuests) || 1,
+      children: Number(this.modifyChildren) || 0
     }).subscribe({
       next: (res) => {
         this.modifyLoading = false;

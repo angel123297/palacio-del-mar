@@ -278,7 +278,11 @@ export class SearchComponent implements OnInit {
     this.checkInDate.set(updated.checkIn);
     this.checkOutDate.set(updated.checkOut);
     this.searchState.updateBranch(this.selectedBranch());
-    this.searchState.updateGuests(this.guestsCount(), 0);
+    const currentChildren = this.searchState.filters().children || 0;
+    const total = this.guestsCount();
+    const children = Math.min(currentChildren, Math.max(0, total - 1));
+    const adults = Math.max(1, total - children);
+    this.searchState.updateGuests(adults, children);
     this.fetchResults();
   }
 

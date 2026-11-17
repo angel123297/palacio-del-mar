@@ -205,7 +205,7 @@ import { finalize, switchMap, Subscription } from 'rxjs';
 
                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 10px 15px; border-radius: 6px;">
                  <span style="color: #aaa;">Huéspedes</span>
-                 <span style="font-weight: 600;">{{ booking.guests }} personas</span>
+                 <span style="font-weight: 600;">{{ booking.guests }} adulto(s)<span *ngIf="booking.children">, {{ booking.children }} niño(s)</span></span>
                </div>
                
                <div *ngIf="!isStandaloneExperience" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 10px 15px; border-radius: 6px;">

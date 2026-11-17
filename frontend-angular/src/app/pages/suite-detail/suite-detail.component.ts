@@ -59,6 +59,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   checkIn = this.today;
   checkOut = addDaysIso(this.today, 2);
   guests = 2;
+  children = 0;
 
   // Step 2: Experiences
   experiences: Experience[] = [];
@@ -213,6 +214,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     if (filters.checkIn) this.checkIn = filters.checkIn;
     if (filters.checkOut) this.checkOut = filters.checkOut;
     if (filters.adults) this.guests = filters.adults;
+    if (filters.children !== undefined && filters.children !== null) this.children = filters.children;
 
     if (this.route.paramMap) {
       this.routeSub = this.route.paramMap.subscribe(params => {
@@ -337,6 +339,34 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   dynamicPricingNotes: string[] = [];
   dynamicQuoteTotal: number | null = null;
 
+  get totalGuestsCount(): number {
+    return (Number(this.guests) || 1) + (Number(this.children) || 0);
+  }
+
+  get adultOptions(): number[] {
+    const max = Math.max(1, (this.suite?.maxGuests || 2) - (Number(this.children) || 0));
+    const opts: number[] = [];
+    for (let i = 1; i <= Math.min(max, 10); i++) opts.push(i);
+    return opts;
+  }
+
+  get childrenOptions(): number[] {
+    const max = Math.max(0, (this.suite?.maxGuests || 2) - (Number(this.guests) || 1));
+    const opts: number[] = [];
+    for (let i = 0; i <= Math.min(max, 8); i++) opts.push(i);
+    return opts;
+  }
+
+  onGuestsOrChildrenChange(): void {
+    const max = this.suite?.maxGuests || 2;
+    if (this.guests + this.children > max) {
+      this.children = Math.max(0, max - this.guests);
+    }
+    this.searchState.updateGuests(this.guests, this.children);
+    this.validateDates();
+    this.fetchLiveQuote();
+  }
+
   fetchLiveQuote() {
     const sId = this.suite?.id || this.suite?._id;
     if (!sId || !this.checkIn || !this.checkOut) return;
@@ -344,7 +374,8 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
       suiteId: sId,
       checkIn: this.checkIn,
       checkOut: this.checkOut,
-      guests: Number(this.guests) || 2
+      guests: Number(this.guests) || 1,
+      children: Number(this.children) || 0
     }).subscribe({
       next: (res) => {
         const d = res?.data || res;
@@ -407,8 +438,8 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
 
   // Mismas reglas que BookingService: $120.000 por huésped adicional (sobre 2) y noche.
   get extraGuestsFee(): number {
-    const guests = Number(this.guests) || 0;
-    return guests > 2 ? (guests - 2) * 120000 * this.nights : 0;
+    const total = this.totalGuestsCount;
+    return total > 2 ? (total - 2) * 120000 * this.nights : 0;
   }
 
   // Depósito de garantía reembolsable que el backend suma al total.
@@ -654,6 +685,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
       checkIn: this.checkIn,
       checkOut: this.checkOut,
       guests: Number(this.guests),
+      children: Number(this.children) || 0,
       airportPickup: this.airportPickup,
       petFriendly: this.petFriendly,
       needsCrib: this.needsCrib,

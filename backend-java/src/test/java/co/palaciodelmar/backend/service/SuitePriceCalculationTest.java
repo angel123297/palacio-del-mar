@@ -97,4 +97,44 @@ class SuitePriceCalculationTest {
         // Total esperado: 1.190.000 + 480.000 = 1.670.000
         assertEquals(new BigDecimal("1670000.00"), response.getTotal());
     }
+
+    @Test
+    @DisplayName("calculatePrice con 2 adultos y 2 niños (4 ocupantes): calcula $480.000 por huéspedes adicionales")
+    void testCalculatePriceWithChildren() {
+        LocalDate checkIn = LocalDate.of(2026, 11, 10);
+        LocalDate checkOut = LocalDate.of(2026, 11, 12);
+        BigDecimal basePrice = new BigDecimal("500000");
+
+        Suite suite = Suite.builder()
+                .id("suite-family")
+                .basePrice(basePrice)
+                .propertyId("prop-1")
+                .branch("bocagrande")
+                .build();
+
+        Property property = Property.builder()
+                .id("prop-1")
+                .status("APPROVED")
+                .active(true)
+                .build();
+
+        when(suiteRepository.findById("suite-family")).thenReturn(Optional.of(suite));
+        when(propertyRepository.findById("prop-1")).thenReturn(Optional.of(property));
+        when(promotionRepository.findByBranchAndActiveTrue(any())).thenReturn(List.of());
+
+        CalculatePriceRequest request = CalculatePriceRequest.builder()
+                .suiteId("suite-family")
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .guests(2)
+                .children(2) // 2 adultos + 2 niños = 4 ocupantes -> 2 extra
+                .includeExperiences(false)
+                .build();
+
+        CalculatePriceResponseDTO response = suiteService.calculatePrice(request);
+
+        assertNotNull(response);
+        assertEquals(new BigDecimal("480000"), response.getExtraGuestsFee());
+        assertEquals(new BigDecimal("1670000.00"), response.getTotal());
+    }
 }

@@ -445,7 +445,9 @@ public class BookingService {
                 }
             }
 
-            BigDecimal extraGuestTotal = extraGuestFee(request.getGuests(), nights);
+            int totalOccupants = (request.getGuests() != null ? request.getGuests() : 1)
+                    + (request.getChildren() != null ? request.getChildren() : 0);
+            BigDecimal extraGuestTotal = extraGuestFee(totalOccupants, nights);
 
             BigDecimal totalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal).add(extraGuestTotal);
             // RN-F01: Deposito de Garantia Simulado
@@ -729,10 +731,10 @@ public class BookingService {
             if (effectiveAdults + effectiveChildren > maxGuests) {
                 throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes (ocupación solicitada: " + (effectiveAdults + effectiveChildren) + ")");
             }
-            int effectiveGuests = effectiveAdults;
+            int effectiveTotalGuests = effectiveAdults + effectiveChildren;
             BigDecimal currentDeposit = freshBooking.getGuaranteeDeposit() != null ? freshBooking.getGuaranteeDeposit() : BigDecimal.ZERO;
             BigDecimal newTotalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal)
-                    .add(extraGuestFee(effectiveGuests, nights)).add(currentDeposit);
+                    .add(extraGuestFee(effectiveTotalGuests, nights)).add(currentDeposit);
             BigDecimal oldTotalPrice = freshBooking.getTotalPrice() != null ? freshBooking.getTotalPrice() : BigDecimal.ZERO;
             if (withinPenaltyWindow && newTotalPrice.compareTo(oldTotalPrice) < 0) {
                 throw new IllegalArgumentException("No se permite reducir el valor total ni acortar noches con menos de 48 horas de anticipación");
@@ -1992,7 +1994,9 @@ public class BookingService {
     private BigDecimal fixedCharges(Booking booking) {
         BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
         long nights = booking.getNights() != null ? booking.getNights() : 0;
-        return extraGuestFee(booking.getGuests(), nights).add(deposit);
+        int totalOccupants = (booking.getGuests() != null ? booking.getGuests() : 1)
+                + (booking.getChildren() != null ? booking.getChildren() : 0);
+        return extraGuestFee(totalOccupants, nights).add(deposit);
     }
 
     /** Cunas: tope global de 5 por noche. Excluye reservas pendientes expiradas y la propia reserva. */

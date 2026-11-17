@@ -29,6 +29,9 @@ public class CalculatePriceRequest {
     @Min(value = 1, message = "Debe haber al menos 1 huésped")
     private Integer guests;
 
+    @Min(value = 0, message = "El número de niños no puede ser negativo")
+    private Integer children;
+
     private Boolean includeExperiences;
     private List<String> experienceIds;
 }

@@ -256,10 +256,12 @@ public class SuiteService {
             }
         }
 
+        int totalOccupants = (request.getGuests() != null ? request.getGuests() : 1)
+                + (request.getChildren() != null ? request.getChildren() : 0);
         BigDecimal extraGuestsFee = BigDecimal.ZERO;
-        if (request.getGuests() != null && request.getGuests() > 2) {
+        if (totalOccupants > 2) {
             extraGuestsFee = new BigDecimal("120000")
-                    .multiply(BigDecimal.valueOf(request.getGuests() - 2))
+                    .multiply(BigDecimal.valueOf(totalOccupants - 2))
                     .multiply(BigDecimal.valueOf(nights));
         }
 

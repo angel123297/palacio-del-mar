@@ -107,7 +107,7 @@ import { renderSVG } from '../../utils/qr';
                 {{ booking.checkIn | date:'shortDate' }} a {{ booking.checkOut | date:'shortDate' }}
               </td>
               <td style="padding: 15px 12px; text-align: right; color: #555;">
-                {{ booking.guests || 1 }}
+                {{ booking.guests || 1 }} adulto(s)<span *ngIf="booking.children">, {{ booking.children }} niño(s)</span>
               </td>
               <td style="padding: 15px 12px; text-align: right; font-weight: bold; font-size: 1.05rem;">
                 {{ currency.formatPrice(roomGrossTotal) }}
