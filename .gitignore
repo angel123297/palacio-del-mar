@@ -27,7 +27,7 @@ frontend-angular/.vite/
 frontend-angular/dist/
 
 # Data and seed datasets
-data/
+# data/
 
 # Analysis, agent scratches and diagram working directories
 .archify/
