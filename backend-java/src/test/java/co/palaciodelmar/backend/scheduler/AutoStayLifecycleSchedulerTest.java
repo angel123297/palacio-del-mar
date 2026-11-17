@@ -159,4 +159,38 @@ class AutoStayLifecycleSchedulerTest {
         verify(bookingService, never()).changeBookingStatus(any(), any(), any(), any());
         verify(bookingRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Auto Check-in: Si la fecha de salida ya expiró sin que el huésped ingresara, transiciona a NO_SHOW en vez de auto check-in")
+    void testAutoCheckInTransitionsExpiredStayToNoShowInsteadOfCheckIn() {
+        LocalDate today = LocalDate.of(2026, 11, 16);
+
+        // Reserva cuyo checkIn fue hace 5 días y checkOut fue hace 2 días (ambos en el pasado)
+        Booking expiredBooking = Booking.builder()
+                .id("bk-noshow-1")
+                .status("confirmed")
+                .checkIn(today.minusDays(5))
+                .checkOut(today.minusDays(2))
+                .user("guest-noshow")
+                .build();
+
+        when(bookingRepository.findByStatusInAndCheckInLessThanEqual(eq(List.of("confirmed")), any(LocalDate.class)))
+                .thenReturn(List.of(expiredBooking));
+        when(bookingRepository.findById("bk-noshow-1")).thenReturn(java.util.Optional.of(expiredBooking));
+
+        scheduler.processAutoCheckIns(today, LocalTime.of(16, 0));
+
+        verify(bookingService).changeBookingStatus(
+                eq(expiredBooking),
+                eq(BookingStatus.NO_SHOW),
+                eq("System-AutoStayLifecycle"),
+                contains("No-show")
+        );
+        verify(bookingService, never()).changeBookingStatus(
+                eq(expiredBooking),
+                eq(BookingStatus.CHECKED_IN),
+                any(),
+                any()
+        );
+    }
 }

@@ -3199,4 +3199,140 @@ class AuditCriticalBugFixesTest {
         assertEquals("evt_maint_rev-conc-1", deliveryStore.get(0).getEventId());
         verify(streamService, times(1)).enqueueDelivery(anyString(), eq("evt_maint_rev-conc-1"), eq("maintenance.alert"));
     }
+
+    @Test
+    @DisplayName("ModifyBooking: Al omitir children (null) en request, conserva los niños existentes y valida contra capacidad total de la suite")
+    void testModifyBookingPreservesExistingChildrenWhenOmittedAndRejectsOverCapacity() {
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        SuiteRepository suiteRepo = mock(SuiteRepository.class);
+        SuiteNightRepository suiteNightRepo = mock(SuiteNightRepository.class);
+        BookingService service = buildBookingService(bookingRepo, suiteRepo, suiteNightRepo, null, mock(PaymentGateway.class));
+
+        Suite suite = Suite.builder()
+                .id("suite-cap-4")
+                .maxGuests(4)
+                .totalUnits(1)
+                .basePrice(new BigDecimal("100000"))
+                .build();
+        when(suiteRepo.findById("suite-cap-4")).thenReturn(Optional.of(suite));
+
+        LocalDate checkIn = LocalDate.now(BOGOTA).plusDays(10);
+        LocalDate checkOut = checkIn.plusDays(2);
+
+        // Reserva existente con 2 adultos y 2 niños (ocupación 4/4)
+        Booking existing = Booking.builder()
+                .id("bk-occ-1")
+                .suite("suite-cap-4")
+                .user("user-1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(2)
+                .guests(2)
+                .children(2)
+                .totalPrice(new BigDecimal("200000"))
+                .createdAt(Instant.now())
+                .build();
+
+        when(bookingRepo.findById("bk-occ-1")).thenReturn(Optional.of(existing));
+
+        // Intento de modificar aumentando adultos a 3 pero omitiendo children (null en request)
+        // 3 adultos + 2 niños existentes = 5 personas > maxGuests (4)
+        BookingRequest req = BookingRequest.builder()
+                .suiteId("suite-cap-4")
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .guests(3)
+                .children(null) // Omitido por el cliente
+                .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                service.modifyBooking("bk-occ-1", "user-1", req)
+        );
+        assertTrue(ex.getMessage().contains("Esta habitación admite máximo 4 huéspedes (ocupación solicitada: 5)"),
+                "Debe sumar los niños existentes y rechazar sobrecupo. Mensaje fue: " + ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("CreateBooking / ModifyBooking: Rechaza fechas de check-in que superen los 2 años en el futuro")
+    void testBookingRejectsCheckInBeyondTwoYears() {
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        SuiteRepository suiteRepo = mock(SuiteRepository.class);
+        SuiteNightRepository suiteNightRepo = mock(SuiteNightRepository.class);
+        BookingService service = buildBookingService(bookingRepo, suiteRepo, suiteNightRepo, null, mock(PaymentGateway.class));
+
+        Suite suite = Suite.builder().id("suite-future").maxGuests(2).totalUnits(1).basePrice(new BigDecimal("100000")).build();
+        when(suiteRepo.findById("suite-future")).thenReturn(Optional.of(suite));
+
+        LocalDate farFuture = LocalDate.now(BOGOTA).plusDays(735);
+        BookingRequest req = BookingRequest.builder()
+                .suiteId("suite-future")
+                .checkIn(farFuture)
+                .checkOut(farFuture.plusDays(2))
+                .guests(2)
+                .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                service.createBooking("user-1", req)
+        );
+        assertTrue(ex.getMessage().contains("2 años en el futuro"), "Debe rechazar reservas con más de 2 años en el futuro");
+    }
+
+    @Test
+    @DisplayName("FoodPrice: resolveServerFoodPrice respeta el catálogo oficial y bloquea manipulación de precios")
+    void testFoodPriceCatalogIntegrity() {
+        // Plato conocido del catálogo
+        BigDecimal pargoPrice = BookingService.resolveServerFoodPrice("Pargo rojo frito con patacones", new BigDecimal("10000"));
+        assertEquals(new BigDecimal("88000"), pargoPrice, "Pargo rojo debe costar 88000 sin importar que el cliente envíe 10000");
+
+        BigDecimal arrozPrice = BookingService.resolveServerFoodPrice("Arroz de mariscos del Caribe", new BigDecimal("20000"));
+        assertEquals(new BigDecimal("125000"), arrozPrice, "Arroz de mariscos debe costar 125000 sin importar que el cliente envíe 20000");
+
+        // Plato desconocido con precio bajo (< 80000) debe ajustarse al default
+        BigDecimal unknownLow = BookingService.resolveServerFoodPrice("Plato inventado", new BigDecimal("15000"));
+        assertEquals(new BigDecimal("80000"), unknownLow, "Plato desconocido con precio bajo debe cobrar default 80000");
+    }
+
+    @Test
+    @DisplayName("IntegrationService: Bloquea desactivación de suite externa si existen reservas activas o futuras")
+    void testIntegrationDeactivateRoomBlockedWhenFutureReservationsExist() {
+        SuiteRepository suiteRepo = mock(SuiteRepository.class);
+        SuiteNightRepository nightRepo = mock(SuiteNightRepository.class);
+        IntegrationService integrationService = new IntegrationService(suiteRepo, nightRepo);
+
+        ApiKey apiKey = ApiKey.builder().propertyId("prop-1").build();
+        Suite suite = Suite.builder()
+                .id("suite-ext-1")
+                .propertyId("prop-1")
+                .externalId("PMS-EXT-1")
+                .active(true)
+                .totalUnits(2)
+                .name("Habitación Externa")
+                .build();
+
+        when(suiteRepo.findByPropertyIdAndExternalId("prop-1", "PMS-EXT-1")).thenReturn(Optional.of(suite));
+
+        LocalDate today = LocalDate.now(BOGOTA);
+        SuiteNight futureNight = SuiteNight.builder()
+                .suite("suite-ext-1")
+                .dates(List.of(today.plusDays(5)))
+                .status("confirmed")
+                .unitSlot(1)
+                .build();
+
+        when(nightRepo.findBySuiteAndDatesBetween(eq("suite-ext-1"), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of(futureNight));
+
+        IntegrationRoomRequest deactivateReq = IntegrationRoomRequest.builder()
+                .externalId("PMS-EXT-1")
+                .name("Habitación Externa")
+                .active(false)
+                .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                integrationService.upsertRoom(apiKey, deactivateReq)
+        );
+        assertTrue(ex.getMessage().contains("No se puede desactivar la habitación porque existen reservas activas o futuras"));
+    }
 }

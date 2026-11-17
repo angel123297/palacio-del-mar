@@ -176,14 +176,33 @@ public class BookingService {
     }
 
 
-    private static final Map<String, BigDecimal> KNOWN_DISH_PRICES = Map.of(
-            "cazuela de mariscos", new BigDecimal("80000"),
-            "posta cartagenera", new BigDecimal("80000"),
-            "pescado frito", new BigDecimal("80000"),
-            "ceviche mixto", new BigDecimal("55000"),
-            "arroz con mariscos", new BigDecimal("75000"),
-            "postre tipico", new BigDecimal("34000"),
-            "torta de coco", new BigDecimal("34000")
+    private static final Map<String, BigDecimal> KNOWN_DISH_PRICES = Map.ofEntries(
+            Map.entry("cazuela de mariscos", new BigDecimal("80000")),
+            Map.entry("posta negra cartagenera", new BigDecimal("94000")),
+            Map.entry("posta cartagenera", new BigDecimal("94000")),
+            Map.entry("pescado frito", new BigDecimal("80000")),
+            Map.entry("pargo rojo frito con patacones", new BigDecimal("88000")),
+            Map.entry("pargo rojo", new BigDecimal("88000")),
+            Map.entry("pargo", new BigDecimal("88000")),
+            Map.entry("ceviche de camaron al coco", new BigDecimal("68000")),
+            Map.entry("ceviche de camaron", new BigDecimal("68000")),
+            Map.entry("ceviche mixto", new BigDecimal("55000")),
+            Map.entry("ceviche", new BigDecimal("55000")),
+            Map.entry("arroz de mariscos del caribe", new BigDecimal("125000")),
+            Map.entry("arroz con mariscos", new BigDecimal("125000")),
+            Map.entry("arroz de mariscos", new BigDecimal("125000")),
+            Map.entry("cocada horneada al horno de leña", new BigDecimal("38000")),
+            Map.entry("cocada", new BigDecimal("38000")),
+            Map.entry("mousse de mango biche & corozo", new BigDecimal("34000")),
+            Map.entry("mousse de mango", new BigDecimal("34000")),
+            Map.entry("postre tipico", new BigDecimal("34000")),
+            Map.entry("torta de coco", new BigDecimal("34000")),
+            Map.entry("coctel de autor palacio del mar", new BigDecimal("48000")),
+            Map.entry("coctel de autor", new BigDecimal("48000")),
+            Map.entry("langosta al termidor", new BigDecimal("160000")),
+            Map.entry("langosta", new BigDecimal("160000")),
+            Map.entry("patacones con hogao", new BigDecimal("28000")),
+            Map.entry("arepa de huevo", new BigDecimal("25000"))
     );
     private static final BigDecimal DEFAULT_FOOD_PRICE = new BigDecimal("80000");
 
@@ -197,7 +216,7 @@ public class BookingService {
                 }
             }
         }
-        if (clientPrice != null && clientPrice.compareTo(new BigDecimal("20000")) >= 0) {
+        if (clientPrice != null && clientPrice.compareTo(DEFAULT_FOOD_PRICE) >= 0) {
             return clientPrice;
         }
         return DEFAULT_FOOD_PRICE;
@@ -278,7 +297,7 @@ public class BookingService {
             throw new ForbiddenAccessException("Debes iniciar sesión para realizar una reserva");
         }
 
-        User bookingUser = userRepository.findById(userId).orElse(null);
+        User bookingUser = userRepository != null ? userRepository.findById(userId).orElse(null) : null;
         if (bookingUser != null) {
             String role = bookingUser.getRole() != null ? bookingUser.getRole().toLowerCase() : "";
             if ("host".equals(role) || "anfitrion".equals(role) || "admin".equals(role)) {
@@ -319,6 +338,7 @@ public class BookingService {
             }
         }
 
+        // Validar capacidad de huespedes para creacion de reserva
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
         int adults = request.getGuests() != null ? request.getGuests() : 1;
         int children = request.getChildren() != null ? request.getChildren() : 0;
@@ -338,6 +358,9 @@ public class BookingService {
 
         if (request.getCheckIn().isBefore(today())) {
             throw new IllegalArgumentException("La fecha de check-in no puede ser anterior a la fecha actual");
+        }
+        if (request.getCheckIn().isAfter(today().plusDays(730))) {
+            throw new IllegalArgumentException("La fecha de check-in no puede superar los 2 años en el futuro");
         }
 
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
@@ -581,9 +604,10 @@ public class BookingService {
                 })
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada"));
 
+        // Validar capacidad de huespedes para modificacion de reserva
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
-        int adults = request.getGuests() != null ? request.getGuests() : 1;
-        int children = request.getChildren() != null ? request.getChildren() : 0;
+        int adults = request.getGuests() != null ? request.getGuests() : (booking.getGuests() != null ? booking.getGuests() : 1);
+        int children = request.getChildren() != null ? request.getChildren() : (booking.getChildren() != null ? booking.getChildren() : 0);
         if (adults < 1) {
             throw new IllegalArgumentException("Debe haber al menos 1 adulto en la reserva");
         }
@@ -600,6 +624,9 @@ public class BookingService {
 
         if (request.getCheckIn().isBefore(today())) {
             throw new IllegalArgumentException("La fecha de check-in no puede ser anterior a la fecha actual");
+        }
+        if (request.getCheckIn().isAfter(today().plusDays(730))) {
+            throw new IllegalArgumentException("La fecha de check-in no puede superar los 2 años en el futuro");
         }
 
         long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
@@ -697,7 +724,12 @@ public class BookingService {
             }
 
             BigDecimal vipExtrasTotal = calculateVipExtrasTotal(freshBooking);
-            int effectiveGuests = request.getGuests() != null ? request.getGuests() : (freshBooking.getGuests() != null ? freshBooking.getGuests() : 1);
+            int effectiveAdults = request.getGuests() != null ? request.getGuests() : (freshBooking.getGuests() != null ? freshBooking.getGuests() : 1);
+            int effectiveChildren = request.getChildren() != null ? request.getChildren() : (freshBooking.getChildren() != null ? freshBooking.getChildren() : 0);
+            if (effectiveAdults + effectiveChildren > maxGuests) {
+                throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes (ocupación solicitada: " + (effectiveAdults + effectiveChildren) + ")");
+            }
+            int effectiveGuests = effectiveAdults;
             BigDecimal currentDeposit = freshBooking.getGuaranteeDeposit() != null ? freshBooking.getGuaranteeDeposit() : BigDecimal.ZERO;
             BigDecimal newTotalPrice = totalRoomPrice.add(experiencesTotal).add(vipExtrasTotal)
                     .add(extraGuestFee(effectiveGuests, nights)).add(currentDeposit);
@@ -708,8 +740,8 @@ public class BookingService {
             freshBooking.setCheckIn(request.getCheckIn());
             freshBooking.setCheckOut(request.getCheckOut());
             freshBooking.setNights((int) nights);
-            if (request.getGuests() != null) freshBooking.setGuests(request.getGuests());
-            if (request.getChildren() != null) freshBooking.setChildren(request.getChildren());
+            freshBooking.setGuests(effectiveAdults);
+            freshBooking.setChildren(effectiveChildren);
             if (request.getNeedsCrib() != null) freshBooking.setNeedsCrib(request.getNeedsCrib());
             Booking.GuestDetails parsedGd = parseGuestDetails(request);
             if (parsedGd != null && ((parsedGd.getFullName() != null && !parsedGd.getFullName().isBlank()) || (parsedGd.getEmail() != null && !parsedGd.getEmail().isBlank()))) {
@@ -1998,7 +2030,10 @@ public class BookingService {
         }
         if (booking.getFoodOrders() != null) {
             for (Booking.FoodOrder fo : booking.getFoodOrders()) {
-                vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
+                BigDecimal foodPrice = (fo.getPrice() != null && fo.getPrice().compareTo(BigDecimal.ZERO) > 0)
+                        ? fo.getPrice()
+                        : resolveServerFoodPrice(fo.getDishName(), null);
+                vipExtrasTotal = vipExtrasTotal.add(foodPrice);
                 if (Boolean.TRUE.equals(fo.getIncludesBreakfastCombo())) {
                     vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("35000"));
                 }

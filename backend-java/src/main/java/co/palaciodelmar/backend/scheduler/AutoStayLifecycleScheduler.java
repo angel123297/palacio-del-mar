@@ -86,6 +86,21 @@ public class AutoStayLifecycleScheduler {
                         if (booking == null || !"confirmed".equalsIgnoreCase(booking.getStatus()) || booking.getCheckIn() == null) {
                             return null;
                         }
+
+                        // Si la fecha de salida ya expiro sin ingreso del huesped, marcar NO_SHOW en lugar de auto check-in
+                        if (booking.getCheckOut() != null && today.isAfter(booking.getCheckOut())) {
+                            bookingService.changeBookingStatus(
+                                    booking,
+                                    BookingStatus.NO_SHOW,
+                                    "System-AutoStayLifecycle",
+                                    "No-show automatico detectado: la fecha de salida ya expiro sin registro de ingreso"
+                            );
+                            bookingRepository.save(booking);
+                            log.info("No-show automatico registrado para reserva {} (Fecha salida {} anterior a hoy {})",
+                                    booking.getId(), booking.getCheckOut(), today);
+                            return null;
+                        }
+
                         boolean freshPast = today.isAfter(booking.getCheckIn());
                         boolean freshReady = today.isEqual(booking.getCheckIn()) && nowTime.getHour() >= autoCheckInHour;
                         if (!freshPast && !freshReady) {

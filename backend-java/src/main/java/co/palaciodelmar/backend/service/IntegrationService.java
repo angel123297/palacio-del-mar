@@ -165,7 +165,20 @@ public class IntegrationService {
             }
             suite.setTotalUnits(newUnits);
         }
-        if (request.getActive() != null) suite.setActive(request.getActive());
+        if (request.getActive() != null) {
+            if (Boolean.FALSE.equals(request.getActive()) && Boolean.TRUE.equals(suite.getActive()) && suite.getId() != null && suiteNightRepository != null) {
+                LocalDate today = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+                Instant now = Instant.now();
+                List<SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(5));
+                boolean hasActiveBookings = futureNights.stream()
+                        .filter(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus()))
+                        .anyMatch(sn -> sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(now));
+                if (hasActiveBookings) {
+                    throw new IllegalStateException("No se puede desactivar la habitación porque existen reservas activas o futuras");
+                }
+            }
+            suite.setActive(request.getActive());
+        }
         suite.setUpdatedAt(Instant.now());
     }
 
