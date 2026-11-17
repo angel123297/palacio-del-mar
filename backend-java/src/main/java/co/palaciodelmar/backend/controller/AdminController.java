@@ -3,6 +3,7 @@ package co.palaciodelmar.backend.controller;
 import co.palaciodelmar.backend.dto.ApiResponse;
 import co.palaciodelmar.backend.dto.BookingDTO;
 import co.palaciodelmar.backend.dto.PromotionDTO;
+import co.palaciodelmar.backend.dto.UserDTO;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Promotion;
 import co.palaciodelmar.backend.service.AdminService;
@@ -141,6 +142,31 @@ public class AdminController {
                 ? hostPayoutService.processAutomatedPayouts()
                 : List.of();
         return ResponseEntity.ok(ApiResponse.ok("Proceso de liquidación ejecutado exitosamente", payouts));
+    }
+
+    // --- Gestión Centralizada de Usuarios (Gap 2) ---
+
+    @GetMapping("/users")
+    public ResponseEntity<ApiResponse<List<UserDTO>>> getAllUsers() {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getAllUsers()));
+    }
+
+    @PutMapping("/users/{id}/status")
+    public ResponseEntity<ApiResponse<UserDTO>> updateUserStatus(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        String status = body != null ? body.get("status") : null;
+        UserDTO dto = adminService.updateUserStatus(id, status);
+        return ResponseEntity.ok(ApiResponse.ok("Estado de usuario actualizado", dto));
+    }
+
+    @PutMapping("/users/{id}/role")
+    public ResponseEntity<ApiResponse<UserDTO>> updateUserRole(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        String role = body != null ? body.get("role") : null;
+        UserDTO dto = adminService.updateUserRole(id, role);
+        return ResponseEntity.ok(ApiResponse.ok("Rol de usuario actualizado", dto));
     }
 
     private co.palaciodelmar.backend.dto.PaymentDTO toPaymentDTO(co.palaciodelmar.backend.model.Payment p) {

@@ -1,6 +1,8 @@
 package co.palaciodelmar.backend.service;
 
+import co.palaciodelmar.backend.dto.UserDTO;
 import co.palaciodelmar.backend.model.Booking;
+import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -425,5 +427,49 @@ class AdminServiceTest {
 
         // Verificamos que se guardó dos veces: una tras el cambio de estado y otra en el catch del fallo de reembolso
         verify(bookingRepository, times(2)).save(any(Booking.class));
+    }
+
+    @Test
+    @DisplayName("getAllUsers retorna lista completa de usuarios formateados en UserDTO")
+    void testGetAllUsers() {
+        User u1 = User.builder().id("u1").name("Carlos").email("carlos@pdm.com").role("user").status("active").build();
+        User u2 = User.builder().id("u2").name("Elena").email("elena@pdm.com").role("host").status("active").build();
+
+        when(userRepository.findAll()).thenReturn(List.of(u1, u2));
+
+        List<UserDTO> result = adminService.getAllUsers();
+        assertEquals(2, result.size());
+        assertEquals("carlos@pdm.com", result.get(0).getEmail());
+        assertEquals("host", result.get(1).getRole());
+    }
+
+    @Test
+    @DisplayName("updateUserStatus cambia estado a suspended y valida estados permitidos")
+    void testUpdateUserStatus() {
+        User u1 = User.builder().id("u1").name("Carlos").email("carlos@pdm.com").role("user").status("active").build();
+        when(userRepository.findById("u1")).thenReturn(java.util.Optional.of(u1));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        UserDTO updated = adminService.updateUserStatus("u1", "suspended");
+        assertEquals("suspended", updated.getStatus());
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            adminService.updateUserStatus("u1", "banned_fake_status");
+        });
+    }
+
+    @Test
+    @DisplayName("updateUserRole modifica rol de usuario y valida roles permitidos")
+    void testUpdateUserRole() {
+        User u1 = User.builder().id("u1").name("Carlos").email("carlos@pdm.com").role("user").status("active").build();
+        when(userRepository.findById("u1")).thenReturn(java.util.Optional.of(u1));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        UserDTO updated = adminService.updateUserRole("u1", "host");
+        assertEquals("host", updated.getRole());
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            adminService.updateUserRole("u1", "super_god_role");
+        });
     }
 }

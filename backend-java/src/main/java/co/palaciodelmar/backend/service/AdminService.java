@@ -1,7 +1,10 @@
 package co.palaciodelmar.backend.service;
 
+import co.palaciodelmar.backend.dto.UserDTO;
+import co.palaciodelmar.backend.exception.ResourceNotFoundException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Promotion;
+import co.palaciodelmar.backend.model.User;
 import co.palaciodelmar.backend.repository.*;
 import lombok.Builder;
 import lombok.Data;
@@ -637,5 +640,67 @@ public class AdminService {
             return "\"" + sanitized.replace("\"", "\"\"") + "\"";
         }
         return sanitized;
+    }
+
+    public List<UserDTO> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(u -> UserDTO.builder()
+                        .id(u.getId())
+                        .name(u.getName())
+                        .lastName(u.getLastName())
+                        .email(u.getEmail())
+                        .role(u.getRole())
+                        .status(u.getStatus())
+                        .emailVerified(u.getEmailVerified())
+                        .createdAt(u.getCreatedAt())
+                        .updatedAt(u.getUpdatedAt())
+                        .build())
+                .toList();
+    }
+
+    public UserDTO updateUserStatus(String userId, String status) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        String cleanStatus = status != null ? status.trim().toLowerCase() : "active";
+        if (!List.of("active", "suspended", "inactive").contains(cleanStatus)) {
+            throw new IllegalArgumentException("Estado no válido: " + status);
+        }
+        user.setStatus(cleanStatus);
+        user.setUpdatedAt(Instant.now());
+        User saved = userRepository.save(user);
+        return UserDTO.builder()
+                .id(saved.getId())
+                .name(saved.getName())
+                .lastName(saved.getLastName())
+                .email(saved.getEmail())
+                .role(saved.getRole())
+                .status(saved.getStatus())
+                .emailVerified(saved.getEmailVerified())
+                .createdAt(saved.getCreatedAt())
+                .updatedAt(saved.getUpdatedAt())
+                .build();
+    }
+
+    public UserDTO updateUserRole(String userId, String role) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        String cleanRole = role != null ? role.trim().toLowerCase() : "user";
+        if (!List.of("user", "host", "admin").contains(cleanRole)) {
+            throw new IllegalArgumentException("Rol no válido: " + role);
+        }
+        user.setRole(cleanRole);
+        user.setUpdatedAt(Instant.now());
+        User saved = userRepository.save(user);
+        return UserDTO.builder()
+                .id(saved.getId())
+                .name(saved.getName())
+                .lastName(saved.getLastName())
+                .email(saved.getEmail())
+                .role(saved.getRole())
+                .status(saved.getStatus())
+                .emailVerified(saved.getEmailVerified())
+                .createdAt(saved.getCreatedAt())
+                .updatedAt(saved.getUpdatedAt())
+                .build();
     }
 }

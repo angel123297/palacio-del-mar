@@ -77,6 +77,11 @@ export interface RefundItem {
                 {{ pendingRefundsCount() }}
               </span>
             </button>
+            <button (click)="activeTab.set('users'); fetchUsers();" role="tab" [attr.aria-selected]="activeTab() === 'users'" tabindex="0" 
+                    [ngClass]="activeTab() === 'users' ? 'bg-[#c9a96e] text-[#0d0d0d] font-bold' : 'text-[#f5f0e8] hover:text-[#c9a96e]'" 
+                    class="px-5 py-2 rounded-md text-xs tracking-widest uppercase transition flex items-center gap-2">
+              <span>👥</span> Usuarios
+            </button>
           </div>
         </div>
 
@@ -514,6 +519,78 @@ export interface RefundItem {
           </div>
         </ng-container>
 
+        <!-- ==================== TAB 5: USUARIOS ==================== -->
+        <ng-container *ngIf="activeTab() === 'users'">
+          <div class="bg-[#111] border border-[rgba(201,169,110,0.2)] rounded-xl p-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <div>
+                <h2 class="font-serif text-2xl text-[#c9a96e]">Directorio & Gestión de Usuarios</h2>
+                <p class="text-xs text-[#f5f0e8] opacity-60">Control centralizado de cuentas: suspende o reactiva usuarios y modifica roles del sistema.</p>
+              </div>
+              <button type="button" (click)="fetchUsers()" class="px-4 py-2 bg-[rgba(201,169,110,0.15)] hover:bg-[#c9a96e] text-[#c9a96e] hover:text-[#0d0d0d] border border-[rgba(201,169,110,0.4)] rounded text-xs font-semibold uppercase tracking-wider transition cursor-pointer">
+                🔄 Refrescar
+              </button>
+            </div>
+
+            <div *ngIf="loadingUsers()" class="py-12 text-center text-sm text-[#f5f0e8] opacity-60">
+              Cargando usuarios de la plataforma...
+            </div>
+
+            <div *ngIf="!loadingUsers() && users().length === 0" class="py-12 text-center text-sm text-[#f5f0e8] opacity-60">
+              No se encontraron usuarios registrados.
+            </div>
+
+            <div *ngIf="!loadingUsers() && users().length > 0" class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-[rgba(201,169,110,0.2)] text-[11px] uppercase tracking-wider text-[#c9a96e]">
+                    <th class="py-3 px-4">Usuario</th>
+                    <th class="py-3 px-4">Correo</th>
+                    <th class="py-3 px-4">Rol Actual</th>
+                    <th class="py-3 px-4">Estado</th>
+                    <th class="py-3 px-4 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[rgba(255,255,255,0.05)] text-xs">
+                  <tr *ngFor="let u of users()" class="hover:bg-[rgba(255,255,255,0.02)] transition">
+                    <td class="py-3.5 px-4">
+                      <div class="font-bold text-white">{{ u.name }} {{ u.lastName || '' }}</div>
+                      <span class="text-[10px] text-white/50">ID: {{ u.id || u._id }}</span>
+                    </td>
+                    <td class="py-3.5 px-4 text-[#f5f0e8] opacity-90">{{ u.email }}</td>
+                    <td class="py-3.5 px-4">
+                      <span [ngClass]="{
+                        'bg-purple-900/40 text-purple-300 border-purple-500/50': u.role === 'admin',
+                        'bg-amber-900/40 text-amber-300 border-amber-500/50': u.role === 'host',
+                        'bg-blue-900/40 text-blue-300 border-blue-500/50': u.role !== 'admin' && u.role !== 'host'
+                      }" class="px-2.5 py-0.5 text-[10px] uppercase font-bold rounded-full border">
+                        {{ u.role === 'admin' ? 'Administrador' : (u.role === 'host' ? 'Anfitrión' : 'Huésped') }}
+                      </span>
+                    </td>
+                    <td class="py-3.5 px-4">
+                      <span [ngClass]="u.status === 'suspended' ? 'bg-red-900/40 text-red-300 border-red-500/50' : 'bg-emerald-900/40 text-emerald-300 border-emerald-500/50'" class="px-2 py-0.5 text-[10px] uppercase font-semibold rounded border">
+                        {{ u.status === 'suspended' ? '● Suspendido' : '● Activo' }}
+                      </span>
+                    </td>
+                    <td class="py-3.5 px-4 text-right">
+                      <div class="flex items-center justify-end gap-2">
+                        <select [value]="u.role" (change)="changeUserRole(u, $any($event.target).value)" [disabled]="updatingUserId() === (u.id || u._id)" class="bg-[#1a1a1a] border border-[rgba(255,255,255,0.2)] rounded px-2 py-1 text-[11px] text-[#c9a96e] outline-none">
+                          <option value="user">Huésped (user)</option>
+                          <option value="host">Anfitrión (host)</option>
+                          <option value="admin">Administrador (admin)</option>
+                        </select>
+                        <button type="button" (click)="toggleUserStatus(u)" [disabled]="updatingUserId() === (u.id || u._id)" [ngClass]="u.status === 'suspended' ? 'bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border-[#2ecc71]' : 'bg-[rgba(231,76,60,0.15)] text-[#ff6b6b] border-[#e74c3c]'" class="px-2.5 py-1 text-[11px] font-semibold rounded border transition cursor-pointer">
+                          {{ u.status === 'suspended' ? 'Reactivar' : 'Suspender' }}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </ng-container>
+
         <!-- Modal: Ficha Detallada de Propiedad -->
         <div *ngIf="previewProperty()" class="fixed inset-0 bg-black/85 z-[1000] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Ficha de moderación del alojamiento">
           <div class="bg-[#111] border border-[#c9a96e] rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
@@ -648,7 +725,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
   
-  activeTab = signal<'bookings' | 'promotions' | 'properties' | 'refunds'>('bookings');
+  activeTab = signal<'bookings' | 'promotions' | 'properties' | 'refunds' | 'users'>('bookings');
+
+  users = signal<any[]>([]);
+  loadingUsers = signal<boolean>(false);
+  updatingUserId = signal<string | null>(null);
 
   metrics = signal<DashboardMetricsDTO | null>(null);
   bookings = signal<Booking[]>([]);
@@ -724,6 +805,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.fetchPromotions();
     this.fetchProperties();
     this.fetchRefunds();
+    this.fetchUsers();
 
     // Actualización en tiempo real vía SSE para el panel de administración
     this.streamSub?.unsubscribe();
@@ -1104,6 +1186,62 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.actionError.set(err?.error?.message || 'Error al procesar el reembolso');
+        setTimeout(() => this.actionError.set(''), 5000);
+      }
+    });
+  }
+
+  fetchUsers(): void {
+    this.loadingUsers.set(true);
+    this.api.get<ApiResponse<any[]>>('/admin/users').subscribe({
+      next: (res) => {
+        this.loadingUsers.set(false);
+        const list = res?.data || (res as any) || [];
+        this.users.set(Array.isArray(list) ? list : []);
+      },
+      error: (err) => {
+        this.loadingUsers.set(false);
+        this.actionError.set(err?.error?.message || 'Error al obtener usuarios');
+        setTimeout(() => this.actionError.set(''), 5000);
+        this.users.set([]);
+      }
+    });
+  }
+
+  toggleUserStatus(u: any): void {
+    const id = u.id || u._id;
+    if (!id || this.updatingUserId()) return;
+    const nextStatus = u.status === 'suspended' ? 'active' : 'suspended';
+    this.updatingUserId.set(id);
+    this.api.put<ApiResponse<any>>(`/admin/users/${id}/status`, { status: nextStatus }).subscribe({
+      next: () => {
+        this.updatingUserId.set(null);
+        this.actionMessage.set(`Usuario ${u.name || u.email} ${nextStatus === 'suspended' ? 'suspendido' : 'activado'} correctamente.`);
+        setTimeout(() => this.actionMessage.set(''), 4000);
+        this.fetchUsers();
+      },
+      error: (err) => {
+        this.updatingUserId.set(null);
+        this.actionError.set(err?.error?.message || 'Error al actualizar estado del usuario');
+        setTimeout(() => this.actionError.set(''), 5000);
+      }
+    });
+  }
+
+  changeUserRole(u: any, newRole: string): void {
+    const id = u.id || u._id;
+    if (!id || this.updatingUserId()) return;
+    this.updatingUserId.set(id);
+    this.api.put<ApiResponse<any>>(`/admin/users/${id}/role`, { role: newRole }).subscribe({
+      next: () => {
+        this.updatingUserId.set(null);
+        this.actionMessage.set(`Rol de ${u.name || u.email} cambiado a ${newRole.toUpperCase()}.`);
+        setTimeout(() => this.actionMessage.set(''), 4000);
+        this.fetchUsers();
+      },
+      error: (err) => {
+        this.updatingUserId.set(null);
+        this.actionError.set(err?.error?.message || 'Error al cambiar rol del usuario');
         setTimeout(() => this.actionError.set(''), 5000);
       }
     });
