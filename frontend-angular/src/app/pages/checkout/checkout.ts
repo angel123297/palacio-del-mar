@@ -279,7 +279,7 @@ import { finalize, switchMap, Subscription } from 'rxjs';
              </div>
 
              <div style="margin-top: 1.25rem; padding: 0.75rem 1rem; background: rgba(201,169,110,0.08); border: 1px solid rgba(201,169,110,0.25); border-radius: 6px; font-size: 0.78rem; color: #ccc; line-height: 1.4; text-align: left;">
-               <span style="color: #2ecc71; font-weight: 600;">✓ Política de cancelación transparente:</span> Reembolso del 100% hasta 7 días antes. Retención del 10% entre 48h y 7 días. Con menos de 48h se retiene el alojamiento y se reintegra el depósito.
+               <span style="color: #2ecc71; font-weight: 600;">✓ Política de cancelación transparente:</span> Reembolso del 100% hasta 7 días antes. Retención del 10% del total de la reserva (sin depósito) entre 48h y 7 días. Con menos de 48h se reintegra únicamente el depósito de garantía.
              </div>
 
              <div style="margin-top: 1.5rem; text-align: center; color: #666; font-size: 0.8rem;">
