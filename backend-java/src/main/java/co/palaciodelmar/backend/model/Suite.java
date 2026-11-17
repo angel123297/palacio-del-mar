@@ -24,7 +24,7 @@ import java.io.Serializable;
 @AllArgsConstructor
 @Document(collection = "suites")
 @CompoundIndexes({
-        @CompoundIndex(name = "property_external_id_idx", def = "{'propertyId': 1, 'externalId': 1}", unique = true, partialFilter = "{'externalId': {'$type': 'string'}}")
+        @CompoundIndex(name = "property_external_id_v2_idx", def = "{'propertyId': 1, 'externalId': 1}", unique = true, partialFilter = "{'externalId': {'$type': 'string'}}")
 })
 public class Suite implements Serializable {
 

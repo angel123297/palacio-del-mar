@@ -286,4 +286,52 @@ class IdempotencyServiceTest {
             org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
         }
     }
+
+    @Test
+    @DisplayName("Redis caído en la 1ra ejecución y recuperado en el reintento: no ejecuta 2 veces")
+    void testRedisOutageDuringFirstRunThenRecoveredOnRetryDoesNotDuplicate() {
+        AtomicInteger executions = new AtomicInteger(0);
+        // Iniciar servicio con Redis caído (null)
+        IdempotencyService localOnlyService = new IdempotencyService(null, new ObjectMapper());
+
+        Map<String, Object> payload = Map.of("orderId", "ord-1");
+        IdempotencyService.IdempotentResult<Map> res1 = localOnlyService.execute(
+                "orders:create", "user-1", "idem-recov-1", payload, Map.class,
+                () -> {
+                    executions.incrementAndGet();
+                    return Map.of("status", "ok", "run", 1);
+                }
+        );
+        assertFalse(res1.replayed());
+        assertEquals(1, executions.get());
+
+        // Ahora Redis se recupera y se inyecta en el servicio
+        localOnlyService.setRedisTemplate(redisTemplate);
+
+        // Reintento idéntico
+        IdempotencyService.IdempotentResult<Map> res2 = localOnlyService.execute(
+                "orders:create", "user-1", "idem-recov-1", payload, Map.class,
+                () -> {
+                    executions.incrementAndGet();
+                    return Map.of("status", "ok", "run", 2);
+                }
+        );
+        assertTrue(res2.replayed(), "Debe reproducir el resultado almacenado en L1 sin duplicar ejecución");
+        assertEquals(1, executions.get(), "La acción de negocio NO debe ejecutarse dos veces");
+        assertEquals(1, res2.body().get("run"));
+    }
+
+    @Test
+    @DisplayName("Bloqueo vencido en Redis no sobrescribe la clave de otro proceso")
+    void testExpiredLockDoesNotOverwriteDifferentOwnerInRedis() {
+        // Simular que el script de conditional set retorna 0 porque otro proceso tomó la clave
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), anyString(), anyString(), anyString()))
+                .thenReturn(0L);
+
+        idempotencyService.execute("payments:confirm", "u-1", "key-conflict-1", Map.of("ref", "123"),
+                Map.class, () -> Map.of("done", true));
+
+        // Verificar que no se invocó un set incondicional sobre opsForValue()
+        verify(redisTemplate.opsForValue(), never()).set(anyString(), anyString(), any(Duration.class));
+    }
 }

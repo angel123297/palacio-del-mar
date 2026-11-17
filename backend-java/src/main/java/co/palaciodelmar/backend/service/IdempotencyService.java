@@ -61,6 +61,9 @@ public class IdempotencyService {
                 "if cur and string.find(cur, ARGV[1], 1, true) then " +
                 "  redis.call('set', KEYS[1], ARGV[2], 'PX', ARGV[3]) " +
                 "  return 1 " +
+                "elseif not cur then " +
+                "  redis.call('set', KEYS[1], ARGV[2], 'PX', ARGV[3]) " +
+                "  return 1 " +
                 "else " +
                 "  return 0 " +
                 "end"
@@ -156,10 +159,27 @@ public class IdempotencyService {
     }
 
     private String tryAcquireOrGetExisting(String fullKey, String inProgressJson) {
+        long now = System.currentTimeMillis();
+        LocalEntry local = localStore.get(fullKey);
+        if (local != null && local.expiresAtMs() > now) {
+            try {
+                StoredRecord rec = objectMapper.readValue(local.serializedRecord(), StoredRecord.class);
+                if ("COMPLETED".equalsIgnoreCase(rec.status())) {
+                    if (redisTemplate != null) {
+                        try {
+                            redisTemplate.opsForValue().setIfAbsent(fullKey, local.serializedRecord(), COMPLETED_TTL);
+                        } catch (Exception ignored) {}
+                    }
+                    return local.serializedRecord();
+                }
+            } catch (Exception ignored) {}
+        }
+
         if (redisTemplate != null) {
             try {
                 Boolean acquired = redisTemplate.opsForValue().setIfAbsent(fullKey, inProgressJson, IN_PROGRESS_TTL);
                 if (Boolean.TRUE.equals(acquired)) {
+                    localStore.put(fullKey, new LocalEntry(inProgressJson, now + IN_PROGRESS_TTL.toMillis()));
                     return null;
                 }
                 String existing = redisTemplate.opsForValue().get(fullKey);
@@ -169,6 +189,7 @@ public class IdempotencyService {
                 // Si expiró justo entre setIfAbsent y get, reintentar una vez
                 Boolean retry = redisTemplate.opsForValue().setIfAbsent(fullKey, inProgressJson, IN_PROGRESS_TTL);
                 if (Boolean.TRUE.equals(retry)) {
+                    localStore.put(fullKey, new LocalEntry(inProgressJson, now + IN_PROGRESS_TTL.toMillis()));
                     return null;
                 }
                 return redisTemplate.opsForValue().get(fullKey);
@@ -177,7 +198,6 @@ public class IdempotencyService {
             }
         }
 
-        long now = System.currentTimeMillis();
         LocalEntry[] existingHolder = new LocalEntry[1];
         localStore.compute(fullKey, (k, current) -> {
             if (current != null && current.expiresAtMs() > now) {
@@ -227,16 +247,13 @@ public class IdempotencyService {
     }
 
     private void saveCompleted(String fullKey, String completedJson, String ownerToken) {
-        boolean redisSuccess = false;
         if (redisTemplate != null) {
             try {
                 Long updated = redisTemplate.execute(CONDITIONAL_SET_COMPLETED_SCRIPT,
                         java.util.List.of(fullKey), ownerToken, completedJson,
                         Long.toString(COMPLETED_TTL.toMillis()));
-                if (Long.valueOf(1).equals(updated)) {
-                    redisSuccess = true;
-                } else {
-                    log.warn("La clave de idempotencia {} no tenía propietario en Redis o expiró", fullKey);
+                if (!Long.valueOf(1).equals(updated)) {
+                    log.warn("La clave de idempotencia {} no fue actualizada en Redis (propietario expiró o pertenece a otra operación)", fullKey);
                 }
             } catch (Exception e) {
                 log.warn("No se pudo persistir resultado idempotente en Redis ({}): {}", fullKey, e.getMessage());
@@ -249,14 +266,6 @@ public class IdempotencyService {
             }
             return current;
         });
-        if (!redisSuccess && redisTemplate != null) {
-            try {
-                LocalEntry current = localStore.get(fullKey);
-                if (current != null && current.serializedRecord().equals(completedJson)) {
-                    redisTemplate.opsForValue().set(fullKey, completedJson, COMPLETED_TTL);
-                }
-            } catch (Exception ignored) {}
-        }
         if (localStore.size() > MAX_LOCAL_ENTRIES) {
             enforceLocalCapacity(now, fullKey);
         }
