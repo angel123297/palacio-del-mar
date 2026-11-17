@@ -2455,6 +2455,27 @@ select option {
   background: #1a1815 !important;
   color: var(--cream) !important;
 }
+#booking-bar select,
+.booking-select {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 1.25rem 0 0 !important;
+  font-family: 'Cormorant Garamond', serif !important;
+  font-size: 1.15rem !important;
+  color: var(--cream) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  line-height: 1.3 !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+#booking-bar select:focus,
+.booking-select:focus {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
 .btn-block { width: 100%; margin-top: 10px; }
 .form-error {
   background: rgba(192, 57, 43, 0.15);
