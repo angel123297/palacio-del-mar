@@ -1503,44 +1503,49 @@ public class BookingService {
             // Desactivar el PIN de la cerradura inteligente al cerrar
             booking.setSmartLockPin(null);
 
-            // Depósito de garantía: retención y compensación frente a balanceDue
-            BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
-            if (deposit.signum() > 0 && !Boolean.TRUE.equals(booking.getGuaranteeRefunded())) {
-                BigDecimal debt = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
-                BigDecimal compensated = deposit.min(debt);
-
-                if (compensated.signum() > 0) {
-                    BigDecimal prevCompensated = booking.getGuaranteeCompensated() != null ? booking.getGuaranteeCompensated() : BigDecimal.ZERO;
-                    booking.setGuaranteeCompensated(prevCompensated.add(compensated));
-                    booking.setBalanceDue(debt.subtract(compensated));
-                    deposit = deposit.subtract(compensated);
-                    booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía retenido/compensado: $" + compensated);
-                    if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
-                        booking.setPaymentStatus("paid");
-                    }
-                }
-
-                // Devolver excedente del depósito con pagos reales
-                BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
-                BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
-                BigDecimal refundableExcess = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
-
-                boolean excessRefunded = false;
-                if (refundableExcess.signum() > 0 && paymentGateway != null) {
-                    String depKey = "ref_dep_" + booking.getId();
-                    excessRefunded = executeSequentialRefund(booking, refundableExcess, depKey);
-                    if (excessRefunded) {
-                        booking.setGuaranteeRefunded(true);
-                    }
-                } else if (refundableExcess.compareTo(BigDecimal.ZERO) <= 0) {
-                    booking.setGuaranteeRefunded(true);
-                }
-            }
+            // Depósito de garantía: retención y compensación frente a balanceDue, y devolución del excedente
+            processGuaranteeDepositRefund(booking);
 
             changeBookingStatus(booking, co.palaciodelmar.backend.model.BookingStatus.CHECKED_OUT, performedBy, reason);
             Booking saved = bookingRepository.save(booking);
             return toDTO(saved);
         });
+    }
+
+    public void processGuaranteeDepositRefund(Booking booking) {
+        if (booking == null) return;
+        BigDecimal deposit = booking.getGuaranteeDeposit() != null ? booking.getGuaranteeDeposit() : BigDecimal.ZERO;
+        if (deposit.signum() > 0 && !Boolean.TRUE.equals(booking.getGuaranteeRefunded())) {
+            BigDecimal debt = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
+            BigDecimal compensated = deposit.min(debt);
+
+            if (compensated.signum() > 0) {
+                BigDecimal prevCompensated = booking.getGuaranteeCompensated() != null ? booking.getGuaranteeCompensated() : BigDecimal.ZERO;
+                booking.setGuaranteeCompensated(prevCompensated.add(compensated));
+                booking.setBalanceDue(debt.subtract(compensated));
+                deposit = deposit.subtract(compensated);
+                booking.setNotes((booking.getNotes() != null ? booking.getNotes() + " | " : "") + "Depósito de garantía retenido/compensado: $" + compensated);
+                if (booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0) {
+                    booking.setPaymentStatus("paid");
+                }
+            }
+
+            // Devolver excedente del depósito con pagos reales
+            BigDecimal paid = booking.getPaidAmount() != null ? booking.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
+            BigDecimal refundableExcess = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
+
+            boolean excessRefunded = false;
+            if (refundableExcess.signum() > 0 && paymentGateway != null) {
+                String depKey = "ref_dep_" + booking.getId();
+                excessRefunded = executeSequentialRefund(booking, refundableExcess, depKey);
+                if (excessRefunded) {
+                    booking.setGuaranteeRefunded(true);
+                }
+            } else if (refundableExcess.compareTo(BigDecimal.ZERO) <= 0) {
+                booking.setGuaranteeRefunded(true);
+            }
+        }
     }
 
     private void assertBookingCanBeModified(Booking booking) {

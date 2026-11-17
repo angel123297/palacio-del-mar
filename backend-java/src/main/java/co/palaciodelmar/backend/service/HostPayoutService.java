@@ -70,7 +70,7 @@ public class HostPayoutService {
 
     private synchronized List<HostPayoutDTO> doProcessAutomatedPayouts() {
         LocalDate today = LocalDate.now(BOGOTA);
-        List<String> eligibleStatuses = List.of("checked_out", "completed");
+        List<String> eligibleStatuses = List.of("checked_out", "completed", "no_show");
         List<HostPayoutDTO> generated = new ArrayList<>();
         recoverPendingPayouts(generated, today, eligibleStatuses);
 

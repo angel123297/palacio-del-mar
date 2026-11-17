@@ -87,16 +87,17 @@ public class AutoStayLifecycleScheduler {
                             return null;
                         }
 
-                        // Si la fecha de salida ya expiro sin ingreso del huesped, marcar NO_SHOW en lugar de auto check-in
+                        // Si la fecha de salida ya expiro sin ingreso del huesped, devolver garantia y marcar NO_SHOW
                         if (booking.getCheckOut() != null && today.isAfter(booking.getCheckOut())) {
+                            bookingService.processGuaranteeDepositRefund(booking);
                             bookingService.changeBookingStatus(
                                     booking,
                                     BookingStatus.NO_SHOW,
                                     "System-AutoStayLifecycle",
-                                    "No-show automatico detectado: la fecha de salida ya expiro sin registro de ingreso"
+                                    "No-show automatico detectado: la fecha de salida ya expiro sin registro de ingreso. Deposito de garantia devuelto al huesped."
                             );
                             bookingRepository.save(booking);
-                            log.info("No-show automatico registrado para reserva {} (Fecha salida {} anterior a hoy {})",
+                            log.info("No-show automatico registrado para reserva {} (Fecha salida {} anterior a hoy {}, garantia devuelta)",
                                     booking.getId(), booking.getCheckOut(), today);
                             return null;
                         }

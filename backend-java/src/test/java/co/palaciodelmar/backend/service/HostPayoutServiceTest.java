@@ -383,4 +383,50 @@ class HostPayoutServiceTest {
         List<HostPayoutDTO> payouts = hostPayoutService.processAutomatedPayouts();
         assertTrue(payouts.isEmpty(), "No se debe liquidar reservas con reembolsos en trámite");
     }
+
+    @Test
+    @DisplayName("Reserva NO_SHOW con depósito reembolsado liquida correctamente el alojamiento al anfitrión")
+    void testNoShowBookingWithDepositRefundedIsEligibleForPayout() {
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+
+        Booking bNoShow = Booking.builder()
+                .id("b-noshow-1")
+                .propertyId("prop-test-1")
+                .status("no_show")
+                .paymentStatus("paid")
+                .subtotal(new BigDecimal("809200"))
+                .totalPrice(new BigDecimal("909200"))
+                .paidAmount(new BigDecimal("909200"))
+                .guaranteeDeposit(new BigDecimal("100000"))
+                .guaranteeRefunded(true)
+                .refundedAmount(new BigDecimal("100000"))
+                .platformFee(new BigDecimal("64736"))
+                .hostPayout(new BigDecimal("744464"))
+                .checkIn(today.minusDays(4))
+                .checkOut(today.minusDays(1))
+                .build();
+
+        Property property = Property.builder()
+                .id("prop-test-1")
+                .ownerId("host-1")
+                .name("Alojamiento Test")
+                .build();
+
+        when(bookingRepository.findByStatusInAndPayoutIdIsNull(anyList())).thenReturn(List.of(bNoShow));
+        when(bookingRepository.findById("b-noshow-1")).thenReturn(Optional.of(bNoShow));
+        when(propertyRepository.findById("prop-test-1")).thenReturn(Optional.of(property));
+        when(hostPayoutRepository.findFirstByBookingIdsContaining("b-noshow-1")).thenReturn(Optional.empty());
+        when(hostPayoutRepository.save(any(HostPayout.class))).thenAnswer(i -> {
+            HostPayout hp = i.getArgument(0);
+            hp.setId("PO-TEST-NOSHOW");
+            return hp;
+        });
+
+        List<HostPayoutDTO> payouts = hostPayoutService.processAutomatedPayouts();
+        assertFalse(payouts.isEmpty(), "La reserva no_show debe ser elegible para liquidación al host");
+        HostPayoutDTO dto = payouts.get(0);
+        assertEquals(new BigDecimal("809200.00"), dto.getGrossTotal());
+        assertEquals(new BigDecimal("64736.00"), dto.getPlatformFee());
+        assertEquals(new BigDecimal("744464.00"), dto.getNetAmount());
+    }
 }

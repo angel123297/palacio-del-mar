@@ -180,6 +180,7 @@ class AutoStayLifecycleSchedulerTest {
 
         scheduler.processAutoCheckIns(today, LocalTime.of(16, 0));
 
+        verify(bookingService).processGuaranteeDepositRefund(eq(expiredBooking));
         verify(bookingService).changeBookingStatus(
                 eq(expiredBooking),
                 eq(BookingStatus.NO_SHOW),
