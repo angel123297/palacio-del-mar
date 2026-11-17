@@ -26,9 +26,6 @@ public class DataInitializer implements CommandLineRunner {
     private final String adminPassword;
     private final boolean seedDemoData;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
-
     public DataInitializer(
             BranchRepository branchRepository,
             SuiteRepository suiteRepository,
@@ -53,22 +50,6 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        try {
-            if (mongoTemplate != null && mongoTemplate.collectionExists("suites")) {
-                org.springframework.data.mongodb.core.index.IndexOperations indexOps = mongoTemplate.indexOps("suites");
-                for (org.springframework.data.mongodb.core.index.IndexInfo info : indexOps.getIndexInfo()) {
-                    if ("property_external_id_idx".equals(info.getName())) {
-                        log.info("Migrando índice obsoleto 'property_external_id_idx' en colección suites...");
-                        indexOps.dropIndex("property_external_id_idx");
-                        log.info("Índice obsoleto 'property_external_id_idx' eliminado exitosamente.");
-                        break;
-                    }
-                }
-            }
-        } catch (Exception ex) {
-            log.warn("Advertencia durante la migración del índice de suites: {}", ex.getMessage());
-        }
-
         Branch b1, b2, b3, b4;
         if (branchRepository.count() == 0) {
 
