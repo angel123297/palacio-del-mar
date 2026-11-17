@@ -65,6 +65,7 @@ class BookingServiceCheckOutTest {
 
         bookingService.setPaymentRepository(paymentRepository);
         bookingService.setRedisLockService(redisLockService);
+        bookingService.setClock(java.time.Clock.fixed(java.time.Instant.parse("2026-11-16T19:00:00Z"), BOGOTA)); // 14:00 COT (Lunes 16 Nov 2026)
         ReflectionTestUtils.setField(bookingService, "propertyRepository", propertyRepository);
 
         when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
@@ -165,6 +166,39 @@ class BookingServiceCheckOutTest {
 
         // Refund for excess deposit (100k) was made with real transaction ID
         verify(paymentGateway).refund(eq("tx_late_real_555"), argThat(amt -> amt != null && amt.compareTo(new BigDecimal("100000")) == 0), anyString());
+    }
+
+    @Test
+    @DisplayName("B15: guestCheckOut (check-out manual del huésped) aplica recargo del 50% por salida tardía")
+    void testGuestCheckOutLateAppliesPenalty() {
+        LocalDate today = LocalDate.now(BOGOTA);
+        Booking booking = Booking.builder()
+                .id("b-guest-late")
+                .user("user-guest-123")
+                .propertyId("prop-1")
+                .status("checked_in")
+                .paymentStatus("paid")
+                .checkIn(today.minusDays(2))
+                .checkOut(today.minusDays(1)) // checkout was yesterday -> isLate is true
+                .pricePerNight(new BigDecimal("200000"))
+                .totalPrice(new BigDecimal("400000"))
+                .paidAmount(new BigDecimal("400000"))
+                .balanceDue(BigDecimal.ZERO)
+                .refundedAmount(BigDecimal.ZERO)
+                .guaranteeDeposit(BigDecimal.ZERO)
+                .guaranteeRefunded(false)
+                .smartLockPin("PIN-GUEST-999")
+                .build();
+
+        when(bookingRepository.findById("b-guest-late")).thenReturn(Optional.of(booking));
+
+        BookingDTO result = bookingService.guestCheckOut("b-guest-late", "user-guest-123");
+
+        assertEquals("checked_out", result.getStatus());
+        // Recargo 50% de 200.000 = 100.000
+        assertEquals(0, new BigDecimal("500000").compareTo(booking.getTotalPrice()));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getBalanceDue()));
+        assertEquals("partial", booking.getPaymentStatus());
     }
 
     @Test

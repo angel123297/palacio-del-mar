@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -29,17 +29,29 @@ import { CommonModule } from '@angular/common';
     </section>
   `
 })
-export class HeroComponent {
+export class HeroComponent implements OnDestroy {
+  private focusTimeout: any = null;
+
   scrollTo(selector: string): void {
     const el = document.querySelector(selector);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
       if (selector === '#booking-bar') {
-        setTimeout(() => {
+        if (this.focusTimeout) {
+          clearTimeout(this.focusTimeout);
+        }
+        this.focusTimeout = setTimeout(() => {
           const target = document.querySelector<HTMLElement>('#booking-bar input, #booking-bar select, #booking-bar button');
           target?.focus();
         }, 600);
       }
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.focusTimeout) {
+      clearTimeout(this.focusTimeout);
+      this.focusTimeout = null;
     }
   }
 }

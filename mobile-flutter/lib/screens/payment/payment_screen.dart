@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import '../../core/config/api_config.dart';
 import 'receipt_screen.dart';
 
 // --- Formatter para tarjeta de crédito: 0000 0000 0000 0000 (16 dígitos) ---
@@ -60,13 +61,13 @@ class CardExpiryInputFormatter extends TextInputFormatter {
 class PaymentScreen extends StatefulWidget {
   final Map<String, dynamic> booking;
   final String token;
-  final String baseUrl;
+  final String? baseUrl;
 
   const PaymentScreen({
     super.key,
     required this.booking,
     required this.token,
-    this.baseUrl = 'https://unbroke-unsized-zandra.ngrok-free.dev/api',
+    this.baseUrl,
   });
 
   @override
@@ -74,6 +75,8 @@ class PaymentScreen extends StatefulWidget {
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
+  String get _effectiveBaseUrl =>
+      (widget.baseUrl != null && widget.baseUrl!.isNotEmpty) ? widget.baseUrl! : ApiConfig.baseUrl;
   String _selectedMethod = 'CARD'; // CARD, PSE, NEQUI
   bool _isProcessing = false;
   String _processingMessage = '';
@@ -309,7 +312,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
       // 1. Iniciar checkout con backend Spring Boot
       final checkoutRes = await http.post(
-        Uri.parse('${widget.baseUrl}/payments/checkout'),
+        Uri.parse('$_effectiveBaseUrl/payments/checkout'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
@@ -336,7 +339,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
       // 2. Confirmar pago enviando el token (tok_4242, tok_0002, tok_9995, tok_0069)
       final confirmRes = await http.post(
-        Uri.parse('${widget.baseUrl}/payments/confirm'),
+        Uri.parse('$_effectiveBaseUrl/payments/confirm'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
@@ -369,7 +372,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
         try {
           final statusRes = await http.get(
-            Uri.parse('${widget.baseUrl}/payments/status/$intentId'),
+            Uri.parse('$_effectiveBaseUrl/payments/status/$intentId'),
             headers: {
               'Authorization': 'Bearer ${widget.token}',
               'ngrok-skip-browser-warning': 'true',
@@ -381,13 +384,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
             final statusData = statusJson['data'] ?? statusJson;
             final paymentStatus = statusData['status'];
             final bookingPaymentStatus = statusData['paymentStatus'];
-            final bookingStatus = statusData['bookingStatus'];
             final notes = statusData['notes']?.toString() ?? '';
 
             if (paymentStatus == 'completed' ||
                 paymentStatus == 'succeeded' ||
-                bookingPaymentStatus == 'paid' ||
-                bookingStatus == 'confirmed') {
+                bookingPaymentStatus == 'paid') {
               paymentResolved = true;
 
               // Redirigir exitosamente a Voucher

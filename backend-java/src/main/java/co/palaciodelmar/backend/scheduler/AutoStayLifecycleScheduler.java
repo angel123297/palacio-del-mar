@@ -49,16 +49,21 @@ public class AutoStayLifecycleScheduler {
     @Autowired(required = false)
     private co.palaciodelmar.backend.service.PaymentGateway paymentGateway;
 
+    @Setter
+    @Autowired(required = false)
+    private java.time.Clock clock = java.time.Clock.system(BOGOTA);
+
     @Value("${palacio.lifecycle.autocheckin.hour:15}")
     private int autoCheckInHour = 15;
 
     @Value("${palacio.lifecycle.autocheckout.hour:13}")
     private int autoCheckOutHour = 13;
 
-    @Scheduled(fixedRateString = "${palacio.lifecycle.check.interval.ms:60000}")
+    @Scheduled(fixedDelayString = "${palacio.lifecycle.check.interval.ms:60000}")
     public void processStayLifecycleTransitions() {
-        LocalDate today = LocalDate.now(BOGOTA);
-        LocalTime nowTime = LocalTime.now(BOGOTA);
+        java.time.ZonedDateTime nowZdt = clock.instant().atZone(BOGOTA);
+        LocalDate today = nowZdt.toLocalDate();
+        LocalTime nowTime = nowZdt.toLocalTime();
 
         processAutoCheckIns(today, nowTime);
         processAutoCheckOuts(today, nowTime);
@@ -81,6 +86,22 @@ public class AutoStayLifecycleScheduler {
                         if (booking == null || !"confirmed".equalsIgnoreCase(booking.getStatus()) || booking.getCheckIn() == null) {
                             return null;
                         }
+
+                        // Si la fecha de salida ya expiro sin ingreso del huesped, devolver garantia y marcar NO_SHOW
+                        if (booking.getCheckOut() != null && today.isAfter(booking.getCheckOut())) {
+                            bookingService.processGuaranteeDepositRefund(booking);
+                            bookingService.changeBookingStatus(
+                                    booking,
+                                    BookingStatus.NO_SHOW,
+                                    "System-AutoStayLifecycle",
+                                    "No-show automatico detectado: la fecha de salida ya expiro sin registro de ingreso. Deposito de garantia devuelto al huesped."
+                            );
+                            bookingRepository.save(booking);
+                            log.info("No-show automatico registrado para reserva {} (Fecha salida {} anterior a hoy {}, garantia devuelta)",
+                                    booking.getId(), booking.getCheckOut(), today);
+                            return null;
+                        }
+
                         boolean freshPast = today.isAfter(booking.getCheckIn());
                         boolean freshReady = today.isEqual(booking.getCheckIn()) && nowTime.getHour() >= autoCheckInHour;
                         if (!freshPast && !freshReady) {

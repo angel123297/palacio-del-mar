@@ -26,14 +26,31 @@ public class ReviewController {
         return ResponseEntity.ok(ApiResponse.ok(reviews));
     }
 
+    private Integer parseRating(Object ratingObj) {
+        if (ratingObj == null) {
+            throw new IllegalArgumentException("La calificación es obligatoria");
+        }
+        if (ratingObj instanceof Number num) {
+            return num.intValue();
+        }
+        if (ratingObj instanceof String str && !str.isBlank()) {
+            try {
+                return Integer.parseInt(str.trim());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("La calificación debe estar entre 1 y 5 estrellas");
+            }
+        }
+        throw new IllegalArgumentException("La calificación debe estar entre 1 y 5 estrellas");
+    }
+
     @PostMapping("/suites/{suiteId}/reviews")
     public ResponseEntity<ApiResponse<ReviewDTO>> addReview(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String suiteId,
             @RequestBody Map<String, Object> body
     ) {
-        Integer rating = (Integer) body.get("rating");
-        String comment = (String) body.get("comment");
+        Integer rating = parseRating(body.get("rating"));
+        String comment = body.get("comment") != null ? String.valueOf(body.get("comment")) : null;
         String userName = principal != null ? principal.getUser().getName() : "Huésped";
         String userId = principal != null ? principal.getUser().getId() : "anonymous";
 
@@ -54,8 +71,8 @@ public class ReviewController {
         }
 
         String bookingId = (String) body.get("bookingId");
-        Integer rating = (Integer) body.get("rating");
-        String comment = (String) body.get("comment");
+        Integer rating = parseRating(body.get("rating"));
+        String comment = body.get("comment") != null ? String.valueOf(body.get("comment")) : null;
 
         ReviewDTO review = reviewService.addVerifiedReview(bookingId, principal.getUser().getId(), rating, comment);
         return ResponseEntity.ok(ApiResponse.ok("¡Gracias por compartir tu experiencia en Palacio del Mar!", review));

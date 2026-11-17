@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -21,6 +23,9 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "suites")
+@CompoundIndexes({
+        @CompoundIndex(name = "property_external_id_v2_idx", def = "{'propertyId': 1, 'externalId': 1}", unique = true, partialFilter = "{'externalId': {'$type': 'string'}}")
+})
 public class Suite implements Serializable {
 
     private static final long serialVersionUID = 1L;

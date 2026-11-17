@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { tap, timeout } from 'rxjs';
+import { BehaviorSubject, Observable, filter, finalize, map, of, take, tap, timeout } from 'rxjs';
 import { User, AuthResponse, LoginDTO, RegisterDTO } from '../models/types';
 import { environment } from '../../environments/environment';
 
@@ -11,6 +11,8 @@ export class AuthService {
   private currentUserSignal = signal<User | null>(null);
   currentUser = this.currentUserSignal.asReadonly();
   private readonly TIMEOUT_MS = 15000;
+  private sessionEpoch = 0;
+  private sessionInitialized$ = new BehaviorSubject<boolean>(false);
 
   get currentUserValue(): User | null {
     return this.currentUserSignal();
@@ -19,6 +21,14 @@ export class AuthService {
   isLoggedIn(): boolean {
     const user = this.currentUserSignal();
     return !!user && user.emailVerified === true;
+  }
+
+  ensureSession(): Observable<User | null> {
+    return this.sessionInitialized$.pipe(
+      filter(init => init === true),
+      take(1),
+      map(() => this.currentUserSignal())
+    );
   }
 
   constructor(private http: HttpClient, private router: Router) {
@@ -47,26 +57,33 @@ export class AuthService {
     const token = localStorage.getItem('token');
     const cachedUser = localStorage.getItem('user');
     if (!token && !cachedUser) {
+      this.sessionInitialized$.next(true);
       return;
     }
 
+    const currentEpoch = this.sessionEpoch;
     this.http.get<AuthResponse>(`${this.apiUrl}/me`).subscribe({
       next: (res) => {
+        if (currentEpoch !== this.sessionEpoch) return;
         const user = res.user || res.data?.user;
         if (user) {
           localStorage.setItem('user', JSON.stringify(user));
           this.currentUserSignal.set(user);
         }
+        this.sessionInitialized$.next(true);
       },
       error: (err) => {
+        if (currentEpoch !== this.sessionEpoch) return;
         if (err?.status === 401) {
           this.clearLocalData();
         }
+        this.sessionInitialized$.next(true);
       }
     });
   }
 
   clearLocalData() {
+    this.sessionEpoch++;
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     this.currentUserSignal.set(null);
@@ -75,7 +92,10 @@ export class AuthService {
   updateCurrentUser(partial: Partial<User>) {
     const current = this.currentUserSignal();
     const updated = { ...(current || {}), ...partial } as User;
-    if (updated && updated.id) {
+    if (updated && (updated.id || (updated as any)._id)) {
+      if (!updated.id && (updated as any)._id) {
+        updated.id = (updated as any)._id;
+      }
       localStorage.setItem('user', JSON.stringify(updated));
       this.currentUserSignal.set(updated);
     }
@@ -167,7 +187,7 @@ export class AuthService {
   logoutAllDevices() {
     return this.http.post<{ success?: boolean; message?: string }>(`${this.apiUrl}/logout-all`, {}).pipe(
       timeout(this.TIMEOUT_MS),
-      tap(() => {
+      finalize(() => {
         this.clearLocalData();
       })
     );

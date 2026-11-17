@@ -49,7 +49,8 @@ public class ApiKeyService {
         Property property = propertyRepository.findById(request.getPropertyId())
                 .orElseThrow(() -> new ResourceNotFoundException("Alojamiento no encontrado"));
 
-        if (!isAdmin(currentUser) && !property.getOwnerId().equals(currentUser.getId())) {
+        String currentUserId = currentUser != null ? currentUser.getId() : null;
+        if (!isAdmin(currentUser) && !java.util.Objects.equals(property.getOwnerId(), currentUserId)) {
             // Anti-IDOR: Responder 404 para no revelar la existencia
             throw new ResourceNotFoundException("Alojamiento no encontrado");
         }
@@ -82,7 +83,8 @@ public class ApiKeyService {
             Property property = propertyRepository.findById(propertyId)
                     .orElseThrow(() -> new ResourceNotFoundException("Alojamiento no encontrado"));
 
-            if (!isAdmin(currentUser) && !property.getOwnerId().equals(currentUser.getId())) {
+            String currentUserId = currentUser != null ? currentUser.getId() : null;
+            if (!isAdmin(currentUser) && !java.util.Objects.equals(property.getOwnerId(), currentUserId)) {
                 throw new ResourceNotFoundException("Alojamiento no encontrado");
             }
             return apiKeyRepository.findByPropertyId(propertyId).stream()
@@ -96,7 +98,8 @@ public class ApiKeyService {
                     .toList();
         }
 
-        return apiKeyRepository.findByOwnerId(currentUser.getId()).stream()
+        String currentUserId = currentUser != null ? currentUser.getId() : null;
+        return apiKeyRepository.findByOwnerId(currentUserId).stream()
                 .map(this::toDTO)
                 .toList();
     }
@@ -105,7 +108,8 @@ public class ApiKeyService {
         ApiKey apiKey = apiKeyRepository.findById(apiKeyId)
                 .orElseThrow(() -> new ResourceNotFoundException("API Key no encontrada"));
 
-        if (!isAdmin(currentUser) && !apiKey.getOwnerId().equals(currentUser.getId())) {
+        String currentUserId = currentUser != null ? currentUser.getId() : null;
+        if (!isAdmin(currentUser) && !java.util.Objects.equals(apiKey.getOwnerId(), currentUserId)) {
             throw new ResourceNotFoundException("API Key no encontrada");
         }
 

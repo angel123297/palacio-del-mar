@@ -43,6 +43,10 @@ public class AuthService {
         this.userSessionCacheService = userSessionCacheService;
     }
 
+    @lombok.Setter
+    @Autowired(required = false)
+    private BookingSseService bookingSseService;
+
     @Autowired
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                        JwtService jwtService, AuthenticationManager authenticationManager,
@@ -92,60 +96,20 @@ public class AuthService {
         String normalizedEmail = request.getEmail() != null ? request.getEmail().toLowerCase() : "";
         if (userRepository.existsByEmail(normalizedEmail)) {
             User existing = userRepository.findByEmail(normalizedEmail).orElse(null);
-            if (existing != null && (existing.getPassword() == null || existing.getPassword().isBlank())) {
-                if ("admin".equalsIgnoreCase(existing.getRole())) {
-                    throw new IllegalArgumentException("No se permite activar ni modificar una cuenta de administrador mediante registro público");
-                }
-                String requestedRole = request.getRole() != null ? request.getRole().trim() : "";
-                if ("admin".equalsIgnoreCase(requestedRole)) {
-                    throw new IllegalArgumentException("No se permite el autorregistro con rol de administrador");
-                }
-                String rawToken = generateSecureToken();
-                String hashedToken = hashToken(rawToken);
-
-                existing.setName(request.getName());
-                if (request.getLastName() != null) {
-                    existing.setLastName(request.getLastName());
-                }
-                if ("host".equalsIgnoreCase(requestedRole) || "anfitrion".equalsIgnoreCase(requestedRole)) {
-                    existing.setRole("host");
-                } else if (existing.getRole() == null || existing.getRole().isBlank()) {
-                    existing.setRole("user");
-                }
-                existing.setPassword(passwordEncoder.encode(request.getPassword()));
-                boolean autoVerify = !emailService.isConfigured();
-                existing.setEmailVerified(autoVerify);
-                existing.setVerificationTokenHash(hashedToken);
-                existing.setVerificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS));
-                if (existing.getProfile() == null) {
-                    existing.setProfile(User.Profile.builder().phone(request.getPhone()).build());
-                } else if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
-                    existing.getProfile().setPhone(request.getPhone());
-                }
-                existing.setUpdatedAt(Instant.now());
-                userRepository.save(existing);
-                if (userSessionCacheService != null) {
-                    userSessionCacheService.evictUser(existing.getEmail());
-                }
-
-                try {
-                    if (request.getReturnUrl() != null && !request.getReturnUrl().isBlank()) {
-                        emailService.sendVerificationEmail(existing.getEmail(), rawToken, request.getReturnUrl());
-                    } else {
-                        emailService.sendVerificationEmail(existing.getEmail(), rawToken);
-                    }
-                } catch (Exception e) {
-                    log.error("Failed to send verification email: {}", e.getMessage(), e);
-                }
-
-                return AuthResponse.builder()
-                        .token(null)
-                        .user(toDTO(existing))
-                        .build();
-            } else {
+            if (existing == null || Boolean.TRUE.equals(existing.getEmailVerified())) {
                 throw new IllegalArgumentException("El email ya está registrado");
             }
+            if ("admin".equalsIgnoreCase(existing.getRole()) || existing.getDeletedAt() != null
+                    || "inactive".equalsIgnoreCase(existing.getStatus())
+                    || "suspended".equalsIgnoreCase(existing.getStatus())) {
+                throw new IllegalArgumentException("No se permite activar esta cuenta mediante registro público");
+            }
+            // An anonymous retry may rotate verification, but cannot replace credentials,
+            // profile or role. Passwordless accounts recover through the emailed reset flow.
+            resendVerification(normalizedEmail);
+            return AuthResponse.builder().token(null).user(null).build();
         }
+
         if (request.getPhone() != null && !request.getPhone().trim().isEmpty() && userRepository.existsByProfilePhone(request.getPhone())) {
             throw new IllegalArgumentException("El número de teléfono ya está registrado");
         }
@@ -171,7 +135,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(assignedRole)
                 .status("active")
-                .emailVerified(!emailService.isConfigured())
+                .emailVerified(false)
                 .verificationTokenHash(hashedToken)
                 .verificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS))
                 .profile(User.Profile.builder()
@@ -230,8 +194,18 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        if (updateRequest.getName() != null) user.setName(updateRequest.getName());
-        if (updateRequest.getLastName() != null) user.setLastName(updateRequest.getLastName());
+        org.springframework.data.mongodb.core.query.Update update = new org.springframework.data.mongodb.core.query.Update();
+        Instant now = Instant.now();
+        update.set("updatedAt", now);
+
+        if (updateRequest.getName() != null) {
+            user.setName(updateRequest.getName());
+            update.set("name", updateRequest.getName());
+        }
+        if (updateRequest.getLastName() != null) {
+            user.setLastName(updateRequest.getLastName());
+            update.set("lastName", updateRequest.getLastName());
+        }
         if (updateRequest.getProfile() != null) {
             if (user.getProfile() == null) user.setProfile(new User.Profile());
             if (updateRequest.getProfile().getPhone() != null) {
@@ -242,21 +216,53 @@ public class AuthService {
                     }
                 }
                 user.getProfile().setPhone(newPhone);
+                update.set("profile.phone", newPhone);
             }
-            if (updateRequest.getProfile().getDocumentId() != null) user.getProfile().setDocumentId(updateRequest.getProfile().getDocumentId());
-            if (updateRequest.getProfile().getDocumentType() != null) user.getProfile().setDocumentType(updateRequest.getProfile().getDocumentType());
-            if (updateRequest.getProfile().getAvatar() != null) user.getProfile().setAvatar(updateRequest.getProfile().getAvatar());
-            if (updateRequest.getProfile().getAddress() != null) user.getProfile().setAddress(updateRequest.getProfile().getAddress());
+            if (updateRequest.getProfile().getDocumentId() != null) {
+                user.getProfile().setDocumentId(updateRequest.getProfile().getDocumentId());
+                update.set("profile.documentId", updateRequest.getProfile().getDocumentId());
+            }
+            if (updateRequest.getProfile().getDocumentType() != null) {
+                user.getProfile().setDocumentType(updateRequest.getProfile().getDocumentType());
+                update.set("profile.documentType", updateRequest.getProfile().getDocumentType());
+            }
+            if (updateRequest.getProfile().getAvatar() != null) {
+                user.getProfile().setAvatar(updateRequest.getProfile().getAvatar());
+                update.set("profile.avatar", updateRequest.getProfile().getAvatar());
+            }
+            if (updateRequest.getProfile().getAddress() != null) {
+                user.getProfile().setAddress(updateRequest.getProfile().getAddress());
+                update.set("profile.address", updateRequest.getProfile().getAddress());
+            }
         }
-        user.setUpdatedAt(Instant.now());
-        User saved = userRepository.save(user);
+        user.setUpdatedAt(now);
+        User saved = atomicPartialUserUpdate(userId, update, user);
         if (userSessionCacheService != null) {
             userSessionCacheService.putCachedUser(saved);
         }
         return toDTO(saved);
     }
 
+    private User atomicPartialUserUpdate(String userId, org.springframework.data.mongodb.core.query.Update update, User fallbackUser) {
+        if (mongoTemplate != null && userId != null) {
+            User updated = mongoTemplate.findAndModify(
+                    new org.springframework.data.mongodb.core.query.Query(
+                            org.springframework.data.mongodb.core.query.Criteria.where("id").is(userId)),
+                    update,
+                    org.springframework.data.mongodb.core.FindAndModifyOptions.options().returnNew(true),
+                    User.class
+            );
+            if (updated != null) {
+                return updated;
+            }
+        }
+        return userRepository.save(fallbackUser);
+    }
+
     public AuthResponse verifyEmail(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token inválido");
+        }
         String hashedToken = hashToken(token);
         User user = userRepository.findByVerificationTokenHash(hashedToken)
                 .orElseThrow(() -> new IllegalArgumentException("Token inválido"));
@@ -265,11 +271,22 @@ public class AuthService {
             throw new IllegalArgumentException("El token ha expirado");
         }
 
-        user.setEmailVerified(true);
-        user.setVerificationTokenHash(null);
-        user.setVerificationTokenExpiresAt(null);
-        user.setUpdatedAt(Instant.now());
-        User savedUser = userRepository.save(user);
+        Instant now = Instant.now();
+        User savedUser = mongoTemplate.findAndModify(
+                new Query(Criteria.where("id").is(user.getId())
+                        .and("verificationTokenHash").is(hashedToken)
+                        .and("verificationTokenExpiresAt").gt(now)
+                        .and("emailVerified").ne(true)
+                        .and("deletedAt").is(null)
+                        .and("status").nin("inactive", "suspended")),
+                new Update().set("emailVerified", true)
+                        .unset("verificationTokenHash")
+                        .unset("verificationTokenExpiresAt")
+                        .set("updatedAt", now),
+                FindAndModifyOptions.options().returnNew(true), User.class);
+        if (savedUser == null) {
+            throw new IllegalArgumentException("Token inválido o expirado");
+        }
         if (userSessionCacheService != null) {
             userSessionCacheService.putCachedUser(savedUser);
         }
@@ -294,13 +311,28 @@ public class AuthService {
             throw new IllegalArgumentException("La nueva contraseña debe tener al menos 8 caracteres");
         }
         Instant changedAt = Instant.now();
-        user.setPassword(passwordEncoder.encode(newPassword));
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        user.setPassword(encodedPassword);
         user.setPasswordChangedAt(changedAt);
         user.setSessionsRevokedAt(changedAt);
         user.setUpdatedAt(changedAt);
-        userRepository.save(user);
+        atomicPartialUserUpdate(
+                user.getId(),
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("password", encodedPassword)
+                        .set("passwordChangedAt", changedAt)
+                        .set("sessionsRevokedAt", changedAt)
+                        .set("updatedAt", changedAt),
+                user
+        );
         if (userSessionCacheService != null) {
             userSessionCacheService.recordGlobalRevocation(user.getEmail(), changedAt);
+        }
+        if (bookingSseService != null) {
+            bookingSseService.closeUserConnections(user.getId());
+            if (user.getEmail() != null) {
+                bookingSseService.closeUserConnections(user.getEmail());
+            }
         }
     }
 
@@ -314,9 +346,21 @@ public class AuthService {
         Instant now = Instant.now();
         user.setSessionsRevokedAt(now);
         user.setUpdatedAt(now);
-        userRepository.save(user);
+        atomicPartialUserUpdate(
+                user.getId(),
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("sessionsRevokedAt", now)
+                        .set("updatedAt", now),
+                user
+        );
         if (userSessionCacheService != null) {
             userSessionCacheService.recordGlobalRevocation(user.getEmail(), now);
+        }
+        if (bookingSseService != null) {
+            bookingSseService.closeUserConnections(user.getId());
+            if (user.getEmail() != null) {
+                bookingSseService.closeUserConnections(user.getEmail());
+            }
         }
         log.info("Revocación global de sesiones ejecutada en todos los dispositivos para {}", user.getEmail());
     }
@@ -336,11 +380,20 @@ public class AuthService {
         // Genera token criptográficamente seguro con validez de 15 minutos almacenado con hash SHA-256.
         String rawToken = generateSecureToken();
         String hashedToken = hashToken(rawToken);
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(15, java.time.temporal.ChronoUnit.MINUTES);
 
         user.setResetPasswordTokenHash(hashedToken);
-        user.setResetPasswordTokenExpiresAt(Instant.now().plus(15, java.time.temporal.ChronoUnit.MINUTES));
-        user.setUpdatedAt(Instant.now());
-        userRepository.save(user);
+        user.setResetPasswordTokenExpiresAt(expiresAt);
+        user.setUpdatedAt(now);
+        atomicPartialUserUpdate(
+                user.getId(),
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("resetPasswordTokenHash", hashedToken)
+                        .set("resetPasswordTokenExpiresAt", expiresAt)
+                        .set("updatedAt", now),
+                user
+        );
 
         emailService.sendPasswordResetEmail(user.getEmail(), rawToken);
         log.info("Enlace de restablecimiento de contraseña generado y enviado a {}", normalizedEmail);
@@ -388,6 +441,12 @@ public class AuthService {
         if (userSessionCacheService != null) {
             userSessionCacheService.recordGlobalRevocation(updatedUser.getEmail(), now);
         }
+        if (bookingSseService != null) {
+            bookingSseService.closeUserConnections(updatedUser.getId());
+            if (updatedUser.getEmail() != null) {
+                bookingSseService.closeUserConnections(updatedUser.getEmail());
+            }
+        }
 
         log.info("Contraseña restablecida exitosamente de forma atómica para el usuario {}", updatedUser.getEmail());
     }
@@ -407,16 +466,35 @@ public class AuthService {
             throw new IllegalStateException("Tu cuenta ya se encuentra verificada. Puedes iniciar sesión directamente.");
         }
 
+        if ("admin".equalsIgnoreCase(user.getRole()) || user.getDeletedAt() != null
+                || "inactive".equalsIgnoreCase(user.getStatus())
+                || "suspended".equalsIgnoreCase(user.getStatus())) {
+            throw new IllegalArgumentException("No se permite reenviar verificación para esta cuenta");
+        }
+
         String rawToken = generateSecureToken();
         String hashedToken = hashToken(rawToken);
+        Instant now = Instant.now();
+        Instant expiresAt = now.plus(24, java.time.temporal.ChronoUnit.HOURS);
 
         user.setVerificationTokenHash(hashedToken);
-        user.setVerificationTokenExpiresAt(Instant.now().plus(24, java.time.temporal.ChronoUnit.HOURS));
-        user.setUpdatedAt(Instant.now());
-        userRepository.save(user);
+        user.setVerificationTokenExpiresAt(expiresAt);
+        user.setUpdatedAt(now);
+        atomicPartialUserUpdate(
+                user.getId(),
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("verificationTokenHash", hashedToken)
+                        .set("verificationTokenExpiresAt", expiresAt)
+                        .set("updatedAt", now),
+                user
+        );
 
-        emailService.sendVerificationEmail(user.getEmail(), rawToken);
-        log.info("Nuevo correo de verificación reenviado exitosamente a {}", normalizedEmail);
+        try {
+            emailService.sendVerificationEmail(user.getEmail(), rawToken);
+            log.info("Nuevo correo de verificación reenviado exitosamente a {}", normalizedEmail);
+        } catch (Exception e) {
+            log.error("Fallo al reenviar correo de verificación a {}: {}", normalizedEmail, e.getMessage());
+        }
     }
 
 

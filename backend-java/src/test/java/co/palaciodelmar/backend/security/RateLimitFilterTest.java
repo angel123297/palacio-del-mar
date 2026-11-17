@@ -31,6 +31,24 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void matrixParametersCannotSkipLoginRateLimit() throws Exception {
+        var request = new MockHttpServletRequest("POST", "/api/auth/login;x=1");
+        request.setRemoteAddr("198.51.100.22");
+        var response = new MockHttpServletResponse();
+        when(rateLimitService.checkLimit("login", "198.51.100.22", 10, 60))
+                .thenReturn(new RateLimitService.RateLimitResult(false, 30));
+        rateLimitFilter.doFilterInternal(request, response, filterChain);
+        assertEquals(429, response.getStatus());
+        verifyNoInteractions(filterChain);
+    }
+
+    @Test
+    void publishedDevelopmentProxyTokenIsRejected() {
+        rateLimitFilter.setProxyToken("palacio_proxy_secret_token_dev_auth_trusted_2026");
+        assertThrows(IllegalStateException.class, rateLimitFilter::validateProxyToken);
+    }
+
+    @Test
     @DisplayName("Debe dejar pasar peticiones GET sin aplicar rate limit")
     void testGetRequestsBypassFilter() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/suites");

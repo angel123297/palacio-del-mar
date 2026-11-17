@@ -138,6 +138,35 @@ class BookingControllerTest {
         verifyNoInteractions(bookingService);
     }
 
+    @Test
+    void addExperienceSupportsCustomQuantity() throws Exception {
+        authenticate("guest-1");
+        when(bookingService.addExperienceToBooking(eq("booking-1"), eq("guest-1"), eq("exp-islas"), eq(3)))
+                .thenReturn(BookingDTO.builder().id("booking-1").build());
+
+        mockMvc.perform(post("/api/bookings/booking-1/experiences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"experienceId":"exp-islas","quantity":3}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(bookingService).addExperienceToBooking("booking-1", "guest-1", "exp-islas", 3);
+    }
+
+    @Test
+    void getBookingReturns404WhenNotFound() throws Exception {
+        authenticate("guest-1");
+        when(bookingService.getBookingByIdSecure(eq("b-unknown"), any()))
+                .thenThrow(new co.palaciodelmar.backend.exception.ResourceNotFoundException("Reserva no encontrada con id: b-unknown"));
+
+        mockMvc.perform(get("/api/bookings/b-unknown"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Reserva no encontrada con id: b-unknown"));
+    }
+
     private void authenticate(String userId) {
         User user = User.builder().id(userId).email(userId + "@example.com").role("USER").build();
         UserPrincipal principal = new UserPrincipal(user);

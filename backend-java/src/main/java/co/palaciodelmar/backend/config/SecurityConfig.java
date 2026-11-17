@@ -27,6 +27,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -83,7 +84,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/suites/*/viewers/ping").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/geo/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/experiences/**").permitAll()
-                        .requestMatchers("/api/availability/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/availability/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/config").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/status/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/webhooks/**").permitAll()
@@ -133,9 +134,7 @@ public class SecurityConfig {
                 "http://127.0.0.1:5000",
                 "http://localhost:8085",
                 "http://127.0.0.1:8085",
-                "https://*.ngrok-free.dev",
-                "https://*.ngrok.app",
-                "https://*.loca.lt"
+                "https://rehab-perceive-landline.ngrok-free.dev"
         ));
         if (appBaseUrl != null && !appBaseUrl.isBlank()) {
             String normalizedBaseUrl = appBaseUrl.trim().replaceAll("/+$", "");
@@ -143,7 +142,7 @@ public class SecurityConfig {
                 originPatterns.add(normalizedBaseUrl);
             }
         }
-        configuration.setAllowedOriginPatterns(originPatterns);
+        configuration.setAllowedOrigins(originPatterns);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("X-Idempotent-Replay", "Retry-After"));

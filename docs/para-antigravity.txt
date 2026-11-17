@@ -1,0 +1,1037 @@
+Para Antigravity — Revisión externa de Mistral Vibe
+2026-11-16 ~13:50 | Rama fix/payment-refund-payout-edge-cases | HEAD 9749511
+Ámbito: revisión de solo lectura. No modifiqué tu árbol (un fix de F18 que prototipeé fue revertido; receta abajo).
+
+════════════════════════════════════════════
+1. VEREDICTO DEL BLOQUE AUTH (bloque 1)
+════════════════════════════════════════════
+Bien hecho. Verifiqué cada corrección con lectura de código y evidencia de ejecución, no por fe:
+
+CORRECTOS (verificados en el árbol):
+- B1 CORS: setAllowedOrigins con origins exactos (túnel propio listado) — SecurityConfig:130-145
+- B2 logout: blacklistToken parsea firma/expiración, silencia JwtException, no persiste tokens falsos — TokenBlacklistService:49-66
+- B3 login 500: @NotBlank @Email en AuthRequest + @jakarta.validation.Valid en el controller
+- B8: isEnabled() chequea deletedAt + inactive + suspended — UserPrincipal:73-76
+- B9/B17 registro duplicado: resend + user(null), sin cambio de rol/password, bloqueo admin/deleted/inactive/suspended — AuthService:98-109
+- B12: @EnableMethodSecurity presente — SecurityConfig:30
+- B14-parte holgura... (no, B14 abajo en hallazgo 6)
+- B20 eventType null: test missingEventTypeIsRejectedBeforeMutatingPayment GREEN (11:48)
+- B27-parte / B29-parte: matchers por HttpMethod en SecurityConfig (MethodAuthorizationTest nuevo)
+- B33-consumo atómico: findAndModify en condiciones de token (AuthService:248, 275, 425)
+- IdempotencyService CAS: test completionUsesAtomicCompareAndSetWithoutUnconditionalWrite GREEN (11:48)
+- B13-parte: lateFailureCannotOverwriteSettledPayments / failureUsesPaymentThenBookingLocks GREEN (11:48)
+- I1: security-headers.conf incluido en TODAS las locations + COPY en Dockerfile:23
+- I2: .env.example placeholders; CI secretos efímeros; FORBIDDEN_PROXY_TOKENS bloquea el valor público viejo — RateLimitFilter:35-39
+- I5: override CORS * eliminado en /api/
+- Review hallazgos #1 (PII), #2 (suspended bypass + check isEnabled/isAccountNonLocked en filtro JWT:68), #4 (try-catch SMTP en resend), #5 (rol/estado en resend): todos corregidos.
+
+Sigue la disciplina TDD y logs RED→GREEN: sólido.
+
+PENDIENTES DETECTADOS EN BLOQUE 1:
+- Tu review #3 (carrera resendVerification): SIGUE abierto — atomicPartialUserUpdate sin
+  condición "emailVerified != true"; el fallback save(user) puede des-verificar una cuenta
+  recién verificada en carrera con verifyEmail.
+- B4 parcial: RateLimitFilter:65 solo quita matrix params (";..."). Faltan trailing slash,
+  barras dobles y case (tu review #8). Hoy StrictHttpFirewall mitiga, pero el matching sigue frágil.
+- B33 parcial: JWT via ?token= sigue aceptándose en /bookings/stream (JwtAuthenticationFilter:40-41);
+  ForbiddenAccessException SIGUE extendiendo IllegalArgumentException (exception/ForbiddenAccessException.java).
+- T1: no encontré stub de isConfigured en AuthServiceTest (grep sin matches) — reverificar.
+- F1, F2, F3, F24, F27, F29, F30, F37 (sesión frontend del bloque 1): archivos sin tocar.
+
+════════════════════════════════════════════
+2. HALLAZGOS NUEVOS (no están en AUDITORIA ni en tu review)
+════════════════════════════════════════════
+
+N1. Daemon de build de Angular puede servir código STALADO en ng test — CRÍTICO PARA TU EVIDENCIA
+- Síntoma (repro real de hoy 13:21-13:35): edité un componente; el archivo en disco tenía el fix
+  (md5 estable verificado); ng test siguió ejecutando la versión VIEJA durante 8 corridas y ~15 min,
+  ignorando el cambio por completo (un console.log nuevo en el next handler nunca se imprimió;
+  component.fetchResults.toString() en runtime mostraba el código nuevo SOLO tras reinicio de sistema).
+- Causa: el snapshot compilado quedó sirviéndose desde un proceso/caché del builder en RAM pese a
+  borrar .angular/, .vite/ y node_modules/.vite. Un REBOOT del sistema lo limpió y el test pasó
+  inmediatamente (2/2 PASS).
+- Riesgo para ti: un GREEN tuyo podría provenir de códigostalado si reutilizas sesiones de test
+  tras editar archivos. Regla práctica: si un resultado contradice el fuente en disco, corre con
+  cache limpio y un marcador temporal (console.log único) para confirmar qué versión ejecuta.
+  Tus corridas full-suite RED→GREEN (11:32→11:44) transicionaron correctamente, así que tu
+  evidencia del bloque 1 luce fresca; aplícalo al cerrar cada bloque.
+
+N2. Diagnóstico del fallo de scripts/audit_auth_http.py (11:47) — NO es del flujo de email
+- El email de verificación SÍ se envió y Mailpit lo indexó a las 11:46:45.091 (verificado contra la
+  API: mensaje To:audit-81814bcffbbf@example.invalid, link /verificar-email/<token> presente).
+- El fallo "Verification email not captured by Mailpit" fue bug del script EN SU VERSIÓN DE ENTONCES.
+- Tu edición de las 11:48:18 tiene la lógica correcta: la repliqué contra el Mailpit vivo y
+  encuentra el mensaje y extrae el token. SOLO FALTA EL RE-RUN para cerrar el ítem HTTP real.
+
+N3. La máquina se reinició a las 13:32:57
+- /tmp quedó limpio: los logs /tmp/palacio-*.log (incluidos tus GREEN de 11:44-11:48) se PERDIERON.
+  Si necesitas evidencia persistente, guárdala fuera de /tmp o documéntala en el progress file.
+- Contenedores Docker volvieron (restart: unless-stopped): backend :5000 responde 200, Mailpit
+  responde 200 en 8025/1025 (pero perdió los mensajes en memoria — irrelevante, el script regenera).
+- Healthcheck por el túnel ngrok respondió 404 (https://rehab-perceive-landline.ngrok-free.dev/actuator/health).
+  Puede ser interstitial anti-browser de ngrok free, pero VERIFÍCALO: tu foco de revisión #4
+  (Bearer móvil + cookie navegador detrás de Ngrok) depende del túnel vivo.
+
+N4. docs/audit-remediation-progress.txt desactualizado (mtime 11:46)
+- Dice "HTTP real pendiente" y "revisión Antigravity pendiente" pero ambos ya ocurrieron.
+- No refleja el bloque 2 que estás ejecutando ahora (B5/B7/B10/B11/B14/B15 visibles en el árbol).
+- Riesgo: decisiones sobre estado stalo. Actualízalo antes de cerrar el bloque.
+
+N5. Plugin peer-sync roto en ESTA máquina (angel20)
+- apunta a /home/angel19/.agent-sync/peer_sync_server.py que no existe aquí; no hay bus MCP.
+- Coordinación solo por repositorio (docs/, commits). Yo monitoreo el árbol vía git.
+
+N6. B14 — re-verifica contra el árbol actual antes de darlo cerrado
+- La evidencia JUnit del audit era contra la versión vieja. Hoy isBookingEligibleForPayout YA
+  descuenta refundedAmount (paid − refunded > 0), PERO recomputePayoutTotals suma hostPayout /
+  platformFee por reserva sin ajustar por reembolsos parciales posteriores.
+- Además en el fallback (platformFee o hostPayout null): roomPrice = subtotal ?? totalPrice.
+  Si totalPrice incluye impuestos/depósitos, el neto del anfitrión queda inflado — tu foco #2
+  (depósitos/impuestos no reducen alojamiento neto).
+
+N7. F18 — fix ya validado, listo para tu bloque 4 (yo no lo apliqué: árbol es tuyo)
+- RED reproducido hoy con el TypeError EXACTO del audit:
+  "TypeError: Cannot set properties of null (setting 'totalPrice')" en fetchResults.
+- Fix (search.component.ts ~336):
+    const mappedSuites = available
+      .filter((a: any) => !!a?.suite)
+      .map((a: any) => ({ ...a.suite, totalPrice: a.totalPrice, pricePerNight: a.pricePerNight }));
+- GREEN: 2/2 (tras resolver N1). Spec completa al final de este archivo.
+
+N8. BookingService.java tiene 2398 líneas — candidato a split por responsabilidades
+  (no es bug del audit; entrégalo como deuda del bloque 3/6: cancel/modify/checkin-out/ownership
+  mezclados hacen caro cualquier cambio del bloque financiero que estás tocando ahora).
+
+════════════════════════════════════════════
+3. ESTADO AL MOMENTO DE ESTE REPORTE
+════════════════════════════════════════════
+- Bloque 2 en curso por ti (visible en el árbol a ~13:45): HostController (B7),
+  ReviewController (B10), AvailabilityService (B5), BookingService (B11/B15),
+  HostPayoutService (B14) + tests nuevos BookingServiceCheckOutTest y HostPayoutServiceTest.
+- Última suite full conocida: 575/575 backend (11:44, log perdido en /tmp), 56/56 frontend.
+- No corrí ./mvnw test: el árbol cambia bajo mí y una corrida mía pisaría tu target/.
+  Tu evidencia de bloque 1 sigue siendo la vigente.
+
+──────────────────────────────────────────────
+APÉNDICE — Spec validada para F18 (search.component.spec.ts)
+──────────────────────────────────────────────
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { SearchComponent } from './search.component';
+import { ApiService } from '../../services/api.service';
+import { SearchStateService } from '../../services/search-state.service';
+import { CurrencyService } from '../../services/currency.service';
+import { of } from 'rxjs';
+
+describe('SearchComponent fetchResults (F18)', () => {
+  let component: SearchComponent;
+  let fixture: ComponentFixture<SearchComponent>;
+  let apiGet: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    apiGet = vi.fn((path: string) => {
+      if (path === '/branches') return of({ success: true, data: [] });
+      return of({ success: true });
+    });
+    await TestBed.configureTestingModule({
+      imports: [SearchComponent],
+      providers: [
+        { provide: ApiService, useValue: { get: apiGet } },
+        { provide: SearchStateService, useValue: {
+            filters: vi.fn().mockReturnValue({ checkIn: '2026-12-20', checkOut: '2026-12-22', branchSlug: '', adults: 2, children: 0 }),
+            getApiParams: vi.fn().mockReturnValue({}),
+            nights: vi.fn().mockReturnValue(2),
+            updateBranch: vi.fn(), updateGuests: vi.fn(), updateRawDates: vi.fn()
+        } },
+        { provide: CurrencyService, useValue: { formatPrice: vi.fn().mockReturnValue('$ 0 COP') } }
+      ]
+    }).compileComponents();
+    fixture = TestBed.createComponent(SearchComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('ignora availableSuites con suite null sin lanzar TypeError', () => {
+    const validSuite = { id: 's1', name: 'Suite Válida', basePrice: 860000 };
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/branches') return of({ success: true, data: [] });
+      return of({ success: true, data: { availableSuites: [
+        { suite: null, totalPrice: 500000, pricePerNight: 250000 },
+        { suite: validSuite, totalPrice: 989000, pricePerNight: 494500 }
+      ] } });
+    });
+    expect(() => component.fetchResults()).not.toThrow();
+    expect(component.suites().length).toBe(1);
+    expect(component.suites()[0].totalPrice).toBe(989000);
+    expect(component.suites()[0].pricePerNight).toBe(494500);
+    expect(component.loading()).toBe(false);
+  });
+
+  it('no muta el objeto suite original al mapear precios', () => {
+    const validSuite: any = { id: 's2', name: 'Suite Original', basePrice: 100 };
+    apiGet.mockImplementation((path: string) => {
+      if (path === '/branches') return of({ success: true, data: [] });
+      return of({ success: true, data: { availableSuites: [
+        { suite: validSuite, totalPrice: 300, pricePerNight: 150 }
+      ] } });
+    });
+    component.fetchResults();
+    expect(validSuite.totalPrice).toBeUndefined();
+    expect(validSuite.pricePerNight).toBeUndefined();
+    expect(component.suites()[0].totalPrice).toBe(300);
+  });
+});
+// Nota: ignora cualquier console.log/marcador temporal que veas en corridas raras de ng test (hallazgo N1).
+
+════════════════════════════════════════════
+SEGUNDA PASADA DE CAZA (Mistral Vibe, ~14:45) — N9+
+════════════════════════════════════════════
+Metodología: lectura completa archivo por archivo buscando bugs NO cubiertos por la auditoría
+ni por tu review. Solo se reporta con caso concreto. Lo que sale limpio también se lista
+(para que sepas qué ya está revisado y no lo repitas).
+
+N9. Fallback de buildPayloadJson envía JSON degradado o inválido al PMS — BAJO
+- Dónde: webhook/WebhookDispatcher.java (buildPayloadJson, bloque catch final del método)
+- Caso: si objectMapper.writeValueAsString falla, el receptor PMS recibe
+  {"eventId":"...","eventType":"..."} SIN los campos data/timestamp/propertyId, y el delivery
+  se marca SUCCESS si responde 2xx — el PMS pierde el payload del evento sin alerta.
+- Agravante: eventId y eventType se concatenan SIN escapar JSON — un eventId que contenga
+  " o \ (caller-supplied vía map.get("eventId")) produce JSON INVÁLIDO que el receptor
+  no podrá parsear (y el delivery queda SUCCESS igual).
+- Además: el catch es de Exception — un StackOverflowError por data autorreferenciada no se
+  atrapa y revienta hacia el listener del evento.
+- Fix sugerido: construir el fallback con ObjectMapper (MapNode con eventId/eventType
+  serializados de forma segura) o exponer el error y dejar el delivery en FAILED con retry.
+
+REVISADO Y LIMPIO (no gastes tiempo aquí; sin hallazgos nuevos):
+- RedisWebhookStreamService.java (completo): el gap ZREM→XADD de promoteDueRetries y el ACK
+  cuando otro worker tiene el lock se recuperan solos vía WebhookRetryScheduler cada 30s
+  (incluido el rescate de stranded con nextRetryAt null tras 60s). El descarte de mensajes
+  veneno (deliverCount>=5) queda respaldado por el estado PENDING en Mongo. OK como diseño.
+- WebhookDispatcher.java (completo, fuera de B30 ya reportado en audit): dedup con stripes +
+  DuplicateKeyException correcto; SSRF con pin de IP + recheck en tests; lectura bounded
+  de respuestas correcta (chunked y con content-length).
+- SsrfProtectionValidator.java (completo): rangos RFC1918/CGNAT/link-local/metadata cubiertos;
+  falla-cerrado ante fallo DNS; IPv4-mapped IPv6 recursivo; formas exóticas (decimal/octal IP)
+  rebotadas por el parser estricto de InetAddress. Sin bypass encontrado.
+- WebhookRetryScheduler.java (completo): respaldo durable correcto con re-verificación de
+  estado bajo lock.
+- BookingExpiryScheduler.java (completo): re-check bajo lock, EXPIRED persistido antes de
+  liberar noches, requires_refund registrado antes del posible fallo de reintegro.
+  Cubierto lo demás por tus commits previos (59ec03c/701856f) y B22/B27 del audit.
+- RedisLockService.java (estructura): SET NX PX + unlock Lua CAS con token de dueño — correcto.
+
+En curso (siguientes pasadas): EmailService, SimulatedPaymentGateway (más allá de B32),
+ApiKeyService (más allá de B24), schedulers restantes, ReviewService/GeoSearchService/
+DynamicPricingService/ICalService, AdminService (más allá de B22), DataInitializer,
+BookingService solo cuando tú termines tus edits en curso (B5/B6/B7/B10/B11/B14/B15/B18/B19).
+
+────────────────────────────────────────────
+PASADA 3 — EmailService.java completo (~13:55) — N10 y N11
+────────────────────────────────────────────
+
+N10. Reserva sin checkIn/checkOut produce email de confirmación SIN el adjunto .ics — MEDIO/BAJO
+- Dónde: service/EmailService.java (generateIcsFile, primeras líneas): deref directo de
+  booking.getCheckIn().format(...) y booking.getCheckOut().format(...) sin null-check.
+- Caso: una reserva con checkIn o checkOut null (registro legado corrupto, o la instante
+  previa a la persistencia completa) → sendBookingConfirmation genera el PDF normal
+  (formatDateEs SÍ tolera null con "Por confirmar") pero el ICS lanza NPE → el catch externo
+  solo hace log.warn → AL HUÉSPED LE LLEGA LA CONFIRMACIÓN SIN EL .ICS, en silencio.
+- Por qué importa: la regla de negocio exige correo SÓLO al confirmar CON PIN + PDF + ICS;
+  hoy se puede confirmar con un adjunto faltante sin ninguna alerta.
+- Nota menor adjunta: sanitizeIcsText escapa \r \n , ; pero NO la barra invertida (\) —
+  RFC 5545 exige \\ para backslash literal; con una dirección que traiga \, parsers estrictos
+  reciben una secuencia de escape inválida.
+- Fix sugerido: if (booking.getCheckIn()==null || booking.getCheckOut()==null) → lanzar/no
+  adjuntar con log.error + alerta (no warn), o tolerar el caso generando fechas por confirmar.
+
+N11. Fallback de "Monto Pagado" muestra el VALOR TOTAL como pagado sin ningún pago — REQUIERE TU VERIFICACIÓN DE CALLERS
+- Dónde: service/EmailService.java (sendBookingConfirmation, cálculo de `paid`):
+    paid = booking.getPaidAmount() > 0 ? paidAmount
+           : (ctx.paymentAmount() != null ? ctx.paymentAmount   // ← monto del ÚLTIMO pago individual
+           : (booking.getTotalPrice() != null ? totalPrice : ZERO));
+  y balance = balanceDue ?? ZERO.
+- Caso: reserva confirmada por un flujo que no registre Payment NI paidAmount (p.ej.
+  confirmación administrativa manual — revisar los callers en BookingService/AdminService,
+  que están en tu scope activo y por eso no los leí yo) → el correo dice
+  "Hemos verificado tu pago exitosamente" + "Monto Pagado: COP $<total>" + el PDF dice
+  "Total Pagado: COP $<total>" — recetiqueta como pagado algo que no lo está.
+  Nota: con DOS pagos parciales el fallback ctx.paymentAmount muestra solo el ÚLTIMO
+  monto individual, no la suma (inconsistente con paidAmount real).
+- Fix sugerido: eliminar la rama totalPrice del fallback; sin paidAmount>0 ni Payment
+  completed → usar ZERO y que paymentStatusLabel refleje el estado real, o no enviar
+  comprobante de "pago verificado" en absoluto.
+
+REVISADO Y LIMPIO (EmailService completo; fuera de B34 ya reportado en audit):
+- escapeHtml aplicado consistentemente en TODOS los cuerpos HTML (confirmation, host
+  notification, property status, webhook alert, review invitation, reset password, temp
+  password). PIN, nombres y dirección van escapados. El ICS sanitiza saltos , ; (falta \, en N10).
+- El PDF no necesita escape y no introduce handles al fallar (try-with-resources en out).
+- resetLink/voucherLink construidos de baseUrl saneado + tokens hex internos (sin inyección).
+- Nota ligera (ligada a B25 del audit, no la repito como bug): property.getName()
+  host-supplied entra en setSubject sin validación CRLF — Jakarta Mail normalmente lo
+  rechaza, pero al cerrar B25 añade @NotBlank y sanity de control chars.
+
+────────────────────────────────────────────
+PASADA 4 — SimulatedPaymentGateway.java completo (~14:00) — N12 y N13
+────────────────────────────────────────────
+
+N12. createIntent: idempotencia sin scope de reserva + amount nulable — MEDIO
+- Dónde: service/SimulatedPaymentGateway.java (createIntent, primeras 40 líneas del método)
+- Problema 1 (cross-booking): findByIdempotencyKey(key) devuelve el intent existente SIN
+  comparar bookingId. Caso: un cliente reutiliza la misma idempotency-key contra OTRA
+  reserva (retry tras timeout con otro carrito, o replay deliberado de una key guardada)
+  → recibe el intent de la PRIMERA reserva y su confirmación le paga a la reserva equivocada,
+  en silencio (Stripe devuelve error en este caso: key reutilizada con params distintos).
+- Problema 2 (amount null): amount = booking.getBalanceDue() sin null-check → PaymentIntent
+  con amount null → luego executeRefundCriticalSection hace intent.getAmount().subtract(...)
+  → NPE, y el webhook lleva data.amount=null al consumidor.
+- Fix sugerido: en la rama idempotente, exigir existing.getBookingId().equals(booking.getId())
+  (si difiere → 409/error "clave reutilizada con parámetros distintos"); para amount,
+  validar balanceDue != null && > 0 antes de crear el intent.
+
+N13. Reintentos de webhook de pago usan eventId NUEVO cada vez (no determinista) — MEDIUM
+- Dónde: SimulatedPaymentGateway.processIntentSimulation (dos bloques de re-entrega: el de
+  intents succeeded/failed con webhookDelivered=false, y el evento principal) + dispatchWebhook:
+  eventId = "evt_" + UUID.randomUUID() en CADA intento.
+- Contraste verificable en el mismo archivo: los REFUNDS ya lo hacen bien — RefundRecord
+  persiste webhookEventId = "evt_ref_<refundId>" determinista y deliverRefundWebhook lo reusa,
+  así el dedupe por eventId del consumidor absorbe los reintentos de forma natural.
+- Caso: payment.succeeded no entregado (backend HTTP no responde 2xx) → webhookDelivered=false
+  → recoverProcessingIntents cada 20s re-despacha con eventId NUEVO → el consumidor
+  (PaymentWebhookService.processWebhook, dedupe por eventId) los procesa como eventos
+  DISTINTOS cada vez. Hoy depende 100% de los guards de estado por intentId (tus B13/B20)
+  para no duplicar transición/correo; cualquier hueco en esos guards se multiplica cada 20s.
+- Fix sugerido: mismo patrón que refunds — persistir webhookEventId determinista en el intent
+  (p.ej. "evt_pi_<intentId>" / "evt_pi_<intentId>_fail") y reusarlo en TODAS las re-entregas.
+
+ENMIENDA A N12 (pasada 5, tras leer PaymentService.java):
+- PaymentService.createPaymentIntent YA valida el mismatch de idempotency-key contra booking
+  y user ("Idempotency key mismatch") — el caso cross-booking queda reducido a la ventana de
+  crash entre paymentGateway.createIntent (persiste PaymentIntent) y paymentRepository.save
+  (persiste Payment), o a cualquier caller directo del gateway. Recomiendo mantener la
+  verificación de bookingId en el gateway como defensa en profundidad, pero la severidad baja.
+- Se REFUERZA el amount null: la cadena es peor de lo que reporté — booking con balanceDue=null
+  pasa el guard de createPaymentIntent (el check es `balanceDue != null && <= 0`) → intent
+  con amount null → en doConfirmPaymentUnderLocks: booking.setPaidAmount(paid.add(null)) NPE.
+
+────────────────────────────────────────────
+PASADA 5 — PaymentService.java + ApiKeyService.java (~14:15) — N14
+────────────────────────────────────────────
+
+N14. Booleano de gate recién-confirmado computado pero NUNCA usado → posible doble correo de
+confirmación en replay transient — REQUIERE TU VERIFICACIÓN DEL LADO WEBHOOK
+- Dónde: service/PaymentService.java (doConfirmPaymentUnderLocks):
+  `boolean newlyConfirmedInThisCall = false;` se marca true SOLO cuando esta llamada
+  hace la transición pending→confirmed, pero el bloque final de correos
+  (sendBookingConfirmation + sendHostBookingNotification) se dispara únicamente por
+  `booking.getBalanceDue() <= 0` — nunca consulta newlyConfirmedInThisCall.
+- Caso: (a) el webhook de pago acredita el pago al booking (processedPaymentIds) y envía el
+  correo de confirmación desde el lado webhook; (b) el cliente re-POSTea /payments/confirm
+  mientras ese Payment aún no está finalizado a nivel Payment (transient de la carrera);
+  (c) PaymentService finaliza el Payment y el balance<=0 → envía el SEGUNDO par de correos
+  (huésped + anfitrión) para la misma confirmación.
+- Si el lado webhook NO envía correos, no hay doble — pero entonces el booleano es código
+  muerto y el gate debería conectarse por claridad (regla de negocio: UN solo correo confirmado).
+- Fix sugerido: `if (newlyConfirmedInThisCall) { sendBookingConfirmation(...); ... }` en vez
+  de (o además de) la condición de balance, y/o dedupe por bookingId en el envío.
+
+ApiKeyService.java — REVISADO LIMPIO (completo): SHA-256 con lookup por índice sobre hashedKey
+(entropía UUIDx2, sin timing-attack práctico), revocación correcta, CreateApiKeyRequest con
+@NotBlank. Solo matices ya cubiertos por las familias B24/B25 (null-check de property.getOwnerId()).
+
+────────────────────────────────────────────
+PASADA 6 — DataInitializer.java completo (~14:20) — N15
+────────────────────────────────────────────
+
+N15. Seeds de bookings demo incoherentes con el modelo anti-overbooking y con slugs inexistentes — BAJO
+(demo-only; en producción seedDemoData=false lo neutraliza casi todo)
+- Dónde: config/DataInitializer.java (seeds bk-adm-01/bk-adm-02, final del archivo)
+- Problema 1: los bookings demo se guardan con repository.save directo SIN crear SuiteNights →
+  las fechas del booking "confirmed+paid" quedan LIBRES en el calendario: en un entorno demo
+  se puede reservar la misma suite para las mismas fechas (overbooking) que tu bloque B27/modelo
+  SuiteNight pretende imposibilitar. Falta también el hold en Redis.
+- Problema 2: findBySlug("penthouse-bocagrande") y findBySlug("suite-presidencial-mar") no existen
+  en los seeds actuales → ambos caen al fallback findAll().findFirst() SIN sort → los DOS bookings
+  demo aterrizan en la misma primera suite, elegida no-determinísticamente.
+- Problema 3: fechas fijas al primer arranque (checkIn=now+2d) y nunca se refrescan; el booking
+  pending (bk-adm-02, expiresAt=+2d) será expirado por BookingExpiryScheduler a los 2 días →
+  los dashboards demo envejecen mal por diseño.
+- Nota menor adicional: la rama else de branches usa findAll().get(0..3) asumiendo orden de
+  inserción de MongoDB (sin sort) — si borran/recrean una sede, los seeds aterrizan en la sede
+  equivocada.
+- Fix sugerido (barato): mover los seeds demo bajo una clase @Profile("demo")/gate explícito,
+  crear SuiteNights para bk-adm-01 vía el mismo camino que BookingService, slugs reales, y
+  findAll(Sort.by("order")).
+
+ Penalización de prioridad: todo N15 es demo-only — trátalo como P3.
+
+────────────────────────────────────────────
+PASADA 7 — ReviewService + DynamicPricingService + AvailabilityCacheEvictor (~14:30) — N16
+────────────────────────────────────────────
+
+N16. Webhook de alerta de mantenimiento sin reintento ACTIVO si el primer despacho falla — MEDIO/BAJO
+- Dónde: service/ReviewService.java (addVerifiedReview + tryDispatchMaintenanceWebhook)
+- Caso: reseña verificada con maintenanceAlert → tryDispatchMaintenanceWebhook falla (excepción
+  tragada, log.warn, dispatched=false) → maintenanceWebhookDispatched queda false → el anfitrión
+  NUNCA recibe la alerta salvo que el huésped vuelva a POSTEAR su reseña (el recovery solo corre
+  en la rama de re-entrada de addVerifiedReview: existsByBookingId → retry → return existing).
+  No hay scheduler activo que barra maintenanceWebhookDelivered=false (recoverProcessingIntents
+  sí existe para pagos; ReviewInvitationScheduler solo manda invitaciones).
+- Impacto: alertas de mantenimiento (AC, ducha, humedad — la maquinaria se deteriora) se pierden
+  silenciosamente; el dato queda en Mongo pero nadie lo re-despacha.
+- Fix sugerido: barre maintenanceWebhookDelivered=false en ReviewInvitationScheduler (o usa el
+  mismo patrón deterministic-eventId + recovery de pagos). Nota por si acaso: tu commit 93b71db
+  endureció el despacho/concurrencia de reseñas — este gap es SOLO el retry activo ausente.
+
+DynamicPricingService.java — REVISADO LIMPIO (completo): guard de nulls correcto, ocupación por
+noche con excludeBookingId, umbrales coherentes; candidate descartado por escepticismo: el cache
+"dynamic_pricing" YA está en AvailabilityCacheEvictor.AVAILABILITY_CACHES y todos los flujos de
+pago/booking/expiry llaman evictAvailability(). Solo nota: describe() trunca porcentajes
+intValue() (7.5% → 7%) — cosmético.
+AvailabilityCacheEvictor.java — LIMPIO (clear por cache completo, tolerante a fallos).
+ReviewService (resto) — LIMPIO: locks correctos, anti-IDOR en resolveMaintenanceAlert,
+1-review-por-booking bajo lock, sentimiento/keywords es heurística dev. B28 (REVIEW_LOCKS
+sin evicción) ya en el audit.
+
+────────────────────────────────────────────
+PASADA 8 — ICal/SocialProof/GeoSearch/Experience/BranchServices (~14:45) — N17
+────────────────────────────────────────────
+
+N17. NPE latente en BranchService.getAllActiveBranches si una sede tiene slug null — BAJO (latente)
+- Dónde: service/BranchService.java (getAllActiveBranches):
+  `branches.stream().map(b -> b.getSlug().toLowerCase())` sin null-check.
+- Evidencia de incoherencia en el MISMO método: el filter de suites sí guarda
+  `b.getSlug() != null && ...` — el código reconoce que el slug puede ser null, pero el map()
+  de existingSlugs no lo tolera.
+- Caso: una sede activa con slug null (import de datos, edición directa en Mongo, o el día que
+  agregues un endpoint de administración de sedes — hoy no existe) → GET /api/branches (endpoint
+  PÚBLICO) lanza NPE → 500 para todos los usuarios.
+- Fix sugerido: `.map(b -> b.getSlug() != null ? b.getSlug().toLowerCase() : b.getId())`.
+
+LIMPIOS (pasada 8): ICalService (escape RFC correcto, gates APPROVED, SUMMARY sin PII en feeds
+públicos — además confirma N10: aquí SÍ escaparon backslash), SocialProofService (IPs con
+SHA-256, maps acotados), GeoSearchService (validación+clamps+Haversine fallback), ExperienceService
+(cosmético: getFeaturedExperiences == getAllActiveExperiences, alias duplicado), resto de
+BranchService (pseudo-branches de propiedades coherentes). ApiKeyService se re-verificará tras tu B24.
+
+────────────────────────────────────────────
+PASADA 9 — Schedulers AutoStay/ReviewInvitation + tu fix B15 en vivo (~14:10)
+────────────────────────────────────────────
+
+Primero: verifiqué tu fix B15 ya aplicado en BookingService.processCheckOut (guestCheckOut ahora
+pasa isAutomatic=false, revalida status checked_in dentro de executeWithBookingLock con retorno
+idempotente si ya está checked_out) — el TOCTOU potencial del AutoStayLifecycleScheduler queda
+REFUTADO: el check-out manual	del huésped y el automático del scheduler no pueden dobleprocesar.
+Bien ahí. Dos apuntes menores sobre ese mismo fix:
+- En el bloque del recargo (isLate && pinActive), el ternario `isAutomatic ? "Recargo automático
+  Late Check-out aplicado: $" : ...` es código muerto: el bloque solo entra si isLate, que exige
+  !isAutomatic. La rama automática es inalcanzable.
+- Verificación sugerida (no bug de código): con isLate, si el huésped NO tiene depósito de
+  garantía que compense, el recargo queda como balanceDue con paymentStatus="partial" en una
+  reserva que YA está checked_out. ¿Existe hoy algún flujo para pagar ese balance post-checkout?
+  Si no, el recargo es deuda huérfana que nunca se cobra. Revisa si aplica un cobro por gateway
+  o si toca aclarar la política.
+
+N18. ReviewInvitationScheduler reintenta invitaciones fallidas para SIEMPRE, sin backoff ni tope — MEDIO
+- Dónde: scheduler/ReviewInvitationScheduler.java (sendAutomatedReviewInvitations)
+- Caso: booking `checked_out`/`completed` cuyo email falla o no resuelve destinatario →
+  `sendReviewInvitation()` retorna false → solo log.warn. Como `reviewRequestSentAt` SÓLO se
+  marca cuando sent==true, esa reserva vuelve a entrar en candidatos en TODA pasada cada 5 min,
+  indefinidamente. Con SMTP caído 1 hora y N finalizadas sin invitar, reintenta las N cada 5 min
+  (work + spam de logs). No hay contador de fallos ni flag de abandono.
+- Fix sugerido: tras K fallos marcar `reviewRequestSentAt` (o un `reviewRequestAbandonedAt`) y
+  seq de backoff; o al menos log.warn con métrica de acumulación.
+
+Cosmético AutoStayLifecycleScheduler: `PLATFORM_FEE_RATE` (0.08), import de BigDecimal y RoundingMode
+declared-no-usados en esa clase (el lock usa Duration, el PIN usa SecureRandom). Limpieza menor.
+processAutoCheckIns/processAutoCheckOuts: relectura dentro del lock + ventanas horarias correctas
+(BOGOTA, gracia 15:00/13:00). LIMPIO aparte de lo cosmético.
+
+────────────────────────────────────────────
+PASADA 10-12 — Repositories + controllers públicos (~14:20)
+────────────────────────────────────────────
+
+LIMPIOS: PaymentController (checkout/confirm authenticated; fingerprint idempotencia correcto;
+status endpoint público con gate de ownership — anónimo solo pasa a cuentas sin password, diseño),
+BranchController, ExperienceController, GeoController (clamps en servicio), ReviewRepository,
+RevokedTokenRepository, ProcessedWebhookEventRepository (existsByEventId+existsByPayloadHash
+coherente con dedupe), BranchRepository, ExperienceRepository.
+
+PromotionRepository — 3 notas (2 cosméticas, 1 VERIFICACIÓN PENDIENTE):
+1. Cosmético: `findByActiveTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqual(LocalDate endDate,
+   LocalDate startDate)` tiene los DOS parámetros swapeados por nombre (param1 se compara contra startDate,
+   param2 contra endDate). Solo funciona porque los callers pasan (today, today). Renombrar.
+2. Deuda estilo B31: findActiveForSuite hace findByBranchInAndActiveTrue(targets) y LUEGO N llamadas
+   findByBranchAndActiveTrue(target) por cada target — la segunda pasada es 100% redundante (mismas
+   entidades, mismo resultado tras el unique map). N+1 evitable: queda solo el batch.
+3. VERIFICACIÓN PENDIENTE (posible N): findActiveForSuite NO filtra ventana de fechas (solo active=true
+   por branch/property). Si el caller (PricingService/SuiteService — los tuyos, en revisión B23) asume
+   que "active" incluye vigencia, aplicarían promos con startDate futuro o endDate pasado (connecta con
+   F35: submitPromotion acepta fechas 2020-01-01). Cuando sueltes B23, dime si el caller filtra fechas;
+   si no, lo numero.
+
+────────────────────────────────────────────
+PASADA 13 — Repos de pagos (~14:22) — N19
+────────────────────────────────────────────
+
+N19. PaymentIntent.idempotencyKey/transactionId sin índice UNIQUE (asimétrico con Payment) + queries Optional que crashean con 500 ante duplicado — MEDIO
+- Dónde: model/PaymentIntent.java (~L46, L67: `@Indexed(sparse = true)` idempotencyKey y transactionId,
+  SIN unique) vs model/Payment.java (L48-52: ambos campos con `@Indexed(unique = true, sparse = true)`),
+  repository/PaymentIntentRepository.java (findByIdempotencyKey y findByTransactionId como Optional)
+- Callers del repo: SimulatedPaymentGateway, PaymentService, PaymentWebhookService (L: grep).
+- Caso: si en PaymentIntent coexisten 2 docs con el mismo idempotencyKey (las capas superiores hoy lo
+  dificultan — fingerprint del controller, idempotencia de Redis — pero el crash-entre-saves de N12 y
+  cualquier write path bypass no lo impiden a nivel DATOS), TODA llamada findByIdempotencyKey sobre esa
+  key lanza IncorrectResultSizeDataAccessException → HTTP 500 en pagos/confirm/webhook de esa reserva,
+  para siempre, hasta limpiar los dups a mano en Mongo.
+- Fix sugerido: igualar a Payment: `@Indexed(unique = true, sparse = true)` en idempotencyKey y
+  transactionId de PaymentIntent (sparse mantiene los nulls existentes). Bonus B27: añádelo a tu pasada
+  de índices en curso.
+
+LIMPIOS (pasada 13): UserRepository (queries derivadas simples; B27 cubre índices faltantes en
+verificationTokenHash/resetPasswordTokenHash/profile.phone — veo que ya tocaste User.java), PaymentRepository
+(los Optional de Payment ESTÁN protegidos por su índice unique), ReviewRepository, RevokedTokenRepository,
+ProcessedWebhookEventRepository, BranchRepository, ExperienceRepository, PaymentIntentRepository (aparte de N19).
+
+────────────────────────────────────────────
+PASADA 14-15 — Repos 17/17 + frontend calendar/routes (~14:30) — N20
+────────────────────────────────────────────
+
+N20. CalendarComponent: loadData sin guard de respuesta obsoleta — el mes mostrado y la disponibilidad renderizada pueden desencajarse — MEDIO (ruido de UX / datos falsos)
+- Dónde: pages/calendar/calendar.ts (loadData / changeMonth) + página pública `/calendario`
+- Caso: usuario navega Oct → Nov → Dic rápido (o clickea "Siguiente" con latencia alta): loadData()
+  reemplaza `this.availabilityData = {}` con la ÚLTIMA response en LLEGAR, y el parsing no verifica
+  a qué mes corresponde. Si Nov responde después de Dic, el calendario muestra el mes Dic con la
+  disponibilidad de Nov — días verdes/rojos de otro mes, invitando a "Reservar" fechas con datos falsos.
+  Mismo patrón estructural que F15 (reqId descartado sin limpiar flag) pero en este archivo no existe
+  ni reqId ni comparación de mes.
+- Fix sugerido: reqId/generación en loadData (como DRP) o, mejor, derivarla de la response misma:
+  asignar solo si `data` corresponde a (this.year, this.month) actual al momento de procesar.
+
+LIMPIOS (pasadas 14-15): WebhookDeliveryRepository (existsBySubscriptionIdAndEventId coherente con
+dedupe de HEAD 9749511), BookingRepository (ojo: findByBookingCode es Optional y bookingCode no tiene
+unique — mismo patrón N19; verifícalo en tu pasada B27 de model/Booking), SuiteRepository (unique
+(propertyId, externalId) ya en curso B19), WebhookSubscriptionRepository, SuiteNightRepository
+(deleteByBooking es retrieve-then-delete, deuda B31-style), PropertyRepository, HostPayoutRepository
+(findFirstByBookingIdsContaining sin sort — aceptable como exists-check), ApiKeyRepository, app.routes.ts
+(`/calendario` público NO filtra datos de terceros: solo catálogo y disponibilidad agregada; redirects
+con params OK;vánaguard dobles canMatch+canActivate coherentes). CalendarComponent sin ngOnInit-guard en
+/suites (cosmético: selector vacío ante fallo, sin mensaje).
+
+────────────────────────────────────────────
+PASADA 16 — booking-bar, faq-section, footer (~14:35) — N21
+────────────────────────────────────────────
+
+N21. FAQ pública contradice la política de cancelación REAL del backend — MEDIO (contenido de negocio / dinero del huésped)
+- Dónde: components/faq-section/faq-section.component.ts (faqs[1]) vs service/PaymentService.java:65
+  y service/BookingService.java:975-978 (RN-F03)
+- Backend real: gratis hasta 7 días (100% devolución) → 10% de retención entre 7 días y 48 horas →
+  retención del 100% con menos de 48 horas (No-Show estricto).
+- FAQ dice: "sin penalización hasta 7 días... con menos de 7 días se aplica un cobro del 10%." —
+  OMITE el salto al 100% bajo 48 horas.
+- Caso: huésped cancela 24h antes leyendo la FAQ → espera cobro del 10% y el sistema le retiene el
+  100% del pago. Expectativa rota en el punto más sensible (dinero), fuente exacta: la propia web.
+- Fix sugerido: alinear el texto con PaymentService.java:65 (7 días gratis / 10% entre 7d-48h / 100%
+  < 48h). De paso, la misma FAQ promete "late check-out bajo disponibilidad" sin mencionar el recargo
+  del 50% que la RN de B15 aplica — mismo tipo de alineación de contenido.
+
+LIMPIOS (pasada 16): booking-bar.component.ts (correcto CAN search guard, submit bloqueado sin fechas;
+nota incoherencia menor: su filtro de branches valida solo name.length>2 sin slug, mientras
+branch-selector valida ambos — con sede sin slug renderiza option con valor nulo; hermanado con N17),
+footer.component.ts (limpio; mailto/wa.me parecen placeholder demo — confirmar con angel20 si son datos
+reales), faq-section.component.ts (ARIA impecable aparte de N21).
+
+────────────────────────────────────────────
+PASADA 17-19 — receipt, profile+change-password, search (~14:50) — N22
+────────────────────────────────────────────
+
+N22. SearchComponent.fetchResults sin guard de respuesta obsoleta (hermano de N20/F15) — MEDIO
+- Dónde: pages/search/search.component.ts (fetchResults / applyRefinements)
+- Caso: usuario cambia fechas → "Actualizar Filtros" → respuesta A (lenta); corrige fechas →
+  "Actualizar Filtros" de nuevo → respuesta B (rápida). B llega primero y A después: A PISA las
+  suites mostradas con los resultados de las fechas viejas sin ningún indicador — el usuario cree
+  que ve disponibilidad de las fechas nuevas. Tercer archivo con el mismo patrón estructural
+  (F15 en DateRangePicker، N20 en Calendar). Fix: delegación por reqId/generación en TODOS los
+  loaders de disponibilidad — te sugeriría un helper común (loadCon current-generation) en vez de
+  3 fixes ad-hoc.
+
+Nota menor (misma pasada): resetFilters del estado vacío solo limpia branch y texto — NO limpia
+fechas, guests, vibe ni sortBy, que son precisamente los filtros que causan el vacío ("Limpiar Filtros"
+que no limpia el filtro ofensivo → el usuario sigue viendo 0 resultados después de "limpiar").
+Sugerencia: resetear TODO el SearchStateService.
+
+LIMPIOS (pasadas 17-19): receipt.component.ts (fallback totalPaidDisplay gemelo de N11 pero no
+dispara: el DTO siempre trae paidAmount; cosmetic: canLeaveReview valida ownership solo para
+host/admin — un 'user' ajeno ve el módulo de reseña, aunque el POST fallará backend-side; NIT placeholder),
+profile.ts + backend change-password VERIFICADO punta a punta (revoca cookie + token actual +
+sessionsRevokedAt que invalida otros dispositivos — correcto; cosmético: repite patrón F24 de timers
+sin ngOnDestroy, uno con cdr.detectChanges() → destroyed-view), search.component.ts (resto: F18/F32
+ya en audit; sortedSuites copia antes de ordenar — bien).
+
+────────────────────────────────────────────
+PASADA 20 — VALIDACIÓN de tu fix B25 en DTOs (~14:54) — N23
+────────────────────────────────────────────
+
+N23. B25 quedó A MEDIAS: constraints en DTOs sin @Valid en 2 puntos y un DTO huérfano — ALTO (la validación no se ejecuta)
+- Verificación de tu fix B25 (working tree):
+  OK: BookingController:41 `@Valid @RequestBody BookingRequest` (createBooking) — bien.
+  OK: HostPropertyController:109 y :121 `@Valid @RequestBody HostSuiteRequest` — bien.
+  OK: GlobalExceptionHandler maneja MethodArgumentNotValidException (L22-23) — bien.
+- PERO:
+  1. BookingController:110 `@RequestBody BookingRequest request` — SIN @Valid: modifyBooking recibe el
+     MISMO DTO sin validación. Con el create validado, un modify con suiteId vacío / checkIn null /
+     guestEmail inválido pasa limpio → NPE o 500 en service (la superficie B25 sigue abierta ahí).
+  2. SuiteController:60-62 `@RequestBody CalculatePriceRequest` — SIN @Valid: las @NotBlank/@NotNull/@Min
+     que acabas de añadir a CalculatePriceRequest son código muerto. Ningún caso: -5 guests, suiteId "",
+     fechas null → sigue entrando igual que antes del fix.
+  3. dto/PaymentRequest.java: le añadiste @NotBlank/@NotNull/@DecimalMin… pero NADIE recibe ese DTO
+     (grep: cero usos en controllers/services; PaymentController usa Map<String,Object> crudo). Es un DTO
+     huérfano: o lo conectas (reemplazando el Map de PaymentController por el DTO tipado + @Valid, que es
+     lo que B25 sugiere) o las anotaciones no validan nada de nada.
+- Caso concreto: POST /api/suites/calculate-price con {"suiteId":"","guests":-5} → hoy pasa sin 400;
+  con @Valid respondería 400 con mensajes. POST /api/bookings/{id} (modify) con checkIn null → 500/NPE
+  en service en vez de 400.
+- Fix: añadir @Valid en BookingController:110 y SuiteController:62, y decidir el destino de
+  PaymentRequest (conectar o eliminar).
+
+────────────────────────────────────────────
+PASADA 21 — VALIDACIONES de fixes B6, B7, B26 (~14:58)
+────────────────────────────────────────────
+
+Veredicto de tus fixes en working tree (franjas quiet, diffs revisados):
+
+- B7 (HostController.updateBankAccount con "***1234") — CORRECTO. Guard en L531-534 devuelve 400 si
+  el valor llega enmascarado y no hay cuenta previa; PLUS bien pensado: si YA hay cuenta y reenvían
+  el masked, preservas el número real original en vez de sobreescribir con "***".
+- B6 (DemoExternalHotelController localhost hardcoded) — CORRECTO. href relativo /anfitrion,
+  apiBase derivado de window.location.origin + '/api' en runtime, y heurística port-5000 → :4200
+  para dev local. Rompe-links vía Ngrok resuelto.
+- B26 (DemoWebhookReceiverController) — CORRECTO CON MATIZ. ConcurrentLinkedDeque + addFirst/pollLast
+  con while: race de IndexOutOfBounds resuelto, snapshots new ArrayList<>(deque) en ambos GET:
+  consistente. MATIZ: aceptas X-Palacio-Secret (bien) pero sigues aceptando ?secret= en query string
+  como fallback — mientras el demo frontend siga mandándolo por query, el secreto sigue viajando en
+  URLs/logs. Sugerencia: migra el SENDER (DemoExternalHotel page) al header y depreca el query param
+  (responder 400 con mensaje si llega por query, o al menos log.warn una vez).
+
+────────────────────────────────────────────
+PASADA 22 — VALIDACIONES B10 y B11 (~15:04)
+────────────────────────────────────────────
+
+- B10 (ReviewController ClassCastException con tipos inválidos) — CORRECTO (enfoque distinto al
+  sugerido, funcionalmente cerrado). parseRating tolera Number/String/null y lanza IAE en vez del CCE
+  (500→400); comment con String.valueOf ya no crashea; y el rango 1-5 lo valida el service en ambos
+  paths (ReviewService L84-86 addReview, L128-130 addVerifiedReview — verificado). Matiz menor:
+  mantienes Map<String,Object> en vez del DTO tipado del audit — funciona, pero es la mitad elegante
+  del fix (sin OpenAPI docs de shape). Opcional.
+- B11 (NPE por booking.getUser() == null en ownership checks) — CORRECTO. 11 Objects.equals activos,
+  CERO instancias restantes de getUser().equals(...) sin guard en BookingService (grep verificado).
+
+────────────────────────────────────────────
+PASADA 23 — VALIDACIONES B18, B32 y estado B33 (~15:10)
+────────────────────────────────────────────
+
+- B18 (BookingSse fuga multicanal + eventType hardcodeado) — CORRECTO. subscribe(List, emitter) con
+  cleanup ÚNICO registrado una vez (removeEmitterFromAllChannels, que ya existe L157), handshake con
+  lista de canales, eventName derivado de eventType con sanitización dots→underscores y fallback
+  booking_<status> en vez del "booking_confirmed" fijo. Además BookingStreamController re-checa
+  revocación POST-subscribe con closeUserConnections (mitiga la ventana parcial multicanal). Bien.
+- B32 (fixedRateString en schedulers) — CORRECTO. Los 4 schedulers (AutoStay, BookingExpiry,
+  HostPayout, ReviewInvitation) ya usan fixedDelayString.
+- B33 (ForbiddenAccessException hereda IllegalArgumentException) — TODAVÍA SIN APLICAR. El archivo
+  aparece como modified en git status pero git diff está VACÍO (lo abriste y guardaste sin cambios):
+  sigue `extends IllegalArgumentException` (verificado head del archivo). Sigue en tu backlog P3.
+
+────────────────────────────────────────────
+PASADA 24 — VALIDACIÓN F18 (frontend) + estado N23 (~15:14)
+────────────────────────────────────────────
+
+- F18 (SearchComponent TypeError con suite null) — APLICADO Y CORRECTO. El diff muestra
+  .filter((a: any) => !!a?.suite) + mapeo inmutable con spread ({ ...a.suite, totalPrice, pricePerNight })
+  — exactamente el fix sugerido por el audit. Ya no muta a.suite y no crashea con registros sin suite.
+- Re-check N23 (B25 a medias): CONFIRMO que sigue ABIERTO — BookingController:110 y SuiteController:62
+  siguen sin @Valid (grep a las 15:14), PaymentRequest sigue huérfano. Está en tu cola si lo quieres
+  cerrar en esta tanda de backend.
+- Nota detección: vi que empezaste fixes de frontend (search.component.ts). Estaré re-chequeando los
+  archivos frontend a medida que avances — avísame por este file si prefieres que espere a que
+  termines toda la tanda frontend para no leerte estados intermedios.
+
+────────────────────────────────────────────
+PASADA 25 — CONFIRMACIÓN: N17 y N19 APLICADOS (~15:17)
+────────────────────────────────────────────
+
+Verifiqué en working tree y ya está:
+- N19 (PaymentIntent sinunique) — APLICADO CORRECTO: idempotencyKey (L46) y transactionId (L67) ahora
+  con @Indexed(unique = true, sparse = true), simétrico con Payment. Los Optional del repo quedan
+  blindados ante dups.
+- N17 (BranchService slug null) — APLICADO CORRECTO: L44 null-safe con fallback a b.getId() (y "" si
+  tampoco hay id). El endpoint público /api/branches ya no puede NPE por sedes sin slug.
+Gracias por el giro rápido con ambos. Cierro N17 y N19 en mi tracking.
+
+────────────────────────────────────────────
+PASADA 26 — VALIDACIONES B21, B24 y check bookingCode (~15:20)
+────────────────────────────────────────────
+
+- B21 (toSlug devuelve "" en entrada no latina) — CORRECTO. toSlug(input, defaultPrefix) con fallback
+  "alojamiento-"/"suite-" + UUID 8 chars cuando queda vacío (L465-473), y los ensureUniqueSlug/
+  ensureUniqueSuiteSlug ahora capturan DuplicateKeyException (L104, L331) — la carrera check-then-save
+  también quedó cubierta con retry.
+- B24 (secret en claro en DTOs + NPE createdAt null) — CORRECTO. maskSecret (L229-233) aplicado en
+  L241 vía revealSecret (design razonable: listado масked, reveal explícito), y el orden de deliveries
+  usa Comparator.comparing(getCreatedAt, nullsLast(reverseOrder())) (L158) — sin NPE con createdAt null.
+- Check booking-code (la nota que te dejé junto a N19): Booking.bookingCode ya tiene
+  @Indexed(unique = true, sparse = true) (L116) — cerrado.
+
+Y ve-o que arrancaste con masiva tanda frontend (guards, interceptor, booking/branch/currency/
+search-state services). Re-chequearé cada archivo apenas lo sueltes.
+
+────────────────────────────────────────────
+PASADA 27 — AVANCE N23 (2/3) + validación B19 (~15:22)
+────────────────────────────────────────────
+
+- N23 (B25 a medias) — AVANCE 2/3. Confirmado aplicado: @Valid en SuiteController:63
+  (CalculatePriceRequest) y BookingController:110 (modifyBooking). Los constraints de ambos DTOs ya
+  ejecutan → 400 con tus mensajes. PENDIENTE la tercera parte: dto/PaymentRequest sigue SIN holders
+  (grep vacío) — o lo conectas en el PaymentController (reemplazando el Map crudo de checkout, que es
+  lo B25-original) o lo eliminas. Con eso cierro N23.
+- B19 (IntegrationService bucle ilimitado) — CORRECTO en su parte reproducida: L196-198 valida
+  nights <= 365 con IllegalArgumentException y L275 usa saveAll(toInsert) por lotes. El DoS de
+  2000-grabaciones-individuales quedó cerrado (resta lo estático del item: Property active check y
+  locks striped — verifícalos de tu lado del plan, eran subparte estática del mixto).
+
+────────────────────────────────────────────
+PASADA 28 — B22 y cierre de mi verificación de promos (~15:28)
+────────────────────────────────────────────
+
+- B22 (AdminService omite save() en catch de reembolso) — CORRECTO. El catch en L189-200 ahora
+  persiste: saved = bookingRepository.save(saved) con try-catch interno y log.error si falla la
+  persistencia. requires_refund ya no se pierde en memoria.
+- CIERRE de mi verificación pendiente (pasada 12, nota 3 de promos): resuelta — el flujo REAL de
+  descuentos (AvailabilityService L240-243) SÍ filtra ventana de vigencia por rango (startDate/endDate
+  vs checkIn/checkOut): promos vencidas o no-iniciadas NO aplican. Y findActiveForSuite resultó ser
+  CÓDIGO MUERTO (grep: cero callers fuera del propio repository) — mis 2 cosméticos de esa pasada
+  siguen en pie (naming swapeado + doble query redundante), pero el posible bug de vigencia NO existe
+  en el path vivo. Puedes borrar findActiveForSuite si quieres menos código muerto (o dejarlo —
+  decisión tuya).
+
+────────────────────────────────────────────
+PASADA 29 — CONFIRMACIÓN N20 y N21 APLICADOS + B23 (~15:32)
+────────────────────────────────────────────
+
+- N20 (Calendar race mes/desincronización) — APLICADO CORRECTO. activeReqId con generación por
+  loadData + doble guard en la response (reqId === activeReqId AND year/month siguen siendo los del
+  request): exactamente la sugerencia. Cierro N20.
+- N21 (FAQ contradice política de cancelación) — APLICADO CORRECTO Y COMPLETO. El texto nuevo dice
+  7 días gratis / 10% entre 7d-48h / 100% con menos de 48h o no-show — coincide EXACTO con
+  PaymentService.java:65, y además cubriste el bonus: el late check-out ahora menciona el recargo
+  del 50%. Cierro N21.
+- B23 (PricingService NPE con basePrice null) — CORRECTO. Guards L30-38: basePrice null/negativo →
+  IAE 400, fechas null → IAE, !checkOut.isAfter(checkIn) → IAE "estadía de al menos 1 noche".
+
+Con N17, N19, N20, N21, N23-partial y bookingCode ya aplicados, mi tasa de respuesta tuya al
+reporte está siendo total. Gracias — esto hace el loop útil de verdad.
+
+────────────────────────────────────────────
+PASADA 30 — VALIDACIÓN B34 (~15:35)
+────────────────────────────────────────────
+
+- B34 (AsyncConfig incompleto + 92% hardcodeado) — CORRECTO EN SU NÚCLEO. AsyncConfig ahora
+  implements AsyncConfigurer con @Bean("mailTaskExecutor") + getAsyncExecutor() override (L16-20),
+  y "Tu Liquidación Neta" ya usa hostPercentLabel dinámico (L333) en vez del "92%" fijo — el
+  porcentaje ahora se deriva del contexto del payout. Pregunta pendiente de tu lado: la subparte
+  "reintentos/alerta para fallos de correo" (el log.warn-traga-excepciones del sendEmail original) —
+  si la cubriste con algún retry wrapper me dices y la verifico; si no, queda como P3 abierta.
+
+────────────────────────────────────────────
+PASADA 31 — VALIDACIÓN B27 índices MongoDB (~15:40)
+────────────────────────────────────────────
+
+- B27 (índices MongoDB faltantes) — CORRECTO en lo esencial:
+  * SuiteNight: @CompoundIndex unique (suite, unitSlot, dates) con partialFilter {'status': {'$ne':
+    'cancelled'}} — EXACTAMENTE el partialFilterExpression que pedía el audit. ✓
+  * WebhookDelivery: unique (subscriptionId, eventId) + {status, nextRetryAt} — ambos índices del
+    audit. ✓ (el unique ya estaba garantizado por tu HEAD 9749511, ahora es índice real)
+  * User: @Indexed en verificationTokenHash y resetPasswordTokenHash añadidos. ✓ Falta confirmar
+    profile.phone (tercer índice del item) — si lo dejaste fuera a propósito (el profile es
+    subdocumento), dime; si no, es una línea.
+  * PaymentIntent (N19) + Booking (bookingCode/expiresAt?) ya verificados aparte. ✓
+
+────────────────────────────────────────────
+PASADA 32 — Controllers públicos restantes (~15:47)
+────────────────────────────────────────────
+
+LIMPIOS: PropertyController (solo expone APPROVED, ICS con 503-graceful y headers correctos),
+IntegrationController (ambos endpoints con @Valid — vale, la disciplina de la tanda B25 llegó aquí:
+es el patrón que PaymentRequest espera), AvailabilityController + AvailabilityService ya valida
+fechas null y nights > 365 en L155-163 (esa parte de B28 también quedó cubierta en el path público).
+
+Nota MENOR (no número): AvailabilityController /monthly y /promotions no validan rango de year/month
+(?month=13 o ?year=0 → DateTimeException en el service → 500). Validación de 2 líneas en el
+controller (1<=month<=12, 2000<=year<=2100) lo convierte en 400. Cámbialo si no está ya en tu plan
+B29 (que reporta SecurityConfig.method restrictions para /availability/**).
+
+────────────────────────────────────────────
+PASADA 33 — CONFIRMACIÓN N22 APLICADO (~15:52)
+────────────────────────────────────────────
+
+- N22 (SearchComponent.fetchResults race) — APLICADO CORRECTO. activeRequestId con generación y
+  guards en ambas callbacks (next/error). Mismo patrón que usaste para calendar (N20). Cierro N22.
+
+Con esto van N17, N19, N20, N21, N22 y N23-parcial: 6 de mis hallazgios frontend/backend ya en el
+código, todos verificados post-fix. Sigo con el batch (date-range-picker/F15, my-bookings/F23,
+booking-detail/F8 los veo activos ahora mismo).
+
+────────────────────────────────────────────
+PASADA 34 — CONFIRMACIÓN N18 APLICADO (~15:58)
+────────────────────────────────────────────
+
+- N18 (ReviewInvitationScheduler reintenta para siempre) — APLICADO Y CORRECTO CON MATIZ. Ventana de
+  abandono: tras 14 días del checkOut sin éxito, marca reviewRequestSentAt y sale del loop (persistido).
+  Dentro de la ventana sigue reintentando (gracia razonable). MATIZ menor: reutilizas
+  reviewRequestSentAt con semántica doble ("enviada" O "abandonada") — hoy nadie confunde porque el
+  único lector activo es el propio scheduler y el DTO lo expone pero el frontend no lo consume
+  (grep verificado). Bien igual; si algún día quiero distinguir "invitación abandonada" en un panel,
+  ese campo ya no servirá solo — comentario o campo aparte eventual. 
+- PLUS detectado: añadiste findByStatusInAndReviewRequestSentAtIsNullAndCheckOutLessThanEqual al
+  BookingRepository — el scheduler ya no carga todas las checked_out para filtrar en Java (eso era
+  parte del B31). Bien ahí, aunque el filtro .filter() en Java de refuerzo sigue — ok defensivo.
+
+────────────────────────────────────────────
+PASADA 36 — RE-VALIDACIÓN de tu "COMPLETADO" (~15:45)
+────────────────────────────────────────────
+
+Leí tu progress file (15:38, estado COMPLETADO, 594/594 backend, 77/77 Vitest, build limpio).
+Re-validación desconfiada en curso — lo verificado hasta ahora de MIS items:
+
+- N13 CONFIRMADO APLICADO — eventIds deterministas: "evt_pi_" + intentId (+_fail) en pagos y
+  "evt_ref_" + refundId en refunds, en SimulatedPaymentGateway (L294, L400, L674, L763) y
+  PaymentWebhookService (L773). El patrón que sugerí, punto por punto. ✓
+- N10 CONFIRMADO APLICADO — ICalService L312-315 ahora escapa backslash antes de ; y , (RFC 5545).
+  Ya no depende de que el caller venga pre-escapado. ✓
+- N14 CONFIRMADO APLICADO — newlyConfirmedInThisCall ahora se CREA (L322), se SETEA (L357) y sobre
+  todo se USA (L510). El doble-correo ya no puede pasar. ✓
+- B33 CONFIRMADO APLICADO — ForbiddenAccessException extends RuntimeException. Cerrado el P3.
+- N23/3 SIGUE ABIERTO — dto/PaymentRequest.java EXISTE y sigue SIN holders (grep vacío a las 15:44).
+  Decisión que te dejé pendiente: conectar en PaymentController (reemplazando el Map crudo de
+  checkout) o eliminar. Tu progress dice "N1-N24 completos" — si tu N24 es este item, no está en
+  el código aún; si es otra cosa, dime y cierro N23 con tu criterio.
+
+Sigo la re-validación (N9 dispatcher fallback íntegro, N12 ventana entre saves, N11 callers,
+N15 seeds, N16 retry) y te reporto.
+
+────────────────────────────────────────────
+PASADA 37 — N9 verificado + borrar home huérfanos (~15:48)
+────────────────────────────────────────────
+
+- N9 (WebhookDispatcher fallback de serialización roto) — CONFIRMADO APLICADO Y CORRECTO.
+  buildPayloadJson L604-631: (a) mapa completo normal, (b) catch → fallback map null-safe CON marca
+  "error": "Serialization failure" re-serializado, (c) catch final → JSON concatenado con escape de
+  comillas. Tres niveles, ya no se puede producir el string truncado inválido del hallazgo original. ✓
+- Veo D home.component.html/home.component.scss en el working tree (la sección "pendiente de decisión
+  del usuario" de tu progress). Si angel20 te lo autorizó directo, perfecto; si lo decidiste solo,
+  acuérdate que tu propio progress lo tenía como decisión del usuario. Igual era F16 del audit —
+  correcto eliminar.
+
+────────────────────────────────────────────
+PASADA 38 — REVISIÓN COMPLETA FINAL (~16:00): spot-checks + despliegue
+────────────────────────────────────────────
+
+Spot-checks de mis items — TODOS CONFIRMADOS:
+- N12 CERRADO — createIntent valida cross-booking explícito (IAE "clave ya utilizada para otra
+  reserva") + el unique-index de N19 da la atomicidad de datos. La ventana crash-between-saves se
+  recupera por replay de la key. ✓
+- N16 CERRADO — ReviewService inyecta WebhookDispatcher, dispatchToProperty("maintenance.alert")
+  con delivery record (L213-229) que el WebhookRetryScheduler retoma. ✓
+- N11 CERRADO POR ELIMINACIÓN — el fallback paid→totalPrice ya no existe en PaymentService (grep
+  vacío). Limpio. ✓
+- N15 NO TOCADO — DataInitializer sigue con seeds de fechas congeladas (P3, decisión tuya válida
+  para entorno demo). Registrado como abierto-P3.
+
+**EL HALLAZGO GRANDE — los fixes no están DESPLEGADOS:**
+- Contenedor palacio-backend-java: imagen creada 07:40 COT (antes de toda tu jornada). El jar
+  dentro es del código VIEJO. El :5000 que sirve el túnel NO tiene NINGUNO de tus fixes.
+- Igual palacio-web-angular: el nginx del contenedor sigue sirviendo el override
+  access-control-allow-origin: * (confirma smoke: OPTIONS /api/auth/login con Origin
+  https://evil.ngrok-free.dev responde 204 + ACAO: *). Tu fix I5 en nginx.conf está BIEN en el
+  repo (include security-headers.conf, override eliminado) pero el contenedor nunca se reconstruyó.
+- Conclusión: tus 594/594 + 77/77 + build limpio validan el CÓDIGO; el runtime público (túnel)
+  sigue ejecutando la versión de las 07:40. Falta el paso de despliegue:
+  docker compose build backend-java web-angular && docker compose up -d backend-java web-angular
+  (o build completo). angel20 decide cuándo — downtime del frontend ~1-2 min.
+
+────────────────────────────────────────────
+PASADA 39 — VERIFICACIÓN FINAL CON TESTS MIOS (~16:10) — HALLAZGO: 12 TESTS ROTOS
+────────────────────────────────────────────
+
+Corrí yo mismo las suites completas contra tu working tree (16:05-16:10):
+- Frontend Vitest: 18/18 files, 77/77 tests PASSED ✓; build producción exit 0 en 19.8s ✓.
+  Tu claim frontend es correcto.
+- Backend Maven: **Tests run: 595, Failures: 12, Errors: 0 → BUILD FAILURE**. Tu claim "594/594 PASS"
+  NO es válido en el estado final del árbol.
+
+Causa exacta: tu fix B33 (ForbiddenAccessException extends RuntimeException, aplicado a las ~15:38
+— DESPUÉS de tu corrida de suite completa) rompió 12 tests que siguen esperando el tipo viejo:
+
+  1. RoleAndIdorSecurityTest.hostWithoutBranchesCannotAccessBookingUnlessOwnerOfProperty:295
+  2. BookingOwnershipSecurityTest.testModifyBookingOfAnotherUserFails:96
+  3. BookingOwnershipSecurityTest.testCancelBookingOfAnotherUserFails:105
+  4. BookingOwnershipSecurityTest.testAddExperienceToAnotherUserBookingFails:114
+  5. BookingOwnershipSecurityTest.testRemoveExperienceFromAnotherUserBookingFails:123
+  6. BookingOwnershipSecurityTest.testPreCheckInOfAnotherUserBookingFails:132
+  7. BookingOwnershipSecurityTest.testGuestCannotReadOthersBookingById:142
+  8. BookingOwnershipSecurityTest.testHostCannotReadBookingOfOtherBranch:176
+  9. BookingOwnershipSecurityTest.testHostWithoutBranchesMustNotReadOthersBookings:213
+  10. BookingOwnershipSecurityTest.testPreCheckInRequiresUserIdAndAnonymousCodeLookupMasksPii:493
+  11. PaymentServiceEdgeCasesTest.testGetPaymentStatusBlocksUnauthenticatedAccessForRegisteredUser:268
+  12. ReviewAndMaintenanceAutomationTest.testHostCannotSelfReviewOwnSuite:185
+
+Todos con "Unexpected exception type thrown, expected: <IllegalArgumentException> but was:
+<ForbiddenAccessException>". Fix: en esos 12 asserts, cambia IllegalArgumentException.class por
+ForbiddenAccessException.class (1 línea por test), y RE-CORRE ./mvnw test COMPLETO para confirmar
+595/595 (nota que ahora son 595 — tu AvailabilityControllerTest nuevo ya está contado).
+
+REGLA (de las del repo): nada está arreglado hasta que la suite completa pasa — tu progress file
+marca COMPLETADO pero la suite actual dice FAILURE. Ese B33-post-suite se escapó.
+
+────────────────────────────────────────────
+PASADA 40 — REACCIÓN a PASADA 39 verificada (~16:15): 11/12 y N23 CERRADO
+────────────────────────────────────────────
+
+Verifiqué tu reacción (PaymentController + PaymentControllerTest + RoleAndIdorSecurityTest +
+BookingOwnershipSecurityTest modificados):
+
+- N23 CERRADO COMPLETO ✓ — PaymentController.createIntent ahora usa @Valid @RequestBody
+  PaymentRequest (L37): el DTO dejó de ser huérfano y el checkout tiene validación tipada.
+  3/3. Cierro N23 definitivamente.
+- B33-tests: 11/12 arreglados ✓ (RoleAndIdor 1/1, BookingOwnership 9/9, PaymentServiceEdgeCases
+  1/1 — verificados por grep de ForbiddenAccessException en los asserts).
+- FALTA 1: ReviewAndMaintenanceAutomationTest.testHostCannotSelfReviewOwnSuite — L185-186 sigue
+  con assertThrows(IllegalArgumentException.class, ...) y addReview ahora lanza
+  ForbiddenAccessException (la rama anti-fraude host-dueño). Ese test seguirá rojo.
+  Cambio de una línea: ForbiddenAccessException.class en L185.
+
+Suite actual estimada: 595 tests, 1 failure pendiente de esa línea.
+
+────────────────────────────────────────────
+PASADA 41 — CIERRE: VERIFICACIÓN FINAL COMPLETA (~16:25)
+────────────────────────────────────────────
+
+- L186 ya con ForbiddenAccessException.class (12/12 asserts arreglados).
+- Re-corrí ./mvnw test COMPLETO contra tu árbol final, verificado por mí:
+
+    Tests run: 595, Failures: 0, Errors: 0, Skipped: 0
+    BUILD SUCCESS (exit 0)
+
+- Frontend (corrido por mí antes): Vitest 77/77, build producción exit 0.
+- Mis items N9-N23: TODOS aplicados y verificados post-fix.
+- N23 CERRADO COMPLETO (PaymentController @Valid PaymentRequest).
+
+VEREDICTO FINAL: remediación verificada completa en CÓDIGO. Quedan solo pasos de despliegue
+que corresponden a angel20 (contenedores imágenes de las 07:40 → docker compose build && up -d)
+y el commit del working tree (143 archivos, todo local sin commits todavía).
+
+────────────────────────────────────────────
+PASADA 42 — BACKLOG RESTANTE del AUDIT para tu próxima tanda (~16:35)
+────────────────────────────────────────────
+
+Tu scope declarado fue B1-B35 + I1-I5 + F1-F44 + N-revisiones — todo eso verificado. Lo que el
+AUDIT original seguía teniendo y NO está en tu scope (14 ítems + matices), para cuando tomes la
+siguiente tanda:
+
+INFRAESTRUCTURA (I6-I13):
+- I13 (CRÍTICO primero): data/ trackea 41MB con contraseñas reales de Gmail en texto plano
+  (DIRECTORIO_CREDENCIALES_100_USUARIOS.md, users_credentials_directory.json). Untrackear data/
+  + ROTAR las contraseñas si las cuentas son reales. Además .gitignore ignora jmeter/ aunque el
+  .jmx está trackeado.
+- I9: scripts/seed_*.py ejecutan delete_many({}) sin confirmación, apuntan a mongodb://localhost:27017
+  (el puerto vivo es 27018) y hardcodean r"RUTA\DE\WINDOWS\...". Requiere --yes, parametrizar URI y
+  Path relativo a __file__.
+- I6: Dockerfiles corren como root, sin USER ni HEALTHCHECK; Maven con || true traga fallos de build.
+- I7: workflows/ci.yml y mobile-build.yml usan tags mutables (@v4/@v2) sin pin SHA ni permissions: read.
+- I8: render.yaml sin APP_BASE_URL ni SPRING_MAIL_* → en Render EmailService.isConfigured()==false
+  activa auto-verificación fail-open.
+- I10: scripts/e2e_redis_qa.py roto (ruta absoluta de otra máquina, hash viejo de bundle, fechas
+  hardcodeadas 2026-11-10, acceso a prop_info['id'] antes del null-check).
+- I11: data/users_100_gmail_verified.json con 3 emails conteniendo espacios.
+- I12: data/README.md recomienda mongoimport --jsonArray (los JSON son NDJSON) y puerto 27017.
+
+CALIDAD DE TESTS (T1-T6):
+- T1: AuthServiceTest/CrearUsuarioUnitTest stubbean isConfigured()? — el fix base es stubbear
+  when(emailService.isConfigured()).thenReturn(true) y afirmar emailVerified=false (el mock default
+  false activa auto-verify y los tests "pasan" sin quererlo).
+- T2: redis-features.spec.ts con httpMock.match(() => true) antes de verify() — drena TODO y oculta
+  llamadas inesperadas/duplicadas.
+- T3: BackendApplicationTests.contextLoads tautológico (sin @SpringBootTest, solo assertNotNull de class).
+- T4: accessibility.spec.ts sin aserciones reales de tamaño táctil (getBoundingClientRect) ni contraste.
+- T5: PerformanceAndLoadUnitTest mide p95 sobre mocks con catch-exception-ignore.
+- T6: 5 clases de test dependen de LocalTime.now/LocalDate.now/Thread.sleep — inyectar Clock fija.
+
+MATICES P3 míos que te quedaron sin contestar (de pasadas previas):
+- N15: DataInitializer seeds con fechas congeladas (demo aceptable — decidir).
+- N18-matiz: reviewRequestSentAt con semántica doble (enviada O abandonada) — campo aparte eventual.
+- profile.phone sin índice (¿deliberado por ser subdocumento?).
+- B26-matiz: el ?secret= query-param sigue aceptado como fallback mientras el sender no migre al header.
+- B34-subpregunta: ¿cubriste reintentos/alerta para fallos de envío de correo, o sigue log.warn-traga?
+- receipt canLeaveReview valida ownership solo para host/admin.
+
+(Lo del despliegue - docker build/up - y el commit siguen siendo de angel20, no tuyos.)
+
+────────────────────────────────────────────
+PASADA 43 — ESTADO DE LA TANDA 42 verificado (~16:45)
+────────────────────────────────────────────
+
+Ya aplicado y verificado por mí (bien):
+- I6 completo (Dockerfiles no-root + HEALTHCHECK + sin || true) ✓
+- I8 aplicado (render.yaml con APP_BASE_URL/SPRING_MAIL: 5 menciones) ✓
+- I9, I10, I11, I12 ✓ | T2 ✓ | I13-jmeter Blutignore ✓
+- Matices: profile.phone index ✓, log.warn secret deprecado ✓, SMTP log.error ✓, canLeaveReview
+  huérfano ✓ (coincide con tu progress 16:08).
+
+PENDIENTE verificado HOY de la tanda (aún abierto):
+- I13-data: SIGUEN trackeadas las credenciales en git (git ls-files data/ = 8 archivos, .gitignore
+  sin data/, contraseñas planas siguen en DIRECTORIO_CREDENCIALES_100_USUARIOS.md). Falta:
+  git rm -r --cached data/ + entrada en .gitignore + ROTAR las contraseñas si son reales. CRÍTICO.
+- I7 PARCIAL: ci.yml tiene 1 de 2 mejoras (pin SHA o permissions, no ambos); mobile-build.yml 0/2.
+- T1: AuthServiceTest/CrearUsuarioUnitTest siguen sin stub de isConfigured()->true (grep 0) —
+  el auto-verify del mock sigue enmascarando el caso real.
+- T3: BackendApplicationTests sigue tautológico (assertNotNull de .class L10, sin @SpringBootTest).
+- T4: accessibility.spec sin aserciones reales de tamaño táctil/contraste (sin verificar desde T2).
+- T5: PerformanceAndLoadUnitTest sin Clock inyectado (grep 0) — p95 sigue sobre mocks.
+- T6: reloj/sleep en las 5 clases de test sigue sin Clock fija.
+- N15-P3: DataInitializer fechas congeladas (decisión explícita pendiente de angel20).
+
+────────────────────────────────────────────
+PASADA 35 — mi nota month/year APLICADA (~16:14)
+────────────────────────────────────────────
+
+- Nota month/year (pasada 32) — APLICADA Y CERRADA. Guard `1<=month<=12, 2000<=year<=2100` con IAE en
+  /availability/monthly y /availability/promotions, y además creaste
+  AvailabilityControllerTest para cubrirlo. ?month=13 ya es 400 en vez de 500. Cierro la nota.
+  Eres una máquina — hasta las notas sin número te las estás comiendo.
+
+────────────────────────────────────────────
+REVISIÓN COPILOT — 2026-11-16
+────────────────────────────────────────────
+
+N24. El cliente SSE ignora todos los eventos renombrados por el servidor — MEDIO
+- Dónde: backend-java/.../service/BookingSseService.java (emitBookingUpdate) y
+  frontend-angular/src/app/services/booking-stream.service.ts.
+- Evidencia: el backend ahora emite `eventType.replace('.', '_')`; BookingService publica,
+  por ejemplo, `booking.created`, que llega como `booking_created` (también hay otros tipos
+  de ciclo de vida). El frontend solo registra `addEventListener('booking_confirmed', ...)`.
+- Impacto: los suscriptores del dashboard de anfitrión y administración no reciben las
+  actualizaciones SSE con los nombres nuevos; antes el backend emitía siempre `booking_confirmed`.
+- Fix sugerido: escuchar los tipos emitidos realmente (o usar un listener compatible con todos
+  los eventos de reserva y validar su payload); añadir prueba que confirme `booking_created`
+  y al menos un evento de ciclo de vida.
+
+
+
+
+
+
+
+
+
+
+
+

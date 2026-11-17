@@ -42,11 +42,16 @@ export class CurrencyService {
     const rate = this.rates[cur];
     const symbol = this.symbols[cur];
 
+    if (!Number.isFinite(amountCop)) {
+      return `${symbol} 0 ${cur}`;
+    }
+
     if (cur === 'COP') {
       return `${symbol} ${Math.round(amountCop).toLocaleString('es-CO')} COP`;
     }
 
     const converted = amountCop * rate;
-    return `${symbol} ${converted.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${cur}`;
+    const fractionDigits = converted > 0 && converted < 10 ? 2 : 0;
+    return `${symbol} ${converted.toLocaleString('en-US', { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits })} ${cur}`;
   }
 }

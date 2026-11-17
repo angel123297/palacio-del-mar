@@ -1,5 +1,6 @@
 package co.palaciodelmar.backend.service;
 
+import co.palaciodelmar.backend.exception.ForbiddenAccessException;
 import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.model.Payment;
 import co.palaciodelmar.backend.model.BookingStatus;
@@ -265,7 +266,7 @@ class PaymentServiceEdgeCasesTest {
         when(bookingRepository.findById("book-reg")).thenReturn(Optional.of(booking));
         when(userRepository.findById("user-owner-1")).thenReturn(Optional.of(owner));
 
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ForbiddenAccessException.class, () ->
                 paymentService.getPaymentStatus("intent-reg", null)
         );
     }

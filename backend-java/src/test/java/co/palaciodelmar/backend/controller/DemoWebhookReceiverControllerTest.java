@@ -28,11 +28,11 @@ class DemoWebhookReceiverControllerTest {
     }
 
     @Test
-    @DisplayName("M-3: Enmascara emails, teléfonos y smartLockPin antes de guardar en memoria")
+    @DisplayName("M-3: Enmascara emails, teléfonos, nombres de huéspedes y smartLockPin antes de guardar en memoria")
     @SuppressWarnings("unchecked")
     void testSanitizesPiiInStoredEvents() {
         DemoWebhookReceiverController controller = new DemoWebhookReceiverController();
-        String rawPayload = "{\"guestEmail\":\"cliente.vip@gmail.com\",\"guestPhone\":\"+573001234567\",\"smartLockPin\":\"987654\",\"bookingCode\":\"PDM-101\"}";
+        String rawPayload = "{\"guestName\":\"Carlos Perez\",\"guestEmail\":\"cliente.vip@gmail.com\",\"guestPhone\":\"+573001234567\",\"smartLockPin\":\"987654\",\"bookingCode\":\"PDM-101\",\"specialRequests\":\"Late checkout request\"}";
 
         ResponseEntity<ApiResponse<Map<String, Object>>> response = controller.receiveWebhook(
                 null, "evt_pii", "booking.confirmed", "1700000000", null, rawPayload
@@ -47,6 +47,8 @@ class DemoWebhookReceiverControllerTest {
         assertFalse(storedPayload.contains("cliente.vip@gmail.com"), "Email en texto plano no debe quedar expuesto");
         assertFalse(storedPayload.contains("+573001234567"), "Teléfono completo no debe quedar expuesto");
         assertFalse(storedPayload.contains("987654"), "smartLockPin no debe quedar expuesto");
+        assertFalse(storedPayload.contains("Carlos Perez"), "Nombre del huésped no debe quedar expuesto");
+        assertFalse(storedPayload.contains("Late checkout request"), "Peticiones especiales no deben quedar expuestas");
         assertTrue(storedPayload.contains("PDM-101"), "Código de reserva no sensible debe conservarse");
     }
 }

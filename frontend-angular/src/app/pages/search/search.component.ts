@@ -169,9 +169,9 @@ import { Suite, ApiResponse } from '../../models/types';
                   </p>
                   <p class="font-serif text-2xl text-[#f5f0e8]">{{ currency.formatPrice(suite.totalPrice || suite.basePrice || 0) }}</p>
                 </div>
-                <button class="px-5 py-2 bg-[#c9a96e] text-[#0d0d0d] uppercase tracking-widest text-xs font-semibold hover:bg-[#e2c99b] transition cursor-pointer">
+                <span class="px-5 py-2 bg-[#c9a96e] text-[#0d0d0d] uppercase tracking-widest text-xs font-semibold group-hover:bg-[#e2c99b] transition inline-block">
                   Reservar
-                </button>
+                </span>
               </div>
             </div>
           </div>
@@ -278,14 +278,23 @@ export class SearchComponent implements OnInit {
     this.checkInDate.set(updated.checkIn);
     this.checkOutDate.set(updated.checkOut);
     this.searchState.updateBranch(this.selectedBranch());
-    this.searchState.updateGuests(this.guestsCount(), 0);
+    const currentChildren = this.searchState.filters().children || 0;
+    const total = this.guestsCount();
+    const children = Math.min(currentChildren, Math.max(0, total - 1));
+    const adults = Math.max(1, total - children);
+    this.searchState.updateGuests(adults, children);
     this.fetchResults();
   }
 
+  private activeRequestId = 0;
+
   resetFilters() {
+    this.searchState.reset();
     this.selectedBranch.set('');
     this.searchQuery.set('');
-    this.searchState.updateBranch('');
+    this.guestsCount.set(2);
+    this.checkInDate.set(this.searchState.filters().checkIn);
+    this.checkOutDate.set(this.searchState.filters().checkOut);
     this.fetchResults();
   }
 
@@ -326,24 +335,32 @@ export class SearchComponent implements OnInit {
   }
 
   fetchResults() {
+    const reqId = ++this.activeRequestId;
     this.loading.set(true);
     this.loadError.set(false);
     const params = this.searchState.getApiParams();
     this.api.get<ApiResponse<any> | any>('/availability', params).subscribe({
       next: (res) => {
+        if (reqId !== this.activeRequestId) {
+          return;
+        }
         const data = res.data || res;
         const available = data.availableSuites || [];
-        const mappedSuites = available.map((a: any) => {
-          const s = a.suite;
-          s.totalPrice = a.totalPrice;
-          s.pricePerNight = a.pricePerNight;
-          return s;
-        });
+        const mappedSuites = available
+          .filter((a: any) => !!a?.suite)
+          .map((a: any) => ({
+            ...a.suite,
+            totalPrice: a.totalPrice,
+            pricePerNight: a.pricePerNight
+          }));
 
         this.suites.set(mappedSuites);
         this.loading.set(false);
       },
       error: () => {
+        if (reqId !== this.activeRequestId) {
+          return;
+        }
         this.suites.set([]);
         this.loadError.set(true);
         this.loading.set(false);

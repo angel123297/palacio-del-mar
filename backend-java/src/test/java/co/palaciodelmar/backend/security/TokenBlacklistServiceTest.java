@@ -41,6 +41,21 @@ class TokenBlacklistServiceTest {
     }
 
     @Test
+    void invalidSignatureDoesNotWriteToAnyRevocationStore() {
+        ReflectionTestUtils.setField(tokenBlacklistService, "redisTemplate", redisTemplate);
+        when(jwtService.extractExpiration("forged.token"))
+                .thenThrow(new io.jsonwebtoken.MalformedJwtException("invalid"));
+        tokenBlacklistService.blacklistToken("forged.token");
+        verifyNoInteractions(revokedTokenRepository, redisTemplate);
+    }
+
+    @Test
+    void missingExpirationDoesNotWriteRevocation() {
+        tokenBlacklistService.blacklistToken("token.without.expiration");
+        verifyNoInteractions(revokedTokenRepository);
+    }
+
+    @Test
     void testBlacklistWithInMemoryFallbackWhenRedisIsNull() {
         ReflectionTestUtils.setField(tokenBlacklistService, "redisTemplate", null);
         when(jwtService.extractExpiration(anyString())).thenReturn(new Date(System.currentTimeMillis() + 60000));

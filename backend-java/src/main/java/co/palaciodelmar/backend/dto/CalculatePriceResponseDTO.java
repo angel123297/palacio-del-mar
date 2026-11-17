@@ -22,6 +22,7 @@ public class CalculatePriceResponseDTO {
     private BigDecimal roomTotal;
     private BigDecimal extraGuestsFee;
     private BigDecimal guaranteeDeposit;
+    private BigDecimal vipExtrasTotal;
     private BigDecimal experiencesTotal;
     private BigDecimal discount;
     private String discountReason;

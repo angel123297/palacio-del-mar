@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
@@ -20,7 +20,12 @@ import { finalize } from 'rxjs';
         <p class="luxury-loader-text">Cargando...</p>
       </div>
 
-      <div *ngIf="!loading && bookings.length === 0" style="text-align: center; padding: 3.5rem 1.5rem; background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px solid rgba(212,175,55,0.25);">
+      <div *ngIf="!loading && loadError" role="alert" style="text-align: center; padding: 3rem 1.5rem; background: rgba(231,76,60,0.06); border: 1px solid rgba(231,76,60,0.3); border-radius: 12px; margin-bottom: 2rem;">
+        <p style="color: #ff9999; margin: 0 0 1.2rem 0; font-size: 1rem; line-height: 1.5;">Ocurrió un inconveniente al cargar tus reservas. Por favor reintenta.</p>
+        <button (click)="fetchMyBookings()" class="btn-outline" style="min-height: 44px; padding: 10px 24px; cursor: pointer;">Reintentar</button>
+      </div>
+
+      <div *ngIf="!loading && !loadError && bookings.length === 0" style="text-align: center; padding: 3.5rem 1.5rem; background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px solid rgba(212,175,55,0.25);">
         <div style="font-size: 2.5rem; margin-bottom: 0.8rem;">✨</div>
         <h2 style="font-family: var(--font-title); font-size: 1.6rem; color: var(--gold); margin-bottom: 0.5rem;">Tu próxima experiencia inolvidable te espera</h2>
         <p style="color: #ccc; font-size: 1rem; max-width: 500px; margin: 0 auto 2rem; line-height: 1.5;">Aún no tienes itinerarios activos en tu cuenta. Explora nuestras suites y casonas coloniales con vistas panorámicas al mar de Cartagena.</p>
@@ -59,15 +64,15 @@ import { finalize } from 'rxjs';
             <div style="font-size: 1.4rem; font-weight: 700; color: var(--gold); margin-bottom: 6px;">{{ currency.formatPrice(booking.totalPrice || 0) }}</div>
             <div style="display: flex; gap: 10px; align-items: center; justify-content: flex-end;">
               <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase;"
-                    [style.background]="booking.status === 'confirmed' ? 'rgba(46, 204, 113, 0.2)' : 'rgba(241, 196, 15, 0.2)'"
-                    [style.color]="booking.status === 'confirmed' ? '#2ecc71' : '#f1c40f'">
+                    [style.background]="getBadgeBackground(booking.status)"
+                    [style.color]="getBadgeColor(booking.status)">
                 {{ getStatusLabel(booking.status) }}
               </span>
               <a [routerLink]="['/reservas', booking.id || booking._id]" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">Ver Detalles</a>
               <a *ngIf="(booking.status === 'pending' || ((booking.balanceDue || 0) > 0 && booking.status !== 'cancelled' && booking.status !== 'expired' && booking.status !== 'no_show')) && !isExpired(booking)" [routerLink]="['/checkout', booking.id || booking._id]" class="btn-primary" style="padding: 6px 16px; font-size: 0.85rem; text-decoration: none;">
                 {{ booking.status === 'pending' ? 'Pagar' : 'Pagar Saldo' }}
               </a>
-              <a *ngIf="booking.status === 'confirmed'" [routerLink]="['/reservas', booking.id || booking._id, 'comprobante']" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #2ecc71; color: #2ecc71; text-decoration: none;">Ver Factura</a>
+              <a *ngIf="showInvoiceButton(booking)" [routerLink]="['/reservas', booking.id || booking._id, 'comprobante']" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #2ecc71; color: #2ecc71; text-decoration: none;">Ver Factura</a>
               <button *ngIf="(booking.status === 'confirmed' || booking.status === 'pending') && !isExpired(booking)" (click)="openCancelModal(booking)" class="btn-outline" style="padding: 6px 16px; font-size: 0.85rem; border-color: #e74c3c; color: #e74c3c; background: transparent; cursor: pointer;">Cancelar</button>
             </div>
           </div>
@@ -101,9 +106,11 @@ import { finalize } from 'rxjs';
     </div>
   `
 })
-export class MyBookingsComponent implements OnInit {
+export class MyBookingsComponent implements OnInit, OnDestroy {
   bookings: Booking[] = [];
   loading = true;
+  loadError = false;
+  private refreshTimeout: any = null;
 
   selectedCancelBooking: Booking | null = null;
   cancelling = false;
@@ -118,6 +125,51 @@ export class MyBookingsComponent implements OnInit {
     private router: Router,
     public currency: CurrencyService
   ) {}
+
+  showInvoiceButton(b: Booking): boolean {
+    const s = (b?.status || '').toLowerCase();
+    const ps = (b?.paymentStatus || '').toLowerCase();
+    return ['confirmed', 'checked_in', 'checked_out', 'completed'].includes(s) || ps === 'paid';
+  }
+
+  getBadgeBackground(status?: string): string {
+    switch (status?.toLowerCase()) {
+      case 'confirmed':
+      case 'checked_in':
+      case 'completed':
+        return 'rgba(46, 204, 113, 0.2)';
+      case 'cancelled':
+      case 'expired':
+        return 'rgba(231, 76, 60, 0.2)';
+      case 'pending':
+        return 'rgba(241, 196, 15, 0.2)';
+      default:
+        return 'rgba(212, 175, 55, 0.2)';
+    }
+  }
+
+  getBadgeColor(status?: string): string {
+    switch (status?.toLowerCase()) {
+      case 'confirmed':
+      case 'checked_in':
+      case 'completed':
+        return '#2ecc71';
+      case 'cancelled':
+      case 'expired':
+        return '#e74c3c';
+      case 'pending':
+        return '#f1c40f';
+      default:
+        return 'var(--gold)';
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
+      this.refreshTimeout = null;
+    }
+  }
 
   /** L8: una reserva pending con TTL vencido ya no debe ofrecer pago ni cancelación. */
   isExpired(b: Booking): boolean {
@@ -210,6 +262,7 @@ export class MyBookingsComponent implements OnInit {
   fetchMyBookings(isBackgroundRefresh = false): void {
     if (!isBackgroundRefresh) {
       this.loading = true;
+      this.loadError = false;
     }
     this.api.get<any>('/bookings').pipe(
       finalize(() => {
@@ -220,12 +273,17 @@ export class MyBookingsComponent implements OnInit {
       next: (res) => {
         const raw = res.data || res;
         this.bookings = Array.isArray(raw) ? raw : (raw.bookings || []);
+        this.loadError = false;
         this.cdr.detectChanges();
         if (!isBackgroundRefresh && this.bookings.some(b => b.status === 'pending' && !this.isExpired(b))) {
-          setTimeout(() => this.fetchMyBookings(true), 2500);
+          if (this.refreshTimeout) clearTimeout(this.refreshTimeout);
+          this.refreshTimeout = setTimeout(() => this.fetchMyBookings(true), 2500);
         }
       },
       error: () => {
+        if (!isBackgroundRefresh) {
+          this.loadError = true;
+        }
         this.cdr.detectChanges();
       }
     });

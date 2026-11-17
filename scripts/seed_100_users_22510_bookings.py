@@ -22,8 +22,8 @@ from decimal import Decimal
 from bson import ObjectId, json_util, Decimal128
 import pymongo
 
-MONGO_URI = "mongodb://localhost:27017/"
-DB_NAME = "palacio_db"
+MONGO_URI = os.getenv("MONGODB_URI", os.getenv("SPRING_DATA_MONGODB_URI", "mongodb://localhost:27018/"))
+DB_NAME = os.getenv("MONGODB_DATABASE", "palacio_db")
 TOTAL_BOOKINGS = 22510
 TOTAL_USERS = 100
 
@@ -85,6 +85,16 @@ def main():
     print(f"   • Documentos en 'bookings': {count_b_prev:,}")
 
     # [PASO 2] Borrar colecciones para estado limpio
+    if "--yes" not in sys.argv and "-y" not in sys.argv:
+        try:
+            confirm = input("\n⚠️ ADVERTENCIA: Este script borrará las colecciones existentes en MongoDB. Escribe 'si' para continuar: ")
+            if confirm.strip().lower() not in ["si", "sí", "yes", "y"]:
+                print("Operación cancelada por el usuario.")
+                sys.exit(0)
+        except (EOFError, io.UnsupportedOperation):
+            print("❌ Operación no interactiva sin bandera --yes. Cancelando borrado.")
+            sys.exit(1)
+
     print("\n[PASO 2] Ejecutando borrado total de 'users' y 'bookings'...")
     del_u = users_col.delete_many({})
     del_b = bookings_col.delete_many({})
@@ -327,7 +337,7 @@ def main():
 
     # [PASO 8] Exportar datasets para GitHub y MongoDB Compass
     print("\n[PASO 8] Exportando datasets a 'data/'...")
-    data_dir = r"C:\Users\hdari\Desktop\palacio-del-mar\data"
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))
     os.makedirs(data_dir, exist_ok=True)
 
     # 1. Exportar usuarios

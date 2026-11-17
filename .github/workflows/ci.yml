@@ -12,6 +12,9 @@ on:
       - main
       - plan/marketplace-webhooks
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend Tests & Coverage (Spring Boot 3 / Java 21)
@@ -28,10 +31,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up JDK 21 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -40,18 +43,24 @@ jobs:
       - name: Make Maven Wrapper Executable
         run: chmod +x backend-java/mvnw
 
+      - name: Generate isolated test credentials
+        shell: bash
+        run: |
+          for key in JWT_SECRET PALACIO_PROXY_TOKEN PAYMENTS_WEBHOOK_SECRET; do
+            value=$(openssl rand -hex 32)
+            echo "::add-mask::$value"
+            echo "$key=$value" >> "$GITHUB_ENV"
+          done
+
       - name: Run Backend Tests & Generate Coverage (JaCoCo)
         working-directory: backend-java
         env:
-          JWT_SECRET: c2VjdXJlX2p3dF9zZWNyZXRfa2V5X3BhbGFjaW9fZGVsX21hcl9zdWl0ZXNfdG9rZW5fMjAyNg==
           MONGO_HOST: localhost
           REDIS_HOST: localhost
-          PALACIO_PROXY_TOKEN: palacio_proxy_secret_token_dev_auth_trusted_2026
-          PAYMENTS_WEBHOOK_SECRET: whsec_live_dev_secure_webhook_key_palacio_2026_ok
         run: ./mvnw -B verify
 
       - name: Upload JaCoCo Code Coverage Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         if: always()
         with:
           name: jacoco-coverage-report
@@ -64,10 +73,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832e0b1 # v4.2.0
         with:
           node-version: 22
           cache: 'npm'
@@ -84,4 +93,3 @@ jobs:
       - name: Run Frontend Unit Tests
         working-directory: frontend-angular
         run: npm test -- --watch=false
-

@@ -56,7 +56,7 @@ public class ExperienceService {
 
     public ExperienceDTO getExperienceById(String id) {
         return toDTO(experienceRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Experiencia no encontrada con id: " + id)));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Experiencia no encontrada con id: " + id)));
     }
 
     public ExperienceDTO toDTO(Experience experience) {

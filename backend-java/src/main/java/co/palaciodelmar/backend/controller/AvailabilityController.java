@@ -43,6 +43,9 @@ public class AvailabilityController {
             @RequestParam(required = false) String suiteType,
             @RequestParam(required = false) String suiteId
     ) {
+        if (month < 1 || month > 12 || year < 2000 || year > 2100) {
+            throw new IllegalArgumentException("Año o mes inválido");
+        }
         AvailabilityService.MonthlyAvailabilityResponseData data = availabilityService.getMonthlyAvailability(
                 year, month, guests, branch, suiteType, suiteId
         );
@@ -55,6 +58,9 @@ public class AvailabilityController {
             @RequestParam int month,
             @RequestParam(required = false) String branch
     ) {
+        if (month < 1 || month > 12 || year < 2000 || year > 2100) {
+            throw new IllegalArgumentException("Año o mes inválido");
+        }
         List<PromotionDTO> promotions = availabilityService.getMonthlyPromotions(year, month, branch).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());

@@ -1,4 +1,4 @@
-import { Component, AfterViewInit, ViewEncapsulation, inject, effect } from '@angular/core';
+import { Component, AfterViewInit, OnDestroy, ViewEncapsulation, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import * as L from 'leaflet';
@@ -9,6 +9,7 @@ import { CurrencyService } from '../../services/currency.service';
   standalone: true,
   imports: [CommonModule],
   encapsulation: ViewEncapsulation.None,
+  styleUrls: ['./hotel-map.component.scss'],
   template: `
     <!-- Contenedor limpio sin ningún rastro de borde -->
     <div class="map-wrapper w-full max-w-7xl mx-auto px-4 mb-10 flex flex-col lg:flex-row gap-6 bg-[#0B0C10] p-6 rounded-2xl shadow-2xl relative z-10">
@@ -259,6 +260,7 @@ export class HotelMapComponent implements AfterViewInit {
 
   private router = inject(Router, { optional: true });
   public currency = inject(CurrencyService);
+  private initTimeout: any = null;
 
   constructor() {
     effect(() => {
@@ -270,12 +272,25 @@ export class HotelMapComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    setTimeout(() => {
+    this.initTimeout = setTimeout(() => {
       this.initMap();
     }, 250);
   }
 
+  ngOnDestroy(): void {
+    if (this.initTimeout) {
+      clearTimeout(this.initTimeout);
+      this.initTimeout = null;
+    }
+    if (this.map) {
+      this.map.remove();
+      this.map = null;
+    }
+  }
+
   private initMap(): void {
+    const el = document.getElementById('hotel-map');
+    if (!el) return;
     this.map = L.map('hotel-map', { zoomControl: false }).setView([10.415, -75.544], 13);
     
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
@@ -287,13 +302,14 @@ export class HotelMapComponent implements AfterViewInit {
 
   public changeLayer(type: string): void {
     this.currentLayer = type;
-    if (this.currentTileLayer) {
+    if (this.map && this.currentTileLayer) {
       this.map.removeLayer(this.currentTileLayer);
     }
     this.setTileLayer(type);
   }
 
   private setTileLayer(type: string): void {
+    if (!this.map) return;
     const mapElement = document.getElementById('hotel-map');
     if (mapElement) {
       mapElement.classList.remove('dark-mode-map');
@@ -315,11 +331,15 @@ export class HotelMapComponent implements AfterViewInit {
   }
 
   private renderMarkers(): void {
-    this.markers.forEach(m => this.map.removeLayer(m));
+    if (!this.map) return;
+    this.markers.forEach(m => {
+      if (this.map) this.map.removeLayer(m);
+    });
     this.markers = [];
 
     this.sectors.forEach(sector => {
       sector.hotels.forEach(hotel => {
+        if (!this.map) return;
         const marker = L.circleMarker([hotel.lat, hotel.lng], {
           color: '#C5A059', fillColor: '#121318', fillOpacity: 0.95, radius: 11, weight: 3
         }).addTo(this.map);
@@ -352,7 +372,9 @@ export class HotelMapComponent implements AfterViewInit {
   public selectSector(sector: any): void {
     this.selectedSector = sector;
     this.selectedHotel = null;
-    this.map.setView([sector.lat, sector.lng], sector.zoom, { animate: true, duration: 1.2 });
+    if (this.map) {
+      this.map.setView([sector.lat, sector.lng], sector.zoom, { animate: true, duration: 1.2 });
+    }
   }
 
   public selectHotel(hotel: any, sectorName: string): void {

@@ -17,4 +17,5 @@ public interface SuiteRepository extends MongoRepository<Suite, String> {
     List<Suite> findByActiveTrue();
     long countByBranchIn(List<String> branches);
     long countByPropertyIdIn(List<String> propertyIds);
+    long countByPropertyId(String propertyId);
 }

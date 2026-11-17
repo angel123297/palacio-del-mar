@@ -1,15 +1,20 @@
 package co.palaciodelmar.backend.controller;
 
 import co.palaciodelmar.backend.dto.ApiResponse;
+import co.palaciodelmar.backend.repository.PropertyRepository;
+import co.palaciodelmar.backend.repository.UserRepository;
 import co.palaciodelmar.backend.webhook.WebhookSigner;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 @Slf4j
 @RestController
@@ -20,18 +25,25 @@ public class DemoWebhookReceiverController {
     private static final java.util.regex.Pattern EMAIL_PII_PATTERN =
             java.util.regex.Pattern.compile("([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*(@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})");
     private static final java.util.regex.Pattern SENSITIVE_JSON_FIELD_PATTERN =
-            java.util.regex.Pattern.compile("(\"(?:guestPhone|phone|smartLockPin|documentId|documentNumber|accountNumber)\"\\s*:\\s*\")([^\"]+)(\")");
+            java.util.regex.Pattern.compile("(\"(?:guestPhone|phone|smartLockPin|documentId|documentNumber|accountNumber|guestName|fullName|customerName|specialRequests|notes)\"\\s*:\\s*\")([^\"]+)(\")");
 
-    private final List<Map<String, Object>> receivedEvents = new CopyOnWriteArrayList<>();
+    @Autowired(required = false)
+    private PropertyRepository propertyRepository;
+
+    @Autowired(required = false)
+    private UserRepository userRepository;
+
+    private final ConcurrentLinkedDeque<Map<String, Object>> receivedEvents = new ConcurrentLinkedDeque<>();
     private volatile boolean simulateFailure = false;
 
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getInfo() {
+        List<Map<String, Object>> filtered = filterEventsForCurrentUser();
         return ResponseEntity.ok(ApiResponse.ok("Receptor Demo de Webhooks Palacio del Mar", Map.of(
                 "status", "ONLINE",
                 "simulateFailure", simulateFailure,
-                "receivedEventsCount", receivedEvents.size(),
-                "recentEvents", receivedEvents,
+                "receivedEventsCount", filtered.size(),
+                "recentEvents", filtered,
                 "usage", "Este endpoint recibe peticiones POST con cabecera X-Palacio-Signature para registrar entregas de webhooks en vivo."
         )));
     }
@@ -42,9 +54,14 @@ public class DemoWebhookReceiverController {
             @RequestHeader(value = "X-Palacio-Event-Id", required = false) String eventId,
             @RequestHeader(value = "X-Palacio-Event-Type", required = false) String eventType,
             @RequestHeader(value = "X-Palacio-Timestamp", required = false) String timestamp,
+            @RequestHeader(value = "X-Palacio-Secret", required = false) String secretHeader,
             @RequestParam(required = false) String secret,
             @RequestBody(required = false) String rawBody
     ) {
+        if (secret != null && !secret.isBlank() && (secretHeader == null || secretHeader.isBlank())) {
+            log.warn("Receptor Demo: El parámetro ?secret en query string está deprecado por seguridad. Utilice la cabecera 'X-Palacio-Secret'.");
+        }
+        String effectiveSecret = (secretHeader != null && !secretHeader.isBlank()) ? secretHeader : secret;
         if (rawBody != null && rawBody.length() > MAX_DEMO_PAYLOAD_CHARS) {
             return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                     .body(ApiResponse.error("El payload excede el tamaño máximo permitido (16 KB) en el receptor de demostración"));
@@ -57,8 +74,8 @@ public class DemoWebhookReceiverController {
         }
 
         boolean signatureValid = false;
-        if (secret != null && signature != null && rawBody != null) {
-            signatureValid = WebhookSigner.verify(rawBody, secret, signature);
+        if (effectiveSecret != null && signature != null && rawBody != null) {
+            signatureValid = WebhookSigner.verify(rawBody, effectiveSecret, signature);
         }
 
         String sanitizedPayload = sanitizePayloadPii(rawBody);
@@ -75,22 +92,81 @@ public class DemoWebhookReceiverController {
         record.put("payload", sanitizedPayload);
         record.put("receivedAt", Instant.now().toString());
 
-        receivedEvents.add(0, record);
-        if (receivedEvents.size() > 50) {
-            receivedEvents.remove(receivedEvents.size() - 1);
+        receivedEvents.addFirst(record);
+        while (receivedEvents.size() > 50) {
+            receivedEvents.pollLast();
         }
 
         log.info("Receptor Demo: Evento {} ({}) recibido exitosamente", eventId, eventType);
         return ResponseEntity.ok(ApiResponse.ok("Evento recibido y registrado en receptor demo", record));
     }
 
+    public ResponseEntity<ApiResponse<Map<String, Object>>> receiveWebhook(
+            String signature,
+            String eventId,
+            String eventType,
+            String timestamp,
+            String secret,
+            String rawBody
+    ) {
+        return receiveWebhook(signature, eventId, eventType, timestamp, null, secret, rawBody);
+    }
+
     @GetMapping("/events")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getEvents() {
+        List<Map<String, Object>> filtered = filterEventsForCurrentUser();
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
                 "simulateFailure", simulateFailure,
-                "count", receivedEvents.size(),
-                "events", receivedEvents
+                "count", filtered.size(),
+                "events", filtered
         )));
+    }
+
+    private List<Map<String, Object>> filterEventsForCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return new ArrayList<>(receivedEvents);
+        }
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equalsIgnoreCase(a.getAuthority()) || "ADMIN".equalsIgnoreCase(a.getAuthority()));
+        if (isAdmin || propertyRepository == null) {
+            return new ArrayList<>(receivedEvents);
+        }
+
+        String usernameOrEmail = auth.getName();
+        co.palaciodelmar.backend.model.User user = null;
+        if (userRepository != null && usernameOrEmail != null) {
+            user = userRepository.findByEmail(usernameOrEmail)
+                    .or(() -> userRepository.findById(usernameOrEmail))
+                    .orElse(null);
+        }
+        String effectiveHostId = (user != null && user.getId() != null) ? user.getId() : usernameOrEmail;
+
+        List<co.palaciodelmar.backend.model.Property> hostProps = propertyRepository.findByOwnerId(effectiveHostId);
+        Set<String> allowedPropIds = new HashSet<>();
+        for (co.palaciodelmar.backend.model.Property p : hostProps) {
+            if (p.getId() != null) allowedPropIds.add(p.getId());
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> evt : receivedEvents) {
+            Object payloadObj = evt.get("payload");
+            if (payloadObj instanceof String payloadStr) {
+                boolean match = false;
+                for (String propId : allowedPropIds) {
+                    if (payloadStr.contains(propId)) {
+                        match = true;
+                        break;
+                    }
+                }
+                if (match) {
+                    result.add(evt);
+                }
+            } else {
+                result.add(evt);
+            }
+        }
+        return result;
     }
 
     @GetMapping("/simulate-failure")

@@ -58,6 +58,7 @@ class WebhookRetrySchedulerTest {
         when(subRepo.findById("sub-1")).thenReturn(Optional.of(sub));
 
         WebhookRetryScheduler scheduler = new WebhookRetryScheduler(deliveryRepo, subRepo, dispatcher);
+        scheduler.setClock(java.time.Clock.fixed(now, java.time.ZoneId.of("America/Bogota")));
         scheduler.processPendingRetries();
 
         verify(dispatcher, times(1)).executeDelivery(regularPending, "secret_123");

@@ -107,7 +107,7 @@ import { renderSVG } from '../../utils/qr';
                 {{ booking.checkIn | date:'shortDate' }} a {{ booking.checkOut | date:'shortDate' }}
               </td>
               <td style="padding: 15px 12px; text-align: right; color: #555;">
-                {{ booking.guests || 1 }}
+                {{ booking.guests || 1 }} adulto(s)<span *ngIf="booking.children">, {{ booking.children }} niño(s)</span>
               </td>
               <td style="padding: 15px 12px; text-align: right; font-weight: bold; font-size: 1.05rem;">
                 {{ currency.formatPrice(roomGrossTotal) }}
@@ -333,7 +333,7 @@ export class ReceiptComponent implements OnInit {
       return Number(this.booking.subtotal) || 0;
     }
     const netAfterDeposit = Math.max(0, (this.booking.totalPrice || 0) - (this.booking.guaranteeDeposit || 0) - this.experiencesSubtotal);
-    return this.booking.taxes != null ? Math.max(0, netAfterDeposit - this.booking.taxes) : (netAfterDeposit / 1.19);
+    return this.booking.taxes != null ? Math.max(0, netAfterDeposit - this.booking.taxes) : Math.round(netAfterDeposit / 1.19);
   }
 
   get taxesDisplay(): number {
@@ -341,11 +341,10 @@ export class ReceiptComponent implements OnInit {
     if (this.booking.taxes !== undefined && this.booking.taxes !== null) {
       return Number(this.booking.taxes) || 0;
     }
-    if (this.booking.subtotal !== undefined && this.booking.subtotal !== null) {
-      return 0;
-    }
-    const netAfterDeposit = Math.max(0, (this.booking.totalPrice || 0) - (this.booking.guaranteeDeposit || 0) - this.experiencesSubtotal);
-    return Math.max(0, netAfterDeposit - (netAfterDeposit / 1.19));
+    const subtotal = this.accommodationSubtotalDisplay;
+    const discount = Number(this.booking.discount) || 0;
+    const netBase = Math.max(0, (this.booking.totalPrice || 0) - (this.booking.guaranteeDeposit || 0) - this.experiencesSubtotal);
+    return Math.max(0, netBase - (subtotal - discount));
   }
 
   get roomGrossTotal(): number {
@@ -364,7 +363,7 @@ export class ReceiptComponent implements OnInit {
     if (this.booking.paidAmount !== undefined && this.booking.paidAmount !== null) {
       return Number(this.booking.paidAmount) || 0;
     }
-    return this.isPaid ? (this.booking.totalPrice || 0) : 0;
+    return this.isPaid ? Math.max(0, (this.booking.totalPrice || 0) - (this.booking.balanceDue || 0)) : 0;
   }
 
   get bookingCodeDisplay(): string {
@@ -394,13 +393,13 @@ export class ReceiptComponent implements OnInit {
     if (!isCompleted) return false;
     const user = this.auth?.currentUserValue;
     if (user) {
-      const role = (user.role || '').toLowerCase();
-      if (role === 'host' || role === 'anfitrion' || role === 'admin') {
-        const uId = user.id || user._id;
-        const bUser = typeof this.booking?.user === 'object' ? (this.booking.user?.id || this.booking.user?._id) : (this.booking?.user || this.booking?.userId);
-        if (uId && bUser && uId !== bUser) {
-          return false;
-        }
+      const uId = user.id || user._id;
+      const bUser = typeof this.booking?.user === 'object' ? (this.booking.user?.id || this.booking.user?._id) : (this.booking?.user || this.booking?.userId);
+      if (uId && bUser && uId !== bUser) {
+        return false;
+      }
+      if (!bUser && user.email && this.guestEmail && user.email.toLowerCase() !== this.guestEmail.toLowerCase()) {
+        return false;
       }
     }
     return true;

@@ -775,6 +775,9 @@ class AuditCriticalBugFixesTest {
                 .propertyId("prop-1")
                 .status("checked_out")
                 .subtotal(new BigDecimal("500000"))
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(BigDecimal.ZERO)
                 .platformFee(new BigDecimal("40000"))
                 .hostPayout(new BigDecimal("460000"))
                 .payoutId("po-stuck-1")
@@ -794,5 +797,2542 @@ class AuditCriticalBugFixesTest {
         assertEquals("PROCESSED", stuck.getStatus());
         assertNotNull(stuck.getProcessedAt());
         assertEquals(0, new BigDecimal("460000").compareTo(stuck.getNetAmount()));
+    }
+
+    @Test
+    @DisplayName("18. Conciliar manualmente garantía en Admin no crea deuda inexistente en reserva checked_out")
+    void adminManualGuaranteeConciliationDoesNotCreateFakeDebt() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        Booking booking = Booking.builder()
+                .id("bk-man-dep-1")
+                .status("checked_out")
+                .paymentStatus("requires_refund")
+                .totalPrice(new BigDecimal("600000"))
+                .paidAmount(new BigDecimal("600000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(BigDecimal.ZERO)
+                .guaranteeDeposit(new BigDecimal("100000"))
+                .guaranteeCompensated(BigDecimal.ZERO)
+                .guaranteeRefunded(false)
+                .pendingRefundAmount(new BigDecimal("100000"))
+                .pendingRefundIdempotencyKey("ref_dep_bk-man-dep-1")
+                .build();
+
+        when(bookingRepository.findById("bk-man-dep-1")).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        AdminService adminService = new AdminService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(co.palaciodelmar.backend.repository.UserRepository.class),
+                mock(co.palaciodelmar.backend.repository.PromotionRepository.class),
+                mock(SuiteNightRepository.class),
+                mock(BookingService.class),
+                mock(PropertyRepository.class),
+                mock(PaymentRepository.class),
+                null
+        );
+
+        adminService.resolveRefund("booking:bk-man-dep-1", "mark_refunded", "Conciliado manual");
+
+        assertTrue(Boolean.TRUE.equals(booking.getGuaranteeRefunded()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getBalanceDue()));
+        assertEquals("paid", booking.getPaymentStatus());
+    }
+
+    @Test
+    @DisplayName("19. Recuperar payout PENDING descarta reservas sin fondos netos o con saldo pendiente")
+    void recoverPendingPayoutSkipsIneligibleBookings() {
+        co.palaciodelmar.backend.repository.HostPayoutRepository payoutRepo =
+                mock(co.palaciodelmar.backend.repository.HostPayoutRepository.class);
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        PropertyRepository propRepo = mock(PropertyRepository.class);
+
+        co.palaciodelmar.backend.model.HostPayout stuck = co.palaciodelmar.backend.model.HostPayout.builder()
+                .id("po-stuck-inelig")
+                .payoutCode("PO-20261114-BAD1")
+                .propertyId("prop-1")
+                .status("PENDING")
+                .bookingIds(List.of("bk-bad-1"))
+                .build();
+
+        Booking refundedBk = Booking.builder()
+                .id("bk-bad-1")
+                .propertyId("prop-1")
+                .status("checked_out")
+                .paidAmount(new BigDecimal("500000"))
+                .refundedAmount(new BigDecimal("500000"))
+                .balanceDue(BigDecimal.ZERO)
+                .payoutId("po-stuck-inelig")
+                .checkIn(LocalDate.now(BOGOTA).minusDays(2))
+                .checkOut(LocalDate.now(BOGOTA))
+                .build();
+
+        when(payoutRepo.findByStatus("PENDING")).thenReturn(List.of(stuck));
+        when(bookingRepo.findById("bk-bad-1")).thenReturn(Optional.of(refundedBk));
+        when(bookingRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(bookingRepo.findByStatusIn(any())).thenReturn(List.of());
+
+        HostPayoutService payoutService = new HostPayoutService(bookingRepo, payoutRepo, propRepo);
+        List<co.palaciodelmar.backend.dto.HostPayoutDTO> result = payoutService.processAutomatedPayouts();
+
+        assertTrue(result.isEmpty());
+        assertNull(refundedBk.getPayoutId());
+        verify(payoutRepo).delete(stuck);
+    }
+
+    @Test
+    @DisplayName("20. executeSequentialRefund usa claves de idempotencia estables por payment.id al reintentar")
+    void sequentialRefundUsesStablePerPaymentIdempotencyKeysAcrossRetries() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService bookingService = buildBookingService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(SuiteNightRepository.class),
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-key-stable-1")
+                .status("cancelled")
+                .paymentStatus("paid")
+                .paidAmount(new BigDecimal("200000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment p1 = Payment.builder()
+                .id("pay-id-A").booking("bk-key-stable-1").transactionId("tx-A")
+                .amount(new BigDecimal("100000")).refundedAmount(BigDecimal.ZERO)
+                .status("completed").createdAt(Instant.now().minusSeconds(60)).build();
+        Payment p2 = Payment.builder()
+                .id("pay-id-B").booking("bk-key-stable-1").transactionId("tx-B")
+                .amount(new BigDecimal("100000")).refundedAmount(BigDecimal.ZERO)
+                .status("completed").createdAt(Instant.now()).build();
+
+        when(paymentRepository.findByBooking("bk-key-stable-1"))
+                .thenReturn(List.of(p1, p2));
+        when(paymentGateway.refund(eq("tx-A"), eq(new BigDecimal("100000")), eq("ref_stable_pay-id-A")))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "r-A", "succeeded", null));
+        when(paymentGateway.refund(eq("tx-B"), eq(new BigDecimal("50000")), eq("ref_stable_pay-id-B")))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(false, null, "failed", "Timeout"))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "r-B", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertFalse(bookingService.executeSequentialRefund(booking, new BigDecimal("150000"), "ref_stable"));
+        p1.setStatus("refunded");
+        p1.setRefundedAmount(new BigDecimal("100000"));
+        assertTrue(bookingService.executeSequentialRefund(booking, new BigDecimal("50000"), "ref_stable"));
+        verify(paymentGateway, times(2)).refund(eq("tx-B"), eq(new BigDecimal("50000")), eq("ref_stable_pay-id-B"));
+    }
+
+    @Test
+    @DisplayName("21. AuthService.updateProfile usa actualización parcial atómica sin sobrescribir password ni tokens")
+    void updateProfileUsesAtomicPartialUpdate() {
+        co.palaciodelmar.backend.repository.UserRepository userRepo = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+        co.palaciodelmar.backend.model.User existing = co.palaciodelmar.backend.model.User.builder()
+                .id("usr-1")
+                .email("u@ejemplo.com")
+                .name("Viejo")
+                .password("old_hash")
+                .resetPasswordTokenHash("old_tok")
+                .build();
+        co.palaciodelmar.backend.model.User updatedFromDb = co.palaciodelmar.backend.model.User.builder()
+                .id("usr-1")
+                .email("u@ejemplo.com")
+                .name("Nuevo")
+                .password("new_hash_from_reset")
+                .build();
+
+        when(userRepo.findById("usr-1")).thenReturn(Optional.of(existing));
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(co.palaciodelmar.backend.model.User.class)))
+                .thenReturn(updatedFromDb);
+
+        AuthService authService = new AuthService(
+                userRepo,
+                mock(org.springframework.security.crypto.password.PasswordEncoder.class),
+                mock(co.palaciodelmar.backend.security.JwtService.class),
+                mock(org.springframework.security.authentication.AuthenticationManager.class),
+                mock(EmailService.class),
+                mongoTemplate
+        );
+
+        co.palaciodelmar.backend.model.User req = co.palaciodelmar.backend.model.User.builder().name("Nuevo").build();
+        var dto = authService.updateProfile("usr-1", req);
+
+        assertEquals("Nuevo", dto.getName());
+        verify(mongoTemplate, times(1)).findAndModify(any(), any(), any(), eq(co.palaciodelmar.backend.model.User.class));
+        verify(userRepo, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("22. BookingExpiryScheduler expira reservas pending con pago parcial y ejecuta reembolso")
+    void expirySchedulerExpiresAndRefundsPartialPaymentBooking() {
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        SuiteNightRepository nightRepo = mock(SuiteNightRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+
+        Booking partialExpired = Booking.builder()
+                .id("bk-part-exp-1")
+                .status("pending")
+                .paymentStatus("partial")
+                .paidAmount(new BigDecimal("150000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("350000"))
+                .expiresAt(Instant.now().minusSeconds(60))
+                .build();
+
+        when(bookingRepo.findByStatusAndExpiresAtBefore(eq("pending"), any())).thenReturn(List.of(partialExpired));
+        when(bookingRepo.findById("bk-part-exp-1")).thenReturn(Optional.of(partialExpired));
+        when(nightRepo.findByBooking("bk-part-exp-1")).thenReturn(List.of());
+        when(bookingRepo.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(bookingService.executeSequentialRefund(eq(partialExpired), eq(new BigDecimal("150000")), eq("ref_exp_bk-part-exp-1")))
+                .thenReturn(false);
+
+        co.palaciodelmar.backend.scheduler.BookingExpiryScheduler scheduler =
+                new co.palaciodelmar.backend.scheduler.BookingExpiryScheduler(bookingRepo, nightRepo, bookingService);
+        scheduler.cleanupExpiredBookings();
+
+        verify(bookingService).changeBookingStatus(eq(partialExpired), eq(BookingStatus.EXPIRED), anyString(), anyString());
+        verify(bookingService).executeSequentialRefund(eq(partialExpired), eq(new BigDecimal("150000")), eq("ref_exp_bk-part-exp-1"));
+        assertEquals("requires_refund", partialExpired.getPaymentStatus());
+        assertEquals(0, new BigDecimal("150000").compareTo(partialExpired.getPendingRefundAmount()));
+    }
+
+    @Test
+    @DisplayName("23. HostController.regeneratePin rechaza reservas canceladas o terminadas")
+    void regeneratePinRejectsCancelledOrCheckedOutBookings() {
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        PropertyRepository propRepo = mock(PropertyRepository.class);
+
+        co.palaciodelmar.backend.model.User host = co.palaciodelmar.backend.model.User.builder()
+                .id("host-1").role("host").email("h@ejemplo.com").build();
+        co.palaciodelmar.backend.security.UserPrincipal principal =
+                new co.palaciodelmar.backend.security.UserPrincipal(host);
+
+        Property prop = Property.builder().id("prop-1").ownerId("host-1").build();
+        Booking cancelled = Booking.builder().id("bk-c1").propertyId("prop-1").status("cancelled").build();
+        Booking checkedOut = Booking.builder().id("bk-co1").propertyId("prop-1").status("checked_out").build();
+
+        when(propRepo.findById("prop-1")).thenReturn(Optional.of(prop));
+        when(bookingRepo.findById("bk-c1")).thenReturn(Optional.of(cancelled));
+        when(bookingRepo.findById("bk-co1")).thenReturn(Optional.of(checkedOut));
+
+        co.palaciodelmar.backend.controller.HostController controller =
+                new co.palaciodelmar.backend.controller.HostController(
+                        bookingRepo,
+                        mock(SuiteRepository.class),
+                        mock(BookingService.class),
+                        mock(co.palaciodelmar.backend.repository.PromotionRepository.class),
+                        propRepo
+                );
+
+        var res1 = controller.regeneratePin(principal, "bk-c1");
+        var res2 = controller.regeneratePin(principal, "bk-co1");
+
+        assertEquals(400, res1.getStatusCode().value());
+        assertEquals(400, res2.getStatusCode().value());
+        verify(bookingRepo, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("24. Pago duplicado reembolsado no se atribuye a la reserva ni omite la llamada a pasarela")
+    void duplicateSurplusPaymentRefundDoesNotBypassGatewayRefundForRealPayment() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService bookingService = buildBookingService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(SuiteNightRepository.class),
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-dup-1")
+                .status("cancelled")
+                .paymentStatus("paid")
+                .paidAmount(new BigDecimal("100000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-real-1")))
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment realPay = Payment.builder()
+                .id("pay-real-1").booking("bk-dup-1").transactionId("tx-real-1")
+                .amount(new BigDecimal("100000")).refundedAmount(BigDecimal.ZERO)
+                .status("completed").createdAt(Instant.now().minusSeconds(60)).build();
+
+        Payment surplusPay = Payment.builder()
+                .id("pay-surplus-2").booking("bk-dup-1").transactionId("tx-surplus-2")
+                .amount(new BigDecimal("100000")).refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("ref-surplus-2")))
+                .status("refunded").createdAt(Instant.now()).build();
+
+        when(paymentRepository.findByBooking("bk-dup-1")).thenReturn(List.of(realPay, surplusPay));
+        when(paymentGateway.refund(eq("tx-real-1"), eq(new BigDecimal("100000")), eq("ref_dup_test")))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "ref-real-1", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+
+        boolean ok = bookingService.executeSequentialRefund(booking, new BigDecimal("100000"), "ref_dup_test");
+
+        assertTrue(ok);
+        verify(paymentGateway, times(1)).refund("tx-real-1", new BigDecimal("100000"), "ref_dup_test");
+        assertTrue(booking.getProcessedRefundIds().contains("ref-real-1"));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
+    }
+
+    @Test
+    @DisplayName("25. Reconciliación tras caída conserva refundId en booking.processedRefundIds para evitar doble conteo por webhook")
+    void recoveryReconciliationPreservesRefundIdOnBooking() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService bookingService = buildBookingService(
+                bookingRepository,
+                mock(SuiteRepository.class),
+                mock(SuiteNightRepository.class),
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-rec-id-1")
+                .status("cancelled")
+                .paymentStatus("requires_refund")
+                .paidAmount(new BigDecimal("100000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .pendingRefundAmount(new BigDecimal("100000"))
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-rec-1")))
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment alreadyUpdatedPay = Payment.builder()
+                .id("pay-rec-1").booking("bk-rec-id-1").transactionId("tx-rec-1")
+                .amount(new BigDecimal("100000")).refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("ref-gw-rec-99")))
+                .status("refunded").createdAt(Instant.now()).build();
+
+        when(paymentRepository.findByBooking("bk-rec-id-1")).thenReturn(List.of(alreadyUpdatedPay));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        boolean ok = bookingService.executeSequentialRefund(booking, new BigDecimal("100000"), "ref_rec_key");
+
+        assertTrue(ok);
+        verify(paymentGateway, never()).refund(anyString(), any(), anyString());
+        assertTrue(booking.getProcessedRefundIds().contains("ref-gw-rec-99"));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getPendingRefundAmount()));
+    }
+
+    @Test
+    @DisplayName("26. Recuperación de múltiples reembolsos registra todos los refundId en una sola escritura atómica")
+    void multiRefundRecoveryPersistsAllMissingRefundIdsAtomically() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+        BookingService bookingService = buildBookingService(bookingRepository, suiteRepository, suiteNightRepository, paymentRepository, paymentGateway);
+        org.springframework.test.util.ReflectionTestUtils.setField(bookingService, "mongoTemplate", mongoTemplate);
+
+        Booking booking = Booking.builder()
+                .id("bk-multi-rec")
+                .status("cancelled")
+                .paymentStatus("requires_refund")
+                .paidAmount(new BigDecimal("200000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .pendingRefundAmount(new BigDecimal("200000"))
+                .pendingRefundIdempotencyKey("ref_multi_key")
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-m1", "pay-m2")))
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment p1 = Payment.builder()
+                .id("pay-m1").booking("bk-multi-rec").transactionId("tx-m1")
+                .amount(new BigDecimal("100000")).refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("ref-m1")))
+                .status("refunded").createdAt(Instant.now().minusSeconds(10)).build();
+        Payment p2 = Payment.builder()
+                .id("pay-m2").booking("bk-multi-rec").transactionId("tx-m2")
+                .amount(new BigDecimal("100000")).refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("ref-m2")))
+                .status("refunded").createdAt(Instant.now()).build();
+
+        when(paymentRepository.findByBooking("bk-multi-rec")).thenReturn(List.of(p1, p2));
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(Booking.class))).thenAnswer(inv -> {
+            booking.setVersion(1L);
+            return booking;
+        });
+
+        boolean ok = bookingService.executeSequentialRefund(booking, new BigDecimal("200000"), "ref_multi_key");
+
+        assertTrue(ok);
+        verify(paymentGateway, never()).refund(anyString(), any(), anyString());
+        verify(mongoTemplate, times(1)).findAndModify(any(), any(), any(), eq(Booking.class));
+        verify(bookingRepository, times(1)).save(any(Booking.class));
+        assertTrue(booking.getProcessedRefundIds().containsAll(List.of("ref-m1", "ref-m2")));
+        assertEquals(0, new BigDecimal("200000").compareTo(booking.getRefundedAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getPendingRefundAmount()));
+    }
+
+    @Test
+    @DisplayName("27. Confirmación síncrona registra paymentId en processedPaymentIds para no excluirse al combinar con webhook")
+    void syncPaymentConfirmationRegistersProcessedPaymentIdForCombinedWebhookRefunds() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService helperBookingService = mock(BookingService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        EmailService emailService = mock(EmailService.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                helperBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-sync-wh-1")
+                .user("user-1")
+                .suite("suite-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("200000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("200000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment payment1 = Payment.builder()
+                .id("pay-sync-1")
+                .booking("bk-sync-wh-1")
+                .user("user-1")
+                .amount(new BigDecimal("100000"))
+                .intentId("pi_sync_1")
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_sync_1")).thenReturn(Optional.of(payment1));
+        when(paymentRepository.findById("pay-sync-1")).thenReturn(Optional.of(payment1));
+        when(bookingRepository.findById("bk-sync-wh-1")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_sync_1", "tok_1"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_sync_1", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        paymentService.confirmPayment("user-1", "pi_sync_1", "tok_1");
+
+        assertTrue(booking.getProcessedPaymentIds().contains("pay-sync-1"));
+    }
+
+    @Test
+    @DisplayName("28. Reconexión SSE concurrente con limpieza del emisor anterior no pierde la nueva suscripción")
+    void sseReconnectDoesNotDropNewSubscriptionDuringOldCleanup() throws Exception {
+        BookingSseService sseService = new BookingSseService();
+        String userId = "user-sse-race";
+
+        for (int i = 0; i < 100; i++) {
+            org.springframework.web.servlet.mvc.method.annotation.SseEmitter oldEmitter =
+                    mock(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
+            org.springframework.web.servlet.mvc.method.annotation.SseEmitter newEmitter =
+                    mock(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
+
+            final Runnable[] completionHook = new Runnable[1];
+            doAnswer(inv -> {
+                completionHook[0] = inv.getArgument(0);
+                return null;
+            }).when(oldEmitter).onCompletion(any(Runnable.class));
+
+            sseService.subscribe(userId, oldEmitter);
+
+            java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+            Thread tCleanup = new Thread(() -> {
+                try {
+                    start.await();
+                    completionHook[0].run();
+                } catch (InterruptedException ignored) {
+                }
+            });
+            Thread tReconnect = new Thread(() -> {
+                try {
+                    start.await();
+                    sseService.subscribe(userId, newEmitter);
+                } catch (InterruptedException ignored) {
+                }
+            });
+            tCleanup.start();
+            tReconnect.start();
+            start.countDown();
+            tCleanup.join();
+            tReconnect.join();
+
+            assertEquals(1, sseService.getActiveSubscribersCount(), "Debe conservarse la nueva suscripción en iteración " + i);
+            clearInvocations(newEmitter);
+            sseService.emitBookingUpdate(userId, co.palaciodelmar.backend.dto.BookingDTO.builder().id("bk-1").build());
+            verify(newEmitter, times(1)).send(any(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.SseEventBuilder.class));
+
+            // Limpiar newEmitter para la siguiente iteración
+            org.mockito.Mockito.reset(newEmitter);
+            doThrow(new java.io.IOException("close")).when(newEmitter).send(any(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.SseEventBuilder.class));
+            sseService.emitBookingUpdate(userId, co.palaciodelmar.backend.dto.BookingDTO.builder().id("bk-cleanup").build());
+        }
+    }
+
+    @Test
+    @DisplayName("29. Reintentar confirmPayment tras fallo guardando Payment no acredita doblemente la reserva")
+    void retryConfirmPaymentDoesNotDoubleCreditBookingWhenPaymentSavePreviouslyFailed() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService helperBookingService = mock(BookingService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        EmailService emailService = mock(EmailService.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                helperBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        // El intento 1 guardó Booking (300.000 pagados y pay-retry-1 en processedPaymentIds), pero falló al guardar Payment
+        Booking booking = Booking.builder()
+                .id("bk-retry-1")
+                .user("user-1")
+                .suite("suite-1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(new BigDecimal("300000"))
+                .balanceDue(BigDecimal.ZERO)
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-retry-1")))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-retry-1")
+                .booking("bk-retry-1")
+                .user("user-1")
+                .amount(new BigDecimal("300000"))
+                .intentId("pi_retry_1")
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_retry_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-retry-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-retry-1")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_retry_1", "tok_1"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_retry_1", "succeeded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        paymentService.confirmPayment("user-1", "pi_retry_1", "tok_1");
+
+        assertEquals(0, new BigDecimal("300000").compareTo(booking.getPaidAmount()));
+        assertEquals("completed", payment.getStatus());
+        verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    @Test
+    @DisplayName("30. Reconfirmar un intento partially_refunded retorna idempotente sin volver a acreditar saldo")
+    void reconfirmPartiallyRefundedPaymentDoesNotReCreditBooking() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService helperBookingService = mock(BookingService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        EmailService emailService = mock(EmailService.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                helperBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-part-ref-1")
+                .user("user-1")
+                .status("confirmed")
+                .paymentStatus("partial")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(new BigDecimal("300000"))
+                .refundedAmount(new BigDecimal("100000"))
+                .balanceDue(new BigDecimal("100000"))
+                .processedPaymentIds(new java.util.ArrayList<>(List.of("pay-pr-1")))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-pr-1")
+                .booking("bk-part-ref-1")
+                .user("user-1")
+                .amount(new BigDecimal("300000"))
+                .refundedAmount(new BigDecimal("100000"))
+                .intentId("pi_pr_1")
+                .transactionId("tx_pr_1")
+                .status("partially_refunded")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_pr_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-pr-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-part-ref-1")).thenReturn(Optional.of(booking));
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment("user-1", "pi_pr_1", "tok_1");
+
+        assertEquals("partially_refunded", result.get("status"));
+        assertEquals(0, new BigDecimal("300000").compareTo(booking.getPaidAmount()));
+        verify(paymentGateway, never()).confirmIntent(anyString(), anyString());
+        verify(bookingRepository, never()).save(any(Booking.class));
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("31. Si falta marca en Redis y falla MongoDB, UserSessionCacheService hace fail-closed incluso con caché previa")
+    @SuppressWarnings("unchecked")
+    void missingRedisMarkerPlusMongoFailureFailsClosedEvenWithCachedUser() {
+        org.springframework.data.redis.core.StringRedisTemplate redisTemplate =
+                mock(org.springframework.data.redis.core.StringRedisTemplate.class);
+        org.springframework.data.redis.core.ValueOperations<String, String> valueOps =
+                mock(org.springframework.data.redis.core.ValueOperations.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository =
+                mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(anyString())).thenReturn(null);
+        when(userRepository.findByEmail("stale@palaciodelmar.co"))
+                .thenThrow(new RuntimeException("MongoDB timeout"));
+
+        co.palaciodelmar.backend.security.UserSessionCacheService cacheService =
+                new co.palaciodelmar.backend.security.UserSessionCacheService(
+                        redisTemplate,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        userRepository
+                );
+
+        // Simular usuario antiguo presente en caché L1
+        co.palaciodelmar.backend.model.User cachedUser = co.palaciodelmar.backend.model.User.builder()
+                .id("u-stale")
+                .email("stale@palaciodelmar.co")
+                .role("GUEST")
+                .build();
+        cacheService.putCachedUser(cachedUser);
+
+        assertTrue(cacheService.isTokenRevokedForUser("stale@palaciodelmar.co", System.currentTimeMillis()));
+    }
+
+    @Test
+    @DisplayName("32. Actualizar cuenta bancaria usa actualización parcial atómica sin sobrescribir contraseña ni token")
+    void updateBankAccountUsesPartialAtomicUpdateWithoutOverwritingCredentials() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+
+        co.palaciodelmar.backend.controller.HostController controller = new co.palaciodelmar.backend.controller.HostController(
+                bookingRepository,
+                suiteRepository,
+                bookingService,
+                promotionRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "userRepository", userRepository);
+        controller.setMongoTemplate(mongoTemplate);
+
+        co.palaciodelmar.backend.model.User hostUser = co.palaciodelmar.backend.model.User.builder()
+                .id("host-bank-1")
+                .email("host@palaciodelmar.co")
+                .password("OLD_HASH")
+                .role("HOST")
+                .build();
+        when(userRepository.findById("host-bank-1")).thenReturn(Optional.of(hostUser));
+
+        co.palaciodelmar.backend.security.UserPrincipal principal = new co.palaciodelmar.backend.security.UserPrincipal(hostUser);
+        co.palaciodelmar.backend.dto.BankAccountDTO req = co.palaciodelmar.backend.dto.BankAccountDTO.builder()
+                .bankName("Bancolombia")
+                .accountType("Ahorros")
+                .accountNumber("1234567890")
+                .holderName("Anfitrion Prueba")
+                .documentType("CC")
+                .documentId("1000111222")
+                .build();
+
+        controller.updateBankAccount(principal, req);
+
+        verify(mongoTemplate, times(1)).updateFirst(
+                any(org.springframework.data.mongodb.core.query.Query.class),
+                any(org.springframework.data.mongodb.core.query.Update.class),
+                eq(co.palaciodelmar.backend.model.User.class)
+        );
+        verify(userRepository, never()).save(any(co.palaciodelmar.backend.model.User.class));
+    }
+
+    @Test
+    @DisplayName("33. Confirmar pago pendiente cuando pasarela reporta refunded no acredita saldo en Booking")
+    void confirmPendingPaymentWhenGatewayReportsRefundedDoesNotCreditBooking() {
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService helperBookingService = mock(BookingService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        EmailService emailService = mock(EmailService.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                helperBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-gw-ref-1")
+                .user("user-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-gw-ref-1")
+                .booking("bk-gw-ref-1")
+                .user("user-1")
+                .amount(new BigDecimal("300000"))
+                .intentId("pi_gw_ref_1")
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_gw_ref-1")).thenReturn(Optional.empty());
+        when(paymentRepository.findByIntentId("pi_gw_ref_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-gw-ref-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-gw-ref-1")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_gw_ref_1", "tok_1"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_gw_ref_1", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThrows(IllegalStateException.class, () -> paymentService.confirmPayment("user-1", "pi_gw_ref_1", "tok_1"));
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getPaidAmount()));
+        assertEquals("refunded", payment.getStatus());
+        verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    @Test
+    @DisplayName("34. Calendario mensual de una suite inexistente no devuelve disponibilidad de otras suites")
+    void monthlyCalendarForNonexistentSuiteDoesNotReturnOtherSuitesAvailability() {
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        PropertyRepository propertyRepository = mock(PropertyRepository.class);
+        PricingService pricingService = new PricingService();
+
+        AvailabilityService availabilityService = new AvailabilityService(
+                suiteRepository,
+                suiteNightRepository,
+                bookingRepository,
+                promotionRepository,
+                branchRepository,
+                propertyRepository,
+                pricingService
+        );
+
+        Suite otherSuite = Suite.builder()
+                .id("suite-real-1")
+                .name("Suite Real")
+                .active(true)
+                .maxGuests(4)
+                .totalUnits(1)
+                .basePrice(new BigDecimal("400000"))
+                .build();
+
+        when(suiteRepository.findById("suite-inexistente")).thenReturn(Optional.empty());
+        when(suiteRepository.findBySlug("suite-inexistente")).thenReturn(Optional.empty());
+        when(suiteRepository.findAll()).thenReturn(List.of(otherSuite));
+
+        LocalDate nextMonth = LocalDate.now().plusMonths(1);
+        AvailabilityService.MonthlyAvailabilityResponseData data = availabilityService.getMonthlyAvailability(
+                nextMonth.getYear(),
+                nextMonth.getMonthValue(),
+                2,
+                null,
+                null,
+                "suite-inexistente"
+        );
+
+        assertEquals(0, data.getTotalSuites());
+        assertTrue(data.getCalendar().stream().allMatch(day -> day.getAvailableSuites() == 0));
+    }
+
+    @Test
+    @DisplayName("35. Webhooks fuera de orden: refund.processed antes que payment.succeeded no confirma ni marca pagada la reserva")
+    void outOfOrderRefundBeforePaymentSucceededDoesNotConfirmOrMarkBookingPaid() {
+        String secret = "whsec_out_of_order_test_secret_1234567890123456";
+        co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository processedRepo =
+                mock(co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        EmailService emailService = mock(EmailService.class);
+
+        co.palaciodelmar.backend.webhook.PaymentWebhookService webhookService =
+                new co.palaciodelmar.backend.webhook.PaymentWebhookService(
+                        paymentRepository,
+                        bookingRepository,
+                        bookingService,
+                        processedRepo,
+                        emailService,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        null
+                );
+        org.springframework.test.util.ReflectionTestUtils.setField(webhookService, "webhookSecret", secret);
+
+        Booking booking = Booking.builder()
+                .id("bk-ooo-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-ooo-1")
+                .booking("bk-ooo-1")
+                .intentId("pi_ooo_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        when(processedRepo.existsByEventId(anyString())).thenReturn(false);
+        when(processedRepo.existsByPayloadHash(anyString())).thenReturn(false);
+        when(processedRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByIntentId("pi_ooo_1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-ooo-1")).thenReturn(Optional.of(booking));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+
+        // 1. Llega primero refund.processed
+        String refundBody = "{\"eventType\":\"refund.processed\",\"data\":{\"intentId\":\"pi_ooo_1\",\"transactionId\":\"re_ooo_1\",\"amount\":300000}}";
+        webhookService.processWebhook(refundBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(refundBody, secret), "evt_ooo_refund", ts);
+        assertEquals("refunded", payment.getStatus());
+
+        // 2. Llega después payment.succeeded
+        String succeededBody = "{\"eventType\":\"payment.succeeded\",\"data\":{\"intentId\":\"pi_ooo_1\",\"transactionId\":\"tx_ooo_1\",\"amount\":300000}}";
+        webhookService.processWebhook(succeededBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(succeededBody, secret), "evt_ooo_paid", ts);
+
+        assertEquals("pending", booking.getStatus());
+        assertEquals("pending", booking.getPaymentStatus());
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getPaidAmount()));
+        assertEquals("refunded", payment.getStatus());
+        verify(bookingService, never()).changeBookingStatus(any(), any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("36. Reenvío de webhook firmado cambiando cabeceras eventId y timestamp es bloqueado")
+    void replayingSignedWebhookWithSwappedTimestampAndEventIdHeadersIsRejected() {
+        String secret = "whsec_replay_header_swap_secret_123456789012345";
+        co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository processedRepo =
+                mock(co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        EmailService emailService = mock(EmailService.class);
+
+        co.palaciodelmar.backend.webhook.PaymentWebhookService webhookService =
+                new co.palaciodelmar.backend.webhook.PaymentWebhookService(
+                        paymentRepository,
+                        bookingRepository,
+                        bookingService,
+                        processedRepo,
+                        emailService,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        null
+                );
+        org.springframework.test.util.ReflectionTestUtils.setField(webhookService, "webhookSecret", secret);
+
+        String nowTs = String.valueOf(Instant.now().getEpochSecond());
+        String oldTs = String.valueOf(Instant.now().minusSeconds(3600).getEpochSecond());
+
+        // Caso A: payload incluye eventId y timestamp firmados -> cambiar cabeceras falla
+        String bodyWithMeta = "{\"eventId\":\"evt_orig_1\",\"timestamp\":\"" + oldTs + "\",\"eventType\":\"payment.failed\",\"data\":{\"intentId\":\"pi_rep_1\"}}";
+        String sigWithMeta = co.palaciodelmar.backend.webhook.WebhookSigner.sign(bodyWithMeta, secret);
+
+        assertThrows(SecurityException.class, () ->
+                webhookService.processWebhook(bodyWithMeta, sigWithMeta, "evt_forged_new", nowTs));
+        assertThrows(IllegalArgumentException.class, () ->
+                webhookService.processWebhook(bodyWithMeta, sigWithMeta, "evt_orig_1", nowTs));
+
+        // Caso B: payload sin eventId/timestamp internos -> hash del payload bloquea reenvío con cabeceras nuevas
+        String bodyNoMeta = "{\"eventType\":\"payment.failed\",\"data\":{\"intentId\":\"pi_rep_2\"}}";
+        String sigNoMeta = co.palaciodelmar.backend.webhook.WebhookSigner.sign(bodyNoMeta, secret);
+        when(processedRepo.existsByEventId("evt_new_header_2")).thenReturn(false);
+        when(processedRepo.existsByPayloadHash(anyString())).thenReturn(true);
+
+        java.util.Map<String, Object> replayRes = webhookService.processWebhook(bodyNoMeta, sigNoMeta, "evt_new_header_2", nowTs);
+        assertEquals("already_processed", replayRes.get("status"));
+        assertEquals(true, replayRes.get("idempotent"));
+        verify(paymentRepository, never()).findByIntentId("pi_rep_2");
+    }
+
+    @Test
+    @DisplayName("37. Reserva legada sin processedPaymentIds no duplica reembolso parcial al llegar payment.succeeded")
+    void partialRefundAlreadyAppliedOnLegacyBookingNotDoubleCountedOnPaymentSucceeded() {
+        String secret = "whsec_legacy_partial_ref_secret_123456789012345";
+        co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository processedRepo =
+                mock(co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        EmailService emailService = mock(EmailService.class);
+
+        co.palaciodelmar.backend.webhook.PaymentWebhookService webhookService =
+                new co.palaciodelmar.backend.webhook.PaymentWebhookService(
+                        paymentRepository,
+                        bookingRepository,
+                        bookingService,
+                        processedRepo,
+                        emailService,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        null
+                );
+        org.springframework.test.util.ReflectionTestUtils.setField(webhookService, "webhookSecret", secret);
+
+        // Reserva legada sin processedPaymentIds, pero ya tiene el reembolso parcial de $100.000 contabilizado
+        Booking booking = Booking.builder()
+                .id("bk-leg-pr-1")
+                .status("confirmed")
+                .paymentStatus("partial")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .refundedAmount(new BigDecimal("100000"))
+                .balanceDue(new BigDecimal("300000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .processedRefundIds(new java.util.ArrayList<>(List.of("re_legacy_1")))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-leg-pr-1")
+                .booking("bk-leg-pr-1")
+                .intentId("pi_leg_pr_1")
+                .amount(new BigDecimal("300000"))
+                .refundedAmount(new BigDecimal("100000"))
+                .processedRefundIds(new java.util.ArrayList<>(List.of("re_legacy_1")))
+                .status("partially_refunded")
+                .build();
+
+        when(processedRepo.existsByEventId(anyString())).thenReturn(false);
+        when(processedRepo.existsByPayloadHash(anyString())).thenReturn(false);
+        when(processedRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByIntentId("pi_leg_pr_1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-leg-pr-1")).thenReturn(Optional.of(booking));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+        String succeededBody = "{\"eventType\":\"payment.succeeded\",\"data\":{\"intentId\":\"pi_leg_pr_1\",\"transactionId\":\"tx_leg_pr_1\",\"amount\":300000}}";
+        webhookService.processWebhook(succeededBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(succeededBody, secret), "evt_leg_pr_ok", ts);
+
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getBalanceDue()));
+        assertEquals("partially_refunded", payment.getStatus());
+    }
+
+    @Test
+    @DisplayName("38. Devolución parcial antes del cobro calcula saldo neto pendiente sin confirmar como pagada")
+    void outOfOrderPartialRefundBeforePaymentSucceededComputesNetBalanceWithoutConfirmingAsPaid() {
+        String secret = "whsec_ooo_partial_ref_test_secret_12345678901234";
+        co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository processedRepo =
+                mock(co.palaciodelmar.backend.repository.ProcessedWebhookEventRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+        EmailService emailService = mock(EmailService.class);
+
+        co.palaciodelmar.backend.webhook.PaymentWebhookService webhookService =
+                new co.palaciodelmar.backend.webhook.PaymentWebhookService(
+                        paymentRepository,
+                        bookingRepository,
+                        bookingService,
+                        processedRepo,
+                        emailService,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        null
+                );
+        org.springframework.test.util.ReflectionTestUtils.setField(webhookService, "webhookSecret", secret);
+
+        Booking booking = Booking.builder()
+                .id("bk-ooo-pr-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("200000"))
+                .paidAmount(BigDecimal.ZERO)
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("200000"))
+                .processedPaymentIds(new java.util.ArrayList<>())
+                .processedRefundIds(new java.util.ArrayList<>())
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-ooo-pr-1")
+                .booking("bk-ooo-pr-1")
+                .intentId("pi_ooo_pr_1")
+                .amount(new BigDecimal("200000"))
+                .status("pending")
+                .build();
+
+        when(processedRepo.existsByEventId(anyString())).thenReturn(false);
+        when(processedRepo.existsByPayloadHash(anyString())).thenReturn(false);
+        when(processedRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByIntentId("pi_ooo_pr_1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-ooo-pr-1")).thenReturn(Optional.of(booking));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String ts = String.valueOf(Instant.now().getEpochSecond());
+
+        // 1. Llega primero refund.processed parcial por $100.000
+        String refundBody = "{\"eventType\":\"refund.processed\",\"data\":{\"intentId\":\"pi_ooo_pr_1\",\"transactionId\":\"re_ooo_pr_1\",\"amount\":100000}}";
+        webhookService.processWebhook(refundBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(refundBody, secret), "evt_ooo_pr_ref", ts);
+
+        // 2. Llega después payment.succeeded por $200.000
+        String succeededBody = "{\"eventType\":\"payment.succeeded\",\"data\":{\"intentId\":\"pi_ooo_pr_1\",\"transactionId\":\"tx_ooo_pr_1\",\"amount\":200000}}";
+        webhookService.processWebhook(succeededBody, co.palaciodelmar.backend.webhook.WebhookSigner.sign(succeededBody, secret), "evt_ooo_pr_paid", ts);
+
+        assertEquals(0, new BigDecimal("200000").compareTo(booking.getPaidAmount()));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getRefundedAmount()));
+        assertEquals(0, new BigDecimal("100000").compareTo(booking.getBalanceDue()));
+        assertEquals("partial", booking.getPaymentStatus());
+        assertEquals("pending", booking.getStatus());
+        assertEquals("partially_refunded", payment.getStatus());
+        verify(bookingService, never()).changeBookingStatus(any(), any(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("39. logoutAllDevices cierra los canales SSE abiertos del usuario para cortar eventos en tiempo real")
+    void logoutAllDevicesClosesActiveSseStreamsForUser() {
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        org.springframework.security.crypto.password.PasswordEncoder passwordEncoder = mock(org.springframework.security.crypto.password.PasswordEncoder.class);
+        co.palaciodelmar.backend.security.JwtService jwtService = mock(co.palaciodelmar.backend.security.JwtService.class);
+        org.springframework.security.authentication.AuthenticationManager authManager = mock(org.springframework.security.authentication.AuthenticationManager.class);
+        EmailService emailService = mock(EmailService.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+
+        AuthService authService = new AuthService(
+                userRepository,
+                passwordEncoder,
+                jwtService,
+                authManager,
+                emailService,
+                mongoTemplate
+        );
+        BookingSseService sseService = new BookingSseService();
+        authService.setBookingSseService(sseService);
+
+        co.palaciodelmar.backend.model.User user = co.palaciodelmar.backend.model.User.builder()
+                .id("u-sse-logout")
+                .email("sse@palaciodelmar.co")
+                .role("GUEST")
+                .build();
+        when(userRepository.findById("u-sse-logout")).thenReturn(Optional.of(user));
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(co.palaciodelmar.backend.model.User.class)))
+                .thenReturn(user);
+
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
+                mock(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
+        sseService.subscribe("u-sse-logout", emitter);
+        assertEquals(1, sseService.getActiveSubscribersCount());
+        clearInvocations(emitter);
+
+        authService.logoutAllDevices("u-sse-logout");
+
+        verify(emitter, times(1)).complete();
+        assertEquals(0, sseService.getActiveSubscribersCount());
+
+        sseService.emitBookingUpdate("u-sse-logout", co.palaciodelmar.backend.dto.BookingDTO.builder().id("bk-after-logout").build());
+        verifyNoMoreInteractions(emitter);
+    }
+
+    @Test
+    @DisplayName("40. confirmPayment ejecuta compensación y registra transacción en Payment si falla el primer guardado de Booking tras el cobro")
+    void confirmPaymentExecutesCompensationAndRecordsTransactionWhenFirstBookingSaveFails() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-first-save-fail")
+                .user("u-1")
+                .suite("suite-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-first-save-fail")
+                .booking("bk-first-save-fail")
+                .user("u-1")
+                .intentId("pi_first_save_fail")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_first_save_fail")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-first-save-fail")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-first-save-fail")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_first_save_fail", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_first_save_fail", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class)))
+                .thenThrow(new RuntimeException("Simulated DB write failure on first save after charge"));
+        when(paymentGateway.refund(eq("tx_first_save_fail"), eq(new BigDecimal("300000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_comp_first_save", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThrows(IllegalStateException.class,
+                () -> paymentService.confirmPayment("u-1", "pi_first_save_fail", "tok_ok"));
+
+        assertEquals("tx_first_save_fail", payment.getTransactionId());
+        assertEquals("refunded", payment.getStatus());
+        assertEquals(0, new BigDecimal("300000").compareTo(payment.getRefundedAmount()));
+        verify(paymentGateway, times(1)).refund(eq("tx_first_save_fail"), eq(new BigDecimal("300000")));
+        verify(paymentRepository, atLeastOnce()).save(payment);
+    }
+
+    @Test
+    @DisplayName("41. Cancelación administrativa persiste pendingRefundAmount y requires_refund desde el primer guardado de CANCELLED")
+    void adminCancellationPersistsPendingRefundAtomicallyWithCancelledStatus() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        AdminService adminService = new AdminService(
+                bookingRepository,
+                suiteRepository,
+                userRepository,
+                promotionRepository,
+                suiteNightRepository,
+                realBookingService,
+                null,
+                paymentRepository,
+                paymentGateway
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-admin-canc-1")
+                .suite("suite-1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(new BigDecimal("300000"))
+                .refundedAmount(BigDecimal.ZERO)
+                .balanceDue(BigDecimal.ZERO)
+                .checkIn(LocalDate.now().plusDays(10))
+                .checkOut(LocalDate.now().plusDays(12))
+                .build();
+
+        java.util.concurrent.atomic.AtomicReference<Booking> persistedSnapshot = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicInteger saveCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        when(bookingRepository.findById("bk-admin-canc-1")).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
+            Booking arg = inv.getArgument(0);
+            int call = saveCount.incrementAndGet();
+            if (call == 1) {
+                persistedSnapshot.set(Booking.builder()
+                        .id(arg.getId())
+                        .status(arg.getStatus())
+                        .paymentStatus(arg.getPaymentStatus())
+                        .paidAmount(arg.getPaidAmount())
+                        .refundedAmount(arg.getRefundedAmount())
+                        .pendingRefundAmount(arg.getPendingRefundAmount())
+                        .pendingRefundIdempotencyKey(arg.getPendingRefundIdempotencyKey())
+                        .build());
+                return arg;
+            }
+            throw new RuntimeException("Simulated persistence failure after initial CANCELLED save");
+        });
+        when(paymentGateway.refund(anyString(), any(BigDecimal.class), anyString()))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(false, null, "failed", "Gateway down"));
+
+        adminService.updateBookingStatus("bk-admin-canc-1", "CANCELLED");
+
+        Booking firstSaved = persistedSnapshot.get();
+        assertNotNull(firstSaved);
+        assertEquals("cancelled", firstSaved.getStatus());
+        assertEquals("requires_refund", firstSaved.getPaymentStatus());
+        assertNotNull(firstSaved.getPendingRefundIdempotencyKey());
+        assertEquals(0, new BigDecimal("300000").compareTo(firstSaved.getPendingRefundAmount()));
+    }
+
+    @Test
+    @DisplayName("42. Una petición autenticada antes de logoutAllDevices no puede abrir canal SSE después del cierre")
+    void preAuthenticatedRequestCannotOpenSseStreamAfterLogoutAllDevices() {
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        org.springframework.security.crypto.password.PasswordEncoder passwordEncoder = mock(org.springframework.security.crypto.password.PasswordEncoder.class);
+        co.palaciodelmar.backend.security.JwtService jwtService = mock(co.palaciodelmar.backend.security.JwtService.class);
+        org.springframework.security.authentication.AuthenticationManager authManager = mock(org.springframework.security.authentication.AuthenticationManager.class);
+        EmailService emailService = mock(EmailService.class);
+        org.springframework.data.mongodb.core.MongoTemplate mongoTemplate = mock(org.springframework.data.mongodb.core.MongoTemplate.class);
+
+        BookingSseService sseService = new BookingSseService();
+        AuthService authService = new AuthService(
+                userRepository,
+                passwordEncoder,
+                jwtService,
+                authManager,
+                emailService,
+                mongoTemplate
+        );
+        authService.setBookingSseService(sseService);
+
+        co.palaciodelmar.backend.controller.BookingStreamController streamController =
+                new co.palaciodelmar.backend.controller.BookingStreamController(sseService, userRepository);
+
+        co.palaciodelmar.backend.model.User user = co.palaciodelmar.backend.model.User.builder()
+                .id("u-race-sse")
+                .email("race-sse@palaciodelmar.co")
+                .role("GUEST")
+                .build();
+        when(userRepository.findById("u-race-sse")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("race-sse@palaciodelmar.co")).thenReturn(Optional.of(user));
+        when(mongoTemplate.findAndModify(any(), any(), any(), eq(co.palaciodelmar.backend.model.User.class)))
+                .thenReturn(user);
+
+        // 1. La petición se autentica ANTES de logoutAllDevices
+        co.palaciodelmar.backend.security.UserPrincipal preAuthPrincipal =
+                new co.palaciodelmar.backend.security.UserPrincipal(user);
+        org.springframework.security.core.Authentication preAuth =
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        preAuthPrincipal, null, preAuthPrincipal.getAuthorities());
+
+        // 2. Ocurre «cerrar todas las sesiones»
+        authService.logoutAllDevices("u-race-sse");
+
+        // 3. La petición en vuelo intenta abrir su canal SSE DESPUÉS del cierre
+        assertThrows(SecurityException.class, () -> streamController.streamBookings(preAuth));
+        assertEquals(0, sseService.getActiveSubscribersCount());
+    }
+
+    @Test
+    @DisplayName("43. confirmPayment no reembolsa el cobro si falla la publicación del evento después de persistir Booking como confirmada y pagada")
+    void confirmPaymentDoesNotRefundWhenEventPublishFailsAfterBookingIsPersisted() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+        org.springframework.context.ApplicationEventPublisher eventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+        realBookingService.setEventPublisher(eventPublisher);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        Booking booking = Booking.builder()
+                .id("bk-evt-fail-1")
+                .user("u-1")
+                .suite("suite-1")
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-evt-fail-1")
+                .booking("bk-evt-fail-1")
+                .user("u-1")
+                .intentId("pi_evt_fail_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_evt_fail_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-evt-fail-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-evt-fail-1")).thenReturn(Optional.of(booking));
+        when(paymentGateway.confirmIntent("pi_evt_fail_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_evt_fail_1", "succeeded", null));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        doThrow(new RuntimeException("Simulated event bus failure after booking save"))
+                .when(eventPublisher).publishEvent(any());
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment("u-1", "pi_evt_fail_1", "tok_ok");
+
+        assertNotNull(result);
+        assertEquals("completed", payment.getStatus());
+        assertEquals("tx_evt_fail_1", payment.getTransactionId());
+        assertEquals("confirmed", booking.getStatus());
+        assertEquals("paid", booking.getPaymentStatus());
+        assertEquals(0, new BigDecimal("300000").compareTo(booking.getPaidAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(booking.getBalanceDue()));
+        verify(paymentGateway, never()).refund(anyString(), any(BigDecimal.class));
+        verify(paymentGateway, never()).refund(anyString(), any(BigDecimal.class), anyString());
+    }
+
+    @Test
+    @DisplayName("44. exportBookingsCsv neutraliza inyección de fórmulas CSV (=, +, -, @) en campos de texto")
+    void exportBookingsCsvNeutralizesFormulaInjectionInTextFields() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        BookingService bookingService = mock(BookingService.class);
+
+        AdminService adminService = new AdminService(
+                bookingRepository,
+                suiteRepository,
+                userRepository,
+                promotionRepository,
+                suiteNightRepository,
+                bookingService,
+                null,
+                null,
+                null
+        );
+
+        Booking maliciousBooking = Booking.builder()
+                .id("bk-csv-inj")
+                .bookingCode("=CMD|' /C calc'!A0")
+                .guestDetails(Booking.GuestDetails.builder()
+                        .fullName("=HYPERLINK(\"http://evil.example\",\"Click\")")
+                        .email("@SUM(1+1)")
+                        .phone("-2+3")
+                        .build())
+                .checkIn(LocalDate.of(2026, 12, 1))
+                .checkOut(LocalDate.of(2026, 12, 3))
+                .nights(2)
+                .guests(2)
+                .totalPrice(new BigDecimal("400000"))
+                .paidAmount(new BigDecimal("400000"))
+                .balanceDue(BigDecimal.ZERO)
+                .status("confirmed")
+                .paymentStatus("paid")
+                .createdAt(Instant.parse("2026-11-14T15:00:00Z"))
+                .build();
+
+        when(bookingRepository.findAll(any(org.springframework.data.domain.Sort.class)))
+                .thenReturn(java.util.List.of(maliciousBooking));
+
+        byte[] csvBytes = adminService.exportBookingsCsv();
+        String csv = new String(csvBytes, java.nio.charset.StandardCharsets.UTF_8);
+
+        assertTrue(csv.contains("'=CMD|' /C calc'!A0"));
+        assertTrue(csv.contains("\"'=HYPERLINK(\"\"http://evil.example\"\",\"\"Click\"\")\""));
+        assertTrue(csv.contains("'@SUM(1+1)"));
+        assertTrue(csv.contains("'-2+3"));
+    }
+
+    @Test
+    @DisplayName("45. Si falla el guardado de SuiteNight en confirmPayment, no queda reserva confirmada con bloqueo temporal y repetir el pago repara/confirma el inventario")
+    void confirmPaymentInventorySaveFailureDoesNotLeaveUnconfirmedSuiteNightsAndReplayRepairsIt() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+
+        LocalDate checkIn = LocalDate.now().plusDays(10);
+        LocalDate checkOut = checkIn.plusDays(1);
+
+        Booking booking = Booking.builder()
+                .id("bk-inv-fail-1")
+                .user("u-inv-1")
+                .suite("suite-inv-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-inv-fail-1")
+                .booking("bk-inv-fail-1")
+                .user("u-inv-1")
+                .intentId("pi_inv_fail_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        co.palaciodelmar.backend.model.SuiteNight heldNight = co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-inv-1")
+                .suite("suite-inv-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-inv-fail-1")
+                .status("held")
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        when(paymentRepository.findByIntentId("pi_inv_fail_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-inv-fail-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-inv-fail-1")).thenReturn(Optional.of(booking));
+        when(suiteNightRepository.findByBooking("bk-inv-fail-1")).thenReturn(java.util.List.of(heldNight));
+        when(paymentGateway.confirmIntent("pi_inv_fail_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_inv_fail_1", "succeeded", null));
+        when(paymentGateway.refund(eq("tx_inv_fail_1"), eq(new BigDecimal("300000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_comp_inv_1", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // 1. Falla el guardado de SuiteNight: no debe persistirse Booking como confirmada y se compensa el pago
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class)))
+                .thenThrow(new RuntimeException("Simulated SuiteNight DB write failure"));
+
+        assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment("u-inv-1", "pi_inv_fail_1", "tok_ok"));
+        verify(bookingRepository, never()).save(any(Booking.class));
+        assertEquals("refunded", payment.getStatus());
+
+        // 2. Además, si una reserva ya confirmada/pagada tuviera un SuiteNight aún en 'held' (o expirado),
+        // repetir confirmPayment sobre un pago completed repara el inventario a 'confirmed' sin expiresAt.
+        booking.setStatus("confirmed");
+        booking.setPaymentStatus("paid");
+        booking.setBalanceDue(BigDecimal.ZERO);
+        booking.setPaidAmount(new BigDecimal("300000"));
+        payment.setStatus("completed");
+        heldNight.setStatus("held");
+        heldNight.setExpiresAt(Instant.now().plusSeconds(300));
+
+        org.mockito.Mockito.reset(suiteNightRepository);
+        when(suiteNightRepository.findByBooking("bk-inv-fail-1")).thenReturn(java.util.List.of(heldNight));
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        paymentService.confirmPayment("u-inv-1", "pi_inv_fail_1", "tok_ok");
+        assertEquals("confirmed", heldNight.getStatus());
+        assertNull(heldNight.getExpiresAt());
+    }
+
+    @Test
+    @DisplayName("46. Si falla bookingRepository.save tras confirmar SuiteNights y se reembolsa el cobro, se libera el inventario bloqueado sin vencimiento")
+    void confirmPaymentBookingSaveFailureReleasesConfirmedSuiteNightsAfterRefund() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentService, "suiteNightRepository", suiteNightRepository);
+
+        LocalDate checkIn = LocalDate.now().plusDays(12);
+        LocalDate checkOut = checkIn.plusDays(1);
+
+        Booking booking = Booking.builder()
+                .id("bk-save-fail-sn")
+                .user("u-sn-1")
+                .suite("suite-sn-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-save-fail-sn")
+                .booking("bk-save-fail-sn")
+                .user("u-sn-1")
+                .intentId("pi_save_fail_sn")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> nightsStore = new java.util.ArrayList<>();
+        co.palaciodelmar.backend.model.SuiteNight heldNight = co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-save-fail-1")
+                .suite("suite-sn-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-save-fail-sn")
+                .status("held")
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+        nightsStore.add(heldNight);
+
+        when(paymentRepository.findByIntentId("pi_save_fail_sn")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-save-fail-sn")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-save-fail-sn")).thenReturn(Optional.of(booking));
+        when(suiteNightRepository.findByBooking("bk-save-fail-sn")).thenAnswer(inv -> new java.util.ArrayList<>(nightsStore));
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+        org.mockito.Mockito.doAnswer(inv -> {
+            nightsStore.clear();
+            return null;
+        }).when(suiteNightRepository).deleteByBooking("bk-save-fail-sn");
+        org.mockito.Mockito.doAnswer(inv -> {
+            nightsStore.clear();
+            return null;
+        }).when(suiteNightRepository).deleteAll(any());
+
+        when(paymentGateway.confirmIntent("pi_save_fail_sn", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_save_fail_sn", "succeeded", null));
+        when(paymentGateway.refund(eq("tx_save_fail_sn"), eq(new BigDecimal("300000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_save_fail_sn", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenThrow(new RuntimeException("Simulated Mongo crash on Booking save"));
+        assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment("u-sn-1", "pi_save_fail_sn", "tok_ok"));
+
+        assertEquals("refunded", payment.getStatus());
+        assertTrue(nightsStore.isEmpty() || nightsStore.stream().allMatch(sn -> "held".equals(sn.getStatus()) && sn.getExpiresAt() != null),
+                "Las SuiteNights no deben quedar bloqueadas sin vencimiento tras reembolsar el cobro");
+    }
+
+    @Test
+    @DisplayName("47. addVerifiedReview no falla si el webhook de mantenimiento lanza excepción, reintenta el webhook en llamada repetida y serializa concurrencia sin Redis")
+    void addVerifiedReviewHandlesWebhookFailureGracefullyAndSerializesWithoutRedis() throws Exception {
+        co.palaciodelmar.backend.repository.ReviewRepository reviewRepository = mock(co.palaciodelmar.backend.repository.ReviewRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        co.palaciodelmar.backend.webhook.WebhookDispatcher webhookDispatcher = mock(co.palaciodelmar.backend.webhook.WebhookDispatcher.class);
+
+        ReviewService reviewService = new ReviewService(reviewRepository, bookingRepository, userRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(reviewService, "webhookDispatcher", webhookDispatcher);
+
+        Booking booking = Booking.builder()
+                .id("bk-rev-1")
+                .user("u-rev-1")
+                .suite("suite-rev-1")
+                .propertyId("prop-rev-1")
+                .status("checked_out")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.Review> savedReviews = new java.util.concurrent.CopyOnWriteArrayList<>();
+        when(bookingRepository.findById("bk-rev-1")).thenReturn(Optional.of(booking));
+        when(reviewRepository.existsByBookingId("bk-rev-1")).thenAnswer(inv -> {
+            Thread.sleep(25);
+            return !savedReviews.isEmpty();
+        });
+        when(reviewRepository.findByBookingId("bk-rev-1")).thenAnswer(inv -> savedReviews.stream().findFirst());
+        when(reviewRepository.save(any(co.palaciodelmar.backend.model.Review.class))).thenAnswer(inv -> {
+            co.palaciodelmar.backend.model.Review r = inv.getArgument(0);
+            if (r.getId() == null) {
+                r.setId("rev-1");
+                savedReviews.add(r);
+            }
+            return r;
+        });
+
+        // Primera llamada: webhookDispatcher lanza excepción al preparar/despachar; la reseña se guarda y retorna éxito
+        doThrow(new RuntimeException("Simulated webhook persistence failure"))
+                .doNothing()
+                .when(webhookDispatcher).dispatchToProperty(eq("prop-rev-1"), eq("maintenance.alert"), any());
+
+        co.palaciodelmar.backend.dto.ReviewDTO dto1 = reviewService.addVerifiedReview(
+                "bk-rev-1", "u-rev-1", 2, "El aire acondicionado no enfria y hace ruido");
+        assertNotNull(dto1);
+        assertEquals(1, savedReviews.size());
+        assertFalse(Boolean.TRUE.equals(savedReviews.get(0).getMaintenanceWebhookDispatched()));
+
+        // Reintento del usuario: recupera la notificación pendiente sin lanzar duplicado
+        co.palaciodelmar.backend.dto.ReviewDTO dto2 = reviewService.addVerifiedReview(
+                "bk-rev-1", "u-rev-1", 2, "El aire acondicionado no enfria y hace ruido");
+        assertNotNull(dto2);
+        assertEquals(1, savedReviews.size());
+        assertTrue(Boolean.TRUE.equals(savedReviews.get(0).getMaintenanceWebhookDispatched()));
+        verify(webhookDispatcher, times(2)).dispatchToProperty(eq("prop-rev-1"), eq("maintenance.alert"), any());
+
+        // Tercer intento cuando ya fue despachado: ahora sí rechaza como duplicado
+        assertThrows(IllegalStateException.class, () ->
+                reviewService.addVerifiedReview("bk-rev-1", "u-rev-1", 2, "El aire acondicionado no enfria y hace ruido"));
+
+        // Además, verificar que 2 hilos concurrentes sin RedisLockService para una misma reserva solo insertan 1 reseña
+        savedReviews.clear();
+        java.util.concurrent.CountDownLatch startLatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.Future<Boolean> f1 = pool.submit(() -> {
+            startLatch.await();
+            reviewService.addVerifiedReview("bk-rev-1", "u-rev-1", 5, "Excelente piscina y desayuno");
+            return true;
+        });
+        java.util.concurrent.Future<Boolean> f2 = pool.submit(() -> {
+            startLatch.await();
+            reviewService.addVerifiedReview("bk-rev-1", "u-rev-1", 5, "Excelente piscina y desayuno");
+            return true;
+        });
+        startLatch.countDown();
+        int successes = 0;
+        for (java.util.concurrent.Future<Boolean> f : java.util.List.of(f1, f2)) {
+            try {
+                if (Boolean.TRUE.equals(f.get())) successes++;
+            } catch (Exception ignored) {
+            }
+        }
+        pool.shutdownNow();
+        assertEquals(1, successes);
+        assertEquals(1, savedReviews.size());
+    }
+
+    @Test
+    @DisplayName("48. Si falla un abono adicional de una reserva ya confirmada, se reembolsa el abono pero NO se elimina su inventario SuiteNight válido")
+    void additionalPaymentFailureOnAlreadyConfirmedBookingPreservesConfirmedSuiteNights() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentService, "suiteNightRepository", suiteNightRepository);
+
+        LocalDate checkIn = LocalDate.now().plusDays(15);
+        LocalDate checkOut = checkIn.plusDays(2);
+
+        Booking confirmedBooking = Booking.builder()
+                .id("bk-already-conf-1")
+                .user("u-conf-1")
+                .suite("suite-conf-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(2)
+                .status("confirmed")
+                .paymentStatus("partial")
+                .totalPrice(new BigDecimal("450000"))
+                .paidAmount(new BigDecimal("300000"))
+                .balanceDue(new BigDecimal("150000"))
+                .processedPaymentIds(new java.util.ArrayList<>(java.util.List.of("pay-initial-1")))
+                .build();
+
+        Payment secondPayment = Payment.builder()
+                .id("pay-second-1")
+                .booking("bk-already-conf-1")
+                .user("u-conf-1")
+                .intentId("pi_second_1")
+                .amount(new BigDecimal("150000"))
+                .status("pending")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> confirmedNights = new java.util.ArrayList<>();
+        confirmedNights.add(co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-conf-1")
+                .suite("suite-conf-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-already-conf-1")
+                .status("confirmed")
+                .expiresAt(null)
+                .build());
+
+        when(paymentRepository.findByIntentId("pi_second_1")).thenReturn(Optional.of(secondPayment));
+        when(paymentRepository.findById("pay-second-1")).thenReturn(Optional.of(secondPayment));
+        when(bookingRepository.findById("bk-already-conf-1")).thenReturn(Optional.of(confirmedBooking));
+        when(suiteNightRepository.findByBooking("bk-already-conf-1")).thenReturn(confirmedNights);
+        org.mockito.Mockito.doAnswer(inv -> {
+            confirmedNights.clear();
+            return null;
+        }).when(suiteNightRepository).deleteByBooking("bk-already-conf-1");
+        org.mockito.Mockito.doAnswer(inv -> {
+            confirmedNights.clear();
+            return null;
+        }).when(suiteNightRepository).deleteAll(any());
+
+        when(paymentGateway.confirmIntent("pi_second_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_second_1", "succeeded", null));
+        when(paymentGateway.refund(eq("tx_second_1"), eq(new BigDecimal("150000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_second_1", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenThrow(new RuntimeException("Simulated DB write failure on additional payment"));
+
+        assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment("u-conf-1", "pi_second_1", "tok_ok"));
+
+        assertEquals("refunded", secondPayment.getStatus());
+        assertEquals(1, confirmedNights.size(), "El inventario válido de la reserva ya confirmada no debe borrarse si falla un abono adicional");
+        verify(suiteNightRepository, never()).deleteByBooking(anyString());
+        verify(suiteNightRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("49. Si falla un segundo abono parcial de una reserva pending vigente, se devuelve ese abono pero se conserva el bloqueo held previo")
+    void secondPartialPaymentFailureOnPendingBookingPreservesActiveHeldSuiteNights() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentService, "suiteNightRepository", suiteNightRepository);
+
+        LocalDate checkIn = LocalDate.now().plusDays(14);
+        LocalDate checkOut = checkIn.plusDays(1);
+        Instant activeHoldExpiry = Instant.now().plusSeconds(600);
+
+        Booking pendingPartialBooking = Booking.builder()
+                .id("bk-pend-part-1")
+                .user("u-pend-1")
+                .suite("suite-pend-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("pending")
+                .paymentStatus("partial")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(new BigDecimal("100000"))
+                .balanceDue(new BigDecimal("200000"))
+                .expiresAt(activeHoldExpiry)
+                .processedPaymentIds(new java.util.ArrayList<>(java.util.List.of("pay-part-1")))
+                .build();
+
+        Payment secondPartialPayment = Payment.builder()
+                .id("pay-part-2")
+                .booking("bk-pend-part-1")
+                .user("u-pend-1")
+                .intentId("pi_part_2")
+                .amount(new BigDecimal("100000"))
+                .status("pending")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> heldNights = new java.util.ArrayList<>();
+        heldNights.add(co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-pend-1")
+                .suite("suite-pend-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-pend-part-1")
+                .status("held")
+                .expiresAt(activeHoldExpiry)
+                .build());
+
+        when(paymentRepository.findByIntentId("pi_part_2")).thenReturn(Optional.of(secondPartialPayment));
+        when(paymentRepository.findById("pay-part-2")).thenReturn(Optional.of(secondPartialPayment));
+        when(bookingRepository.findById("bk-pend-part-1")).thenReturn(Optional.of(pendingPartialBooking));
+        when(suiteNightRepository.findByBooking("bk-pend-part-1")).thenReturn(heldNights);
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+        org.mockito.Mockito.doAnswer(inv -> {
+            heldNights.clear();
+            return null;
+        }).when(suiteNightRepository).deleteByBooking("bk-pend-part-1");
+        org.mockito.Mockito.doAnswer(inv -> {
+            heldNights.clear();
+            return null;
+        }).when(suiteNightRepository).deleteAll(any());
+
+        when(paymentGateway.confirmIntent("pi_part_2", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_part_2", "succeeded", null));
+        when(paymentGateway.refund(eq("tx_part_2"), eq(new BigDecimal("100000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_part_2", "refunded", null));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.save(any(Booking.class))).thenThrow(new RuntimeException("Simulated DB write failure on second partial payment"));
+
+        assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment("u-pend-1", "pi_part_2", "tok_ok"));
+
+        assertEquals("refunded", secondPartialPayment.getStatus());
+        assertEquals(1, heldNights.size(), "El bloqueo held de la reserva pending con abono previo y plazo vigente no debe eliminarse");
+        assertEquals("held", heldNights.get(0).getStatus());
+        assertEquals(activeHoldExpiry, heldNights.get(0).getExpiresAt());
+        verify(suiteNightRepository, never()).deleteByBooking(anyString());
+        verify(suiteNightRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("50. Si bookingRepository.save aplica el cambio en BD pero se pierde la confirmación (lanza excepción), no reembolsa ni borra inventario")
+    void confirmPaymentLostAckAfterCommitDoesNotRefundOrDeleteInventory() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentService, "suiteNightRepository", suiteNightRepository);
+
+        LocalDate checkIn = LocalDate.now().plusDays(16);
+        LocalDate checkOut = checkIn.plusDays(1);
+
+        Booking initialBooking = Booking.builder()
+                .id("bk-lost-ack-1")
+                .version(1L)
+                .user("u-ack-1")
+                .suite("suite-ack-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        java.util.concurrent.atomic.AtomicReference<Booking> dbBooking = new java.util.concurrent.atomic.AtomicReference<>(initialBooking);
+
+        Payment payment = Payment.builder()
+                .id("pay-lost-ack-1")
+                .booking("bk-lost-ack-1")
+                .user("u-ack-1")
+                .intentId("pi_lost_ack_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> nightsStore = new java.util.ArrayList<>();
+        nightsStore.add(co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-ack-1")
+                .suite("suite-ack-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-lost-ack-1")
+                .status("held")
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build());
+
+        when(paymentRepository.findByIntentId("pi_lost_ack_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-lost-ack-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-lost-ack-1")).thenAnswer(inv -> {
+            Booking b = dbBooking.get();
+            return Optional.of(Booking.builder()
+                    .id(b.getId())
+                    .version(b.getVersion())
+                    .user(b.getUser())
+                    .suite(b.getSuite())
+                    .branch(b.getBranch())
+                    .unitSlot(b.getUnitSlot())
+                    .checkIn(b.getCheckIn())
+                    .checkOut(b.getCheckOut())
+                    .nights(b.getNights())
+                    .status(b.getStatus())
+                    .paymentStatus(b.getPaymentStatus())
+                    .totalPrice(b.getTotalPrice())
+                    .paidAmount(b.getPaidAmount())
+                    .balanceDue(b.getBalanceDue())
+                    .expiresAt(b.getExpiresAt())
+                    .processedPaymentIds(b.getProcessedPaymentIds() != null ? new java.util.ArrayList<>(b.getProcessedPaymentIds()) : null)
+                    .build());
+        });
+        when(suiteNightRepository.findByBooking("bk-lost-ack-1")).thenAnswer(inv -> new java.util.ArrayList<>(nightsStore));
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentGateway.confirmIntent("pi_lost_ack_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_lost_ack_1", "succeeded", null));
+
+        // Simula que el guardado en MongoDB SÍ se aplica, pero la respuesta/ack se pierde con excepción de red
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
+            Booking arg = inv.getArgument(0);
+            Booking committed = Booking.builder()
+                    .id(arg.getId())
+                    .version(2L)
+                    .user(arg.getUser())
+                    .suite(arg.getSuite())
+                    .branch(arg.getBranch())
+                    .unitSlot(arg.getUnitSlot())
+                    .checkIn(arg.getCheckIn())
+                    .checkOut(arg.getCheckOut())
+                    .nights(arg.getNights())
+                    .status(arg.getStatus())
+                    .paymentStatus(arg.getPaymentStatus())
+                    .totalPrice(arg.getTotalPrice())
+                    .paidAmount(arg.getPaidAmount())
+                    .balanceDue(arg.getBalanceDue())
+                    .expiresAt(arg.getExpiresAt())
+                    .processedPaymentIds(arg.getProcessedPaymentIds() != null ? new java.util.ArrayList<>(arg.getProcessedPaymentIds()) : null)
+                    .build();
+            dbBooking.set(committed);
+            throw new org.springframework.dao.DataAccessResourceFailureException("Simulated lost ack after MongoDB write committed");
+        });
+
+        java.util.Map<String, Object> result = paymentService.confirmPayment("u-ack-1", "pi_lost_ack_1", "tok_ok");
+        assertNotNull(result);
+        assertEquals("completed", payment.getStatus());
+        assertEquals("confirmed", dbBooking.get().getStatus());
+        assertEquals("paid", dbBooking.get().getPaymentStatus());
+        assertEquals(1, nightsStore.size());
+        assertEquals("confirmed", nightsStore.get(0).getStatus());
+        assertNull(nightsStore.get(0).getExpiresAt());
+        verify(paymentGateway, never()).refund(anyString(), any(BigDecimal.class));
+        verify(paymentGateway, never()).refund(anyString(), any(BigDecimal.class), anyString());
+        verify(suiteNightRepository, never()).deleteByBooking(anyString());
+        verify(suiteNightRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    @DisplayName("51. Una confirmación administrativa intercalada (OptimisticLockingFailureException) no se confunde con la aplicación del cobro ni marca el pago como completed")
+    void interleavedAdminConfirmationCausesOptimisticFailureAndRefundsPaymentWithoutMarkingCompleted() {
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        PaymentRepository paymentRepository = mock(PaymentRepository.class);
+        SuiteRepository suiteRepository = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository branchRepository = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository experienceRepository = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository promotionRepository = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        SuiteNightRepository suiteNightRepository = mock(SuiteNightRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        EmailService emailService = mock(EmailService.class);
+        PaymentGateway paymentGateway = mock(PaymentGateway.class);
+
+        BookingService realBookingService = new BookingService(
+                bookingRepository,
+                suiteRepository,
+                branchRepository,
+                experienceRepository,
+                suiteNightRepository,
+                userRepository,
+                promotionRepository,
+                new PricingService(),
+                paymentGateway
+        );
+        realBookingService.setPaymentRepository(paymentRepository);
+
+        PaymentService paymentService = new PaymentService(
+                paymentRepository,
+                bookingRepository,
+                realBookingService,
+                paymentGateway,
+                emailService,
+                userRepository
+        );
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentService, "suiteNightRepository", suiteNightRepository);
+
+        LocalDate checkIn = LocalDate.now().plusDays(18);
+        LocalDate checkOut = checkIn.plusDays(1);
+
+        Booking initialPendingBooking = Booking.builder()
+                .id("bk-admin-race-1")
+                .version(1L)
+                .user("u-race-1")
+                .suite("suite-race-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("pending")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .expiresAt(Instant.now().plusSeconds(600))
+                .build();
+
+        // Copia en BD actualizada concurrentemente por ADMIN (status=confirmed, version=2L, paidAmount=0)
+        Booking adminConfirmedInDb = Booking.builder()
+                .id("bk-admin-race-1")
+                .version(2L)
+                .user("u-race-1")
+                .suite("suite-race-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(1)
+                .status("confirmed")
+                .paymentStatus("pending")
+                .totalPrice(new BigDecimal("300000"))
+                .paidAmount(BigDecimal.ZERO)
+                .balanceDue(new BigDecimal("300000"))
+                .statusHistory(java.util.List.of(Booking.StatusHistoryEntry.builder()
+                        .status("confirmed")
+                        .changedBy("ADMIN")
+                        .reason("Cambio administrativo de estado")
+                        .timestamp(Instant.now())
+                        .build()))
+                .build();
+
+        Payment payment = Payment.builder()
+                .id("pay-admin-race-1")
+                .booking("bk-admin-race-1")
+                .user("u-race-1")
+                .intentId("pi_admin_race_1")
+                .amount(new BigDecimal("300000"))
+                .status("pending")
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.SuiteNight> nightsStore = new java.util.ArrayList<>();
+        nightsStore.add(co.palaciodelmar.backend.model.SuiteNight.builder()
+                .id("sn-race-1")
+                .suite("suite-race-1")
+                .branch("branch-1")
+                .unitSlot(1)
+                .dates(java.util.List.of(checkIn))
+                .booking("bk-admin-race-1")
+                .status("confirmed")
+                .expiresAt(null)
+                .build());
+
+        when(paymentRepository.findByIntentId("pi_admin_race_1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findById("pay-admin-race-1")).thenReturn(Optional.of(payment));
+        when(bookingRepository.findById("bk-admin-race-1"))
+                .thenReturn(Optional.of(initialPendingBooking))
+                .thenReturn(Optional.of(initialPendingBooking))
+                .thenReturn(Optional.of(adminConfirmedInDb));
+        when(suiteNightRepository.findByBooking("bk-admin-race-1")).thenAnswer(inv -> new java.util.ArrayList<>(nightsStore));
+        when(suiteNightRepository.save(any(co.palaciodelmar.backend.model.SuiteNight.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentGateway.confirmIntent("pi_admin_race_1", "tok_ok"))
+                .thenReturn(new PaymentGateway.PaymentConfirmResponse(true, "tx_admin_race_1", "succeeded", null));
+        when(paymentGateway.refund(eq("tx_admin_race_1"), eq(new BigDecimal("300000"))))
+                .thenReturn(new PaymentGateway.PaymentRefundResponse(true, "re_admin_race_1", "refunded", null));
+        when(bookingRepository.save(any(Booking.class)))
+                .thenThrow(new org.springframework.dao.OptimisticLockingFailureException("Concurrent admin confirmation bumped version"));
+
+        assertThrows(IllegalStateException.class, () ->
+                paymentService.confirmPayment("u-race-1", "pi_admin_race_1", "tok_ok"));
+
+        assertEquals("refunded", payment.getStatus());
+        assertEquals(0, BigDecimal.ZERO.compareTo(adminConfirmedInDb.getPaidAmount()));
+        assertEquals(1, nightsStore.size(), "El inventario de la reserva confirmada por ADMIN no debe borrarse");
+        assertEquals("confirmed", nightsStore.get(0).getStatus());
+        verify(paymentGateway, times(1)).refund(eq("tx_admin_race_1"), eq(new BigDecimal("300000")));
+        verify(suiteNightRepository, never()).deleteByBooking(anyString());
+    }
+
+    @Test
+    @DisplayName("52. Reintento de alerta maintenance.alert tras fallo parcial en segundo destinatario no duplica entrega ni cambia eventId al primero")
+    void partialFailureOnSecondWebhookSubscriberDoesNotDuplicateFirstSubscriberOnRetry() {
+        co.palaciodelmar.backend.repository.ReviewRepository reviewRepository = mock(co.palaciodelmar.backend.repository.ReviewRepository.class);
+        BookingRepository bookingRepository = mock(BookingRepository.class);
+        co.palaciodelmar.backend.repository.UserRepository userRepository = mock(co.palaciodelmar.backend.repository.UserRepository.class);
+        co.palaciodelmar.backend.repository.WebhookSubscriptionRepository subRepo = mock(co.palaciodelmar.backend.repository.WebhookSubscriptionRepository.class);
+        co.palaciodelmar.backend.repository.WebhookDeliveryRepository deliveryRepo = mock(co.palaciodelmar.backend.repository.WebhookDeliveryRepository.class);
+        co.palaciodelmar.backend.webhook.RedisWebhookStreamService streamService = mock(co.palaciodelmar.backend.webhook.RedisWebhookStreamService.class);
+        co.palaciodelmar.backend.webhook.SsrfProtectionValidator ssrfValidator = mock(co.palaciodelmar.backend.webhook.SsrfProtectionValidator.class);
+
+        co.palaciodelmar.backend.webhook.WebhookDispatcher realDispatcher =
+                new co.palaciodelmar.backend.webhook.WebhookDispatcher(subRepo, deliveryRepo, null, null, ssrfValidator);
+        realDispatcher.setRedisWebhookStreamService(streamService);
+
+        ReviewService reviewService = new ReviewService(reviewRepository, bookingRepository, userRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(reviewService, "webhookDispatcher", realDispatcher);
+
+        Booking booking = Booking.builder()
+                .id("bk-multi-1")
+                .user("u-multi-1")
+                .suite("suite-multi-1")
+                .propertyId("prop-multi-1")
+                .status("checked_out")
+                .build();
+
+        co.palaciodelmar.backend.model.WebhookSubscription sub1 = co.palaciodelmar.backend.model.WebhookSubscription.builder()
+                .id("sub-1")
+                .propertyId("prop-multi-1")
+                .ownerId("host-1")
+                .url("https://example.com/hook-1")
+                .events(java.util.List.of("maintenance.alert"))
+                .active(true)
+                .build();
+        co.palaciodelmar.backend.model.WebhookSubscription sub2 = co.palaciodelmar.backend.model.WebhookSubscription.builder()
+                .id("sub-2")
+                .propertyId("prop-multi-1")
+                .ownerId("host-1")
+                .url("https://example.com/hook-2")
+                .events(java.util.List.of("maintenance.alert"))
+                .active(true)
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.Review> savedReviews = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.List<co.palaciodelmar.backend.model.WebhookDelivery> deliveryStore = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.concurrent.atomic.AtomicBoolean failSub2Once = new java.util.concurrent.atomic.AtomicBoolean(true);
+
+        when(bookingRepository.findById("bk-multi-1")).thenReturn(Optional.of(booking));
+        when(reviewRepository.existsByBookingId("bk-multi-1")).thenAnswer(inv -> !savedReviews.isEmpty());
+        when(reviewRepository.findByBookingId("bk-multi-1")).thenAnswer(inv -> savedReviews.stream().findFirst());
+        when(reviewRepository.save(any(co.palaciodelmar.backend.model.Review.class))).thenAnswer(inv -> {
+            co.palaciodelmar.backend.model.Review r = inv.getArgument(0);
+            if (r.getId() == null) {
+                r.setId("rev-multi-1");
+                savedReviews.add(r);
+            }
+            return r;
+        });
+
+        when(subRepo.findByPropertyIdAndActiveTrue("prop-multi-1")).thenReturn(java.util.List.of(sub1, sub2));
+        when(deliveryRepo.existsBySubscriptionIdAndEventId(anyString(), anyString())).thenAnswer(inv -> {
+            String sid = inv.getArgument(0);
+            String eid = inv.getArgument(1);
+            return deliveryStore.stream().anyMatch(d -> sid.equals(d.getSubscriptionId()) && eid.equals(d.getEventId()));
+        });
+        when(deliveryRepo.save(any(co.palaciodelmar.backend.model.WebhookDelivery.class))).thenAnswer(inv -> {
+            co.palaciodelmar.backend.model.WebhookDelivery d = inv.getArgument(0);
+            if ("sub-2".equals(d.getSubscriptionId()) && failSub2Once.compareAndSet(true, false)) {
+                throw new RuntimeException("Simulated failure on second recipient");
+            }
+            if (d.getId() == null) {
+                d.setId("del-" + (deliveryStore.size() + 1));
+            }
+            deliveryStore.add(d);
+            return d;
+        });
+        when(streamService.enqueueDelivery(anyString(), anyString(), eq("maintenance.alert"))).thenReturn(true);
+
+        // Primer intento: sub-1 se encola y sub-2 falla -> reseña queda con maintenanceWebhookDispatched=false
+        co.palaciodelmar.backend.dto.ReviewDTO dto1 = reviewService.addVerifiedReview(
+                "bk-multi-1", "u-multi-1", 2, "El aire acondicionado hace ruido y fallo");
+        assertNotNull(dto1);
+        assertEquals(1, savedReviews.size());
+        assertFalse(Boolean.TRUE.equals(savedReviews.get(0).getMaintenanceWebhookDispatched()));
+        assertEquals(1, deliveryStore.size());
+        assertEquals("sub-1", deliveryStore.get(0).getSubscriptionId());
+        String firstEventId = deliveryStore.get(0).getEventId();
+        assertEquals("evt_maint_rev-multi-1", firstEventId);
+
+        // Reintento: recupera sub-2 con el mismo eventId y NO duplica sub-1
+        co.palaciodelmar.backend.dto.ReviewDTO dto2 = reviewService.addVerifiedReview(
+                "bk-multi-1", "u-multi-1", 2, "El aire acondicionado hace ruido y fallo");
+        assertNotNull(dto2);
+        assertTrue(Boolean.TRUE.equals(savedReviews.get(0).getMaintenanceWebhookDispatched()));
+        assertEquals(2, deliveryStore.size(), "No debe duplicarse la entrega de sub-1 en el reintento");
+        assertEquals(1, deliveryStore.stream().filter(d -> "sub-1".equals(d.getSubscriptionId())).count());
+        assertEquals(1, deliveryStore.stream().filter(d -> "sub-2".equals(d.getSubscriptionId())).count());
+        assertEquals(firstEventId, deliveryStore.get(1).getEventId());
+        verify(streamService, times(2)).enqueueDelivery(anyString(), eq(firstEventId), eq("maintenance.alert"));
+    }
+
+    @Test
+    @DisplayName("53. Dos despachos simultáneos del mismo evento maintenance.alert no duplican guardado ni encolado")
+    void concurrentWebhookDispatchForSameDeterministicEventIdDeduplicatesSaveAndEnqueue() throws Exception {
+        co.palaciodelmar.backend.repository.WebhookSubscriptionRepository subRepo = mock(co.palaciodelmar.backend.repository.WebhookSubscriptionRepository.class);
+        co.palaciodelmar.backend.repository.WebhookDeliveryRepository deliveryRepo = mock(co.palaciodelmar.backend.repository.WebhookDeliveryRepository.class);
+        co.palaciodelmar.backend.webhook.RedisWebhookStreamService streamService = mock(co.palaciodelmar.backend.webhook.RedisWebhookStreamService.class);
+        co.palaciodelmar.backend.webhook.SsrfProtectionValidator ssrfValidator = mock(co.palaciodelmar.backend.webhook.SsrfProtectionValidator.class);
+
+        co.palaciodelmar.backend.webhook.WebhookDispatcher realDispatcher =
+                new co.palaciodelmar.backend.webhook.WebhookDispatcher(subRepo, deliveryRepo, null, null, ssrfValidator);
+        realDispatcher.setRedisWebhookStreamService(streamService);
+
+        co.palaciodelmar.backend.model.WebhookSubscription sub1 = co.palaciodelmar.backend.model.WebhookSubscription.builder()
+                .id("sub-conc-1")
+                .propertyId("prop-conc-1")
+                .ownerId("host-1")
+                .url("https://example.com/hook-conc")
+                .events(java.util.List.of("maintenance.alert"))
+                .active(true)
+                .build();
+
+        java.util.List<co.palaciodelmar.backend.model.WebhookDelivery> deliveryStore = new java.util.concurrent.CopyOnWriteArrayList<>();
+        when(subRepo.findByPropertyIdAndActiveTrue("prop-conc-1")).thenReturn(java.util.List.of(sub1));
+        when(deliveryRepo.existsBySubscriptionIdAndEventId(anyString(), anyString())).thenAnswer(inv -> {
+            String sid = inv.getArgument(0);
+            String eid = inv.getArgument(1);
+            return deliveryStore.stream().anyMatch(d -> sid.equals(d.getSubscriptionId()) && eid.equals(d.getEventId()));
+        });
+        when(deliveryRepo.save(any(co.palaciodelmar.backend.model.WebhookDelivery.class))).thenAnswer(inv -> {
+            Thread.sleep(30);
+            co.palaciodelmar.backend.model.WebhookDelivery d = inv.getArgument(0);
+            if (d.getId() == null) {
+                d.setId("del-conc-" + (deliveryStore.size() + 1));
+            }
+            deliveryStore.add(d);
+            return d;
+        });
+        when(streamService.enqueueDelivery(anyString(), anyString(), eq("maintenance.alert"))).thenReturn(true);
+
+        java.util.Map<String, Object> alertPayload = java.util.Map.of(
+                "reviewId", "rev-conc-1",
+                "bookingId", "bk-conc-1",
+                "alert", "Aire acondicionado"
+        );
+
+        java.util.concurrent.CountDownLatch startLatch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.Future<?> f1 = pool.submit(() -> {
+            startLatch.await();
+            realDispatcher.dispatchToProperty("prop-conc-1", "maintenance.alert", alertPayload);
+            return null;
+        });
+        java.util.concurrent.Future<?> f2 = pool.submit(() -> {
+            startLatch.await();
+            realDispatcher.dispatchToProperty("prop-conc-1", "maintenance.alert", alertPayload);
+            return null;
+        });
+        startLatch.countDown();
+        f1.get();
+        f2.get();
+        pool.shutdown();
+
+        assertEquals(1, deliveryStore.size(), "Solo debe persistirse una entrega para el mismo (subscriptionId, eventId)");
+        assertEquals("evt_maint_rev-conc-1", deliveryStore.get(0).getEventId());
+        verify(streamService, times(1)).enqueueDelivery(anyString(), eq("evt_maint_rev-conc-1"), eq("maintenance.alert"));
+    }
+
+    @Test
+    @DisplayName("ModifyBooking: Al omitir children (null) en request, conserva los niños existentes y valida contra capacidad total de la suite")
+    void testModifyBookingPreservesExistingChildrenWhenOmittedAndRejectsOverCapacity() {
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        SuiteRepository suiteRepo = mock(SuiteRepository.class);
+        SuiteNightRepository suiteNightRepo = mock(SuiteNightRepository.class);
+        BookingService service = buildBookingService(bookingRepo, suiteRepo, suiteNightRepo, null, mock(PaymentGateway.class));
+
+        Suite suite = Suite.builder()
+                .id("suite-cap-4")
+                .maxGuests(4)
+                .totalUnits(1)
+                .basePrice(new BigDecimal("100000"))
+                .build();
+        when(suiteRepo.findById("suite-cap-4")).thenReturn(Optional.of(suite));
+
+        LocalDate checkIn = LocalDate.now(BOGOTA).plusDays(10);
+        LocalDate checkOut = checkIn.plusDays(2);
+
+        // Reserva existente con 2 adultos y 2 niños (ocupación 4/4)
+        Booking existing = Booking.builder()
+                .id("bk-occ-1")
+                .suite("suite-cap-4")
+                .user("user-1")
+                .status("confirmed")
+                .paymentStatus("paid")
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .nights(2)
+                .guests(2)
+                .children(2)
+                .totalPrice(new BigDecimal("200000"))
+                .createdAt(Instant.now())
+                .build();
+
+        when(bookingRepo.findById("bk-occ-1")).thenReturn(Optional.of(existing));
+
+        // Intento de modificar aumentando adultos a 3 pero omitiendo children (null en request)
+        // 3 adultos + 2 niños existentes = 5 personas > maxGuests (4)
+        BookingRequest req = BookingRequest.builder()
+                .suiteId("suite-cap-4")
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .guests(3)
+                .children(null) // Omitido por el cliente
+                .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                service.modifyBooking("bk-occ-1", "user-1", req)
+        );
+        assertTrue(ex.getMessage().contains("Esta habitación admite máximo 4 huéspedes (ocupación solicitada: 5)"),
+                "Debe sumar los niños existentes y rechazar sobrecupo. Mensaje fue: " + ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("CreateBooking / ModifyBooking: Rechaza fechas de check-in que superen los 2 años en el futuro")
+    void testBookingRejectsCheckInBeyondTwoYears() {
+        BookingRepository bookingRepo = mock(BookingRepository.class);
+        SuiteRepository suiteRepo = mock(SuiteRepository.class);
+        SuiteNightRepository suiteNightRepo = mock(SuiteNightRepository.class);
+        BookingService service = buildBookingService(bookingRepo, suiteRepo, suiteNightRepo, null, mock(PaymentGateway.class));
+
+        Suite suite = Suite.builder().id("suite-future").maxGuests(2).totalUnits(1).basePrice(new BigDecimal("100000")).build();
+        when(suiteRepo.findById("suite-future")).thenReturn(Optional.of(suite));
+
+        LocalDate farFuture = LocalDate.now(BOGOTA).plusDays(735);
+        BookingRequest req = BookingRequest.builder()
+                .suiteId("suite-future")
+                .checkIn(farFuture)
+                .checkOut(farFuture.plusDays(2))
+                .guests(2)
+                .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                service.createBooking("user-1", req)
+        );
+        assertTrue(ex.getMessage().contains("2 años en el futuro"), "Debe rechazar reservas con más de 2 años en el futuro");
+    }
+
+    @Test
+    @DisplayName("FoodPrice: resolveServerFoodPrice respeta el catálogo oficial y bloquea manipulación de precios")
+    void testFoodPriceCatalogIntegrity() {
+        // Plato conocido del catálogo
+        BigDecimal pargoPrice = BookingService.resolveServerFoodPrice("Pargo rojo frito con patacones", new BigDecimal("10000"));
+        assertEquals(new BigDecimal("88000"), pargoPrice, "Pargo rojo debe costar 88000 sin importar que el cliente envíe 10000");
+
+        BigDecimal arrozPrice = BookingService.resolveServerFoodPrice("Arroz de mariscos del Caribe", new BigDecimal("20000"));
+        assertEquals(new BigDecimal("125000"), arrozPrice, "Arroz de mariscos debe costar 125000 sin importar que el cliente envíe 20000");
+
+        // Plato desconocido con precio bajo (< 80000) debe ajustarse al default
+        BigDecimal unknownLow = BookingService.resolveServerFoodPrice("Plato inventado", new BigDecimal("15000"));
+        assertEquals(new BigDecimal("80000"), unknownLow, "Plato desconocido con precio bajo debe cobrar default 80000");
+    }
+
+    @Test
+    @DisplayName("IntegrationService: Bloquea desactivación de suite externa si existen reservas activas o futuras")
+    void testIntegrationDeactivateRoomBlockedWhenFutureReservationsExist() {
+        SuiteRepository suiteRepo = mock(SuiteRepository.class);
+        SuiteNightRepository nightRepo = mock(SuiteNightRepository.class);
+        IntegrationService integrationService = new IntegrationService(suiteRepo, nightRepo);
+
+        ApiKey apiKey = ApiKey.builder().propertyId("prop-1").build();
+        Suite suite = Suite.builder()
+                .id("suite-ext-1")
+                .propertyId("prop-1")
+                .externalId("PMS-EXT-1")
+                .active(true)
+                .totalUnits(2)
+                .name("Habitación Externa")
+                .build();
+
+        when(suiteRepo.findByPropertyIdAndExternalId("prop-1", "PMS-EXT-1")).thenReturn(Optional.of(suite));
+
+        LocalDate today = LocalDate.now(BOGOTA);
+        SuiteNight futureNight = SuiteNight.builder()
+                .suite("suite-ext-1")
+                .dates(List.of(today.plusDays(5)))
+                .status("confirmed")
+                .unitSlot(1)
+                .build();
+
+        when(nightRepo.findBySuiteAndDatesBetween(eq("suite-ext-1"), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of(futureNight));
+
+        IntegrationRoomRequest deactivateReq = IntegrationRoomRequest.builder()
+                .externalId("PMS-EXT-1")
+                .name("Habitación Externa")
+                .active(false)
+                .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                integrationService.upsertRoom(apiKey, deactivateReq)
+        );
+        assertTrue(ex.getMessage().contains("No se puede desactivar la habitación porque existen reservas activas o futuras"));
     }
 }

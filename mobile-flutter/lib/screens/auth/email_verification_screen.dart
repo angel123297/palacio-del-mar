@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'dart:async';
 import 'dart:convert';
+import '../../core/config/api_config.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../core/security/secure_storage.dart';
 import '../../core/theme/app_theme.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
-  final String baseUrl;
+  final String? baseUrl;
   final VoidCallback? onVerified;
 
   const EmailVerificationScreen({
     super.key,
     required this.email,
-    this.baseUrl = 'https://unbroke-unsized-zandra.ngrok-free.dev/api',
+    this.baseUrl,
     this.onVerified,
   });
 
@@ -25,6 +28,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   final TextEditingController _tokenController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
+
+  String get _effectiveBaseUrl =>
+      (widget.baseUrl != null && widget.baseUrl!.isNotEmpty) ? widget.baseUrl! : ApiConfig.baseUrl;
 
   // Temporizador para evitar spam de reenvío (60 segundos)
   int _resendCooldown = 0;
@@ -63,7 +69,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('${widget.baseUrl}/auth/verify-email'),
+        Uri.parse('$_effectiveBaseUrl/auth/verify-email'),
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
@@ -79,6 +85,14 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         if (jwtToken != null && jwtToken.toString().isNotEmpty) {
           await SecureStorage.saveToken(jwtToken.toString());
         }
+
+        if (!mounted) return;
+
+        // Sincronizar y actualizar de inmediato el estado en AuthProvider
+        try {
+          final authProvider = context.read<AuthProvider>();
+          await authProvider.checkAuthStatus();
+        } catch (_) {}
 
         if (!mounted) return;
 
@@ -111,7 +125,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('${widget.baseUrl}/auth/resend-verification'),
+        Uri.parse('$_effectiveBaseUrl/auth/resend-verification'),
         headers: {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',

@@ -34,10 +34,23 @@ public class HostPropertyController {
     @Autowired(required = false)
     private ReviewService reviewService;
 
+    private String resolveUserId(UserPrincipal principal) {
+        if (principal == null) return null;
+        if (principal.getUser() != null && principal.getUser().getId() != null) {
+            return principal.getUser().getId();
+        }
+        return principal.getUsername();
+    }
+
+    private boolean resolveIsAdmin(UserPrincipal principal) {
+        if (principal == null || principal.getAuthorities() == null) return false;
+        return principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<List<PropertyDTO>>> getMyProperties(
             @AuthenticationPrincipal UserPrincipal principal) {
-        String userId = principal.getUser().getId();
+        String userId = resolveUserId(principal);
         List<PropertyDTO> properties = propertyService.getPropertiesByOwner(userId);
         return ResponseEntity.ok(ApiResponse.ok(properties));
     }
@@ -46,8 +59,8 @@ public class HostPropertyController {
     public ResponseEntity<ApiResponse<PropertyDTO>> createProperty(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody PropertyRequest req) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         // Los admins auto-aprueban sus propiedades; anfitriones estándar quedan PENDING para revisión
         PropertyDTO created = propertyService.createProperty(userId, req, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok("Propiedad registrada exitosamente", created));
@@ -57,8 +70,8 @@ public class HostPropertyController {
     public ResponseEntity<ApiResponse<PropertyDTO>> getProperty(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         PropertyDTO dto = propertyService.getPropertyByOwner(id, userId, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
@@ -68,8 +81,8 @@ public class HostPropertyController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id,
             @Valid @RequestBody PropertyRequest req) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         PropertyDTO updated = propertyService.updateProperty(id, userId, req, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok("Propiedad actualizada exitosamente", updated));
     }
@@ -80,8 +93,8 @@ public class HostPropertyController {
     public ResponseEntity<ApiResponse<List<SuiteResponseDTO>>> getPropertySuites(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String propertyId) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         List<Suite> suites = propertyService.getPropertySuitesForHost(propertyId, userId, isAdmin);
         List<SuiteResponseDTO> dtos = suites.stream()
                 .map(s -> SuiteResponseDTO.from(s, null))
@@ -94,8 +107,8 @@ public class HostPropertyController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String propertyId,
             @Valid @RequestBody HostSuiteRequest req) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         Suite created = propertyService.createSuiteForProperty(propertyId, userId, req, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok("Habitación creada exitosamente", SuiteResponseDTO.from(created, null)));
     }
@@ -106,8 +119,8 @@ public class HostPropertyController {
             @PathVariable String propertyId,
             @PathVariable String suiteId,
             @Valid @RequestBody HostSuiteRequest req) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         Suite updated = propertyService.updateSuiteForProperty(propertyId, suiteId, userId, req, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok("Habitación actualizada exitosamente", SuiteResponseDTO.from(updated, null)));
     }
@@ -117,8 +130,8 @@ public class HostPropertyController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String propertyId,
             @PathVariable String suiteId) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         propertyService.deleteSuiteForProperty(propertyId, suiteId, userId, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok("Habitación desactivada exitosamente", null));
     }
@@ -128,8 +141,8 @@ public class HostPropertyController {
     @GetMapping("/payouts")
     public ResponseEntity<ApiResponse<List<HostPayoutDTO>>> getMyPayouts(
             @AuthenticationPrincipal UserPrincipal principal) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         List<HostPayoutDTO> payouts = isAdmin && hostPayoutService != null
                 ? hostPayoutService.getPayoutsForAdmin()
                 : (hostPayoutService != null ? hostPayoutService.getPayoutsForHost(userId) : List.of());
@@ -139,7 +152,7 @@ public class HostPropertyController {
     @PostMapping("/payouts/process-now")
     public ResponseEntity<ApiResponse<List<HostPayoutDTO>>> triggerPayoutProcess(
             @AuthenticationPrincipal UserPrincipal principal) {
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = resolveIsAdmin(principal);
         if (!isAdmin) {
             return ResponseEntity.status(403).body(ApiResponse.error("Solo administradores pueden forzar la liquidación inmediata"));
         }
@@ -150,8 +163,8 @@ public class HostPropertyController {
     @GetMapping("/reviews")
     public ResponseEntity<ApiResponse<List<ReviewDTO>>> getHostReviews(
             @AuthenticationPrincipal UserPrincipal principal) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         List<PropertyDTO> properties = isAdmin ? propertyService.getAllPropertiesForAdmin(null) : propertyService.getPropertiesByOwner(userId);
         List<ReviewDTO> hostReviews = new java.util.ArrayList<>();
         if (reviewService != null && properties != null) {
@@ -175,7 +188,7 @@ public class HostPropertyController {
     public ResponseEntity<ApiResponse<ReviewDTO>> resolveMaintenance(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String reviewId) {
-        String userId = principal.getUser().getId();
+        String userId = resolveUserId(principal);
         ReviewDTO dto = reviewService != null ? reviewService.resolveMaintenanceAlert(reviewId, userId) : null;
         return ResponseEntity.ok(ApiResponse.ok("Alerta de mantenimiento marcada como resuelta", dto));
     }
@@ -184,8 +197,8 @@ public class HostPropertyController {
     public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getPropertyIcalSyncInfo(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id) {
-        String userId = principal.getUser().getId();
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
         PropertyDTO property = propertyService.getPropertyByOwner(id, userId, isAdmin);
 
         java.util.Map<String, Object> syncInfo = new java.util.LinkedHashMap<>();

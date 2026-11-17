@@ -62,16 +62,21 @@ import { Experience } from '../../models/types';
             </div>
           </div>
         </div>
+
+        <div *ngIf="!loading && experiences.length === 0" class="text-center py-12 text-sm text-[#f5f0e8] opacity-60">
+          <p *ngIf="loadError">No se pudieron cargar las experiencias en este momento.</p>
+          <p *ngIf="!loadError">No hay experiencias disponibles en este momento.</p>
+        </div>
       </div>
 
       <!-- Quick Experience Booking Modal -->
-      <div *ngIf="selectedExp" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(0,0,0,0.85)] backdrop-blur-sm animate-fade-in">
+      <div *ngIf="selectedExp" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[rgba(0,0,0,0.85)] backdrop-blur-sm animate-fade-in" role="dialog" aria-modal="true" aria-labelledby="modal-exp-title">
         <div class="bg-[#141210] border border-[rgba(201,169,110,0.3)] rounded-2xl max-w-lg w-full p-6 text-[#f5f0e8] shadow-2xl relative">
           <button (click)="closeBookingModal()" class="absolute top-4 right-4 text-[#888] hover:text-[#fff] text-xl font-bold cursor-pointer" aria-label="Cerrar modal">&times;</button>
           
           <div class="mb-4">
             <span class="text-[#c9a96e] text-xs font-semibold tracking-wider uppercase">Reserva de Actividad Exclusiva</span>
-            <h3 class="text-2xl font-serif text-[#f5f0e8] mt-1">{{ selectedExp.name }}</h3>
+            <h3 id="modal-exp-title" class="text-2xl font-serif text-[#f5f0e8] mt-1">{{ selectedExp.name }}</h3>
             <p class="text-xs text-[#aaa] mt-1">{{ selectedExp.shortDescription || selectedExp.description }}</p>
           </div>
 
@@ -82,29 +87,29 @@ import { Experience } from '../../models/types';
           <form (ngSubmit)="submitExperienceBooking()" class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Fecha</label>
-                <input type="date" [(ngModel)]="bookingDate" name="bookingDate" [min]="minDate" required class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
+                <label for="exp-booking-date" class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Fecha</label>
+                <input id="exp-booking-date" type="date" [(ngModel)]="bookingDate" name="bookingDate" [min]="minDate" required class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
               </div>
               <div>
-                <label class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Personas</label>
-                <input type="number" [(ngModel)]="bookingQty" name="bookingQty" min="1" max="10" required class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
+                <label for="exp-booking-qty" class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Personas</label>
+                <input id="exp-booking-qty" type="number" [(ngModel)]="bookingQty" name="bookingQty" min="1" max="10" required class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
               </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Nombre Completo</label>
-                <input type="text" [(ngModel)]="guestName" name="guestName" placeholder="Tu nombre" required class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
+                <label for="exp-guest-name" class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Nombre Completo</label>
+                <input id="exp-guest-name" type="text" [(ngModel)]="guestName" name="guestName" placeholder="Tu nombre" required class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
               </div>
               <div>
-                <label class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Correo Electrónico</label>
-                <input type="email" [(ngModel)]="guestEmail" name="guestEmail" placeholder="tu@email.com" required class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
+                <label for="exp-guest-email" class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Correo Electrónico</label>
+                <input id="exp-guest-email" type="email" [(ngModel)]="guestEmail" name="guestEmail" placeholder="tu@email.com" required class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
               </div>
             </div>
 
             <div>
-              <label class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Teléfono / WhatsApp</label>
-              <input type="tel" [(ngModel)]="guestPhone" name="guestPhone" placeholder="+57 300 000 0000" class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
+              <label for="exp-guest-phone" class="block text-xs uppercase tracking-wider text-[#c9a96e] mb-1 font-semibold">Teléfono / WhatsApp</label>
+              <input id="exp-guest-phone" type="tel" [(ngModel)]="guestPhone" name="guestPhone" placeholder="+57 300 000 0000" class="w-full bg-[#1e1a17] border border-[rgba(255,255,255,0.1)] focus:border-[#c9a96e] rounded-lg px-3 py-2 text-sm text-[#f5f0e8] outline-none" />
             </div>
 
             <div class="pt-3 border-t border-[rgba(255,255,255,0.08)] flex items-center justify-between">
@@ -125,6 +130,7 @@ import { Experience } from '../../models/types';
 export class ExperiencesSectionComponent implements OnInit {
   experiences: Experience[] = [];
   loading = true;
+  loadError = false;
   selectedExp: Experience | null = null;
   bookingDate: string = '';
   bookingQty: number = 1;
@@ -157,6 +163,7 @@ export class ExperiencesSectionComponent implements OnInit {
       },
       error: () => {
         this.loading = false;
+        this.loadError = true;
         this.cdr.detectChanges();
       }
     });

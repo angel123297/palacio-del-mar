@@ -27,10 +27,16 @@ public class PricingService {
      */
     public PricingResult calculatePrice(BigDecimal basePrice, LocalDate checkIn, LocalDate checkOut,
                                         BigDecimal branchPromotionPercent, Function<LocalDate, BigDecimal> dynamicFactor) {
-        long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
-        if (nights <= 0) {
-            throw new IllegalArgumentException("La estadía debe ser de al menos 1 noche.");
+        if (basePrice == null || basePrice.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("El precio base es obligatorio y debe ser no negativo.");
         }
+        if (checkIn == null || checkOut == null) {
+            throw new IllegalArgumentException("Las fechas de check-in y check-out son obligatorias.");
+        }
+        if (!checkOut.isAfter(checkIn)) {
+            throw new IllegalArgumentException("La estadía debe ser de al menos 1 noche (check-out posterior a check-in).");
+        }
+        long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
 
         BigDecimal subtotal = BigDecimal.ZERO;
         List<NightlyPrice> nightlyPrices = new ArrayList<>();

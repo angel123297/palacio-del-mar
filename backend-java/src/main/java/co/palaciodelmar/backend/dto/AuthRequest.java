@@ -10,6 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AuthRequest {
+    @jakarta.validation.constraints.NotBlank
+    @jakarta.validation.constraints.Email
     private String email;
+    @jakarta.validation.constraints.NotBlank
     private String password;
 }

@@ -46,7 +46,7 @@ public class HostWebhookController {
     public ResponseEntity<ApiResponse<WebhookSubscriptionDTO>> updateSubscription(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id,
-            @RequestBody WebhookSubscriptionRequest request
+            @Valid @RequestBody WebhookSubscriptionRequest request
     ) {
         User user = principal != null ? principal.getUser() : null;
         WebhookSubscriptionDTO updated = hostWebhookService.updateSubscription(user, id, request);
@@ -69,7 +69,8 @@ public class HostWebhookController {
             @RequestParam(required = false) String propertyId,
             @RequestParam(required = false) String subscriptionId
     ) {
-        List<WebhookDeliveryDTO> deliveries = hostWebhookService.getDeliveries(principal.getUser(), propertyId, subscriptionId);
+        User user = principal != null ? principal.getUser() : null;
+        List<WebhookDeliveryDTO> deliveries = hostWebhookService.getDeliveries(user, propertyId, subscriptionId);
         return ResponseEntity.ok(ApiResponse.ok(deliveries));
     }
 
@@ -78,7 +79,8 @@ public class HostWebhookController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id
     ) {
-        WebhookDeliveryDTO delivery = hostWebhookService.redeliver(principal.getUser(), id);
+        User user = principal != null ? principal.getUser() : null;
+        WebhookDeliveryDTO delivery = hostWebhookService.redeliver(user, id);
         return ResponseEntity.ok(ApiResponse.ok("Entrega de webhook reenviada exitosamente", delivery));
     }
 

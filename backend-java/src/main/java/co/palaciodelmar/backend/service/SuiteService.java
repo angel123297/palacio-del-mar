@@ -51,8 +51,13 @@ public class SuiteService {
         Map<String, Property> propMap = propertyRepository.findAll().stream()
                 .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
 
-        List<Suite> suites = suiteRepository.findAll().stream()
-                .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+        List<Suite> suites = suiteRepository.findByActiveTrue();
+        if (suites == null || suites.isEmpty()) {
+            suites = suiteRepository.findAll().stream()
+                    .filter(s -> !Boolean.FALSE.equals(s.getActive()))
+                    .toList();
+        }
+        suites = suites.stream()
                 .filter(s -> {
                     if (s.getPropertyId() == null) {
                         return true;
@@ -111,8 +116,13 @@ public class SuiteService {
         Map<String, Property> propMap = propertyRepository.findAll().stream()
                 .collect(Collectors.toMap(Property::getId, Function.identity(), (a, b) -> a));
 
-        return suiteRepository.findAll().stream()
-                .filter(s -> targetId.equals(s.getBranch()) && !Boolean.FALSE.equals(s.getActive()))
+        List<Suite> branchSuites = suiteRepository.findByBranchAndActiveTrue(targetId);
+        if (branchSuites == null || branchSuites.isEmpty()) {
+            branchSuites = suiteRepository.findAll().stream()
+                    .filter(s -> targetId.equals(s.getBranch()) && !Boolean.FALSE.equals(s.getActive()))
+                    .toList();
+        }
+        return branchSuites.stream()
                 .filter(s -> {
                     if (s.getPropertyId() == null) {
                         return true;
@@ -216,10 +226,10 @@ public class SuiteService {
             }
         }
 
-        long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
-        if (nights <= 0) {
-            nights = 1;
+        if (request.getCheckIn() == null || request.getCheckOut() == null || !request.getCheckOut().isAfter(request.getCheckIn())) {
+            throw new IllegalArgumentException("La fecha de check-out debe ser estrictamente posterior a la fecha de check-in.");
         }
+        long nights = ChronoUnit.DAYS.between(request.getCheckIn(), request.getCheckOut());
 
         BigDecimal branchPromoPercent = findActiveSuitePromotion(suite, request.getCheckIn(), request.getCheckOut());
         Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
@@ -234,25 +244,52 @@ public class SuiteService {
         BigDecimal experiencesTotal = BigDecimal.ZERO;
         if (Boolean.TRUE.equals(request.getIncludeExperiences()) && request.getExperienceIds() != null) {
             for (String expId : request.getExperienceIds()) {
-                if (expId != null && !expId.isBlank() && !expId.startsWith("fx-")) {
+                if (expId != null && !expId.isBlank()) {
                     Optional<Experience> exp = experienceRepository.findById(expId);
-                    if (exp.isPresent() && exp.get().getPrice() != null) {
-                        experiencesTotal = experiencesTotal.add(exp.get().getPrice());
+                    if (exp.isPresent()) {
+                        Experience e = exp.get();
+                        if (Boolean.TRUE.equals(e.getActive()) && Boolean.TRUE.equals(e.getAvailable()) && e.getPrice() != null) {
+                            experiencesTotal = experiencesTotal.add(e.getPrice());
+                        }
                     }
                 }
             }
         }
 
+        int totalOccupants = (request.getGuests() != null ? request.getGuests() : 1)
+                + (request.getChildren() != null ? request.getChildren() : 0);
         BigDecimal extraGuestsFee = BigDecimal.ZERO;
-        if (request.getGuests() != null && request.getGuests() > 2) {
+        if (totalOccupants > 2) {
             extraGuestsFee = new BigDecimal("120000")
-                    .multiply(BigDecimal.valueOf(request.getGuests() - 2))
+                    .multiply(BigDecimal.valueOf(totalOccupants - 2))
                     .multiply(BigDecimal.valueOf(nights));
+        }
+
+        BigDecimal vipExtrasTotal = BigDecimal.ZERO;
+        if (Boolean.TRUE.equals(request.getAirportPickup())) {
+            vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("150000"));
+        }
+        if (Boolean.TRUE.equals(request.getPetFriendly())) {
+            vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
+        }
+        if (request.getFoodOrders() != null) {
+            for (var food : request.getFoodOrders()) {
+                if (food != null) {
+                    BigDecimal foodPrice = BookingService.resolveServerFoodPrice(
+                            food.getFoodName() != null ? food.getFoodName() : food.getDishName(),
+                            food.getPrice()
+                    );
+                    if (Boolean.TRUE.equals(food.getIncludesBreakfastCombo())) {
+                        foodPrice = foodPrice.add(new BigDecimal("35000"));
+                    }
+                    vipExtrasTotal = vipExtrasTotal.add(foodPrice);
+                }
+            }
         }
 
         BigDecimal roomTotal = result.total();
         BigDecimal guaranteeDeposit = new BigDecimal("100000");
-        BigDecimal total = roomTotal.add(experiencesTotal).add(extraGuestsFee);
+        BigDecimal total = roomTotal.add(experiencesTotal).add(extraGuestsFee).add(vipExtrasTotal);
         BigDecimal totalWithDeposit = total.add(guaranteeDeposit);
 
         CalculatePriceResponseDTO.DatesInfo datesInfo = CalculatePriceResponseDTO.DatesInfo.builder()
@@ -276,6 +313,7 @@ public class SuiteService {
                 .roomTotal(roomTotal)
                 .extraGuestsFee(extraGuestsFee)
                 .guaranteeDeposit(guaranteeDeposit)
+                .vipExtrasTotal(vipExtrasTotal)
                 .experiencesTotal(experiencesTotal)
                 .discount(result.discount())
                 .discountReason(result.discount().compareTo(BigDecimal.ZERO) > 0 ? "Promoción / Larga estadía" : null)

@@ -161,6 +161,23 @@ class PricingServiceTest {
         assertMoneyEquals(new BigDecimal("130.00"), result.subtotal());
     }
 
+    @Test
+    void rejectsNullOrNegativeBasePrice() {
+        LocalDate checkIn = LocalDate.parse("2026-05-04");
+        assertThrows(IllegalArgumentException.class,
+                () -> service.calculatePrice(null, checkIn, checkIn.plusDays(1), BigDecimal.ZERO));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.calculatePrice(new BigDecimal("-50"), checkIn, checkIn.plusDays(1), BigDecimal.ZERO));
+    }
+
+    @Test
+    void rejectsNullDates() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.calculatePrice(new BigDecimal("100"), null, LocalDate.now(), BigDecimal.ZERO));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.calculatePrice(new BigDecimal("100"), LocalDate.now(), null, BigDecimal.ZERO));
+    }
+
     private static void assertMoneyEquals(BigDecimal expected, BigDecimal actual) {
         assertEquals(0, expected.compareTo(actual),
                 () -> "Expected " + expected.toPlainString() + " but got " + actual.toPlainString());

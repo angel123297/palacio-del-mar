@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -46,32 +47,84 @@ public class BookingStreamController {
             throw new SecurityException("Debe estar autenticado para suscribirse al canal de eventos");
         }
 
+        co.palaciodelmar.backend.security.UserPrincipal principal =
+                (authentication.getPrincipal() instanceof co.palaciodelmar.backend.security.UserPrincipal up) ? up : null;
+        long authSeq = principal != null
+                ? principal.getAuthSequence()
+                : co.palaciodelmar.backend.security.UserPrincipal.nextAuthSequence();
+
         String email = authentication.getName();
         User user = userRepository.findByEmail(email).orElse(null);
         String userId = user != null ? user.getId() : email;
 
+        if (user != null) {
+            if ("inactive".equalsIgnoreCase(user.getStatus()) || "suspended".equalsIgnoreCase(user.getStatus())) {
+                throw new SecurityException("Cuenta inactiva o suspendida");
+            }
+            if (principal != null) {
+                if (!java.util.Objects.equals(principal.getSnapshotSessionsRevokedAt(), user.getSessionsRevokedAt())
+                        || !java.util.Objects.equals(principal.getSnapshotPasswordChangedAt(), user.getPasswordChangedAt())) {
+                    throw new SecurityException("La sesión fue revocada antes de abrir el canal de eventos");
+                }
+                if (user.getSessionsRevokedAt() != null) {
+                    if (principal.getTokenIssuedAtMs() != null
+                            && principal.getTokenIssuedAtMs() <= user.getSessionsRevokedAt().toEpochMilli()) {
+                        throw new SecurityException("La sesión fue revocada antes de abrir el canal de eventos");
+                    }
+                    if (!principal.getAuthenticatedAt().isAfter(user.getSessionsRevokedAt())) {
+                        throw new SecurityException("La sesión fue revocada antes de abrir el canal de eventos");
+                    }
+                }
+                if (user.getPasswordChangedAt() != null
+                        && !principal.getAuthenticatedAt().isAfter(user.getPasswordChangedAt())) {
+                    throw new SecurityException("La sesión fue revocada por cambio de contraseña");
+                }
+            } else if (user.getSessionsRevokedAt() != null) {
+                throw new SecurityException("La sesión fue revocada antes de abrir el canal de eventos");
+            }
+        }
+
+        if (bookingSseService.isSessionRevoked(userId, authSeq)
+                || (email != null && bookingSseService.isSessionRevoked(email, authSeq))) {
+            throw new SecurityException("La sesión fue revocada antes de abrir el canal de eventos");
+        }
+
         log.info("Usuario {} ({}) suscrito a canal SSE de reservas", email, userId);
-        SseEmitter emitter = bookingSseService.subscribe(userId);
-        
-        // Si el usuario es ADMIN, suscribir al canal global admin.
-        // Si es HOST, suscribir ÚNICAMENTE a los canales de sus propiedades para aislar tenants (RN-SSE multi-inquilino)
-        if (user != null && user.getRole() != null) {
-            String roleLower = user.getRole().toLowerCase();
-            if ("admin".equals(roleLower)) {
-                bookingSseService.subscribe("admin", emitter);
-            } else if ("host".equals(roleLower) && propertyRepository != null && user.getId() != null) {
-                List<Property> properties = propertyRepository.findByOwnerId(user.getId());
-                if (properties != null) {
-                    for (Property prop : properties) {
-                        if (prop.getId() != null) {
-                            bookingSseService.subscribe("prop_" + prop.getId(), emitter);
-                            log.debug("Host {} suscrito al canal reactivo de propiedad {}", user.getId(), prop.getId());
+        BookingSseService.setCurrentAuthSequence(authSeq);
+        try {
+            List<String> channels = new ArrayList<>();
+            channels.add(userId);
+
+            // Si el usuario es ADMIN, suscribir al canal global admin.
+            // Si es HOST, suscribir ÚNICAMENTE a los canales de sus propiedades para aislar tenants (RN-SSE multi-inquilino)
+            if (user != null && user.getRole() != null) {
+                String roleLower = user.getRole().toLowerCase();
+                if ("admin".equals(roleLower)) {
+                    channels.add("admin");
+                } else if ("host".equals(roleLower) && propertyRepository != null && user.getId() != null) {
+                    List<Property> properties = propertyRepository.findByOwnerId(user.getId());
+                    if (properties != null) {
+                        for (Property prop : properties) {
+                            if (prop.getId() != null) {
+                                channels.add("prop_" + prop.getId());
+                                log.debug("Host {} suscrito al canal reactivo de propiedad {}", user.getId(), prop.getId());
+                            }
                         }
                     }
                 }
             }
-        }
 
-        return emitter;
+            SseEmitter emitter = bookingSseService.subscribe(channels);
+
+            if (bookingSseService.isSessionRevoked(userId, authSeq)
+                    || (email != null && bookingSseService.isSessionRevoked(email, authSeq))) {
+                bookingSseService.closeUserConnections(userId);
+                throw new SecurityException("La sesión fue revocada durante la apertura del canal de eventos");
+            }
+
+            return emitter;
+        } finally {
+            BookingSseService.clearCurrentAuthSequence();
+        }
     }
 }

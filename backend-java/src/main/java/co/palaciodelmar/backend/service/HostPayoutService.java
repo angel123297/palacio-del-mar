@@ -70,21 +70,18 @@ public class HostPayoutService {
 
     private synchronized List<HostPayoutDTO> doProcessAutomatedPayouts() {
         LocalDate today = LocalDate.now(BOGOTA);
+        List<String> eligibleStatuses = List.of("checked_out", "completed", "no_show");
         List<HostPayoutDTO> generated = new ArrayList<>();
-        recoverPendingPayouts(generated, today);
+        recoverPendingPayouts(generated, today, eligibleStatuses);
 
-        List<String> eligibleStatuses = List.of("checked_out", "completed");
-
-        List<Booking> candidates = bookingRepository.findByStatusIn(eligibleStatuses).stream()
-                .filter(b -> b.getPayoutId() == null)
-                .filter(b -> b.getCheckIn() != null && !b.getCheckIn().isAfter(today))
-                .filter(b -> b.getPaidAmount() != null && b.getPaidAmount().compareTo(BigDecimal.ZERO) > 0)
-                .filter(b -> b.getBalanceDue() == null || b.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0)
-                .filter(b -> {
-                    BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : BigDecimal.ZERO;
-                    BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
-                    return paid.subtract(refunded).compareTo(BigDecimal.ZERO) > 0;
-                })
+        List<Booking> candidates = bookingRepository.findByStatusInAndPayoutIdIsNull(eligibleStatuses);
+        if (candidates == null || candidates.isEmpty()) {
+            candidates = bookingRepository.findByStatusIn(eligibleStatuses).stream()
+                    .filter(b -> b.getPayoutId() == null)
+                    .toList();
+        }
+        candidates = candidates.stream()
+                .filter(b -> isBookingEligibleForPayout(b, today, eligibleStatuses))
                 .toList();
 
         if (candidates.isEmpty()) {
@@ -133,7 +130,7 @@ public class HostPayoutService {
             String ownerId = property != null && property.getOwnerId() != null ? property.getOwnerId() : "system";
             String propName = property != null ? property.getName() : "Alojamiento (" + propId + ")";
 
-            String payoutCode = "PO-" + datePrefix + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+            String payoutCode = "PO-" + datePrefix + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
             HostPayout payout = HostPayout.builder()
                     .payoutCode(payoutCode)
                     .propertyId(propId)
@@ -201,10 +198,34 @@ public class HostPayoutService {
         return generated;
     }
 
+    private boolean isBookingEligibleForPayout(Booking b, LocalDate today, List<String> eligibleStatuses) {
+        if (b == null || b.getStatus() == null || !eligibleStatuses.contains(b.getStatus().toLowerCase())) {
+            return false;
+        }
+        if (b.getCheckIn() == null || b.getCheckIn().isAfter(today)) {
+            return false;
+        }
+        if (b.getPaidAmount() == null || b.getPaidAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            return false;
+        }
+        if (b.getBalanceDue() != null && b.getBalanceDue().compareTo(BigDecimal.ZERO) > 0) {
+            return false;
+        }
+        if ("requires_refund".equalsIgnoreCase(b.getPaymentStatus())) {
+            return false;
+        }
+        if (b.getPendingRefundAmount() != null && b.getPendingRefundAmount().compareTo(BigDecimal.ZERO) > 0) {
+            return false;
+        }
+        BigDecimal paid = b.getPaidAmount();
+        BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
+        return paid.subtract(refunded).compareTo(BigDecimal.ZERO) > 0;
+    }
+
     /**
      * Reconcilia liquidaciones que quedaron en estado PENDING tras una caída o fallo intermedio.
      */
-    private void recoverPendingPayouts(List<HostPayoutDTO> generated, LocalDate today) {
+    private void recoverPendingPayouts(List<HostPayoutDTO> generated, LocalDate today, List<String> eligibleStatuses) {
         List<HostPayout> pendingPayouts = hostPayoutRepository.findByStatus("PENDING");
         if (pendingPayouts == null || pendingPayouts.isEmpty()) {
             return;
@@ -217,6 +238,15 @@ public class HostPayoutService {
                 if (bId == null) continue;
                 Booking b = bookingRepository.findById(bId).orElse(null);
                 if (b == null) continue;
+                boolean eligible = isBookingEligibleForPayout(b, today, eligibleStatuses);
+                if (!eligible) {
+                    if (pending.getId().equals(b.getPayoutId())) {
+                        b.setPayoutId(null);
+                        b.setUpdatedAt(Instant.now());
+                        bookingRepository.save(b);
+                    }
+                    continue;
+                }
                 if (pending.getId().equals(b.getPayoutId())) {
                     settledBookings.add(b);
                 } else if (b.getPayoutId() == null) {
@@ -234,7 +264,7 @@ public class HostPayoutService {
             }
             if (settledBookings.isEmpty()) {
                 hostPayoutRepository.delete(pending);
-                log.warn("Liquidación PENDING {} eliminada en recuperación por no tener reservas selladas.", pending.getPayoutCode());
+                log.warn("Liquidación PENDING {} eliminada en recuperación por no tener reservas elegibles selladas.", pending.getPayoutCode());
                 continue;
             }
             recomputePayoutTotals(pending, settledBookings, today);
@@ -266,6 +296,38 @@ public class HostPayoutService {
             BigDecimal roomPrice = (b.getPlatformFee() != null && b.getHostPayout() != null)
                     ? bookingFee.add(bookingNet)
                     : fallbackRoom;
+
+            BigDecimal feeRatio;
+            if (roomPrice.compareTo(BigDecimal.ZERO) > 0) {
+                if (bookingFee.compareTo(BigDecimal.ZERO) > 0) {
+                    feeRatio = bookingFee.divide(roomPrice, 4, RoundingMode.HALF_UP);
+                } else {
+                    feeRatio = BigDecimal.ZERO;
+                }
+            } else {
+                feeRatio = new BigDecimal("0.08");
+            }
+
+            BigDecimal refunded = b.getRefundedAmount() != null ? b.getRefundedAmount() : BigDecimal.ZERO;
+            BigDecimal depositPortion = (Boolean.TRUE.equals(b.getGuaranteeRefunded()) && b.getGuaranteeDeposit() != null)
+                    ? b.getGuaranteeDeposit()
+                    : BigDecimal.ZERO;
+            BigDecimal nonDepositRefund = refunded.subtract(depositPortion).max(BigDecimal.ZERO);
+
+            BigDecimal paid = b.getPaidAmount() != null ? b.getPaidAmount() : (b.getTotalPrice() != null ? b.getTotalPrice() : roomPrice);
+            BigDecimal currentTotal = b.getTotalPrice() != null ? b.getTotalPrice() : roomPrice;
+            BigDecimal modificationSurplusRefund = paid.subtract(currentTotal).max(BigDecimal.ZERO);
+            BigDecimal effectiveLodgingReduction = nonDepositRefund.subtract(modificationSurplusRefund).max(BigDecimal.ZERO);
+
+            if (effectiveLodgingReduction.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal total = currentTotal.compareTo(BigDecimal.ZERO) > 0 ? currentTotal : roomPrice;
+                BigDecimal lodgingRefund = (total.compareTo(BigDecimal.ZERO) > 0 && roomPrice.compareTo(BigDecimal.ZERO) > 0)
+                        ? effectiveLodgingReduction.multiply(roomPrice).divide(total, 2, RoundingMode.HALF_UP).min(roomPrice)
+                        : effectiveLodgingReduction.min(roomPrice);
+                roomPrice = roomPrice.subtract(lodgingRefund).max(BigDecimal.ZERO);
+                bookingFee = roomPrice.multiply(feeRatio).setScale(2, RoundingMode.HALF_UP);
+                bookingNet = roomPrice.subtract(bookingFee);
+            }
 
             gross = gross.add(roomPrice);
             fee = fee.add(bookingFee);

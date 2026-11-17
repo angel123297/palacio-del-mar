@@ -1,12 +1,12 @@
 package co.palaciodelmar.backend.controller;
 
 import co.palaciodelmar.backend.dto.ApiResponse;
-
-
+import co.palaciodelmar.backend.dto.PaymentRequest;
 import co.palaciodelmar.backend.security.UserPrincipal;
 import co.palaciodelmar.backend.service.IdempotencyService;
 import co.palaciodelmar.backend.service.PaymentGateway;
 import co.palaciodelmar.backend.service.PaymentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -34,11 +34,11 @@ public class PaymentController {
     @PostMapping("/checkout")
     public ResponseEntity<ApiResponse<PaymentGateway.PaymentIntentResponse>> createIntent(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestBody Map<String, Object> body,
+            @Valid @RequestBody PaymentRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
-        String bookingId = (body != null && body.get("bookingId") != null) ? String.valueOf(body.get("bookingId")) : null;
-        String method = (body != null && body.get("method") != null) ? String.valueOf(body.get("method")) : "card";
+        String bookingId = request != null ? request.getBookingId() : null;
+        String method = request != null ? request.getMethod() : "card";
         String userId = (principal != null && principal.getUser() != null) ? principal.getUser().getId() : null;
 
         if (idempotencyService != null && idempotencyKey != null && !idempotencyKey.isBlank()) {

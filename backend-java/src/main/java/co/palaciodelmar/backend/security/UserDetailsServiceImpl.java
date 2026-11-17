@@ -38,7 +38,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         if (userSessionCacheService != null) {
             Optional<User> cached = userSessionCacheService.getCachedUser(normalizedEmail);
             if (cached.isPresent()) {
-                return new UserPrincipal(cached.get());
+                return principalForActiveRecord(cached.get());
             }
         }
 
@@ -47,9 +47,9 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         if (userSessionCacheService != null) {
             userSessionCacheService.putCachedUser(user);
-            return new UserPrincipal(UserSessionCacheService.sanitizeForCache(user));
+            return principalForActiveRecord(UserSessionCacheService.sanitizeForCache(user));
         }
-        return new UserPrincipal(user);
+        return principalForActiveRecord(user);
     }
 
     @Override
@@ -64,7 +64,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         if (userSessionCacheService != null) {
             Optional<User> cached = userSessionCacheService.getCachedUser(normalizedEmail);
             if (cached.isPresent() && cached.get().getPassword() != null) {
-                return new UserPrincipal(cached.get());
+                return principalForActiveRecord(cached.get());
             }
         }
 
@@ -73,6 +73,12 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         if (userSessionCacheService != null) {
             userSessionCacheService.putCachedUser(user);
+        }
+        return principalForActiveRecord(user);
+    }
+    private UserPrincipal principalForActiveRecord(User user) {
+        if (user.getDeletedAt() != null || "inactive".equalsIgnoreCase(user.getStatus()) || "suspended".equalsIgnoreCase(user.getStatus())) {
+            throw new UsernameNotFoundException("Usuario no encontrado o cuenta inactiva");
         }
         return new UserPrincipal(user);
     }

@@ -62,6 +62,9 @@ public class WebhookDispatcher {
     @Value("${palacio.webhooks.retry.backoff-attempt-3:1800}")
     private long backoffAttempt3Seconds = 1800; // 30 minutos por defecto
 
+    private static final int DEDUP_LOCK_STRIPES = 256;
+    private final Object[] dedupStripes = new Object[DEDUP_LOCK_STRIPES];
+
     @org.springframework.beans.factory.annotation.Autowired
     public WebhookDispatcher(
             WebhookSubscriptionRepository subscriptionRepository,
@@ -97,6 +100,9 @@ public class WebhookDispatcher {
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
         this.ssrfProtectionValidator = ssrfProtectionValidator != null ? ssrfProtectionValidator : new SsrfProtectionValidator();
+        for (int i = 0; i < DEDUP_LOCK_STRIPES; i++) {
+            this.dedupStripes[i] = new Object();
+        }
     }
 
     @EventListener
@@ -116,9 +122,10 @@ public class WebhookDispatcher {
             return;
         }
 
+        String deterministicEventId = resolveDeterministicEventId(eventType, data);
         for (WebhookSubscription sub : activeSubscriptions) {
             if (isSubscribed(sub, eventType)) {
-                createAndDispatchDelivery(sub, eventType, data);
+                createAndDispatchDelivery(sub, eventType, data, deterministicEventId);
             }
         }
     }
@@ -128,7 +135,31 @@ public class WebhookDispatcher {
      * Si Redis no está disponible o no está configurado (p.ej. tests unitarios), ejecuta sincrónicamente como fallback.
      */
     public WebhookDelivery createAndDispatchDelivery(WebhookSubscription sub, String eventType, Object data) {
-        WebhookDelivery saved = createPendingDelivery(sub, eventType, data);
+        return createAndDispatchDelivery(sub, eventType, data, null);
+    }
+
+    private WebhookDelivery createAndDispatchDelivery(WebhookSubscription sub, String eventType, Object data, String explicitEventId) {
+        String effectiveEventId = (explicitEventId != null && !explicitEventId.isBlank()) ? explicitEventId.trim() : null;
+        WebhookDelivery saved;
+        if (effectiveEventId != null && sub.getId() != null) {
+            int stripeIndex = Math.floorMod((sub.getId() + "::" + effectiveEventId).hashCode(), DEDUP_LOCK_STRIPES);
+            synchronized (dedupStripes[stripeIndex]) {
+                if (deliveryRepository.existsBySubscriptionIdAndEventId(sub.getId(), effectiveEventId)) {
+                    log.debug("Entrega de webhook {} ya registrada para suscripción {}; omitiendo duplicado en reintento.",
+                            effectiveEventId, sub.getId());
+                    return null;
+                }
+                try {
+                    saved = createPendingDelivery(sub, eventType, data, effectiveEventId);
+                } catch (org.springframework.dao.DuplicateKeyException dupEx) {
+                    log.debug("Entrega de webhook {} ya registrada concurrentemente para suscripción {}; omitiendo duplicado.",
+                            effectiveEventId, sub.getId());
+                    return null;
+                }
+            }
+        } else {
+            saved = createPendingDelivery(sub, eventType, data, null);
+        }
         if (redisWebhookStreamService != null && saved.getId() != null
                 && redisWebhookStreamService.enqueueDelivery(saved.getId(), saved.getEventId(), saved.getEventType())) {
             return saved;
@@ -141,13 +172,15 @@ public class WebhookDispatcher {
      * Crea y ejecuta sincrónicamente la entrega (usado en pruebas interactivas desde el panel de anfitrión).
      */
     public WebhookDelivery createAndExecuteDelivery(WebhookSubscription sub, String eventType, Object data) {
-        WebhookDelivery saved = createPendingDelivery(sub, eventType, data);
+        WebhookDelivery saved = createPendingDelivery(sub, eventType, data, null);
         executeDelivery(saved, sub.getSecret());
         return saved;
     }
 
-    private WebhookDelivery createPendingDelivery(WebhookSubscription sub, String eventType, Object data) {
-        String eventId = "evt_" + UUID.randomUUID().toString().replace("-", "");
+    private WebhookDelivery createPendingDelivery(WebhookSubscription sub, String eventType, Object data, String explicitEventId) {
+        String eventId = (explicitEventId != null && !explicitEventId.isBlank())
+                ? explicitEventId.trim()
+                : "evt_" + UUID.randomUUID().toString().replace("-", "");
         String payloadJson = buildPayloadJson(eventId, eventType, sub.getPropertyId(), data);
 
         WebhookDelivery delivery = WebhookDelivery.builder()
@@ -165,6 +198,30 @@ public class WebhookDispatcher {
                 .build();
 
         return deliveryRepository.save(delivery);
+    }
+
+    private String resolveDeterministicEventId(String eventType, Object data) {
+        if (data instanceof Map<?, ?> map) {
+            Object explicit = map.get("eventId");
+            if (explicit instanceof String eid && !eid.isBlank()) {
+                return eid.trim();
+            }
+            if ("maintenance.alert".equals(eventType)) {
+                Object reviewId = map.get("reviewId");
+                if (reviewId instanceof String rid && !rid.isBlank()) {
+                    return "evt_maint_" + rid.trim();
+                }
+                Object bookingId = map.get("bookingId");
+                if (bookingId instanceof String bid && !bid.isBlank()) {
+                    return "evt_maint_bk_" + bid.trim();
+                }
+            }
+        }
+        if ("payout.processed".equals(eventType) && data instanceof co.palaciodelmar.backend.dto.HostPayoutDTO payoutDto
+                && payoutDto.getId() != null && !payoutDto.getId().isBlank()) {
+            return "evt_payout_" + payoutDto.getId().trim();
+        }
+        return null;
     }
 
     public void executeDelivery(WebhookDelivery delivery, String secret) {
@@ -273,22 +330,38 @@ public class WebhookDispatcher {
         java.net.InetAddress boundAddress = java.net.InetAddress.getByAddress(target.host(), target.pinnedAddress().getAddress());
 
         java.net.Socket rawSocket = new java.net.Socket();
-        rawSocket.connect(new java.net.InetSocketAddress(boundAddress, target.port()), timeoutMs);
-        rawSocket.setSoTimeout(timeoutMs);
+        java.net.Socket activeSocket = null;
+        try {
+            rawSocket.connect(new java.net.InetSocketAddress(boundAddress, target.port()), timeoutMs);
+            rawSocket.setSoTimeout(timeoutMs);
 
-        java.net.Socket activeSocket = rawSocket;
-        if (target.https()) {
-            javax.net.ssl.SSLSocketFactory sslFactory = (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
-            javax.net.ssl.SSLSocket sslSocket = (javax.net.ssl.SSLSocket) sslFactory.createSocket(
-                    rawSocket, target.host(), target.port(), true);
-            javax.net.ssl.SSLParameters sslParams = sslSocket.getSSLParameters();
-            sslParams.setEndpointIdentificationAlgorithm("HTTPS");
-            if (!co.palaciodelmar.backend.security.RateLimitFilter.isValidIpLiteral(target.host())) {
-                sslParams.setServerNames(List.of(new javax.net.ssl.SNIHostName(target.host())));
+            activeSocket = rawSocket;
+            if (target.https()) {
+                javax.net.ssl.SSLSocketFactory sslFactory = (javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault();
+                javax.net.ssl.SSLSocket sslSocket = (javax.net.ssl.SSLSocket) sslFactory.createSocket(
+                        rawSocket, target.host(), target.port(), true);
+                javax.net.ssl.SSLParameters sslParams = sslSocket.getSSLParameters();
+                sslParams.setEndpointIdentificationAlgorithm("HTTPS");
+                if (!co.palaciodelmar.backend.security.RateLimitFilter.isValidIpLiteral(target.host())) {
+                    sslParams.setServerNames(List.of(new javax.net.ssl.SNIHostName(target.host())));
+                }
+                sslSocket.setSSLParameters(sslParams);
+                sslSocket.startHandshake();
+                activeSocket = sslSocket;
             }
-            sslSocket.setSSLParameters(sslParams);
-            sslSocket.startHandshake();
-            activeSocket = sslSocket;
+        } catch (Throwable t) {
+            try {
+                if (activeSocket != null) {
+                    activeSocket.close();
+                } else {
+                    rawSocket.close();
+                }
+            } catch (Throwable ignored) {
+            }
+            if (t instanceof java.io.IOException ioe) {
+                throw ioe;
+            }
+            throw new java.io.IOException("Socket initialization failed: " + t.getMessage(), t);
         }
 
         try (java.net.Socket sock = activeSocket;
@@ -538,9 +611,19 @@ public class WebhookDispatcher {
 
         try {
             return objectMapper.writeValueAsString(payloadMap);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.error("Error serializando payload para webhook: {}", e.getMessage());
-            return "{\"eventId\":\"" + eventId + "\",\"eventType\":\"" + eventType + "\"}";
+            Map<String, Object> fallback = new LinkedHashMap<>();
+            fallback.put("eventId", eventId != null ? eventId : "");
+            fallback.put("eventType", eventType != null ? eventType : "");
+            fallback.put("propertyId", propertyId);
+            fallback.put("timestamp", Instant.now().toString());
+            fallback.put("error", "Serialization failure");
+            try {
+                return objectMapper.writeValueAsString(fallback);
+            } catch (Exception ex) {
+                return "{\"eventId\":\"" + (eventId != null ? eventId.replace("\"", "\\\"") : "") + "\",\"eventType\":\"" + (eventType != null ? eventType.replace("\"", "\\\"") : "") + "\"}";
+            }
         }
     }
 

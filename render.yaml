@@ -26,6 +26,16 @@ services:
         value: "false"
       - key: SPRING_CACHE_TYPE
         value: "none"
+      - key: APP_BASE_URL
+        sync: false
+      - key: SPRING_MAIL_HOST
+        sync: false
+      - key: SPRING_MAIL_PORT
+        value: "587"
+      - key: SPRING_MAIL_USERNAME
+        sync: false
+      - key: SPRING_MAIL_PASSWORD
+        sync: false
 
   # --- Frontend Web + Flutter iOS App + APK Download ---
   - type: web

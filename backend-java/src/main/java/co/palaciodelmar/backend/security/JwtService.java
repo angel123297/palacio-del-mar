@@ -110,6 +110,7 @@ public class JwtService {
 
         // 2. Verificación durable contra estado del usuario (passwordChangedAt y sessionsRevokedAt)
         if (userDetails instanceof UserPrincipal principal && principal.getUser() != null) {
+            principal.setTokenIssuedAtMs(tokenIssuedAtMs);
             java.time.Instant sessionsRevokedAt = principal.getUser().getSessionsRevokedAt();
             if (sessionsRevokedAt != null && tokenIssuedAtMs > 0 && tokenIssuedAtMs <= sessionsRevokedAt.toEpochMilli()) {
                 return false;

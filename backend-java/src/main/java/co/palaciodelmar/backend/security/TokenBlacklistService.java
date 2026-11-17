@@ -53,16 +53,17 @@ public class TokenBlacklistService {
 
         try {
             String tokenHash = hashToken(token);
-            Date expiration = null;
+            Date expiration;
             try {
+                // Parsing verifies the signature and expiration; untrusted input is never persisted.
                 expiration = jwtService.extractExpiration(token);
-            } catch (Exception ex) {
-                log.debug("No se pudo extraer la fecha de expiración del token a revocar: {}", ex.getMessage());
+            } catch (io.jsonwebtoken.JwtException | IllegalArgumentException ex) {
+                return;
             }
-
-            long ttlMillis = (expiration != null)
-                    ? Math.max(0, expiration.getTime() - System.currentTimeMillis())
-                    : 86400000L; // Fallback 24h
+            if (expiration == null) {
+                return;
+            }
+            long ttlMillis = expiration.getTime() - System.currentTimeMillis();
 
             if (ttlMillis <= 0) {
                 // Si el token ya expiró de forma natural, no requiere blacklist
@@ -148,7 +149,8 @@ public class TokenBlacklistService {
                 return true;
             }
         } catch (Exception e) {
-            log.warn("Error al consultar revocación de token: {}", e.getMessage());
+            log.error("Error al consultar revocación de token: {}. Aplicando fail-closed por seguridad.", e.getMessage());
+            return true;
         }
 
         return false;

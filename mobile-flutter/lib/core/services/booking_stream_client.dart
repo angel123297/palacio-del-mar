@@ -26,8 +26,9 @@ class BookingStreamClient {
 
     try {
       _client = HttpClient();
-      final uri = Uri.parse('${ApiConfig.baseUrl}/bookings/stream?token=${Uri.encodeComponent(token)}');
+      final uri = Uri.parse('${ApiConfig.baseUrl}/bookings/stream');
       final request = await _client!.getUrl(uri);
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
       request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
 

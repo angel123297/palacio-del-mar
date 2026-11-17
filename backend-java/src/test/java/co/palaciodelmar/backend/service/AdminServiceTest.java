@@ -12,6 +12,7 @@ import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
 class AdminServiceTest {
@@ -391,5 +392,38 @@ class AdminServiceTest {
         // Verify formatted numbers
         org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("1200000.00"));
         org.junit.jupiter.api.Assertions.assertTrue(csvContent.contains("250000.00"));
+    }
+
+    @Test
+    @DisplayName("B22: updateBookingStatus persiste en MongoDB cuando executeSequentialRefund lanza RuntimeException")
+    void testUpdateBookingStatusPersistsRequiresRefundWhenSequentialRefundThrows() {
+        Booking booking = Booking.builder()
+                .id("b-refund-fail")
+                .bookingCode("PDM-FAIL-01")
+                .status("confirmed")
+                .paymentStatus("completed")
+                .paidAmount(new BigDecimal("500000.00"))
+                .refundedAmount(BigDecimal.ZERO)
+                .totalPrice(new BigDecimal("500000.00"))
+                .suite("suite-1")
+                .unitSlot(1)
+                .checkIn(LocalDate.of(2026, 12, 10))
+                .checkOut(LocalDate.of(2026, 12, 15))
+                .build();
+
+        when(bookingRepository.findById("b-refund-fail")).thenReturn(java.util.Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(i -> i.getArgument(0));
+
+        when(bookingService.executeSequentialRefund(any(), any(), any()))
+                .thenThrow(new RuntimeException("Error simulado en pasarela"));
+
+        Booking result = adminService.updateBookingStatus("b-refund-fail", "CANCELLED");
+
+        assertEquals("requires_refund", result.getPaymentStatus());
+        assertEquals(new BigDecimal("500000.00"), result.getPendingRefundAmount());
+        assertNotNull(result.getPendingRefundIdempotencyKey());
+
+        // Verificamos que se guardó dos veces: una tras el cambio de estado y otra en el catch del fallo de reembolso
+        verify(bookingRepository, times(2)).save(any(Booking.class));
     }
 }

@@ -29,4 +29,6 @@ public interface BookingRepository extends MongoRepository<Booking, String> {
     org.springframework.data.domain.Page<Booking> findByPropertyIdIn(List<String> propertyIds, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Booking> findByPropertyIdInAndStatusIgnoreCase(List<String> propertyIds, String status, org.springframework.data.domain.Pageable pageable);
     List<Booking> findByPendingRefundIdempotencyKeyIsNotNull();
+    List<Booking> findByStatusInAndReviewRequestSentAtIsNullAndCheckOutLessThanEqual(List<String> statuses, java.time.LocalDate date);
+    List<Booking> findByStatusInAndPayoutIdIsNull(List<String> statuses);
 }

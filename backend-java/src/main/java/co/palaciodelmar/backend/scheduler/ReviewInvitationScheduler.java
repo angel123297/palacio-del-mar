@@ -4,10 +4,13 @@ import co.palaciodelmar.backend.model.Booking;
 import co.palaciodelmar.backend.repository.BookingRepository;
 import co.palaciodelmar.backend.service.EmailService;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -27,15 +30,22 @@ public class ReviewInvitationScheduler {
     private final BookingRepository bookingRepository;
     private final EmailService emailService;
 
-    @Scheduled(fixedRateString = "${palacio.reviews.invitation.interval.ms:300000}") // cada 5 min
+    @Setter
+    @Autowired(required = false)
+    private Clock clock = Clock.system(BOGOTA);
+
+    @Scheduled(fixedDelayString = "${palacio.reviews.invitation.interval.ms:300000}") // cada 5 min
     public void sendAutomatedReviewInvitations() {
-        LocalDate today = LocalDate.now(BOGOTA);
+        LocalDate today = clock.instant().atZone(BOGOTA).toLocalDate();
         List<String> completedStatuses = List.of("checked_out", "completed");
 
-        List<Booking> candidates = bookingRepository.findByStatusIn(completedStatuses).stream()
-                .filter(b -> b.getReviewRequestSentAt() == null)
-                .filter(b -> b.getCheckOut() != null && !b.getCheckOut().isAfter(today))
-                .toList();
+        List<Booking> candidates = bookingRepository.findByStatusInAndReviewRequestSentAtIsNullAndCheckOutLessThanEqual(completedStatuses, today);
+        if (candidates == null || candidates.isEmpty()) {
+            candidates = bookingRepository.findByStatusIn(completedStatuses).stream()
+                    .filter(b -> b.getReviewRequestSentAt() == null)
+                    .filter(b -> b.getCheckOut() != null && !b.getCheckOut().isAfter(today))
+                    .toList();
+        }
 
         if (candidates.isEmpty()) {
             return;
@@ -52,7 +62,14 @@ public class ReviewInvitationScheduler {
                     bookingRepository.save(booking);
                     log.info("Invitación a reseña enviada automáticamente para reserva {}", booking.getId());
                 } else {
-                    log.warn("Invitación a reseña no enviada para reserva {} (sin destinatario o fallo SMTP)", booking.getId());
+                    if (booking.getCheckOut() != null && booking.getCheckOut().isBefore(today.minusDays(14))) {
+                        booking.setReviewRequestSentAt(Instant.now());
+                        booking.setUpdatedAt(Instant.now());
+                        bookingRepository.save(booking);
+                        log.warn("Invitación a reseña abandonada tras ventana de 14 días para reserva {}", booking.getId());
+                    } else {
+                        log.warn("Invitación a reseña no enviada para reserva {} (sin destinatario o fallo SMTP temporal)", booking.getId());
+                    }
                 }
             } catch (Exception e) {
                 log.error("Error al enviar invitación a reseña para reserva {}: {}", booking.getId(), e.getMessage());

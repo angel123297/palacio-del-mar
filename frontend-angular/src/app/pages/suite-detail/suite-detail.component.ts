@@ -1,8 +1,9 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
 import { DateRangePickerComponent } from '../../components/date-range-picker/date-range-picker.component';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
@@ -40,6 +41,8 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   lightboxIndex = 0;
   suite: Suite | null = null;
   loading = true;
+  loadError = false;
+  isNotFound = false;
   step = 1;
 
   // Redis Social Proof & Geo Nearby
@@ -48,12 +51,15 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   private viewerPingTimer: ReturnType<typeof setInterval> | null = null;
   private bookingIdempotencyKey = '';
   private bookingFingerprint = '';
+  private routeSub?: Subscription;
+  private currentIdOrSlug = '';
   
   // Step 1: Basic Booking Info
   today = bogotaTodayIso();
   checkIn = this.today;
   checkOut = addDaysIso(this.today, 2);
   guests = 2;
+  children = 0;
 
   // Step 2: Experiences
   experiences: Experience[] = [];
@@ -88,6 +94,11 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   isOwnSuite = false;
   checkingOwnership = false;
   availabilityConflict = '';
+  selectedImage = '';
+
+  selectImage(img: string): void {
+    this.selectedImage = img;
+  }
   
   openAuth() {
     this.authModalOpen = true;
@@ -107,13 +118,28 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   }
 
   foodOptions = [
-    { id: 't1', name: 'Cazuela de Mariscos (Típico)' },
-    { id: 't2', name: 'Mojarra Frita con Arroz de Coco (Típico)' },
-    { id: 't3', name: 'Posta Cartagenera (Típico)' },
-    { id: 'n1', name: 'Hamburguesa Artesanal (Normal)' },
-    { id: 'n2', name: 'Pasta Alfredo (Normal)' },
-    { id: 'other', name: 'Otro (Especificar)' }
+    { id: 't1', name: 'Cazuela de Mariscos (Típico)', price: 80000 },
+    { id: 't2', name: 'Mojarra Frita con Arroz de Coco (Típico)', price: 80000 },
+    { id: 't3', name: 'Posta Cartagenera (Típico)', price: 94000 },
+    { id: 't4', name: 'Pargo Rojo Frito con Patacones', price: 88000 },
+    { id: 't5', name: 'Arroz de Mariscos del Caribe', price: 125000 },
+    { id: 't6', name: 'Langosta al Termidor', price: 160000 },
+    { id: 'c1', name: 'Ceviche de Camarón al Coco', price: 68000 },
+    { id: 'c2', name: 'Ceviche Mixto Tradicional', price: 55000 },
+    { id: 'e1', name: 'Patacones con Hogao', price: 28000 },
+    { id: 'e2', name: 'Arepa de Huevo Tradicional', price: 25000 },
+    { id: 'd1', name: 'Cocada Horneada al Horno de Leña', price: 38000 },
+    { id: 'd2', name: 'Mousse de Mango Biche & Corozo', price: 34000 },
+    { id: 'n1', name: 'Hamburguesa Artesanal (Normal)', price: 80000 },
+    { id: 'n2', name: 'Pasta Alfredo (Normal)', price: 80000 },
+    { id: 'other', name: 'Otro (Especificar)', price: 80000 }
   ];
+
+  get currentFoodPrice(): number {
+    if (!this.wantFood || !this.foodType) return 0;
+    const opt = this.foodOptions.find(f => f.id === this.foodType);
+    return opt ? opt.price : 80000;
+  }
 
   constructor(
     private route: ActivatedRoute,
@@ -123,7 +149,17 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private sanitizer: DomSanitizer,
     private router: Router
-  ) {}
+  ) {
+    effect(() => {
+      const user = this.auth.currentUser();
+      if (user) {
+        this.guestName = user.name || '';
+        this.guestEmail = user.email || '';
+        this.guestPhone = user.profile?.phone || user.phone || '';
+      }
+      this.checkOwnSuite();
+    });
+  }
 
   get mapUrl(): SafeResourceUrl {
     const address = (typeof this.suite?.branch === 'object' ? this.suite.branch?.address : null) || 'Cartagena, Colombia';
@@ -158,7 +194,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
 
   getSuiteImage(suite: Suite | null): string {
     const brokenIds = ['photo-1591088398332', 'photo-1595526114035', 'photo-1522771739844', 'photo-1566665797739'];
-    const raw = suite?.mainImage || '';
+    const raw = this.selectedImage || suite?.mainImage || '';
     if (!raw || brokenIds.some(id => raw.includes(id))) {
       return 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800';
     }
@@ -193,50 +229,71 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     if (filters.checkIn) this.checkIn = filters.checkIn;
     if (filters.checkOut) this.checkOut = filters.checkOut;
     if (filters.adults) this.guests = filters.adults;
+    if (filters.children !== undefined && filters.children !== null) this.children = filters.children;
 
-    if (this.auth.isLoggedIn()) {
-       const user = this.auth.currentUserValue;
-       if (user) {
-         this.guestName = user.name || '';
-         this.guestEmail = user.email || '';
-         this.guestPhone = user.profile?.phone || user.phone || '';
-       }
+    if (this.route.paramMap) {
+      this.routeSub = this.route.paramMap.subscribe(params => {
+        const idOrSlug = params.get('idOrSlug');
+        if (idOrSlug && idOrSlug !== this.currentIdOrSlug) {
+          this.currentIdOrSlug = idOrSlug;
+          this.loadSuiteData(idOrSlug);
+        }
+      });
+    } else {
+      const idOrSlug = this.route.snapshot?.paramMap?.get('idOrSlug');
+      if (idOrSlug) {
+        this.currentIdOrSlug = idOrSlug;
+        this.loadSuiteData(idOrSlug);
+      }
     }
 
-    const idOrSlug = this.route.snapshot.paramMap.get('idOrSlug');
-    if (idOrSlug) {
-      this.api.get<any>(`/suites/${idOrSlug}`).subscribe({
-        next: (res) => {
-          this.suite = res.data || res;
-          this.loading = false;
-          this.checkOwnSuite();
-          this.fetchLiveQuote();
-          this.initSocialProofPing(idOrSlug);
-          this.fetchNearbyGeoPlaces(idOrSlug);
-          const sId = this.suite ? (this.suite.id || this.suite._id) : idOrSlug;
-          this.loadReviews(sId || idOrSlug);
-          this.cdr.detectChanges();
-        },
-        error: () => {
-          this.suite = null;
-          this.loading = false;
-          if (this.viewerPingTimer) {
-            clearInterval(this.viewerPingTimer);
-            this.viewerPingTimer = null;
-          }
-          this.cdr.detectChanges();
-        }
-      });
-      
-      this.api.get<any>('/experiences').subscribe({
-        next: (res) => {
-           this.experiences = res.data || res;
-        }
-      });
+    this.api.get<any>('/experiences').subscribe({
+      next: (res) => {
+        this.experiences = res.data || res;
+      }
+    });
+  }
+
+  reloadCurrentSuite(): void {
+    if (this.currentIdOrSlug) {
+      this.loadSuiteData(this.currentIdOrSlug);
     }
   }
 
+  loadSuiteData(idOrSlug: string): void {
+    this.loading = true;
+    this.loadError = false;
+    this.isNotFound = false;
+    this.api.get<any>(`/suites/${idOrSlug}`).subscribe({
+      next: (res) => {
+        this.suite = res.data || res;
+        this.loading = false;
+        this.checkOwnSuite();
+        this.fetchLiveQuote();
+        this.initSocialProofPing(idOrSlug);
+        this.fetchNearbyGeoPlaces(idOrSlug);
+        const sId = this.suite ? (this.suite.id || this.suite._id) : idOrSlug;
+        this.loadReviews(sId || idOrSlug);
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.suite = null;
+        this.loading = false;
+        this.loadError = true;
+        this.isNotFound = err?.status === 404;
+        if (this.viewerPingTimer) {
+          clearInterval(this.viewerPingTimer);
+          this.viewerPingTimer = null;
+        }
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
   ngOnDestroy(): void {
+    if (this.routeSub) {
+      this.routeSub.unsubscribe();
+    }
     if (this.viewerPingTimer) {
       clearInterval(this.viewerPingTimer);
       this.viewerPingTimer = null;
@@ -297,6 +354,34 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   dynamicPricingNotes: string[] = [];
   dynamicQuoteTotal: number | null = null;
 
+  get totalGuestsCount(): number {
+    return (Number(this.guests) || 1) + (Number(this.children) || 0);
+  }
+
+  get adultOptions(): number[] {
+    const max = Math.max(1, (this.suite?.maxGuests || 2) - (Number(this.children) || 0));
+    const opts: number[] = [];
+    for (let i = 1; i <= Math.min(max, 10); i++) opts.push(i);
+    return opts;
+  }
+
+  get childrenOptions(): number[] {
+    const max = Math.max(0, (this.suite?.maxGuests || 2) - (Number(this.guests) || 1));
+    const opts: number[] = [];
+    for (let i = 0; i <= Math.min(max, 8); i++) opts.push(i);
+    return opts;
+  }
+
+  onGuestsOrChildrenChange(): void {
+    const max = this.suite?.maxGuests || 2;
+    if (this.guests + this.children > max) {
+      this.children = Math.max(0, max - this.guests);
+    }
+    this.searchState.updateGuests(this.guests, this.children);
+    this.validateDates();
+    this.fetchLiveQuote();
+  }
+
   fetchLiveQuote() {
     const sId = this.suite?.id || this.suite?._id;
     if (!sId || !this.checkIn || !this.checkOut) return;
@@ -304,7 +389,8 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
       suiteId: sId,
       checkIn: this.checkIn,
       checkOut: this.checkOut,
-      guests: Number(this.guests) || 2
+      guests: Number(this.guests) || 1,
+      children: Number(this.children) || 0
     }).subscribe({
       next: (res) => {
         const d = res?.data || res;
@@ -359,7 +445,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     if (this.airportPickup) total += 150000;
     if (this.petFriendly) total += 80000;
     if (this.wantFood && this.foodType) {
-      total += 80000;
+      total += this.currentFoodPrice;
       if (this.breakfastCombo) total += 35000;
     }
     return total;
@@ -367,8 +453,8 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
 
   // Mismas reglas que BookingService: $120.000 por huésped adicional (sobre 2) y noche.
   get extraGuestsFee(): number {
-    const guests = Number(this.guests) || 0;
-    return guests > 2 ? (guests - 2) * 120000 * this.nights : 0;
+    const total = this.totalGuestsCount;
+    return total > 2 ? (total - 2) * 120000 * this.nights : 0;
   }
 
   // Depósito de garantía reembolsable que el backend suma al total.
@@ -441,7 +527,6 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     } else if (delta > 0) {
       this.selectedExperiences.push({ exp, qty: 1 });
     }
-    this.fetchLiveQuote();
   }
 
   getExperienceQty(exp: Experience): number {
@@ -473,7 +558,6 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     } else {
       this.selectedExperiences.push({ exp, qty: 1 });
     }
-    this.fetchLiveQuote();
   }
 
   isExperienceSelected(exp: Experience): boolean {
@@ -590,13 +674,22 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   }
 
   private submitBooking(): void {
+    if (this.wantFood && this.foodType === 'other' && (!this.customFood || !this.customFood.trim())) {
+      this.bookingBusy = false;
+      this.message = 'Por favor especifica tu pedido gastronómico personalizado en el paso 3.';
+      this.isError = true;
+      this.goToStep(3);
+      this.cdr.detectChanges();
+      return;
+    }
+
     const foodOrders = [];
     if (this.wantFood && this.foodType) {
        const selectedDish = this.foodType === 'other' ? this.customFood : this.foodOptions.find(f => f.id === this.foodType)?.name;
        foodOrders.push({
           dishName: selectedDish,
           foodName: selectedDish,
-          price: 80000,
+          price: this.currentFoodPrice,
           includesBreakfastCombo: this.breakfastCombo,
           specialInstructions: this.foodType === 'other' ? (this.customFood || 'Pedido personalizado') : ''
        });
@@ -607,6 +700,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
       checkIn: this.checkIn,
       checkOut: this.checkOut,
       guests: Number(this.guests),
+      children: Number(this.children) || 0,
       airportPickup: this.airportPickup,
       petFriendly: this.petFriendly,
       needsCrib: this.needsCrib,

@@ -114,8 +114,8 @@ const DEFAULT_FALLBACK_BRANCHES: Branch[] = [
             </h3>
 
             <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; margin: 4px 0 10px 0; color: #f1c40f;">
-              <span>★ 4.9</span>
-              <span style="color: rgba(245,240,232,0.6);">(Huéspedes verificados)</span>
+              <span>★ {{ suite.rating ? (suite.rating | number:'1.1-1') : '4.9' }}</span>
+              <span style="color: rgba(245,240,232,0.6);">({{ suite.reviewsCount ? suite.reviewsCount + ' reseñas' : 'Huéspedes verificados' }})</span>
             </div>
 
             <div class="room-chips">
@@ -235,7 +235,7 @@ export class RoomsSectionComponent implements OnInit {
         if (bSlug !== this.selectedBranch && s.propertyId !== this.selectedBranch) return false;
       }
       if (this.selectedType) {
-        if (s.type !== this.selectedType) return false;
+        if ((s.type || '').toLowerCase() !== this.selectedType.toLowerCase()) return false;
       }
       return true;
     });

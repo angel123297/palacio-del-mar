@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, effect, HostListener } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -36,90 +36,6 @@ export interface RefundItem {
   notes?: string;
   createdAt?: string;
 }
-
-const DEFAULT_ADMIN_PROPERTIES: Property[] = [
-  {
-    id: 'prop-101',
-    name: 'Casona Colonial Getsemaní',
-    type: 'HOTEL',
-    city: 'Cartagena',
-    address: 'Calle de la Sierpe # 29-11',
-    description: 'Auténtica casona del siglo XVIII con patio andaluz, piscina privada y 8 suites exclusivas.',
-    status: 'PENDING',
-    suitesCount: 4,
-    commissionRate: 0.08,
-    mainImage: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800'
-  } as Property,
-  {
-    id: 'prop-102',
-    name: 'Palacio Bocagrande Resort',
-    type: 'HOTEL',
-    city: 'Cartagena',
-    address: 'Cra. 1 # 5-40, Bocagrande',
-    description: 'Vanguardia arquitectónica con acceso directo al mar Caribe y mayordomía 24/7.',
-    status: 'APPROVED',
-    suitesCount: 12,
-    commissionRate: 0.08,
-    mainImage: 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=800'
-  } as Property,
-  {
-    id: 'prop-103',
-    name: 'Villa Manglares Serena',
-    type: 'VILLA',
-    city: 'Cartagena',
-    address: 'La Boquilla Km 7',
-    description: 'Propiedad en revisión de documentación catastral y registro nacional de turismo.',
-    status: 'PENDING',
-    suitesCount: 2,
-    commissionRate: 0.08,
-    mainImage: 'https://images.unsplash.com/photo-1540518614846-7eded433c457?w=800'
-  } as Property
-];
-
-const DEFAULT_ADMIN_REFUNDS: RefundItem[] = [
-  {
-    id: 'pay-ref-7701',
-    bookingId: 'BK-2026-904',
-    amount: 1450000,
-    currency: 'COP',
-    status: 'requires_refund',
-    notes: 'Cancelación voluntaria con más de 7 días de anticipación (reembolso 100%).',
-    createdAt: '2026-10-21T10:15:00Z'
-  },
-  {
-    id: 'pay-ref-7702',
-    bookingId: 'BK-2026-882',
-    amount: 850000,
-    currency: 'COP',
-    status: 'requires_refund',
-    notes: 'Reserva no confirmada antes del vencimiento del plazo de pago.',
-    createdAt: '2026-10-20T16:40:00Z'
-  }
-];
-
-const DEFAULT_ADMIN_BOOKINGS: Booking[] = [
-  {
-    id: 'bk-adm-01',
-    bookingCode: 'BK-2026-001',
-    guestName: 'Valentina Restrepo',
-    guestEmail: 'valentina.r@ejemplo.co',
-    checkIn: '2026-10-22',
-    checkOut: '2026-10-25',
-    totalPrice: 2550000,
-    status: 'confirmed',
-    smartLockPin: '849201'
-  } as Booking,
-  {
-    id: 'bk-adm-02',
-    bookingCode: 'BK-2026-002',
-    guestName: 'Carlos Mario Mendoza',
-    guestEmail: 'carlos.m@ejemplo.com',
-    checkIn: '2026-10-24',
-    checkOut: '2026-10-28',
-    totalPrice: 1890000,
-    status: 'pending'
-  } as Booking
-];
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -741,6 +657,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   processingPayouts = signal(false);
   actionMessage = signal<string>('');
   actionError = signal<string>('');
+  processingBookingId = signal<string | null>(null);
 
   // Pagination & Filters state
   currentPage = signal<number>(1);
@@ -929,6 +846,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         const list = res.data || res || [];
         this.promotions.set(Array.isArray(list) ? list : []);
+      },
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al obtener promociones');
+        setTimeout(() => this.actionError.set(''), 5000);
+        this.promotions.set([]);
       }
     });
   }
@@ -942,7 +864,13 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.newPromo.endDate < this.newPromo.startDate) {
+    const today = new Date().toISOString().split('T')[0];
+    if (this.newPromo.startDate < today) {
+      this.promoError = 'La fecha de inicio no puede ser en el pasado';
+      return;
+    }
+
+    if (this.newPromo.endDate <= this.newPromo.startDate) {
       this.promoError = 'La fecha de fin debe ser posterior a la fecha de inicio';
       return;
     }
@@ -989,15 +917,19 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   approveBooking(b: Booking) {
     const id = b.id || b._id;
+    if (!id || this.processingBookingId() === id) return;
+    this.processingBookingId.set(id);
     // Endpoint real: PUT /admin/bookings/{id}/status (el frontend anterior llamaba a /approve, que no existe en el backend).
     this.api.put<any>(`/admin/bookings/${id}/status`, { status: 'confirmed' }).subscribe({
       next: () => {
+        this.processingBookingId.set(null);
         this.fetchBookings();
         this.fetchMetrics();
         this.actionMessage.set(`Reserva ${b.bookingCode || id} aprobada exitosamente.`);
         setTimeout(() => this.actionMessage.set(''), 4000);
       },
       error: (err) => {
+        this.processingBookingId.set(null);
         this.actionError.set(err?.error?.message || 'Error al aprobar la reserva');
         setTimeout(() => this.actionError.set(''), 5000);
       }
@@ -1011,7 +943,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         const a = document.createElement('a');
         a.href = url;
         a.download = 'reservas-palacio-del-mar.csv';
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
       },
       error: () => {
@@ -1076,7 +1010,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         const list = res.data || (res as any) || [];
         this.properties.set(Array.isArray(list) ? list : []);
       },
-      error: () => {
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al obtener alojamientos');
+        setTimeout(() => this.actionError.set(''), 5000);
         this.properties.set([]);
       }
     });
@@ -1133,7 +1069,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         const list = res.data || (res as any) || [];
         this.refunds.set(Array.isArray(list) ? list : []);
       },
-      error: () => {
+      error: (err) => {
+        this.actionError.set(err?.error?.message || 'Error al obtener reembolsos');
+        setTimeout(() => this.actionError.set(''), 5000);
         this.refunds.set([]);
       }
     });
@@ -1169,5 +1107,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
         setTimeout(() => this.actionError.set(''), 5000);
       }
     });
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.approvalModalProperty()) {
+      this.approvalModalProperty.set(null);
+    } else if (this.rejectionModalProperty()) {
+      this.rejectionModalProperty.set(null);
+    } else if (this.activeRefundItem()) {
+      this.closeRefundModal();
+    } else if (this.previewProperty()) {
+      this.previewProperty.set(null);
+    }
   }
 }

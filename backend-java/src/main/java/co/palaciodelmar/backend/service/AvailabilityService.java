@@ -251,7 +251,11 @@ public class AvailabilityService {
                     ? pricingService.calculatePrice(suite.getBasePrice(), checkIn, checkOut, promoDiscount, DynamicPricingService.asFactorFunction(dynamicAdjustments))
                     : pricingService.calculatePrice(suite.getBasePrice(), checkIn, checkOut, promoDiscount);
             java.math.BigDecimal totalPrice = pricingResult.total();
-            java.math.BigDecimal pricePerNight = suite.getBasePrice();
+            java.math.BigDecimal pricePerNight = (nights > 0 && pricingResult.subtotal() != null)
+                    ? pricingResult.subtotal().divide(BigDecimal.valueOf(nights), 2, java.math.RoundingMode.HALF_UP)
+                    : (pricingResult.nightlyPrices() != null && !pricingResult.nightlyPrices().isEmpty()
+                        ? pricingResult.nightlyPrices().get(0).price()
+                        : suite.getBasePrice());
 
             SuiteAvailabilityResult result = SuiteAvailabilityResult.builder()
                     .suite(suite)
@@ -310,7 +314,8 @@ public class AvailabilityService {
         List<Suite> allSuites = getApprovedActiveSuites();
         List<Suite> filteredSuites = new ArrayList<>();
 
-        if (suiteId != null && !suiteId.isBlank()) {
+        boolean hasSpecificSuiteFilter = suiteId != null && !suiteId.isBlank();
+        if (hasSpecificSuiteFilter) {
             Optional<Suite> specificSuite = findSuiteByIdOrSlug(suiteId);
             if (specificSuite.isPresent() && !Boolean.FALSE.equals(specificSuite.get().getActive())) {
                 Suite s = specificSuite.get();
@@ -325,7 +330,7 @@ public class AvailabilityService {
             }
         }
 
-        if (filteredSuites.isEmpty()) {
+        if (filteredSuites.isEmpty() && !hasSpecificSuiteFilter) {
             for (Suite suite : allSuites) {
                 if (branchId != null && !branchId.isEmpty()) {
                     boolean matchesBranch = suite.getBranch() != null && (suite.getBranch().equals(resolvedBranchId) || suite.getBranch().equals(branchId));
@@ -407,7 +412,12 @@ public class AvailabilityService {
                     int occupiedUnits = perDay.getOrDefault(currentDay, 0);
                     int totU = s.getTotalUnits() != null ? s.getTotalUnits() : 1;
                     if (occupiedUnits < totU) {
-                        co.palaciodelmar.backend.service.PricingService.PricingResult pr = pricingService.calculatePrice(s.getBasePrice(), currentDay, currentDay.plusDays(1), java.math.BigDecimal.ZERO);
+                        Map<LocalDate, DynamicPricingService.Adjustment> dynamicAdjustments = dynamicPricingService != null
+                                ? dynamicPricingService.adjustmentsFor(s, currentDay, currentDay.plusDays(1), null)
+                                : Map.of();
+                        co.palaciodelmar.backend.service.PricingService.PricingResult pr = (dynamicAdjustments != null && !dynamicAdjustments.isEmpty())
+                                ? pricingService.calculatePrice(s.getBasePrice(), currentDay, currentDay.plusDays(1), java.math.BigDecimal.ZERO, DynamicPricingService.asFactorFunction(dynamicAdjustments))
+                                : pricingService.calculatePrice(s.getBasePrice(), currentDay, currentDay.plusDays(1), java.math.BigDecimal.ZERO);
                         java.math.BigDecimal p = pr.nightlyPrices().get(0).price();
                         if (minPrice == null || p.compareTo(minPrice) < 0) {
                             minPrice = p;

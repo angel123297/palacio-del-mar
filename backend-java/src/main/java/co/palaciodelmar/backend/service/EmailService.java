@@ -167,7 +167,7 @@ public class EmailService {
             javaMailSender.send(message);
             log.info("Correo de verificación enviado exitosamente a {}", toEmail);
         } catch (Exception e) {
-            log.warn("No se pudo enviar correo de verificación a {} (servidor SMTP no disponible): {}", toEmail, e.getMessage());
+            log.error("No se pudo enviar correo de verificación a {} (servidor SMTP no disponible): {}", toEmail, e.getMessage(), e);
         }
     }
 
@@ -194,7 +194,7 @@ public class EmailService {
 
             BigDecimal paid = booking.getPaidAmount() != null && booking.getPaidAmount().compareTo(BigDecimal.ZERO) > 0
                     ? booking.getPaidAmount()
-                    : (ctx.paymentAmount() != null ? ctx.paymentAmount() : (booking.getTotalPrice() != null ? booking.getTotalPrice() : BigDecimal.ZERO));
+                    : (ctx.paymentAmount() != null ? ctx.paymentAmount() : BigDecimal.ZERO);
             BigDecimal total = booking.getTotalPrice() != null ? booking.getTotalPrice() : paid;
             BigDecimal balance = booking.getBalanceDue() != null ? booking.getBalanceDue() : BigDecimal.ZERO;
 
@@ -254,7 +254,9 @@ public class EmailService {
 
             try {
                 byte[] icsBytes = generateIcsFile(booking, ctx);
-                helper.addAttachment("Reserva_" + safeFileCode + ".ics", new ByteArrayResource(icsBytes));
+                if (icsBytes != null && icsBytes.length > 0) {
+                    helper.addAttachment("Reserva_" + safeFileCode + ".ics", new ByteArrayResource(icsBytes));
+                }
             } catch (Exception icsEx) {
                 log.warn("No se pudo generar adjunto ICS para reserva {}: {}", booking.getId(), icsEx.getMessage());
             }
@@ -262,8 +264,8 @@ public class EmailService {
             javaMailSender.send(message);
             log.info("Voucher de reserva {} enviado exitosamente a {}", ctx.bookingCode(), ctx.guestEmail());
         } catch (Exception e) {
-            log.warn("No se pudo enviar correo de confirmación para reserva {} (servidor SMTP no disponible): {}",
-                    booking != null ? booking.getId() : "N/A", e.getMessage());
+            log.error("No se pudo enviar correo de confirmación para reserva {} (servidor SMTP no disponible): {}",
+                    booking != null ? booking.getId() : "N/A", e.getMessage(), e);
         }
     }
 
@@ -304,10 +306,17 @@ public class EmailService {
                     ? booking.getGuestDetails().getPhone()
                     : "No especificado";
 
+            BigDecimal commissionRate = (property != null && property.getCommissionRate() != null)
+                    ? property.getCommissionRate()
+                    : new BigDecimal("8.00");
+            BigDecimal hostPercent = new BigDecimal("100.00").subtract(commissionRate).max(BigDecimal.ZERO);
+            BigDecimal hostFactor = hostPercent.divide(new BigDecimal("100.00"), 4, java.math.RoundingMode.HALF_UP);
+
             BigDecimal hostPayout = booking.getHostPayout() != null && booking.getHostPayout().compareTo(BigDecimal.ZERO) > 0
                     ? booking.getHostPayout()
-                    : (booking.getTotalPrice() != null ? booking.getTotalPrice().multiply(new BigDecimal("0.92")) : BigDecimal.ZERO);
+                    : (booking.getTotalPrice() != null ? booking.getTotalPrice().multiply(hostFactor).setScale(0, java.math.RoundingMode.HALF_UP) : BigDecimal.ZERO);
 
+            String hostPercentLabel = hostPercent.stripTrailingZeros().toPlainString();
             String hostUrl = normalizedBaseUrl() + "/anfitrion";
 
             String html = "<div style=\"background:#0d0d0d; color:#fff; font-family:sans-serif; padding:25px; border-radius:8px; max-width:600px; margin:auto;\">"
@@ -321,7 +330,7 @@ public class EmailService {
                     + "<p style=\"margin:4px 0;\"><strong>Check-in:</strong> " + escapeHtml(formatDateEs(booking.getCheckIn())) + " (" + escapeHtml(ctx.checkInTime()) + ")</p>"
                     + "<p style=\"margin:4px 0;\"><strong>Check-out:</strong> " + escapeHtml(formatDateEs(booking.getCheckOut())) + " (" + escapeHtml(ctx.checkOutTime()) + ")</p>"
                     + "<p style=\"margin:4px 0;\"><strong>Huéspedes:</strong> " + escapeHtml(ctx.guestsLabel()) + "</p>"
-                    + "<p style=\"margin:8px 0 0 0; color:#c9a96e; font-size:16px;\"><strong>Tu Liquidación Neta (92%):</strong> " + formatCop(hostPayout) + "</p>"
+                    + "<p style=\"margin:8px 0 0 0; color:#c9a96e; font-size:16px;\"><strong>Tu Liquidación Neta (" + hostPercentLabel + "%):</strong> " + formatCop(hostPayout) + "</p>"
                     + "</div>"
                     + "<p><a href=\"" + hostUrl + "\" style=\"background:#c9a96e; color:#0d0d0d; padding:10px 20px; text-decoration:none; border-radius:4px; font-weight:bold; display:inline-block;\">Ver en el Panel de Anfitrión</a></p>"
                     + "</div>";
@@ -497,7 +506,7 @@ public class EmailService {
             javaMailSender.send(message);
             log.info("Correo con enlace de restablecimiento de contraseña enviado exitosamente a {}", toEmail);
         } catch (Exception e) {
-            log.warn("No se pudo enviar correo con enlace de restablecimiento a {}: {}", toEmail, e.getMessage());
+            log.error("No se pudo enviar correo con enlace de restablecimiento a {}: {}", toEmail, e.getMessage(), e);
         }
     }
 
@@ -535,7 +544,7 @@ public class EmailService {
             javaMailSender.send(message);
             log.info("Correo con contraseña temporal enviado exitosamente a {}", toEmail);
         } catch (Exception e) {
-            log.warn("No se pudo enviar correo con contraseña temporal a {}: {}", toEmail, e.getMessage());
+            log.error("No se pudo enviar correo con contraseña temporal a {}: {}", toEmail, e.getMessage(), e);
         }
     }
 
@@ -581,6 +590,11 @@ public class EmailService {
     }
 
     private byte[] generateIcsFile(Booking booking, BookingEmailContext ctx) {
+        if (booking == null || booking.getCheckIn() == null || booking.getCheckOut() == null) {
+            log.warn("No se puede generar archivo ICS para reserva {}: fechas de check-in o check-out nulas",
+                    booking != null ? booking.getId() : "null");
+            return new byte[0];
+        }
         String dtStart = booking.getCheckIn().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String dtEnd = booking.getCheckOut().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String cleanSummary = sanitizeIcsText("Estadía en " + ctx.propertyName() + " - " + ctx.suiteName());
@@ -817,7 +831,7 @@ public class EmailService {
 
     private String sanitizeIcsText(String value) {
         if (value == null) return "";
-        return value.replace("\r", " ").replace("\n", " ").replace(",", "\\,").replace(";", "\\;");
+        return value.replace("\\", "\\\\").replace("\r", " ").replace("\n", " ").replace(",", "\\,").replace(";", "\\;");
     }
 
     public boolean isConfigured() {

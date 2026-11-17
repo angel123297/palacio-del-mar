@@ -82,6 +82,11 @@ import { finalize } from 'rxjs';
               </div>
             </div>
 
+            <div style="margin-bottom: 1.5rem;">
+              <label for="profile-confirm-password" style="display: block; color: #c9a96e; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500;">Confirmar Nueva Contraseña</label>
+              <input id="profile-confirm-password" type="password" formControlName="confirmPassword" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 12px; border-radius: 6px; font-size: 1rem;">
+            </div>
+
             <button type="submit" [disabled]="passwordForm.invalid || savingPassword" class="btn-primary" style="width: 100%; padding: 14px; font-size: 1rem; display: flex; justify-content: center; gap: 10px; min-height: 44px;">
               <span *ngIf="!savingPassword">Cambiar Contraseña</span>
               <span *ngIf="savingPassword">Actualizando...</span>
@@ -147,7 +152,8 @@ export class ProfileComponent implements OnInit {
 
     this.passwordForm = this.fb.group({
       currentPassword: ['', Validators.required],
-      newPassword: ['', [Validators.required, Validators.minLength(8)]]
+      newPassword: ['', [Validators.required, Validators.minLength(8)]],
+      confirmPassword: ['', Validators.required]
     });
   }
 
@@ -176,8 +182,11 @@ export class ProfileComponent implements OnInit {
            });
         }
       },
-      error: () => {
-        if (!current) {
+      error: (err) => {
+        if (err?.status === 401) {
+          this.profileError = 'Sesión expirada o no autorizada. Por favor inicia sesión nuevamente.';
+          this.auth.clearLocalData();
+        } else if (!current) {
           this.profileError = 'No se pudo cargar el perfil.';
         }
       }
@@ -212,13 +221,19 @@ export class ProfileComponent implements OnInit {
 
   changePassword() {
     if (this.passwordForm.invalid) return;
+    const { currentPassword, newPassword, confirmPassword } = this.passwordForm.value;
+    if (newPassword !== confirmPassword) {
+      this.passwordError = 'Las contraseñas no coinciden.';
+      this.cdr.detectChanges();
+      return;
+    }
 
     this.savingPassword = true;
     this.passwordSuccess = '';
     this.passwordError = '';
     this.cdr.detectChanges();
 
-    this.api.put<any>('/auth/change-password', this.passwordForm.value).pipe(
+    this.api.put<any>('/auth/change-password', { currentPassword, newPassword }).pipe(
       finalize(() => {
         this.savingPassword = false;
         this.cdr.detectChanges();

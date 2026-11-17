@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -66,6 +68,7 @@ class CancellationPolicyBoundaryTest {
         bookingService = new BookingService(
                 bookingRepository, suiteRepository, branchRepository, experienceRepository,
                 suiteNightRepository, userRepository, promotionRepository, pricingService, paymentGateway);
+        bookingService.setClock(Clock.fixed(Instant.parse("2026-11-16T15:00:00Z"), BOGOTA)); // 10:00 AM COT (Lunes 16 Nov 2026)
 
         when(suiteRepository.findById(anyString())).thenReturn(Optional.empty());
         when(branchRepository.findById(anyString())).thenReturn(Optional.empty());
@@ -95,10 +98,12 @@ class CancellationPolicyBoundaryTest {
                 .build();
     }
 
+    private static final LocalDate BASE_DATE = LocalDate.of(2026, 11, 16);
+
     @Test
     @DisplayName("Cancelación <48h (1 día antes): retención del 100% de la base sin depósito, sin reembolso")
     void testCancelLessThan48HoursRetainsEverything() {
-        LocalDate checkIn = LocalDate.now(BOGOTA).plus(1, ChronoUnit.DAYS);
+        LocalDate checkIn = BASE_DATE.plus(1, ChronoUnit.DAYS);
         when(bookingRepository.findById("b1")).thenReturn(Optional.of(paidBooking(checkIn)));
 
         bookingService.cancelBooking("b1", "u1", "emergencia");
@@ -116,9 +121,9 @@ class CancellationPolicyBoundaryTest {
     }
 
     @Test
-    @DisplayName("Frontera exacta: cancelar 2 días antes ya cae en el tramo del 10% (no 100%)")
+    @DisplayName("Frontera exacta: cancelar 2 días antes a las 10:00 (53h antes de llegada a las 15:00) cae en el tramo del 10% (no 100%)")
     void testCancelAtExactlyTwoDaysFallsInto10PercentBracket() {
-        LocalDate checkIn = LocalDate.now(BOGOTA).plus(2, ChronoUnit.DAYS);
+        LocalDate checkIn = BASE_DATE.plus(2, ChronoUnit.DAYS);
         when(bookingRepository.findById("b1")).thenReturn(Optional.of(paidBooking(checkIn)));
 
         bookingService.cancelBooking("b1", "u1", "cambio de planes");
@@ -136,7 +141,7 @@ class CancellationPolicyBoundaryTest {
     @Test
     @DisplayName("Frontera exacta: cancelar 7 días antes es gratis (0% retención)")
     void testCancelAtExactlySevenDaysIsFree() {
-        LocalDate checkIn = LocalDate.now(BOGOTA).plus(7, ChronoUnit.DAYS);
+        LocalDate checkIn = BASE_DATE.plus(7, ChronoUnit.DAYS);
         when(bookingRepository.findById("b1")).thenReturn(Optional.of(paidBooking(checkIn)));
 
         bookingService.cancelBooking("b1", "u1", "cambio de planes");
@@ -154,7 +159,7 @@ class CancellationPolicyBoundaryTest {
     @Test
     @DisplayName("Cancelar reserva impaga: no se llama al gateway ni cambia el paymentStatus")
     void testCancelUnpaidBookingNeverTouchesGateway() {
-        LocalDate checkIn = LocalDate.now(BOGOTA).plus(1, ChronoUnit.DAYS);
+        LocalDate checkIn = BASE_DATE.plus(1, ChronoUnit.DAYS);
         Booking booking = paidBooking(checkIn);
         booking.setPaidAmount(BigDecimal.ZERO);
         booking.setPaymentStatus("pending");
@@ -175,7 +180,7 @@ class CancellationPolicyBoundaryTest {
     @Test
     @DisplayName("Cancelar una reserva confirmada es una transición válida de la máquina de estados")
     void testCancelConfirmedBookingIsAllowed() {
-        LocalDate checkIn = LocalDate.now(BOGOTA).plus(1, ChronoUnit.DAYS);
+        LocalDate checkIn = BASE_DATE.plus(1, ChronoUnit.DAYS);
         Booking booking = paidBooking(checkIn);
         booking.setStatus("confirmed");
         when(bookingRepository.findById("b1")).thenReturn(Optional.of(booking));

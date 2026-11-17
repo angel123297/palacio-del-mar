@@ -1,0 +1,222 @@
+A continuación presento la revisión y auditoría técnica profunda del bloque de cambios presentado para **Palacio del Mar**. Como desarrollador riguroso y desconfiado, se evaluó cada línea frente a condiciones de carrera, vectores de evasión, exposición de datos, regresiones y robustez de pruebas.
+
+---
+
+### Resumen Ejecutivo del Bloque
+El bloque introduce mejoras positivas en el aislamiento de credenciales de CI, eliminación de wildcards permisivos en CORS y mitigación de la toma de control de cuentas inactivas mediante registro público. Sin embargo, **presenta fallas críticas y de severidad alta** que introducen fuga de información personal (PII), bypass de autenticación para cuentas suspendidas, condiciones de carrera en la rotación de tokens y caídas de servicio (HTTP 500) ante fallos de SMTP en reenvíos.
+
+---
+
+### Hallazgos Detallados de Seguridad y Calidad
+
+#### 1. Fuga Masiva de PII en Registro Anónimo Duplicado (Data Exposure / OWASP API3)
+- **Severidad:** **CRÍTICA**
+- **Ruta / Líneas:** [AuthService.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/service/AuthService.java#L106-L109)
+- **Problema:**
+  Cuando un usuario anónimo intenta registrarse con un correo ya existente que aún no está verificado (`emailVerified = false`), el nuevo código ejecuta:
+  ```java
+  resendVerification(normalizedEmail);
+  return AuthResponse.builder().token(null).user(toDTO(existing)).build();
+  ```
+  `toDTO(existing)` retorna el objeto completo del usuario original: nombre, apellidos, teléfono, tipo y número de documento de identidad (`profile.documentId`), dirección residencial (`profile.address`), avatar y sucursales.
+  Cualquier atacante no autenticado que sondee correos puede extraer la información confidencial y personal de los usuarios no verificados.
+- **Corrección sugerida:**
+  Nunca devolver la entidad del usuario existente a un actor no autenticado. Retornar `user(null)` o lanzar `IllegalArgumentException("El email ya está registrado")`:
+  ```java
+  resendVerification(normalizedEmail);
+  return AuthResponse.builder().token(null).user(null).build();
+  ```
+
+---
+
+#### 2. Bypass de Autenticación y Autorización para Cuentas Suspendidas
+- **Severidad:** **CRÍTICA**
+- **Ruta / Líneas:**
+  - [UserPrincipal.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/security/UserPrincipal.java#L73-L75)
+  - [UserDetailsServiceImpl.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/security/UserDetailsServiceImpl.java#L79-L84)
+  - [JwtAuthenticationFilter.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/security/JwtAuthenticationFilter.java#L58-L67)
+- **Problema:**
+  1. `UserPrincipal.isEnabled()` solo evalúa `user.getDeletedAt() == null && !"inactive".equalsIgnoreCase(user.getStatus())`. El estado `"suspended"` (usado explícitamente en el modelo del negocio y en las consultas de `AuthService`) se ignora. `isAccountNonLocked()` tampoco está implementado y retorna `true` por defecto. Un usuario con estado `suspended` puede iniciar sesión exitosamente en `/api/auth/login`.
+  2. En `JwtAuthenticationFilter`, tras verificar `jwtService.isTokenValid(jwt, userDetails)`, **nunca se comprueba** si `userDetails.isEnabled()` o `userDetails.isAccountNonLocked()`. Cualquier cuenta dada de baja (`inactive` o `suspended`) con un JWT emitido previamente continuará ejecutando peticiones autorizadas hasta la expiración del token.
+- **Corrección sugerida:**
+  - En `UserPrincipal.java`:
+    ```java
+    @Override
+    public boolean isEnabled() {
+        return user != null && user.getDeletedAt() == null 
+                && !"inactive".equalsIgnoreCase(user.getStatus()) 
+                && !"suspended".equalsIgnoreCase(user.getStatus());
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return user != null && !"suspended".equalsIgnoreCase(user.getStatus());
+    }
+    ```
+  - En `UserDetailsServiceImpl.java`:
+    ```java
+    private UserPrincipal principalForActiveRecord(User user) {
+        if (user.getDeletedAt() != null || "inactive".equalsIgnoreCase(user.getStatus()) || "suspended".equalsIgnoreCase(user.getStatus())) {
+            throw new UsernameNotFoundException("Usuario no encontrado o cuenta inactiva");
+        }
+        return new UserPrincipal(user);
+    }
+    ```
+  - En `JwtAuthenticationFilter.java`:
+    ```java
+    if (jwtService.isTokenValid(jwt, userDetails) && userDetails.isEnabled() && userDetails.isAccountNonLocked()) { ... }
+    ```
+
+---
+
+#### 3. Condición de Carrera en `resendVerification` y Revocación Accidental de Verificación
+- **Severidad:** **ALTA**
+- **Ruta / Líneas:** [AuthService.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/service/AuthService.java#L470-L485)
+- **Problema:**
+  En `resendVerification`, el token se persiste con `atomicPartialUserUpdate(user.getId(), update, user)`.
+  1. La consulta interna solo busca `Criteria.where("id").is(userId)`. Si un usuario hace clic en el enlace de correo de `verifyEmail` concurrentemente con una llamada a `resendVerification`, `resendVerification` puede ejecutarse después e inyectar un nuevo hash de token sin comprobar si la cuenta ya se verificó en MongoDB.
+  2. `atomicPartialUserUpdate` utiliza como fallback `userRepository.save(fallbackUser)`. Si la actualización falla o retorna null, persiste la instancia `user` en memoria (la cual tiene `emailVerified = false` al momento de ser leída), **sobreescribiendo y des-verificando** la cuenta del usuario.
+- **Corrección sugerida:**
+  Ejecutar una actualización atómica y condicional directamente en `resendVerification`, asegurando que `emailVerified != true`:
+  ```java
+  Query query = new Query(Criteria.where("id").is(user.getId())
+          .and("emailVerified").ne(true)
+          .and("deletedAt").is(null)
+          .and("status").nin("inactive", "suspended"));
+  Update update = new Update()
+          .set("verificationTokenHash", hashedToken)
+          .set("verificationTokenExpiresAt", expiresAt)
+          .set("updatedAt", now);
+  User updated = mongoTemplate.findAndModify(query, update, FindAndModifyOptions.options().returnNew(true), User.class);
+  if (updated == null) {
+      log.info("Reenvío omitido: usuario ya verificado, inexistente o inactivo.");
+      return;
+  }
+  ```
+
+---
+
+#### 4. Regresión: Violación a la Regla "Verificación Obligatoria Incluso si SMTP Falla" en Reenvío
+- **Severidad:** **ALTA**
+- **Ruta / Líneas:** [AuthService.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/service/AuthService.java#L485-L488)
+- **Problema:**
+  En `register` se protege la llamada con un `try-catch` para que un fallo en el servidor de correo no impida la respuesta exitosa.
+  Sin embargo, en `resendVerification`:
+  ```java
+  emailService.sendVerificationEmail(user.getEmail(), rawToken);
+  ```
+  La llamada **carece de bloque `try-catch`**. Si el servidor SMTP se encuentra caído o rechaza la conexión, lanza una excepción no controlada (`MailException` / `IllegalStateException`), resultando en HTTP 500.
+  Como el nuevo flujo de `register` invoca `resendVerification(normalizedEmail)` si la cuenta existe sin verificar, **el registro falla con error 500 si SMTP falla**, violando directamente la regla de negocio.
+- **Corrección sugerida:**
+  Envolver la invocación a `emailService.sendVerificationEmail` en `resendVerification` dentro de un bloque `try-catch` que capture y registre el error sin propagar un HTTP 500.
+
+---
+
+#### 5. Endpoint Público `/api/auth/resend-verification` Permite Rotación en Cuentas Restringidas
+- **Severidad:** **ALTA**
+- **Ruta / Líneas:** [AuthService.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/service/AuthService.java#L460-L470)
+- **Problema:**
+  En `register` se bloquea la activación de administradores o cuentas suspendidas (`"admin".equalsIgnoreCase(existing.getRole()) || ...`).
+  Sin embargo, el endpoint público `POST /api/auth/resend-verification` no valida el rol ni el estado de la cuenta. Un atacante puede forzar el reenvío y rotación continua de tokens en cuentas administrativas o suspendidas.
+- **Corrección sugerida:**
+  Incorporar en `resendVerification` las mismas salvaguardas de cuenta:
+  ```java
+  if ("admin".equalsIgnoreCase(user.getRole()) || user.getDeletedAt() != null
+          || "inactive".equalsIgnoreCase(user.getStatus())
+          || "suspended".equalsIgnoreCase(user.getStatus())) {
+      throw new IllegalArgumentException("No se permite reenviar verificación para esta cuenta");
+  }
+  ```
+
+---
+
+#### 6. Falta de Validación de Entrada en `verifyEmail` (Riesgo de HTTP 500)
+- **Severidad:** **MEDIA**
+- **Ruta / Líneas:** [AuthService.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/service/AuthService.java#L262-L265)
+- **Problema:**
+  `verifyEmail(String token)` invoca directamente `hashToken(token)` sin validar que el parámetro no sea nulo.
+  `token.getBytes(...)` dentro de `hashToken` genera un `NullPointerException` no controlado (HTTP 500).
+- **Corrección sugerida:**
+  Validar al inicio del método:
+  ```java
+  if (token == null || token.trim().isEmpty()) {
+      throw new IllegalArgumentException("El token de verificación es requerido");
+  }
+  ```
+
+---
+
+#### 7. Riesgo de Build en Docker y Duplicación de Cabeceras en Nginx
+- **Severidad:** **MEDIA**
+- **Ruta / Líneas:**
+  - [Dockerfile](file:///home/angel20/Projects/palacio-del-mar/frontend-angular/Dockerfile#L23)
+  - [nginx.conf](file:///home/angel20/Projects/palacio-del-mar/frontend-angular/nginx.conf#L44)
+- **Problema:**
+  1. El diff añade `COPY security-headers.conf /etc/nginx/security-headers.conf`, pero dicho archivo no forma parte del diff ni se creó en este bloque. Si el archivo no existe en el contexto de compilación, el comando `docker build` fallará inmediatamente.
+  2. En `nginx.conf`, se agregó `include /etc/nginx/security-headers.conf;` en el bloque `location /api/`. Dado que Spring Boot ya genera y envía `X-Frame-Options: DENY` y `X-Content-Type-Options: nosniff`, Nginx agregará una segunda cabecera (posiblemente contradictoria como `SAMEORIGIN`), provocando respuestas HTTP inválidas ante escaneos de seguridad.
+- **Corrección sugerida:**
+  - Asegurar la presencia física de `security-headers.conf`.
+  - Remover `include /etc/nginx/security-headers.conf;` de `location /api/` en `nginx.conf`, permitiendo que el backend Spring Boot gestione sus propias cabeceras de API.
+
+---
+
+#### 8. Evasión Potencial de Rate Limiting por Normalización Incompleta de URI
+- **Severidad:** **MEDIA**
+- **Ruta / Líneas:** [RateLimitFilter.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/security/RateLimitFilter.java#L65)
+- **Problema:**
+  La sustitución `request.getRequestURI().replaceAll(";[^/]*", "")` elimina parámetros de matriz, pero no normaliza trailing slashes (`/api/auth/login/`), barras consecutivas (`//api//auth/login`) ni diferencias de mayúsculas/minúsculas. Si la comprobación de ruta en el filtro utiliza igualdad estricta de cadenas, peticiones con barra final evadirán el limitador mientras que Spring MVC las procesará en el mismo controlador.
+- **Corrección sugerida:**
+  Normalizar exhaustivamente la ruta:
+  ```java
+  String path = request.getRequestURI()
+          .replaceAll(";[^/]*", "")
+          .replaceAll("/+", "/")
+          .replaceAll("/+$", "")
+          .toLowerCase();
+  ```
+
+---
+
+#### 9. Seguridad de Métodos y Alcance en `SecurityConfig.java`
+- **Severidad:** **MEDIA / BAJA**
+- **Ruta / Líneas:** [SecurityConfig.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/main/java/co/palaciodelmar/backend/config/SecurityConfig.java#L85-L100)
+- **Problema:**
+  1. `/api/availability/**` se encuentra en `permitAll()` para todos los verbos HTTP. Si existen métodos `POST`, `PUT` o `DELETE` para bloquear disponibilidad, quedan accesibles públicamente. Debe restringirse a `HttpMethod.GET`.
+  2. `/api/auth/register`, `/api/auth/login`, `/api/auth/resend-verification`, etc. se abren a cualquier método HTTP en Spring Security, en lugar de restringirse a `HttpMethod.POST`.
+- **Corrección sugerida:**
+  Asegurar la restricción de método en cada regla:
+  ```java
+  .requestMatchers(HttpMethod.GET, "/api/availability/**").permitAll()
+  .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register", "/api/auth/resend-verification", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/logout").permitAll()
+  .requestMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
+  ```
+
+---
+
+#### 10. Brechas en Cobertura de Pruebas Unitarias
+- **Severidad:** **MEDIA**
+- **Ruta / Líneas:** [AuthServiceTest.java](file:///home/angel20/Projects/palacio-del-mar/backend-java/src/test/java/co/palaciodelmar/backend/service/AuthServiceTest.java)
+- **Problema:**
+  Los tests agregados cubren el caso feliz y la rotación básica, pero omiten:
+  1. Prueba de que `resendVerification` maneje el fallo de SMTP sin propagar excepciones.
+  2. Prueba de que un intento de registro sobre una cuenta existente no verificada no devuelva PII (`assertNull(response.getUser())`).
+  3. Prueba de bloqueo en `resendVerification` si la cuenta es de tipo `admin`, `inactive` o `suspended`.
+  4. Prueba de intento de autenticación (`/login` y filtro JWT) con un usuario en estado `suspended`.
+  5. Prueba de invocación de `verifyEmail(null)`.
+
+---
+
+### Verificación de Reglas del Negocio y Restricciones Específicas
+
+| Regla Requerida | Estado en el Diff | Observación |
+| :--- | :---: | :--- |
+| **Verificación obligatoria si SMTP falla** | ⚠️ Parcial | Cumplido en nuevo registro (`emailVerified(false)`). **Violado en reenvío** por falta de `try-catch` en `sendVerificationEmail`. |
+| **Reenvío invalida tokens anteriores** | ✅ Cumplido | El hash anterior se sobrescribe al generar un nuevo token. Requiere ajuste atómico para evitar carreras. |
+| **No cambiar pass/perfil/rol en registro anónimo** | ⚠️ Parcial | Los datos no se alteran en BD, pero **se filtra el perfil existente (PII)** en el DTO de respuesta. |
+| **Bearer móvil debe seguir funcionando** | ✅ Cumplido | `JwtAuthenticationFilter` prioriza la cabecera `Authorization: Bearer <token>`, y las respuestas devuelven el token JWT. |
+| **Túnel ngrok habilitado** | ✅ Cumplido | `https://rehab-perceive-landline.ngrok-free.dev` está explícito en la configuración CORS y verificado por test. |
+| **No usar contraseñas reales** | ✅ Cumplido | Se eliminaron los secretos estáticos de `.env.example` y CI; solo se usan mocks y tokens generados aleatoriamente. |
+| **Seguridad de métodos / CORS / Nginx** | ⚠️ Requiere ajuste | CORS quedó bien restringido, pero Nginx duplica cabeceras en `/api/` y faltan restricciones de método en endpoints sensibles. |
+
+---
+*Nota: No se cierra el bloque ni se aplican cambios hasta recibir tus observaciones y ajustes a este plan de hallazgos.*

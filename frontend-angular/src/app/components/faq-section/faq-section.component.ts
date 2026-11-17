@@ -49,11 +49,11 @@ export class FaqSectionComponent {
   faqs = [
     {
       q: '¿Cuáles son los horarios de Check-in y Check-out?',
-      a: 'El Check-in está disponible a partir de las 15:00 hrs y el Check-out se realiza hasta las 12:00 hrs del mediodía. Contamos con servicio de custodia de equipaje y late check-out bajo disponibilidad.'
+      a: 'El Check-in está disponible a partir de las 15:00 hrs y el Check-out se realiza hasta las 12:00 hrs del mediodía. Contamos con servicio de custodia de equipaje. El late check-out está sujeto a disponibilidad y aplica un recargo del 50% sobre el valor de la noche.'
     },
     {
       q: '¿Cuál es la política de cancelación de reservas?',
-      a: 'Puedes cancelar tu reserva sin penalización hasta 7 días antes de la fecha de entrada con reembolso completo a tu cuenta. Para cancelaciones con menos de 7 días se aplica un cobro del 10%.'
+      a: 'Cancelación gratuita con 100% de reembolso hasta 7 días antes de la llegada. Entre 7 días y 48 horas antes del check-in, aplica una retención del 10% sobre el valor total de la reserva (excluyendo el depósito de garantía). Con menos de 48 horas o no-show, se retiene el 100% del valor de la reserva y se reintegra íntegro el depósito de garantía.'
     },
     {
       q: '¿Ofrecen servicio de transporte desde el Aeropuerto Rafael Núñez?',

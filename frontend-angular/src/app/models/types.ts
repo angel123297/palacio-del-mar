@@ -63,6 +63,8 @@ export interface Suite {
   available?: boolean;
   isAvailable?: boolean;
   featured?: boolean;
+  rating?: number;
+  reviewsCount?: number;
 }
 
 export interface Experience {

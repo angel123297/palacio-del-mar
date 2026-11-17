@@ -23,6 +23,9 @@ public class ProcessedWebhookEvent {
     @Indexed(unique = true)
     private String eventId; // e.g., "evt_..."
 
+    @Indexed(unique = true, sparse = true)
+    private String payloadHash;
+
     private String eventType; // e.g., "payment.succeeded"
 
     @Builder.Default

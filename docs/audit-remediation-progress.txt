@@ -1,0 +1,41 @@
+Plan: docs/audit-remediation-plan.txt
+Base: 9749511
+Estado: COMPLETADO — Todos los hallazgos de auditoría (B1-B35, I1-I5, F1-F44) y revisiones externas (N1-N24) resueltos y verificados.
+Rama: fix/payment-refund-payout-edge-cases (trabajo estrictamente local, sin git push ni merge a main).
+
+══════════════════════════════════════════════════════════════
+RESUMEN DE VERIFICACIÓN FINAL (15:50 COT)
+══════════════════════════════════════════════════════════════
+1. Backend (Java 21 / Spring Boot 3):
+   - 595/595 pruebas unitarias e integración JUnit 5 PASAN (0 fallos, 0 errores) en 35.9s.
+   - N23 parte 3 (PaymentRequest): Conectado con @Valid @RequestBody PaymentRequest en PaymentController.createIntent() con checkoutWithBlankBookingIdReturnsBadRequest (6/6 PASS).
+   - B33 pruebas (ForbiddenAccessException): 12/12 asserts ajustados a ForbiddenAccessException.class (incluyendo ReviewAndMaintenanceAutomationTest:185).
+   - Cobertura completa de B1-B35, I1-I5, N1-N24.
+   - Seguridad: CORS con orígenes exactos y túnel ngrok, JWT atómico, blacklist, rate-limiting estricto, mitigación anti-SSRF con recheck y DNS rebinding, ForbiddenAccessException heredando de RuntimeException, validaciones de mes/año en AvailabilityController, @Valid en todos los DTOs de entrada.
+
+2. Frontend (Angular 19 Standalone + Signals):
+   - 77/77 pruebas unitarias Vitest PASAN (18/18 archivos de prueba, 100% PASS) en 7.7s.
+   - Producción build (npm run build): Compilación limpia con 0 errores (bundle generado exitosamente en 7.5s).
+   - Archivos huérfanos eliminados por autorización del usuario (F16): home.component.html y home.component.scss.
+   - Constantes mock DEFAULT_ADMIN_* eliminadas de admin-dashboard.component.ts.
+   - Cobertura completa de F1-F44 (SSE con withCredentials y sin token en query, reqId anti-carreras, aria-labels WCAG 2.2 AA, confirmación de passwords, control in-flight contra doble click).
+
+
+3. Infraestructura y Hardening Adicional (I6-I13 y matices de auditoría):
+   - I6 (Dockerfiles hardening): Eliminado `|| true` de Maven dependency:go-offline (verificado descarga limpia en 17s), configurado usuario no-root `appuser:appgroup` en backend y `HEALTHCHECK` activo en ambos Dockerfiles (wget a `/actuator/health` en backend y a `/` en nginx).
+   - I13 / Gitignore: Actualizado `.gitignore` para ignorar únicamente logs y resultados de JMeter (`jmeter/*.log`, `jmeter/*.jtl`, `jmeter/results/`) permitiendo el versionado de planes `.jmx`.
+   - Índices MongoDB: Agregado `@CompoundIndex(name = "user_profile_phone_idx", def = "{'profile.phone': 1}", sparse = true)` en User.java.
+   - Demo Webhook: Agregado log de advertencia deprecando `?secret=` en query string para forzar uso de cabecera `X-Palacio-Secret`.
+   - EmailService: Elevado nivel de log de fallos de envío SMTP a `log.error` con excepciones completas para monitoreo de observabilidad.
+   - ReceiptComponent: Reforzada validación de correspondencia de correo en `canLeaveReview` para reservas con usuario huérfano.
+   - Verificación completa: Backend 595/595 JUnit PASS (58.2s), Frontend 77/77 Vitest PASS (10.8s), Producción Angular Build 0 errores (7.7s).
+
+4. Hardening de CI y Calidad de Pruebas (I7, I13, T1, T3):
+   - I13 (Git Hygiene): Carpeta `data/` desindexada del seguimiento de Git (`git rm -r --cached data/`) y añadida a `.gitignore`. Los archivos físicos (41 MB con datasets de seed) permanecen intactos en el disco para uso de los scripts locales.
+   - I7 (Supply Chain Security en CI): Workflows `.github/workflows/ci.yml` y `.github/workflows/mobile-build.yml` actualizados con `permissions: contents: read` y fijación estricta de acciones externas mediante commit SHAs inmutables (`actions/checkout`, `actions/setup-java`, `actions/setup-node`, `actions/upload-artifact`, `subosito/flutter-action`).
+   - T1 (Stubbing explícito): `AuthServiceTest` y `CrearUsuarioUnitTest` configurados con `lenient().when(emailService.isConfigured()).thenReturn(true)` en `setUp()`.
+   - T3 (Contrato de Aplicación): `BackendApplicationTests` robustecido con verificación explícita de anotaciones `@SpringBootApplication` y `@EnableScheduling`.
+   - Validación Final Ejecutada:
+     * Backend: 595/595 tests JUnit PASSED (`BUILD SUCCESS`).
+     * Frontend: 77/77 tests Vitest PASSED en 18 archivos de prueba.
+     * Build Frontend: Compilación limpia `npm run build` (0 errores).

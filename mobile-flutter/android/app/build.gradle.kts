@@ -32,12 +32,18 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties.getProperty("keyAlias") ?: "palaciodelmar"
-            keyPassword = keystoreProperties.getProperty("keyPassword") ?: "PalacioDelMar2026SecureKey"
-            storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) } ?: file("palacio-release-key.jks")
-            storePassword = keystoreProperties.getProperty("storePassword") ?: "PalacioDelMar2026SecureKey"
-            enableV1Signing = true
-            enableV2Signing = true
+            val keyStore = keystoreProperties.getProperty("storeFile")?.let { file(it) } ?: file("palacio-release-key.jks")
+            if (keyStore.exists()) {
+                keyAlias = keystoreProperties.getProperty("keyAlias") ?: "palaciodelmar"
+                keyPassword = keystoreProperties.getProperty("keyPassword") ?: "PalacioDelMar2026SecureKey"
+                storeFile = keyStore
+                storePassword = keystoreProperties.getProperty("storePassword") ?: "PalacioDelMar2026SecureKey"
+                enableV1Signing = true
+                enableV2Signing = true
+            } else {
+                // Fallback automático para entornos de CI y pruebas locales sin clave privada versionada
+                initWith(signingConfigs.getByName("debug"))
+            }
         }
     }
 

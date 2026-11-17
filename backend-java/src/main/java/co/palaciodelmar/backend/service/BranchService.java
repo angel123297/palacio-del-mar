@@ -41,7 +41,7 @@ public class BranchService {
 
         // Unificar con propiedades aprobadas del marketplace (anfitriones externos como 'waos')
         Set<String> existingSlugs = branches.stream()
-                .map(b -> b.getSlug().toLowerCase())
+                .map(b -> b.getSlug() != null ? b.getSlug().toLowerCase() : (b.getId() != null ? b.getId().toLowerCase() : ""))
                 .collect(Collectors.toSet());
 
         List<Property> approvedProperties = propertyRepository.findByStatus("APPROVED").stream()
@@ -93,7 +93,7 @@ public class BranchService {
 
         Property property = propertyRepository.findBySlug(lower)
                 .filter(p -> !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus()))
-                .orElseThrow(() -> new IllegalArgumentException("Sucursal o alojamiento no encontrado: " + slug));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Sucursal o alojamiento no encontrado: " + slug));
 
         List<Suite> propSuites = suiteRepository.findByPropertyId(property.getId()).stream()
                 .filter(s -> !Boolean.FALSE.equals(s.getActive()))

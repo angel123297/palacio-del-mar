@@ -66,6 +66,7 @@ describe('BookingDetailComponent (Anti-IDOR y Roles)', () => {
         {
           provide: ActivatedRoute,
           useValue: {
+            paramMap: of(convertToParamMap({ id: 'bk-guest-100' })),
             snapshot: {
               paramMap: convertToParamMap({ id: 'bk-guest-100' })
             }

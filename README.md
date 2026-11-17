@@ -169,13 +169,13 @@ Instala la aplicación oficial de **Palacio del Mar** en tu dispositivo móvil e
 Instala directamente la aplicación en tu teléfono Android descargando el paquete instalador oficial:
 
 - 📲 **Descargar APK Oficial:**
-  👉 **[Descargar APK Palacio Del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)**
+  👉 **[Descargar APK Palacio Del Mar](https://rehab-perceive-landline.ngrok-free.dev/palacio-del-mar-release.apk)**
 - 📦 **Repositorio GitHub Releases (v1.0.0):**
   👉 **[Descargar desde GitHub Releases (Tag v1.0.0)](https://github.com/angel123297/palacio-del-mar/releases/tag/v1.0.0)**
 
 #### Pasos para instalar en Android:
-1. **Descarga el instalador:** Toca el enlace **[Descargar APK Palacio Del Mar](https://unbroke-unsized-zandra.ngrok-free.dev/palacio-del-mar-release.apk)** desde tu celular.
-2. **Instala el archivo:** Abre la notificación de descarga (`palacio-del-mar-release.apk`). Si Android solicita permisos, presiona **Ajustes** y activa *"Permitir desde esta fuente"*, luego pulsa **Instalar**.
+1. **Descarga el instalador:** Toca el enlace **[Descargar APK Palacio Del Mar](https://rehab-perceive-landline.ngrok-free.dev/palacio-del-mar-release.apk)** desde tu celular.
+2. **Instala el archivo:** Abre la notificación de descarga finalizada (`palacio-del-mar-release.apk`). Si Android solicita permisos, presiona **Ajustes** y activa *"Permitir desde esta fuente"*, luego pulsa **Instalar**.
 3. **Listo para usar:** Abre la app **Palacio del Mar**. Tendrás acceso a exploración de suites, reservas con temporizador, pasarela de pagos integrada y llave digital.
 
 ---
@@ -184,11 +184,11 @@ Instala directamente la aplicación en tu teléfono Android descargando el paque
 
 En iPhone y iPad no se requiere descargar archivos pesados ni certificados de desarrollo. Accede directamente a la aplicación nativa optimizada desde el siguiente enlace:
 
-👉 **[Abrir App Móvil Palacio Del Mar (iOS)](https://unbroke-unsized-zandra.ngrok-free.dev/app/)**
+👉 **[Abrir App Móvil Palacio Del Mar (iOS)](https://rehab-perceive-landline.ngrok-free.dev/app/)**
 
 > 💡 *En iPhone / iPad tócalo directamente para abrir en Safari. En PC: haz `Ctrl + Clic` para abrir en pestaña nueva.*
 
 #### Pasos para instalar en iPhone / iPad:
-1. Abre el enlace **[https://unbroke-unsized-zandra.ngrok-free.dev/app/](https://unbroke-unsized-zandra.ngrok-free.dev/app/)** en **Safari**.
+1. Abre el enlace **[https://rehab-perceive-landline.ngrok-free.dev/app/](https://rehab-perceive-landline.ngrok-free.dev/app/)** en **Safari**.
 2. Presiona el botón de **Compartir** `⎋` en la barra inferior de Safari y selecciona **"Agregar al inicio"** (*Add to Home Screen*).
 3. Se creará el acceso de **Palacio del Mar** en tu pantalla de inicio, abriendo como app nativa a pantalla completa sin barras de navegador.

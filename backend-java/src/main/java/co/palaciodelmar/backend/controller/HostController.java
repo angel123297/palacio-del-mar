@@ -61,6 +61,10 @@ public class HostController {
     @Autowired(required = false)
     private co.palaciodelmar.backend.service.PaymentGateway paymentGateway;
 
+    @lombok.Setter
+    @Autowired(required = false)
+    private org.springframework.data.mongodb.core.MongoTemplate mongoTemplate;
+
     @Autowired
     public HostController(
             BookingRepository bookingRepository,
@@ -458,6 +462,11 @@ public class HostController {
         if (!hasAccessToBooking(user, booking)) {
             return ResponseEntity.status(403).body(ApiResponse.error("No tienes acceso a esta reserva"));
         }
+        String status = booking.getStatus() != null ? booking.getStatus().toLowerCase() : "";
+        if (!"confirmed".equals(status) && !"checked_in".equals(status)) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(
+                    "Solo se puede regenerar el PIN en reservas confirmadas o en check-in (estado actual: " + booking.getStatus() + ")"));
+        }
 
         String newPin = String.format("%06d", SECURE_RANDOM.nextInt(100000, 1000000));
         booking.setSmartLockPin(newPin);
@@ -519,7 +528,10 @@ public class HostController {
         final String effectiveAccountNumber;
         final String effectiveMasked;
 
-        if (rawAccount != null && rawAccount.startsWith("***") && existing != null && existing.getAccountNumber() != null) {
+        if (rawAccount != null && rawAccount.startsWith("***")) {
+            if (existing == null || existing.getAccountNumber() == null || existing.getAccountNumber().isBlank()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("No se puede registrar una cuenta bancaria con un valor enmascarado"));
+            }
             // Se reenvió el valor ya enmascarado; preservar el número real original
             effectiveAccountNumber = existing.getAccountNumber();
             effectiveMasked = existing.getAccountNumberMasked() != null ? existing.getAccountNumberMasked() : maskAccountNumber(effectiveAccountNumber);
@@ -547,9 +559,20 @@ public class HostController {
                 .updatedAt(java.time.Instant.now())
                 .build();
 
+        java.time.Instant now = java.time.Instant.now();
         freshUser.setBankAccount(updated);
-        freshUser.setUpdatedAt(java.time.Instant.now());
-        if (userRepository != null) {
+        freshUser.setUpdatedAt(now);
+        if (mongoTemplate != null && freshUser.getId() != null) {
+            mongoTemplate.updateFirst(
+                    new org.springframework.data.mongodb.core.query.Query(
+                            org.springframework.data.mongodb.core.query.Criteria.where("id").is(freshUser.getId())
+                    ),
+                    new org.springframework.data.mongodb.core.query.Update()
+                            .set("bankAccount", updated)
+                            .set("updatedAt", now),
+                    User.class
+            );
+        } else if (userRepository != null) {
             userRepository.save(freshUser);
         }
 

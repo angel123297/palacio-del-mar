@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -18,6 +20,9 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "users")
+@CompoundIndexes({
+        @CompoundIndex(name = "user_profile_phone_idx", def = "{'profile.phone': 1}", sparse = true)
+})
 public class User {
 
     @Id
@@ -48,9 +53,11 @@ public class User {
     @Builder.Default
     private Boolean emailVerified = false;
 
+    @Indexed
     private String verificationTokenHash;
     private Instant verificationTokenExpiresAt;
 
+    @Indexed
     private String resetPasswordTokenHash;
     private Instant resetPasswordTokenExpiresAt;
 

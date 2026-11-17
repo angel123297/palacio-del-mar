@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -6,11 +6,11 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div *ngIf="isOpen" class="fixed inset-0 z-[300] bg-black/95 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-fade-in" role="dialog" aria-modal="true" aria-label="Visor de Fotografías de Suite">
+    <div *ngIf="isOpen && images.length > 0" class="fixed inset-0 z-[300] bg-black/95 flex flex-col items-center justify-center p-4 backdrop-blur-md animate-fade-in" role="dialog" aria-modal="true" aria-label="Visor de Fotografías de Suite">
       <!-- Barra superior de controles -->
       <div class="absolute top-4 right-4 flex items-center gap-4 z-10">
         <span class="text-xs uppercase tracking-widest text-[#c9a96e] font-mono">
-          {{ currentIndex + 1 }} / {{ images.length }}
+          {{ safeIndex() + 1 }} / {{ images.length }}
         </span>
         <button (click)="close()" aria-label="Cerrar visor" class="text-white hover:text-[#c9a96e] text-3xl font-light w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-all cursor-pointer">
           ✕
@@ -19,7 +19,7 @@ import { CommonModule } from '@angular/common';
 
       <!-- Imagen activa -->
       <div class="relative max-w-5xl max-h-[80vh] flex items-center justify-center overflow-hidden">
-        <img [src]="images[currentIndex]" [alt]="title || 'Fotografía de la Suite'" class="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl transition-all duration-300 select-none" />
+        <img [src]="images[safeIndex()]" [alt]="title || 'Fotografía de la Suite'" class="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl transition-all duration-300 select-none" />
       </div>
 
       <!-- Controles de navegación -->
@@ -32,7 +32,7 @@ import { CommonModule } from '@angular/common';
 
       <!-- Miniaturas inferiores -->
       <div *ngIf="images.length > 1" class="absolute bottom-4 max-w-xl flex items-center gap-2 overflow-x-auto p-2 bg-black/60 rounded-xl border border-white/10">
-        <button *ngFor="let img of images; let idx = index" (click)="currentIndex = idx" [class.border-[#c9a96e]]="currentIndex === idx" class="w-12 h-12 rounded overflow-hidden border-2 border-transparent hover:opacity-100 transition-all flex-shrink-0 cursor-pointer" [class.opacity-50]="currentIndex !== idx">
+        <button *ngFor="let img of images; let idx = index" (click)="currentIndex = idx" [class.border-[#c9a96e]]="safeIndex() === idx" class="w-12 h-12 rounded overflow-hidden border-2 border-transparent hover:opacity-100 transition-all flex-shrink-0 cursor-pointer" [class.opacity-50]="safeIndex() !== idx">
           <img [src]="img" alt="Miniatura" class="w-full h-full object-cover" />
         </button>
       </div>
@@ -47,18 +47,43 @@ export class LightboxModalComponent {
 
   @Output() closed = new EventEmitter<void>();
 
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.isOpen) {
+      this.close();
+    }
+  }
+
+  @HostListener('document:keydown.arrowleft')
+  onArrowLeft(): void {
+    if (this.isOpen) {
+      this.prev();
+    }
+  }
+
+  @HostListener('document:keydown.arrowright')
+  onArrowRight(): void {
+    if (this.isOpen) {
+      this.next();
+    }
+  }
+
+  safeIndex(): number {
+    if (!this.images || this.images.length === 0) return 0;
+    return Math.max(0, Math.min(this.currentIndex, this.images.length - 1));
+  }
+
   close(): void {
-    this.isOpen = false;
     this.closed.emit();
   }
 
   next(): void {
-    if (this.images.length === 0) return;
-    this.currentIndex = (this.currentIndex + 1) % this.images.length;
+    if (!this.images || this.images.length === 0) return;
+    this.currentIndex = (this.safeIndex() + 1) % this.images.length;
   }
 
   prev(): void {
-    if (this.images.length === 0) return;
-    this.currentIndex = (this.currentIndex - 1 + this.images.length) % this.images.length;
+    if (!this.images || this.images.length === 0) return;
+    this.currentIndex = (this.safeIndex() - 1 + this.images.length) % this.images.length;
   }
 }

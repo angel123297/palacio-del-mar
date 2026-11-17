@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'dart:convert';
+import '../../core/config/api_config.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/providers/booking_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -12,7 +13,7 @@ class BookingStepperScreen extends StatefulWidget {
   final String suiteName;
   final double pricePerNightCOP;
   final String token;
-  final String baseUrl;
+  final String? baseUrl;
 
   const BookingStepperScreen({
     super.key,
@@ -20,7 +21,7 @@ class BookingStepperScreen extends StatefulWidget {
     required this.suiteName,
     required this.pricePerNightCOP,
     required this.token,
-    this.baseUrl = 'https://unbroke-unsized-zandra.ngrok-free.dev/api',
+    this.baseUrl,
   });
 
   @override
@@ -31,13 +32,16 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
   int _currentStep = 0;
   bool _isLoading = false;
 
+  String get _effectiveBaseUrl =>
+      (widget.baseUrl != null && widget.baseUrl!.isNotEmpty) ? widget.baseUrl! : ApiConfig.baseUrl;
+
   // Paso 1: Fechas
   DateTime _checkIn = DateTime.now().add(const Duration(days: 1));
   DateTime _checkOut = DateTime.now().add(const Duration(days: 3));
 
   // Paso 2: Huéspedes y agregados
   int _guests = 2;
-  int _children = 0;
+  final int _children = 0;
   bool _needsCrib = false;
   bool _petFriendly = false;
   static const double _petFeeCOP = 80000;
@@ -53,7 +57,6 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
   double? _apiSubtotal;
   double? _apiTaxes;
   double? _apiRoomTotal;
-  bool _isQuoting = false;
 
   // Paso 4: Huésped titular
   final _nameController = TextEditingController();
@@ -73,10 +76,9 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
 
   Future<void> _fetchPriceQuote() async {
     if (!mounted) return;
-    setState(() => _isQuoting = true);
     try {
       final res = await http.post(
-        Uri.parse('${widget.baseUrl}/suites/calculate-price'),
+        Uri.parse('$_effectiveBaseUrl/suites/calculate-price'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'suiteId': widget.suiteId,
@@ -102,8 +104,6 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
       }
     } catch (_) {
       // Usar cálculo de respaldo local
-    } finally {
-      if (mounted) setState(() => _isQuoting = false);
     }
   }
 
@@ -185,7 +185,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('${widget.baseUrl}/bookings'),
+        Uri.parse('$_effectiveBaseUrl/bookings'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
@@ -212,7 +212,7 @@ class _BookingStepperScreenState extends State<BookingStepperScreen> {
             builder: (_) => PaymentScreen(
               booking: bookingData,
               token: widget.token,
-              baseUrl: widget.baseUrl,
+              baseUrl: _effectiveBaseUrl,
             ),
           ),
         );

@@ -6,8 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class BackendApplicationTests {
 
 	@Test
+	@org.junit.jupiter.api.DisplayName("Verificar que BackendApplication está anotado con @SpringBootApplication y @EnableScheduling")
 	void contextLoads() {
 		assertNotNull(BackendApplication.class);
+		org.junit.jupiter.api.Assertions.assertTrue(
+				BackendApplication.class.isAnnotationPresent(org.springframework.boot.autoconfigure.SpringBootApplication.class),
+				"BackendApplication debe estar anotado con @SpringBootApplication");
+		org.junit.jupiter.api.Assertions.assertTrue(
+				BackendApplication.class.isAnnotationPresent(org.springframework.scheduling.annotation.EnableScheduling.class),
+				"BackendApplication debe habilitar scheduling mediante @EnableScheduling");
 	}
 
 	@Test

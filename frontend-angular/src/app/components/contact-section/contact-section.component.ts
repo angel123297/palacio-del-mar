@@ -122,6 +122,9 @@ export class ContactSectionComponent {
   sentSuccess = false;
 
   handleSubmit(): void {
+    if (!this.formData.name?.trim() || !this.formData.email?.trim() || !this.formData.message?.trim()) {
+      return;
+    }
     // Envío real por correo del cliente: abre el gestor de email con la solicitud ya redactada.
     const subject = `Solicitud ${this.labelForEventType()} — Palacio del Mar`;
     const body = [

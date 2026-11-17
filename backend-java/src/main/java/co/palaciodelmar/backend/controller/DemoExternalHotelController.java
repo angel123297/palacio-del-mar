@@ -33,7 +33,7 @@ public class DemoExternalHotelController {
                 <h1 class="text-3xl font-bold text-white mt-2">Cartagena Luxury Beach Resort</h1>
                 <p class="text-sm text-slate-400">Demostración de Integración Bidireccional (Dirección B vía API Key) con Palacio del Mar</p>
             </div>
-            <a href="http://localhost:4200/anfitrion" target="_blank" class="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-lg hover:bg-amber-500/20 transition">
+            <a id="backLink" href="/anfitrion" target="_blank" class="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-lg hover:bg-amber-500/20 transition">
                 &larr; Volver al Panel de Anfitrión
             </a>
         </header>
@@ -44,7 +44,7 @@ public class DemoExternalHotelController {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">API Endpoint Base de Palacio del Mar</label>
-                    <input id="apiBase" type="text" value="http://localhost:5000/api" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500">
+                    <input id="apiBase" type="text" placeholder="/api" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500">
                 </div>
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">API Key de Propiedad (<code>X-Palacio-Api-Key</code>)</label>
@@ -151,6 +151,15 @@ public class DemoExternalHotelController {
     </div>
 
     <script>
+        const apiBaseInput = document.getElementById('apiBase');
+        if (apiBaseInput && !apiBaseInput.value) {
+            apiBaseInput.value = window.location.origin + '/api';
+        }
+        const backLink = document.getElementById('backLink');
+        if (backLink && window.location.port === '5000') {
+            backLink.href = window.location.protocol + '//' + window.location.hostname + ':4200/anfitrion';
+        }
+
         // Set default dates: tomorrow to +3 days
         const today = new Date();
         const tomorrow = new Date(today);

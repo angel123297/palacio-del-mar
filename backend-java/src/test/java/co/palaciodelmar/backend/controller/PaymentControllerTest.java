@@ -69,6 +69,15 @@ class PaymentControllerTest {
     }
 
     @Test
+    void checkoutWithBlankBookingIdReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/payments/checkout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookingId\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void confirmPaymentPassesIntentAndTokenToService() throws Exception {
         when(paymentService.confirmPayment(null, "intent-2", "token-2"))
                 .thenReturn(Map.of("paymentStatus", "succeeded"));

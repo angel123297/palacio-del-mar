@@ -35,5 +35,24 @@ void main() {
       expect(result, isA<Map<String, dynamic>>());
       expect(result.containsKey('success'), isTrue);
     });
+
+    test('getExperiences invoca endpoint y retorna lista tipada', () async {
+      final result = await ApiService.getExperiences();
+      expect(result, isA<List<Map<String, dynamic>>>());
+    });
+
+    test('bookExperienceOnly encapsula estructura de reserva standalone de experiencia', () async {
+      final result = await ApiService.bookExperienceOnly(
+        experienceId: 'exp_sunset_01',
+        date: DateTime(2027, 5, 20),
+        quantity: 2,
+        guestName: 'Carlos Mendoza',
+        guestEmail: 'carlos@example.com',
+        guestPhone: '+573001234567',
+      );
+
+      expect(result, isA<Map<String, dynamic>>());
+      expect(result.containsKey('success'), isTrue);
+    });
   });
 }

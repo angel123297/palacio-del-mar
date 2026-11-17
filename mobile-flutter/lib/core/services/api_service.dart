@@ -130,7 +130,7 @@ class ApiService {
     try {
       final response = await AuthenticatedHttpClient.post('/auth/reset-password', {
         'token': token.trim(),
-        'password': newPassword,
+        'newPassword': newPassword,
       });
       Map<String, dynamic> responseData = {};
       try {
@@ -266,6 +266,81 @@ class ApiService {
       return null;
     } catch (_) {
       return null;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getExperiences() async {
+    try {
+      final response = await AuthenticatedHttpClient.get('/experiences');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final list = data is Map ? (data['data'] as List?) : (data as List?);
+        if (list != null) {
+          return list.map((e) => e as Map<String, dynamic>).toList();
+        }
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>> bookExperienceOnly({
+    required String experienceId,
+    required DateTime date,
+    required int quantity,
+    required String guestName,
+    required String guestEmail,
+    required String guestPhone,
+  }) async {
+    try {
+      final dateStr = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      final names = guestName.trim().split(' ');
+      final firstName = names.isNotEmpty ? names.first : guestName.trim();
+      final lastName = names.length > 1 ? names.sublist(1).join(' ') : '';
+
+      final body = {
+        'suite': 'standalone-experience',
+        'checkIn': dateStr,
+        'checkOut': dateStr,
+        'guests': quantity,
+        'guestDetails': {
+          'firstName': firstName,
+          'lastName': lastName,
+          'fullName': guestName.trim(),
+          'email': guestEmail.trim().toLowerCase(),
+          'phone': guestPhone.trim(),
+        },
+        'experiences': [
+          {
+            'id': experienceId,
+            'quantity': quantity,
+          }
+        ],
+      };
+
+      final response = await AuthenticatedHttpClient.post('/bookings', body);
+      Map<String, dynamic> responseData = {};
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (_) {}
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          'data': responseData['data'] ?? responseData,
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['message'] ?? 'Error al reservar experiencia (${response.statusCode})',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error de conexión al reservar experiencia',
+      };
     }
   }
 }

@@ -107,7 +107,7 @@ public class BookingController {
     public ResponseEntity<ApiResponse<BookingDTO>> modifyBooking(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id,
-            @RequestBody BookingRequest request
+            @Valid @RequestBody BookingRequest request
     ) {
         if (request == null) {
             throw new IllegalArgumentException("El cuerpo de la solicitud no puede estar vacío");
@@ -129,10 +129,21 @@ public class BookingController {
     public ResponseEntity<ApiResponse<BookingDTO>> addExperience(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable String id,
-            @RequestBody Map<String, String> body
+            @RequestBody(required = false) Map<String, Object> body
     ) {
-        String experienceId = body != null ? body.get("experienceId") : null;
-        BookingDTO booking = bookingService.addExperienceToBooking(id, requireUserId(principal), experienceId);
+        String experienceId = body != null && body.get("experienceId") != null ? String.valueOf(body.get("experienceId")) : null;
+        int quantity = 1;
+        if (body != null && body.containsKey("quantity")) {
+            Object qObj = body.get("quantity");
+            if (qObj instanceof Number n) {
+                quantity = Math.max(1, n.intValue());
+            } else if (qObj != null) {
+                try {
+                    quantity = Math.max(1, Integer.parseInt(String.valueOf(qObj).trim()));
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        BookingDTO booking = bookingService.addExperienceToBooking(id, requireUserId(principal), experienceId, quantity);
         return ResponseEntity.ok(ApiResponse.ok("Experiencia agregada exitosamente", booking));
     }
 

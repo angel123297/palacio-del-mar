@@ -1,5 +1,6 @@
 package co.palaciodelmar.backend.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -32,14 +33,17 @@ public class HostSuiteRequest {
     private String mainImage;
     private List<String> images;
 
+    @Min(value = 1, message = "La capacidad máxima debe ser de al menos 1 persona")
     @Builder.Default
     private Integer maxGuests = 2;
 
+    @Min(value = 1, message = "El tamaño debe ser mayor a 0 m²")
     @Builder.Default
     private Integer size = 30;
 
     private List<String> amenities;
 
+    @Min(value = 1, message = "El número total de unidades debe ser al menos 1")
     @Builder.Default
     private Integer totalUnits = 1;
 

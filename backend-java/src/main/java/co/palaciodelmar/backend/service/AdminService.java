@@ -6,6 +6,7 @@ import co.palaciodelmar.backend.repository.*;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -15,6 +16,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 public class AdminService {
 
@@ -129,25 +131,33 @@ public class AdminService {
 
         return executeWithSuiteLock(booking.getSuite(), () -> {
             Booking fresh = findBookingByIdOrCode(bookingId);
-            bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado");
-            Booking saved = bookingRepository.save(fresh);
+            BigDecimal paid = fresh.getPaidAmount() != null ? fresh.getPaidAmount() : BigDecimal.ZERO;
+            BigDecimal refunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : BigDecimal.ZERO;
+            BigDecimal netPaid = paid.subtract(refunded).max(BigDecimal.ZERO);
+            String idemKey = null;
 
-            if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED) {
-                BigDecimal paid = fresh.getPaidAmount() != null ? fresh.getPaidAmount() : BigDecimal.ZERO;
-                BigDecimal refunded = fresh.getRefundedAmount() != null ? fresh.getRefundedAmount() : BigDecimal.ZERO;
-                BigDecimal netPaid = paid.subtract(refunded).max(BigDecimal.ZERO);
-
+            if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED
+                    || targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED) {
+                fresh.setBalanceDue(BigDecimal.ZERO);
                 if (netPaid.compareTo(BigDecimal.ZERO) > 0) {
-                    String idemKey = "ref_admin_canc_" + fresh.getId() + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
-                    boolean refundedOk = bookingService.executeSequentialRefund(fresh, netPaid, idemKey);
-                    if (!refundedOk && (fresh.getPendingRefundAmount() == null || fresh.getPendingRefundAmount().compareTo(BigDecimal.ZERO) <= 0)) {
-                        fresh.setPaymentStatus("requires_refund");
-                        fresh.setPendingRefundAmount(netPaid);
-                        fresh.setPendingRefundIdempotencyKey(idemKey);
+                    idemKey = fresh.getPendingRefundIdempotencyKey();
+                    if (idemKey == null || idemKey.isBlank()) {
+                        String prefix = targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED
+                                ? "ref_exp_"
+                                : "ref_admin_canc_";
+                        idemKey = prefix + fresh.getId() + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
                     }
-                    saved = bookingRepository.save(fresh);
+                    fresh.setPendingRefundIdempotencyKey(idemKey);
+                    fresh.setPendingRefundAmount(netPaid);
+                    fresh.setPaymentStatus("requires_refund");
+                } else if (paid.compareTo(BigDecimal.ZERO) > 0) {
+                    fresh.setPaymentStatus(refunded.compareTo(paid) >= 0 ? "refunded" : "partial");
                 }
             }
+
+            bookingService.changeBookingStatus(fresh, targetStatus, "ADMIN", "Cambio administrativo de estado", false);
+            Booking saved = bookingRepository.save(fresh);
+            bookingService.publishBookingStatusEvent(saved, targetStatus);
 
             if (targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED
                     || targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED
@@ -162,6 +172,32 @@ public class AdminService {
                             saved.getCheckOut(),
                             effectiveBookingId
                     );
+                }
+            }
+
+            if ((targetStatus == co.palaciodelmar.backend.model.BookingStatus.CANCELLED
+                    || targetStatus == co.palaciodelmar.backend.model.BookingStatus.EXPIRED)
+                    && idemKey != null && netPaid.compareTo(BigDecimal.ZERO) > 0) {
+                try {
+                    boolean refundedOk = bookingService.executeSequentialRefund(saved, netPaid, idemKey);
+                    if (!refundedOk && (saved.getPendingRefundAmount() == null || saved.getPendingRefundAmount().compareTo(BigDecimal.ZERO) <= 0)) {
+                        saved.setPaymentStatus("requires_refund");
+                        saved.setPendingRefundAmount(netPaid);
+                        saved.setPendingRefundIdempotencyKey(idemKey);
+                        saved = bookingRepository.save(saved);
+                    }
+                } catch (RuntimeException ex) {
+                    log.warn("Fallo ejecutando reembolso automático para reserva {}: {}", saved.getId(), ex.getMessage());
+                    saved.setPaymentStatus("requires_refund");
+                    if (saved.getPendingRefundAmount() == null || saved.getPendingRefundAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                        saved.setPendingRefundAmount(netPaid);
+                        saved.setPendingRefundIdempotencyKey(idemKey);
+                    }
+                    try {
+                        saved = bookingRepository.save(saved);
+                    } catch (Exception saveEx) {
+                        log.error("Fallo persistiendo requires_refund para reserva {}: {}", saved.getId(), saveEx.getMessage());
+                    }
                 }
             }
 
@@ -365,6 +401,9 @@ public class AdminService {
                         newRefunded = paid;
                     }
                     b.setRefundedAmount(newRefunded);
+                    if (pendingKey != null && pendingKey.startsWith("ref_dep_") && pendingAmt.compareTo(BigDecimal.ZERO) > 0) {
+                        b.setGuaranteeRefunded(true);
+                    }
                     b.setPaymentStatus(resolveBookingPaymentStatusAfterRefund(b, paid, newRefunded));
                     b.setPendingRefundAmount(BigDecimal.ZERO);
                     b.setPendingRefundIdempotencyKey(null);
@@ -541,7 +580,7 @@ public class AdminService {
             return safeRefunded.compareTo(safePaid) >= 0 ? "refunded" : (safeRefunded.compareTo(BigDecimal.ZERO) > 0 ? "partial" : "paid");
         }
         BigDecimal netPaid = safePaid.subtract(safeRefunded).max(BigDecimal.ZERO);
-        BigDecimal total = b.getTotalPrice() != null ? b.getTotalPrice() : BigDecimal.ZERO;
+        BigDecimal total = b.getTotalPrice() != null ? b.resolveEffectiveTotalPrice() : BigDecimal.ZERO;
         b.setBalanceDue(total.subtract(netPaid).max(BigDecimal.ZERO));
         if (total.compareTo(BigDecimal.ZERO) > 0 && netPaid.compareTo(total) >= 0) {
             return "paid";
@@ -584,9 +623,19 @@ public class AdminService {
 
     private String escapeCsv(String value) {
         if (value == null) return "";
-        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
+        String sanitized = value;
+        String trimmed = sanitized.stripLeading();
+        if (!sanitized.isEmpty()) {
+            char first = sanitized.charAt(0);
+            char firstNonWs = trimmed.isEmpty() ? first : trimmed.charAt(0);
+            if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r'
+                    || firstNonWs == '=' || firstNonWs == '+' || firstNonWs == '-' || firstNonWs == '@') {
+                sanitized = "'" + sanitized;
+            }
         }
-        return value;
+        if (sanitized.contains(",") || sanitized.contains("\"") || sanitized.contains("\n") || sanitized.contains("\r")) {
+            return "\"" + sanitized.replace("\"", "\"\"") + "\"";
+        }
+        return sanitized;
     }
 }
