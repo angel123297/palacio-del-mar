@@ -388,4 +388,38 @@ class AuditR14FixesTest {
         assertThrows(IllegalArgumentException.class, () ->
                 ps.unblockSuiteNights("p1", "s1", "h1", LocalDate.now().plusDays(2), LocalDate.now().plusDays(5), false));
     }
+
+    // ---------- LOW: GlobalExceptionHandler y SuiteService truncan mensajes largos en 404 ----------
+    @Test
+    @DisplayName("LOW: GlobalExceptionHandler handleNotFound trunca mensajes de más de 300 caracteres")
+    void globalExceptionHandlerTruncatesLongNotFoundMessage() {
+        co.palaciodelmar.backend.exception.GlobalExceptionHandler handler =
+                new co.palaciodelmar.backend.exception.GlobalExceptionHandler();
+        String hugeMessage = "Recurso no encontrado con id: " + "X".repeat(3000);
+        var resp = handler.handleNotFound(new co.palaciodelmar.backend.exception.ResourceNotFoundException(hugeMessage));
+        assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
+        assertTrue(resp.getBody().getMessage().length() <= 305);
+        assertTrue(resp.getBody().getMessage().endsWith("..."));
+    }
+
+    @Test
+    @DisplayName("LOW: SuiteService trunca identificador gigante en mensaje de ResourceNotFoundException")
+    void suiteServiceTruncatesHugeIdInNotFoundMessage() {
+        SuiteRepository sr = mock(SuiteRepository.class);
+        co.palaciodelmar.backend.repository.BranchRepository br = mock(co.palaciodelmar.backend.repository.BranchRepository.class);
+        PropertyRepository pr = mock(PropertyRepository.class);
+        co.palaciodelmar.backend.repository.ExperienceRepository er = mock(co.palaciodelmar.backend.repository.ExperienceRepository.class);
+        co.palaciodelmar.backend.repository.PromotionRepository pmr = mock(co.palaciodelmar.backend.repository.PromotionRepository.class);
+        PricingService ps = mock(PricingService.class);
+        SuiteService suiteService = new SuiteService(sr, br, pr, er, pmr, ps);
+
+        String hugeId = "suite_id_" + "A".repeat(3000);
+        when(sr.findById(hugeId)).thenReturn(Optional.empty());
+        when(sr.findBySlug(hugeId.toLowerCase())).thenReturn(Optional.empty());
+
+        var ex = assertThrows(co.palaciodelmar.backend.exception.ResourceNotFoundException.class, () ->
+                suiteService.getSuiteByIdOrSlug(hugeId));
+        assertTrue(ex.getMessage().length() <= 100);
+        assertTrue(ex.getMessage().contains("..."));
+    }
 }

@@ -137,17 +137,18 @@ public class SuiteService {
     @Cacheable(value = "suite_detail", key = "#idOrSlug.toLowerCase()")
     public SuiteResponseDTO getSuiteByIdOrSlug(String idOrSlug) {
         String lower = idOrSlug.trim().toLowerCase();
+        String safeId = idOrSlug != null && idOrSlug.length() > 50 ? idOrSlug.substring(0, 50) + "..." : idOrSlug;
         Suite suite = suiteRepository.findById(idOrSlug)
                 .or(() -> suiteRepository.findBySlug(lower))
                 .or(() -> {
                     String alias = AvailabilityService.SLUG_ALIASES.get(lower);
                     return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
                 })
-                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Suite no encontrada con identificador: " + idOrSlug));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Suite no encontrada con identificador: " + safeId));
         if (suite.getPropertyId() != null) {
             Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
             if (p == null || Boolean.FALSE.equals(p.getActive()) || !"APPROVED".equalsIgnoreCase(p.getStatus())) {
-                throw new IllegalArgumentException("Suite no disponible o la propiedad no está aprobada: " + idOrSlug);
+                throw new IllegalArgumentException("Suite no disponible o la propiedad no está aprobada: " + safeId);
             }
         }
         Branch branch = suite.getBranch() != null ? branchRepository.findById(suite.getBranch()).orElse(null) : null;
@@ -211,18 +212,19 @@ public class SuiteService {
 
         String rawSuiteId = request.getSuiteId().trim();
         String lowerSuiteId = rawSuiteId.toLowerCase();
+        String safeSuiteId = rawSuiteId.length() > 50 ? rawSuiteId.substring(0, 50) + "..." : rawSuiteId;
         Suite suite = suiteRepository.findById(rawSuiteId)
                 .or(() -> suiteRepository.findBySlug(lowerSuiteId))
                 .or(() -> {
                     String alias = AvailabilityService.SLUG_ALIASES.get(lowerSuiteId);
                     return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
                 })
-                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Suite no encontrada: " + request.getSuiteId()));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Suite no encontrada: " + safeSuiteId));
 
         if (suite.getPropertyId() != null) {
             Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
             if (p == null || Boolean.FALSE.equals(p.getActive()) || !"APPROVED".equalsIgnoreCase(p.getStatus())) {
-                throw new IllegalArgumentException("Suite no disponible o la propiedad no está aprobada: " + request.getSuiteId());
+                throw new IllegalArgumentException("Suite no disponible o la propiedad no está aprobada: " + safeSuiteId);
             }
         }
 

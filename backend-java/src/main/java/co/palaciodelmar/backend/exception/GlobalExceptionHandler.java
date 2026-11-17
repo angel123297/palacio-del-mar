@@ -19,15 +19,19 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private String sanitizeMessage(String message) {
+    private String sanitizeMessage(String message, String defaultFallback) {
         if (message == null || message.isBlank()) {
-            return "Solicitud inválida";
+            return defaultFallback != null ? defaultFallback : "Solicitud inválida";
         }
         String clean = message.trim();
         if (clean.length() > 300) {
             return clean.substring(0, 300) + "...";
         }
         return clean;
+    }
+
+    private String sanitizeMessage(String message) {
+        return sanitizeMessage(message, "Solicitud inválida");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -55,7 +59,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ForbiddenAccessException.class)
     public ResponseEntity<ApiResponse<Void>> handleForbiddenAccess(ForbiddenAccessException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(sanitizeMessage(ex.getMessage(), "Acceso denegado")));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -63,12 +67,12 @@ public class GlobalExceptionHandler {
         String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
                 ? ex.getMessage()
                 : "Acceso denegado: no posees los permisos necesarios";
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(msg));
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(sanitizeMessage(msg, "Acceso denegado")));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(ResourceNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(sanitizeMessage(ex.getMessage(), "Recurso no encontrado")));
     }
 
     @ExceptionHandler(BadCredentialsException.class)
@@ -81,13 +85,13 @@ public class GlobalExceptionHandler {
         String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
                 ? ex.getMessage()
                 : "No autorizado";
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(msg));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(sanitizeMessage(msg, "No autorizado")));
     }
 
     @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Void>> handleResponseStatusException(org.springframework.web.server.ResponseStatusException ex) {
         String reason = ex.getReason() != null ? ex.getReason() : ex.getMessage();
-        return ResponseEntity.status(ex.getStatusCode()).body(ApiResponse.error(reason));
+        return ResponseEntity.status(ex.getStatusCode()).body(ApiResponse.error(sanitizeMessage(reason, "Error en la solicitud")));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
