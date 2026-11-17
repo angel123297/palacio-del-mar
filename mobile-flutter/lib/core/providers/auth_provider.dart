@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import '../security/secure_storage.dart';
 import '../services/api_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthProvider extends ChangeNotifier {
+  AuthProvider({bool? useBrowserSession, Future<Map<String, dynamic>?> Function()? loadSessionUser})
+      : _useBrowserSession = useBrowserSession ?? kIsWeb,
+        _loadSessionUser = loadSessionUser ?? ApiService.getCurrentUser;
+
+  final bool _useBrowserSession;
+  final Future<Map<String, dynamic>?> Function() _loadSessionUser;
   bool _isAuthenticated = false;
   bool _isLoading = false;
   String? _currentUserEmail;
@@ -32,6 +39,15 @@ class AuthProvider extends ChangeNotifier {
     final token = await SecureStorage.getToken();
     _token = token;
     _isAuthenticated = token != null;
+    if (!_isAuthenticated && _useBrowserSession) {
+      final user = await _loadSessionUser();
+      if (user != null && user['emailVerified'] == true) {
+        _isAuthenticated = true;
+        _currentUserId = user['id']?.toString() ?? user['_id']?.toString();
+        _currentUserEmail = user['email']?.toString();
+        _currentUserName = '${user['name'] ?? ''} ${user['lastName'] ?? ''}'.trim();
+      }
+    }
     if (_isAuthenticated) {
       await fetchUserProfile();
     }

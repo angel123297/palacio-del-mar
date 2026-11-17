@@ -49,7 +49,11 @@ export class VerifyEmail implements OnInit, OnDestroy {
           }
         }
         this.redirectTimer = setTimeout(() => {
-          this.router.navigateByUrl(targetUrl);
+          if (targetUrl === '/app/' || targetUrl === '/app') {
+            this.redirectToApplication();
+          } else {
+            this.router.navigateByUrl(targetUrl);
+          }
         }, 2000);
       },
       error: (err) => {
@@ -57,6 +61,10 @@ export class VerifyEmail implements OnInit, OnDestroy {
         this.message.set(err?.error?.message || err?.message || 'Error: Enlace inválido o expirado');
       }
     });
+  }
+
+  redirectToApplication() {
+    window.location.assign('/app/');
   }
 
   ngOnDestroy() {

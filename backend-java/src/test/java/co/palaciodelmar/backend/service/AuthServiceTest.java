@@ -130,6 +130,22 @@ class AuthServiceTest {
     }
 
     @Test
+    void repeatedRegistrationPreservesMobileReturnDestination() {
+        when(userRepository.existsByEmail(testUser.getEmail())).thenReturn(true);
+        when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        registerRequest.setReturnUrl("/app/");
+        authService.register(registerRequest);
+        verify(emailService).sendVerificationEmail(eq(testUser.getEmail()), anyString(), eq("/app/"));
+    }
+
+    @Test
+    void resendPreservesMobileReturnDestination() {
+        when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        authService.resendVerification(testUser.getEmail(), "/app/");
+        verify(emailService).sendVerificationEmail(eq(testUser.getEmail()), anyString(), eq("/app/"));
+    }
+
+    @Test
     void passwordlessAccountCannotBeClaimedThroughPublicRegistration() {
         testUser.setPassword(null);
         testUser.setVerificationTokenHash("old-token-hash");

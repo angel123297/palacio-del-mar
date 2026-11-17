@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../network/http_client.dart';
 import '../security/secure_storage.dart';
 
@@ -68,6 +69,7 @@ class ApiService {
         'email': email.trim().toLowerCase(),
         'password': password,
         'phone': phone ?? '',
+        if (kIsWeb) 'returnUrl': '/app/',
       });
 
       Map<String, dynamic> responseData = {};

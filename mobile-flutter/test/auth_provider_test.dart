@@ -16,6 +16,16 @@ void main() {
   });
 
   group('AuthProvider Tests', () {
+    test('restaura la sesión web existente al abrir la aplicación', () async {
+      final auth = AuthProvider(
+        useBrowserSession: true,
+        loadSessionUser: () async => {'id': '1', 'email': 'test@example.com', 'name': 'Ana', 'emailVerified': true},
+      );
+      await auth.checkAuthStatus();
+      expect(auth.isAuthenticated, isTrue);
+      expect(auth.currentUserEmail, 'test@example.com');
+    });
+
     test('Estado inicial no autenticado', () {
       final auth = AuthProvider();
       expect(auth.isAuthenticated, isFalse);

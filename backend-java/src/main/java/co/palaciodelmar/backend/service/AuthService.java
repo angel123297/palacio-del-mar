@@ -107,7 +107,7 @@ public class AuthService {
             }
             // An anonymous retry may rotate verification, but cannot replace credentials,
             // profile or role. Passwordless accounts recover through the emailed reset flow.
-            resendVerification(normalizedEmail);
+            resendVerification(normalizedEmail, request.getReturnUrl());
             return AuthResponse.builder().token(null).user(null).build();
         }
 
@@ -464,6 +464,10 @@ public class AuthService {
     }
 
     public void resendVerification(String email) {
+        resendVerification(email, null);
+    }
+
+    public void resendVerification(String email, String returnUrl) {
         if (email == null || email.trim().isEmpty()) {
             throw new IllegalArgumentException("Email es requerido");
         }
@@ -505,7 +509,11 @@ public class AuthService {
         );
 
         try {
-            emailService.sendVerificationEmail(user.getEmail(), rawToken);
+            if (returnUrl != null && !returnUrl.isBlank()) {
+                emailService.sendVerificationEmail(user.getEmail(), rawToken, returnUrl);
+            } else {
+                emailService.sendVerificationEmail(user.getEmail(), rawToken);
+            }
             log.info("Nuevo correo de verificación reenviado exitosamente a {}", normalizedEmail);
         } catch (Exception e) {
             log.error("Fallo al reenviar correo de verificación a {}: {}", normalizedEmail, e.getMessage());

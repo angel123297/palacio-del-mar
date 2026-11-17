@@ -101,7 +101,7 @@ public class AuthController {
             throw new IllegalArgumentException("Email es requerido");
         }
 
-        authService.resendVerification(email);
+        authService.resendVerification(email, body.get("returnUrl"));
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);

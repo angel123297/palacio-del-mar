@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'dart:async';
@@ -130,7 +131,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true',
         },
-        body: jsonEncode({'email': widget.email.trim().toLowerCase()}),
+        body: jsonEncode({'email': widget.email.trim().toLowerCase(), if (kIsWeb) 'returnUrl': '/app/'}),
       );
 
       final data = jsonDecode(response.body);
@@ -229,8 +230,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    '1. Abre el mensaje en tu correo y pulsa el botón "Verificar mi Cuenta".\n'
-                    '2. O copia el código de verificación del mensaje y pégalo abajo:',
+                    'Abre el correo y pulsa el botón "Verificar mi Cuenta". '
+                    'También puedes pegar aquí el token que aparece al final del enlace.',
                     style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.4),
                   ),
                 ],
