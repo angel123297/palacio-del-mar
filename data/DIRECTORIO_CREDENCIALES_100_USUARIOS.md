@@ -1,0 +1,106 @@
+# Directorio Oficial de Credenciales Seguras - 100 Usuarios Palacio del Mar
+
+> **Seguridad:** Cada usuario posee una contraseña única e individual. La clave compartida anterior (`Palacio2026!`) quedó completamente invalidada.
+
+| # | Correo Electrónico | Contraseña Única Válida | Rol | Nombre Completo | Grupo Operativo |
+|---|---|---|---|---|---|
+| **001** | `angel.gutierrez.pdm001@gmail.com` | `Pdms4v5Jz%F&` | host | Ángel Gutiérrez Gutiérrez | ZERO_BOOKINGS |
+| **002** | `carmen.gaviria.pdm002@gmail.com` | `Pdmnz1fr#BFE` | host | Carmen Gaviria Rojas | ZERO_BOOKINGS |
+| **003** | `julian.gutierrez.pdm003@gmail.com` | `Pdm$!n2riGRU` | host | Julián Gutiérrez Flores | ZERO_BOOKINGS |
+| **004** | `paola.jaramillo.pdm004@gmail.com` | `PdmsCMYk0PU$` | host | Paola Jaramillo Peña | ZERO_BOOKINGS |
+| **005** | `simon.jimenez.pdm005@gmail.com` | `PdmAAq&Y0R&e` | host | Simón Jiménez García | ZERO_BOOKINGS |
+| **006** | `catalina.herrera.pdm006@gmail.com` | `Pdmz2&ObA77$` | user | Catalina Herrera Ospina | ZERO_BOOKINGS |
+| **007** | `juan pablo.gutierrez.pdm007@gmail.com` | `Pdm45DMd140C` | user | Juan Pablo Gutiérrez García | ZERO_BOOKINGS |
+| **008** | `juliana.martinez.pdm008@gmail.com` | `Pdm*J1C1TQab` | user | Juliana Martínez Jaramillo | ZERO_BOOKINGS |
+| **009** | `alejandro.gutierrez.pdm009@gmail.com` | `Pdm62GfGHRT3` | user | Alejandro Gutiérrez Medina | ZERO_BOOKINGS |
+| **010** | `patricia.montes.pdm010@gmail.com` | `PdmW%1F5Tbwb` | user | Patricia Montes Medina | ZERO_BOOKINGS |
+| **011** | `dario.gonzalez.pdm011@gmail.com` | `Pdmq*aDsO4ep` | user | Darío González López | ZERO_BOOKINGS |
+| **012** | `natalia.hernandez.pdm012@gmail.com` | `PdmM$GLa*0TE` | user | Natalia Hernández Zuluaga | ZERO_BOOKINGS |
+| **013** | `alejandro.peña.pdm013@gmail.com` | `PdmuuJxD#Nuw` | user | Alejandro Peña Peña | ZERO_BOOKINGS |
+| **014** | `paula.vargas.pdm014@gmail.com` | `PdmoUOu@#sr3` | user | Paula Vargas Restrepo | ZERO_BOOKINGS |
+| **015** | `simon.diaz.pdm015@gmail.com` | `PdmA#2@meAUO` | user | Simón Díaz Díaz | ZERO_BOOKINGS |
+| **016** | `natalia.hernandez.pdm016@gmail.com` | `Pdmxd8cg$$y1` | user | Natalia Hernández González | SINGLE_BOOKING |
+| **017** | `leonardo.reyes.pdm017@gmail.com` | `PdmMfeP5pGF8` | user | Leonardo Reyes Medina | SINGLE_BOOKING |
+| **018** | `alejandra.zuluaga.pdm018@gmail.com` | `PdmSR&&ZJN#C` | user | Alejandra Zuluaga Restrepo | SINGLE_BOOKING |
+| **019** | `fernando.medina.pdm019@gmail.com` | `Pdm3BFka%iNG` | user | Fernando Medina Zuluaga | SINGLE_BOOKING |
+| **020** | `sara.montoya.pdm020@gmail.com` | `PdmF!m#8b9fY` | user | Sara Montoya Díaz | SINGLE_BOOKING |
+| **021** | `samuel.castro.pdm021@gmail.com` | `PdmJeV3ahV@k` | user | Samuel Castro Castro | SINGLE_BOOKING |
+| **022** | `natalia.torres.pdm022@gmail.com` | `Pdm$8Sp8Kycb` | user | Natalia Torres Ospina | SINGLE_BOOKING |
+| **023** | `samuel.restrepo.pdm023@gmail.com` | `Pdm24JrVowa!` | user | Samuel Restrepo Navarro | SINGLE_BOOKING |
+| **024** | `luciana.restrepo.pdm024@gmail.com` | `PdmZZ3hx*!T0` | user | Luciana Restrepo Arango | SINGLE_BOOKING |
+| **025** | `ender.gaviria.pdm025@gmail.com` | `PdmpESA*X%nH` | user | Ender Gaviria Pérez | SINGLE_BOOKING |
+| **026** | `diana.cardenas.pdm026@gmail.com` | `Pdmex#FF9wVc` | user | Diana Cárdenas Jiménez | SINGLE_BOOKING |
+| **027** | `tomas.gaviria.pdm027@gmail.com` | `Pdm4%NwCbz!g` | user | Tomás Gaviria Valencia | SINGLE_BOOKING |
+| **028** | `carolina.arango.pdm028@gmail.com` | `PdmN4$2FkbXI` | user | Carolina Arango Reyes | SINGLE_BOOKING |
+| **029** | `simon.gaviria.pdm029@gmail.com` | `PdmO6hOy&x@H` | user | Simón Gaviria Rodríguez | SINGLE_BOOKING |
+| **030** | `sara.restrepo.pdm030@gmail.com` | `Pdm6id7vQ&h8` | user | Sara Restrepo Rojas | SINGLE_BOOKING |
+| **031** | `dario.morales.pdm031@gmail.com` | `PdmlgVP4n!ls` | user | Darío Morales Reyes | SINGLE_BOOKING |
+| **032** | `catalina.jaramillo.pdm032@gmail.com` | `Pdmt1L7VoN3%` | user | Catalina Jaramillo Navarro | SINGLE_BOOKING |
+| **033** | `juan pablo.sanchez.pdm033@gmail.com` | `Pdm84AG*m@Rf` | user | Juan Pablo Sánchez González | SINGLE_BOOKING |
+| **034** | `daniela.cardenas.pdm034@gmail.com` | `Pdmg1o!UZ2It` | user | Daniela Cárdenas Ortiz | SINGLE_BOOKING |
+| **035** | `santiago.mendoza.pdm035@gmail.com` | `PdmWQF!5*9di` | user | Santiago Mendoza Jaramillo | SINGLE_BOOKING |
+| **036** | `sara.zuluaga.pdm036@gmail.com` | `PdmCna!jNF#W` | user | Sara Zuluaga Morales | ACTIVE_REST |
+| **037** | `javier.garcia.pdm037@gmail.com` | `PdmWU5T0BjEt` | user | Javier García Reyes | ACTIVE_REST |
+| **038** | `marcela.ramirez.pdm038@gmail.com` | `PdmMi28#Tycq` | user | Marcela Ramírez Medina | ACTIVE_REST |
+| **039** | `julian.ospina.pdm039@gmail.com` | `Pdm7tg24X*ul` | user | Julián Ospina Rodríguez | ACTIVE_REST |
+| **040** | `natalia.montes.pdm040@gmail.com` | `PdmA1e*npdkh` | user | Natalia Montes Restrepo | ACTIVE_REST |
+| **041** | `manuel.aguilar.pdm041@gmail.com` | `PdmMqSw9qp#f` | user | Manuel Aguilar Medina | ACTIVE_REST |
+| **042** | `claudia.montes.pdm042@gmail.com` | `PdmA*LVo0r*R` | user | Claudia Montes Jaramillo | ACTIVE_REST |
+| **043** | `emiliano.montes.pdm043@gmail.com` | `Pdm9hn4fE$&&` | user | Emiliano Montes Castro | ACTIVE_REST |
+| **044** | `alejandra.gutierrez.pdm044@gmail.com` | `Pdmj6!xcCdrU` | user | Alejandra Gutiérrez Vargas | ACTIVE_REST |
+| **045** | `diego.montoya.pdm045@gmail.com` | `Pdm3NGg&IAWc` | user | Diego Montoya Montes | ACTIVE_REST |
+| **046** | `paula.sanchez.pdm046@gmail.com` | `Pdm#pOaPz$Tx` | user | Paula Sánchez González | ACTIVE_REST |
+| **047** | `carlos.restrepo.pdm047@gmail.com` | `Pdm@Mm96OtD2` | user | Carlos Restrepo Reyes | ACTIVE_REST |
+| **048** | `claudia.torres.pdm048@gmail.com` | `Pdmhp8MQv#C7` | user | Claudia Torres Martínez | ACTIVE_REST |
+| **049** | `esteban.arango.pdm049@gmail.com` | `PdmM$vpOp#10` | user | Esteban Arango Reyes | ACTIVE_REST |
+| **050** | `catalina.gomez.pdm050@gmail.com` | `Pdmby&NX7LEV` | user | Catalina Gómez Díaz | ACTIVE_REST |
+| **051** | `mateo.rojas.pdm051@gmail.com` | `Pdm@J4p#9RFv` | user | Mateo Rojas Valencia | ACTIVE_REST |
+| **052** | `paula.castro.pdm052@gmail.com` | `Pdm*OHwoGbSZ` | user | Paula Castro Ortiz | ACTIVE_REST |
+| **053** | `ender.aguilar.pdm053@gmail.com` | `Pdm62P2Bwf@R` | user | Ender Aguilar Restrepo | ACTIVE_REST |
+| **054** | `paola.restrepo.pdm054@gmail.com` | `Pdm5fI&B9w47` | user | Paola Restrepo Montes | ACTIVE_REST |
+| **055** | `rodrigo.montes.pdm055@gmail.com` | `Pdmk$4GSwGDg` | user | Rodrigo Montes Jiménez | ACTIVE_REST |
+| **056** | `marcela.vargas.pdm056@gmail.com` | `PdmW1&skvOWz` | user | Marcela Vargas García | ACTIVE_REST |
+| **057** | `ender.morales.pdm057@gmail.com` | `PdmoV&Dx#Yy5` | user | Ender Morales González | ACTIVE_REST |
+| **058** | `manuela.restrepo.pdm058@gmail.com` | `Pdmhre!l3hIv` | user | Manuela Restrepo Castro | ACTIVE_REST |
+| **059** | `diego.ospina.pdm059@gmail.com` | `PdmZSYzr94K%` | user | Diego Ospina López | ACTIVE_REST |
+| **060** | `valentina.gonzalez.pdm060@gmail.com` | `Pdm95@@!WaYx` | user | Valentina González Reyes | ACTIVE_REST |
+| **061** | `daniel.ramirez.pdm061@gmail.com` | `PdmkMBp*9dA#` | user | Daniel Ramírez Sánchez | ACTIVE_REST |
+| **062** | `mariana.hernandez.pdm062@gmail.com` | `Pdm2ssEWArn@` | user | Mariana Hernández Aguilar | ACTIVE_REST |
+| **063** | `javier.silva.pdm063@gmail.com` | `Pdm&ajn25AXR` | user | Javier Silva Vargas | ACTIVE_REST |
+| **064** | `patricia.garcia.pdm064@gmail.com` | `Pdm$2aK*YnJm` | user | Patricia García Reyes | ACTIVE_REST |
+| **065** | `diego.zuluaga.pdm065@gmail.com` | `PdmdMHk1ETto` | user | Diego Zuluaga Flores | ACTIVE_REST |
+| **066** | `mariana.valencia.pdm066@gmail.com` | `Pdmh8%69tJmt` | user | Mariana Valencia Salazar | ACTIVE_REST |
+| **067** | `andres.morales.pdm067@gmail.com` | `Pdmh#$RmCsV6` | user | Andrés Morales Peña | ACTIVE_REST |
+| **068** | `juliana.lopez.pdm068@gmail.com` | `Pdm#Iu&iHduq` | user | Juliana López Ospina | ACTIVE_REST |
+| **069** | `alejandro.silva.pdm069@gmail.com` | `PdmXKk!9LgN3` | user | Alejandro Silva Gutiérrez | ACTIVE_REST |
+| **070** | `marcela.jimenez.pdm070@gmail.com` | `PdmW&5aLRe8f` | user | Marcela Jiménez Ortiz | ACTIVE_REST |
+| **071** | `lucas.vargas.pdm071@gmail.com` | `Pdm*$P!tOb3S` | user | Lucas Vargas Rojas | ACTIVE_REST |
+| **072** | `diana.navarro.pdm072@gmail.com` | `Pdmi36E5sNb0` | user | Diana Navarro Arango | ACTIVE_REST |
+| **073** | `sebastian.zuluaga.pdm073@gmail.com` | `PdmgcY8%6pe!` | user | Sebastián Zuluaga Navarro | ACTIVE_REST |
+| **074** | `andrea.restrepo.pdm074@gmail.com` | `PdmpMG$2UISJ` | user | Andrea Restrepo Herrera | ACTIVE_REST |
+| **075** | `esteban.jimenez.pdm075@gmail.com` | `PdmY3Dvjk*j*` | user | Esteban Jiménez Ortiz | ACTIVE_REST |
+| **076** | `catalina.ramirez.pdm076@gmail.com` | `Pdmxjsxjk#d7` | user | Catalina Ramírez Torres | ACTIVE_REST |
+| **077** | `david.torres.pdm077@gmail.com` | `PdmNVHN*Hu%@` | user | David Torres López | ACTIVE_REST |
+| **078** | `carolina.silva.pdm078@gmail.com` | `PdmB0HP$q5cV` | user | Carolina Silva Salazar | ACTIVE_REST |
+| **079** | `juan pablo.cardenas.pdm079@gmail.com` | `PdmFTciw7RX2` | user | Juan Pablo Cárdenas Martínez | ACTIVE_REST |
+| **080** | `adriana.restrepo.pdm080@gmail.com` | `PdmJCuB%65FY` | user | Adriana Restrepo Castillo | ACTIVE_REST |
+| **081** | `lucas.garcia.pdm081@gmail.com` | `PdmLXEl$90%$` | user | Lucas García Montoya | ACTIVE_REST |
+| **082** | `abigail.perez.pdm082@gmail.com` | `PdmAP8X0*KPo` | user | Abigail Pérez Rodríguez | ACTIVE_REST |
+| **083** | `nicolas.aguilar.pdm083@gmail.com` | `PdmWqsJh%XTx` | user | Nicolás Aguilar Pérez | ACTIVE_REST |
+| **084** | `paola.vargas.pdm084@gmail.com` | `Pdm0QQWaasL#` | user | Paola Vargas García | ACTIVE_REST |
+| **085** | `sebastian.restrepo.pdm085@gmail.com` | `PdmJPN5hpNW#` | user | Sebastián Restrepo Vargas | ACTIVE_REST |
+| **086** | `diana.zuluaga.pdm086@gmail.com` | `Pdmgu0MSxF5S` | user | Diana Zuluaga Ramírez | ACTIVE_REST |
+| **087** | `gabriel.mendoza.pdm087@gmail.com` | `PdmpQxlXu@qy` | user | Gabriel Mendoza Montes | ACTIVE_REST |
+| **088** | `juliana.reyes.pdm088@gmail.com` | `PdmCT13w$GVE` | user | Juliana Reyes Valencia | ACTIVE_REST |
+| **089** | `carlos.aguilar.pdm089@gmail.com` | `Pdm#Eg4KQ%Tx` | user | Carlos Aguilar Gómez | ACTIVE_REST |
+| **090** | `andrea.castro.pdm090@gmail.com` | `PdmzfP*s*WmE` | user | Andrea Castro Ortiz | ACTIVE_REST |
+| **091** | `julian.ramirez.pdm091@gmail.com` | `Pdm3T58$42SD` | user | Julián Ramírez Castillo | ACTIVE_REST |
+| **092** | `victoria.gaviria.pdm092@gmail.com` | `Pdm%Myok&xg2` | user | Victoria Gaviria Gutiérrez | ACTIVE_REST |
+| **093** | `dario.jimenez.pdm093@gmail.com` | `PdmhhnU*pYT0` | user | Darío Jiménez Montoya | ACTIVE_REST |
+| **094** | `carolina.ramirez.pdm094@gmail.com` | `Pdm#vJy&Y4Ah` | user | Carolina Ramírez Flores | ACTIVE_REST |
+| **095** | `ender.medina.pdm095@gmail.com` | `Pdmnt7eAA0Ct` | user | Ender Medina Gómez | ACTIVE_REST |
+| **096** | `catalina.castro.pdm096@gmail.com` | `Pdm$zLlAz5j#` | user | Catalina Castro García | ACTIVE_REST |
+| **097** | `leonardo.navarro.pdm097@gmail.com` | `PdmvUHf8qnr!` | user | Leonardo Navarro Navarro | ACTIVE_REST |
+| **098** | `andrea.castro.pdm098@gmail.com` | `PdmC17BdOzdl` | user | Andrea Castro Mendoza | ACTIVE_REST |
+| **099** | `daniel.gaviria.pdm099@gmail.com` | `PdmrKh8$x7@V` | user | Daniel Gaviria Mendoza | ACTIVE_REST |
+| **100** | `vanessa.castillo.pdm100@gmail.com` | `PdmF@iV2Q@B6` | user | Vanessa Castillo Jiménez | ACTIVE_REST |
