@@ -311,6 +311,9 @@ public class AuthService {
         if (newPassword == null || newPassword.length() < 8) {
             throw new IllegalArgumentException("La nueva contraseña debe tener al menos 8 caracteres");
         }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new IllegalArgumentException("La nueva contraseña debe ser diferente a la contraseña actual");
+        }
         Instant changedAt = Instant.now();
         String encodedPassword = passwordEncoder.encode(newPassword);
         user.setPassword(encodedPassword);

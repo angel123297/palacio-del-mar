@@ -290,4 +290,102 @@ class AuditR14FixesTest {
         assertEquals(0, new BigDecimal("58400.00").compareTo(booking.getPlatformFee()), "Comisión debe ser 58.400 COP");
         assertEquals(0, new BigDecimal("671600.00").compareTo(booking.getHostPayout()), "Payout debe ser 671.600 COP");
     }
+
+    // ---------- LOW: validación de guests en availability y geo radius ----------
+    @Test
+    @DisplayName("LOW: guests < 1 o > 50 es rechazado en AvailabilityController")
+    void availabilityRejectsInvalidGuests() {
+        AvailabilityService as = mock(AvailabilityService.class);
+        co.palaciodelmar.backend.controller.AvailabilityController ac = new co.palaciodelmar.backend.controller.AvailabilityController(as);
+        assertThrows(IllegalArgumentException.class, () ->
+                ac.checkAvailability(LocalDate.now(), LocalDate.now().plusDays(1), -1, null, null));
+        assertThrows(IllegalArgumentException.class, () ->
+                ac.checkAvailability(LocalDate.now(), LocalDate.now().plusDays(1), 51, null, null));
+    }
+
+    @Test
+    @DisplayName("LOW: radiusKm <= 0 en GeoController es rechazado")
+    void geoRejectsInvalidRadius() {
+        GeoSearchService gs = mock(GeoSearchService.class);
+        co.palaciodelmar.backend.controller.GeoController gc = new co.palaciodelmar.backend.controller.GeoController(gs);
+        assertThrows(IllegalArgumentException.class, () ->
+                gc.findNearby(10.4, -75.5, -5.0, null, 10));
+        assertThrows(IllegalArgumentException.class, () ->
+                gc.findNearby(10.4, -75.5, 0.0, null, 10));
+    }
+
+    // ---------- LOW: demo webhook query secret rechazado ----------
+    @Test
+    @DisplayName("LOW: demo webhook rechaza parámetro secret en query string")
+    void demoWebhookRejectsQuerySecret() {
+        co.palaciodelmar.backend.controller.DemoWebhookReceiverController c =
+                new co.palaciodelmar.backend.controller.DemoWebhookReceiverController();
+        var resp = c.receiveWebhook(null, "evt_1", "test", "1700000000", null, "leaked_secret", "{}");
+        assertEquals(HttpStatus.BAD_REQUEST, resp.getStatusCode());
+        assertTrue(resp.getBody().getMessage().contains("query string"));
+    }
+
+    // ---------- LOW: cambio de contraseña exige que sea diferente ----------
+    @Test
+    @DisplayName("LOW: changePassword rechaza contraseña nueva idéntica a la actual")
+    void changePasswordRejectsIdenticalPassword() {
+        UserRepository ur = mock(UserRepository.class);
+        org.springframework.security.crypto.password.PasswordEncoder pe =
+                mock(org.springframework.security.crypto.password.PasswordEncoder.class);
+        AuthService auth = new AuthService(ur, pe, mock(co.palaciodelmar.backend.security.JwtService.class),
+                mock(org.springframework.security.authentication.AuthenticationManager.class),
+                mock(EmailService.class),
+                mock(org.springframework.data.mongodb.core.MongoTemplate.class));
+
+        User user = User.builder().id("u1").password("encoded_pass").build();
+        when(ur.findById("u1")).thenReturn(Optional.of(user));
+        when(pe.matches("mypassword", "encoded_pass")).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                auth.changePassword("u1", "mypassword", "mypassword"));
+        assertTrue(ex.getMessage().contains("diferente a la contraseña actual"));
+    }
+
+    // ---------- LOW: suite inexistente en reviews retorna 404 ----------
+    @Test
+    @DisplayName("LOW: reviews de suite inexistente lanza ResourceNotFoundException (404)")
+    void reviewsForNonExistentSuiteThrows404() {
+        ReviewRepository rr = mock(ReviewRepository.class);
+        BookingRepository br = mock(BookingRepository.class);
+        SuiteRepository sr = mock(SuiteRepository.class);
+        ReviewService rs = new ReviewService(rr, br, mock(UserRepository.class));
+        ReflectionTestUtils.setField(rs, "suiteRepository", sr);
+
+        when(sr.findById("nonexistent")).thenReturn(Optional.empty());
+        when(sr.findBySlug("nonexistent")).thenReturn(Optional.empty());
+
+        assertThrows(co.palaciodelmar.backend.exception.ResourceNotFoundException.class, () ->
+                rs.getSuiteReviews("nonexistent"));
+    }
+
+    // ---------- LOW: unblock con fechas pasadas o rango vacío ----------
+    @Test
+    @DisplayName("LOW: unblock rechaza fechas pasadas o rango sin noches de mantenimiento")
+    void unblockRejectsPastDatesAndEmptyRange() {
+        PropertyRepository pr = mock(PropertyRepository.class);
+        SuiteRepository sr = mock(SuiteRepository.class);
+        SuiteNightRepository snr = mock(SuiteNightRepository.class);
+        PropertyService ps = new PropertyService(pr, sr);
+        ReflectionTestUtils.setField(ps, "suiteNightRepository", snr);
+
+        Property prop = Property.builder().id("p1").ownerId("h1").build();
+        Suite suite = Suite.builder().id("s1").propertyId("p1").build();
+        when(pr.findById("p1")).thenReturn(Optional.of(prop));
+        when(sr.findById("s1")).thenReturn(Optional.of(suite));
+
+        // Fechas pasadas
+        assertThrows(IllegalArgumentException.class, () ->
+                ps.unblockSuiteNights("p1", "s1", "h1", LocalDate.now().minusDays(5), LocalDate.now().minusDays(2), false));
+
+        // Rango sin noches de mantenimiento
+        when(snr.findBySuiteAndDatesBetween(eq("s1"), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(Collections.emptyList());
+        assertThrows(IllegalArgumentException.class, () ->
+                ps.unblockSuiteNights("p1", "s1", "h1", LocalDate.now().plusDays(2), LocalDate.now().plusDays(5), false));
+    }
 }

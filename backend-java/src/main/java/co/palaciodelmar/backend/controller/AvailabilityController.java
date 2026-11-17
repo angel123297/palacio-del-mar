@@ -28,6 +28,9 @@ public class AvailabilityController {
             @RequestParam(required = false) String branch,
             @RequestParam(required = false) String suiteType
     ) {
+        if (guests != null && (guests < 1 || guests > 50)) {
+            throw new IllegalArgumentException("El número de huéspedes debe estar entre 1 y 50");
+        }
         AvailabilityService.AvailabilityResponseData data = availabilityService.checkAvailability(
                 checkIn, checkOut, guests, branch, suiteType
         );
@@ -45,6 +48,9 @@ public class AvailabilityController {
     ) {
         if (month < 1 || month > 12 || year < 2000 || year > 2100) {
             throw new IllegalArgumentException("Año o mes inválido");
+        }
+        if (guests != null && (guests < 1 || guests > 50)) {
+            throw new IllegalArgumentException("El número de huéspedes debe estar entre 1 y 50");
         }
         AvailabilityService.MonthlyAvailabilityResponseData data = availabilityService.getMonthlyAvailability(
                 year, month, guests, branch, suiteType, suiteId

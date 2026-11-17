@@ -108,7 +108,7 @@ public class SecurityConfig {
                         .requestMatchers("/demo/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/actuator/**").hasRole("ADMIN")
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/payments/checkout").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/payments/confirm").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/bookings").authenticated()

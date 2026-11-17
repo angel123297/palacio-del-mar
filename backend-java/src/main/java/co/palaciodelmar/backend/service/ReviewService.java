@@ -70,13 +70,24 @@ public class ReviewService {
     }
 
     public List<ReviewDTO> getSuiteReviews(String suiteId) {
+        String resolvedSuiteName = null;
+        if (suiteRepository != null && suiteId != null && !suiteId.isBlank()) {
+            var suiteOpt = suiteRepository.findById(suiteId);
+            if (suiteOpt.isEmpty()) {
+                suiteOpt = suiteRepository.findBySlug(suiteId);
+            }
+            if (suiteOpt.isEmpty()) {
+                throw new co.palaciodelmar.backend.exception.ResourceNotFoundException("Habitación no encontrada");
+            }
+            resolvedSuiteName = suiteOpt.get().getName();
+        }
         List<Review> reviews = reviewRepository.findBySuiteAndApprovedTrueOrderByCreatedAtDesc(suiteId);
         if (reviews.isEmpty()) {
             return List.of();
         }
-        String suiteName = resolveSuiteName(suiteId);
+        final String finalSuiteName = (resolvedSuiteName != null) ? resolvedSuiteName : resolveSuiteName(suiteId);
         return reviews.stream()
-                .map(r -> toDTO(r, suiteName))
+                .map(r -> toDTO(r, finalSuiteName))
                 .toList();
     }
 

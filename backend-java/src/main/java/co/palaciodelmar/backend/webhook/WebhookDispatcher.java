@@ -62,6 +62,9 @@ public class WebhookDispatcher {
     @Value("${palacio.webhooks.retry.backoff-attempt-3:1800}")
     private long backoffAttempt3Seconds = 1800; // 30 minutos por defecto
 
+    @Value("${payments.webhook.secret:}")
+    private String defaultWebhookSecret;
+
     private static final int DEDUP_LOCK_STRIPES = 256;
     private final Object[] dedupStripes = new Object[DEDUP_LOCK_STRIPES];
 
@@ -260,7 +263,10 @@ public class WebhookDispatcher {
         }
 
         String payloadBody = delivery.getPayload() != null ? delivery.getPayload() : "{}";
-        String signature = WebhookSigner.sign(payloadBody, secret != null ? secret : "secret");
+        String effectiveSecret = (secret != null && !secret.isBlank()) ? secret : defaultWebhookSecret;
+        String signature = (effectiveSecret != null && !effectiveSecret.isBlank())
+                ? WebhookSigner.sign(payloadBody, effectiveSecret)
+                : "";
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
 
         log.info("Despachando webhook {} (intento {}/{}) hacia {}",

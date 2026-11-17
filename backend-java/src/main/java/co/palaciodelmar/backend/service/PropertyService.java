@@ -692,6 +692,10 @@ public class PropertyService {
         if (!endDate.isAfter(startDate)) {
             throw new IllegalArgumentException("La fecha de fin debe ser posterior a la fecha de inicio");
         }
+        LocalDate today = LocalDate.now(ZoneId.of("America/Bogota"));
+        if (startDate.isBefore(today)) {
+            throw new IllegalArgumentException("No es posible desbloquear fechas pasadas");
+        }
 
         if (suiteNightRepository == null) {
             throw new IllegalStateException("El repositorio de noches no está disponible");
@@ -702,9 +706,10 @@ public class PropertyService {
                 .filter(sn -> "maintenance".equalsIgnoreCase(sn.getStatus()))
                 .toList();
 
-        if (!maintenanceNights.isEmpty()) {
-            suiteNightRepository.deleteAll(maintenanceNights);
+        if (maintenanceNights.isEmpty()) {
+            throw new IllegalArgumentException("No existen noches bloqueadas por mantenimiento en el rango seleccionado");
         }
+        suiteNightRepository.deleteAll(maintenanceNights);
         if (availabilityCacheEvictor != null) {
             availabilityCacheEvictor.evictAll();
         }

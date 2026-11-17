@@ -19,12 +19,23 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private String sanitizeMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return "Solicitud inválida";
+        }
+        String clean = message.trim();
+        if (clean.length() > 300) {
+            return clean.substring(0, 300) + "...";
+        }
+        return clean;
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         String errors = ex.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
-        return ResponseEntity.badRequest().body(ApiResponse.error(errors));
+        return ResponseEntity.badRequest().body(ApiResponse.error(sanitizeMessage(errors)));
     }
 
     @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
@@ -39,7 +50,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(RuntimeException ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));
+        return ResponseEntity.badRequest().body(ApiResponse.error(sanitizeMessage(ex.getMessage())));
     }
 
     @ExceptionHandler(ForbiddenAccessException.class)

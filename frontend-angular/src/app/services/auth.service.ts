@@ -5,6 +5,17 @@ import { BehaviorSubject, Observable, filter, finalize, map, of, take, tap, time
 import { User, AuthResponse, LoginDTO, RegisterDTO } from '../models/types';
 import { environment } from '../../environments/environment';
 
+function sanitizeUserForStorage(user: any): any {
+  if (!user) return user;
+  const clone = { ...user };
+  if (clone.profile) {
+    const { documentId, documentType, ...safeProfile } = clone.profile;
+    clone.profile = safeProfile;
+  }
+  return clone;
+}
+
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private apiUrl = environment.apiUrl + '/auth';
@@ -67,7 +78,7 @@ export class AuthService {
         if (currentEpoch !== this.sessionEpoch) return;
         const user = res.user || res.data?.user;
         if (user) {
-          localStorage.setItem('user', JSON.stringify(user));
+          localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
           this.currentUserSignal.set(user);
         }
         this.sessionInitialized$.next(true);
@@ -96,7 +107,7 @@ export class AuthService {
       if (!updated.id && (updated as any)._id) {
         updated.id = (updated as any)._id;
       }
-      localStorage.setItem('user', JSON.stringify(updated));
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(updated)));
       this.currentUserSignal.set(updated);
     }
   }
@@ -111,7 +122,7 @@ export class AuthService {
         }
         const user = res.user || res.data?.user;
         if (user) {
-          localStorage.setItem('user', JSON.stringify(user));
+          localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
           this.currentUserSignal.set(user);
         }
       })
@@ -126,7 +137,7 @@ export class AuthService {
         const user = res.user || res.data?.user;
         if (token && user?.emailVerified === true) {
           localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(user));
+          localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
           this.currentUserSignal.set(user);
         } else {
           // El usuario aun no ha verificado su correo: limpiar cualquier residuo de sesion
@@ -146,7 +157,7 @@ export class AuthService {
         }
         const user = res.user || (res as any).data?.user;
         if (user) {
-          localStorage.setItem('user', JSON.stringify(user));
+          localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
           this.currentUserSignal.set(user);
         }
       })

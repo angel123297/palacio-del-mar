@@ -58,10 +58,11 @@ public class DemoWebhookReceiverController {
             @RequestParam(required = false) String secret,
             @RequestBody(required = false) String rawBody
     ) {
-        if (secret != null && !secret.isBlank() && (secretHeader == null || secretHeader.isBlank())) {
-            log.warn("Receptor Demo: El parámetro ?secret en query string está deprecado por seguridad. Utilice la cabecera 'X-Palacio-Secret'.");
+        if (secret != null && !secret.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Por motivos de seguridad, el secreto no debe enviarse como parámetro de URL (query string). Utilice la cabecera HTTP 'X-Palacio-Secret'."));
         }
-        String effectiveSecret = (secretHeader != null && !secretHeader.isBlank()) ? secretHeader : secret;
+        String effectiveSecret = secretHeader;
         if (rawBody != null && rawBody.length() > MAX_DEMO_PAYLOAD_CHARS) {
             return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                     .body(ApiResponse.error("El payload excede el tamaño máximo permitido (16 KB) en el receptor de demostración"));
@@ -109,7 +110,7 @@ public class DemoWebhookReceiverController {
             String secret,
             String rawBody
     ) {
-        return receiveWebhook(signature, eventId, eventType, timestamp, null, secret, rawBody);
+        return receiveWebhook(signature, eventId, eventType, timestamp, secret, null, rawBody);
     }
 
     @GetMapping("/events")
