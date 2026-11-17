@@ -6,6 +6,7 @@ import co.palaciodelmar.backend.dto.PropertyRequest;
 import co.palaciodelmar.backend.exception.ResourceNotFoundException;
 import co.palaciodelmar.backend.model.Property;
 import co.palaciodelmar.backend.model.Suite;
+import co.palaciodelmar.backend.model.SuiteNight;
 import co.palaciodelmar.backend.repository.PropertyRepository;
 import co.palaciodelmar.backend.repository.SuiteRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,8 +18,14 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -509,5 +516,164 @@ public class PropertyService {
             slug = base + "-" + count++;
         }
         return slug;
+    }
+
+    public Map<String, Object> blockSuiteNightsForMaintenance(
+            String propertyId, String suiteId, String ownerId,
+            LocalDate startDate, LocalDate endDate, String reason, boolean isAdmin) {
+        getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
+
+        Suite suite = suiteRepository.findById(suiteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Habitación no encontrada"));
+
+        if (!propertyId.equals(suite.getPropertyId()) && !propertyId.equals(suite.getBranch())) {
+            throw new ResourceNotFoundException("Habitación no pertenece a esta propiedad");
+        }
+
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("Las fechas de inicio y fin son obligatorias");
+        }
+        if (!endDate.isAfter(startDate)) {
+            throw new IllegalArgumentException("La fecha de fin debe ser posterior a la fecha de inicio");
+        }
+        LocalDate today = LocalDate.now(ZoneId.of("America/Bogota"));
+        if (startDate.isBefore(today)) {
+            throw new IllegalArgumentException("No es posible bloquear fechas pasadas");
+        }
+        if (ChronoUnit.DAYS.between(startDate, endDate) > 365) {
+            throw new IllegalArgumentException("El rango máximo de bloqueo es de 365 días");
+        }
+
+        if (suiteNightRepository == null) {
+            throw new IllegalStateException("El repositorio de noches no está disponible");
+        }
+
+        List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), startDate, endDate.minusDays(1));
+        boolean hasActiveGuestBooking = occupied.stream().anyMatch(sn ->
+                sn.getBooking() != null
+                && !sn.getBooking().startsWith("MAINT_")
+                && !sn.getBooking().startsWith("EXT_BLOCK_")
+                && !"cancelled".equalsIgnoreCase(sn.getStatus())
+                && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(Instant.now()))
+        );
+        if (hasActiveGuestBooking) {
+            throw new IllegalStateException("No es posible bloquear por mantenimiento: existen reservas activas en las fechas seleccionadas");
+        }
+
+        int totalUnits = suite.getTotalUnits() != null && suite.getTotalUnits() > 0 ? suite.getTotalUnits() : 1;
+        String blockRef = "MAINT_" + UUID.randomUUID().toString().substring(0, 8);
+        long days = ChronoUnit.DAYS.between(startDate, endDate);
+        List<SuiteNight> toSave = new ArrayList<>();
+
+        for (int slot = 1; slot <= totalUnits; slot++) {
+            int currentSlot = slot;
+            for (int d = 0; d < days; d++) {
+                LocalDate date = startDate.plusDays(d);
+                boolean alreadyMaintenance = occupied.stream().anyMatch(sn ->
+                        sn.getUnitSlot() != null && sn.getUnitSlot() == currentSlot &&
+                        sn.getDates() != null && sn.getDates().contains(date) &&
+                        "maintenance".equalsIgnoreCase(sn.getStatus())
+                );
+                if (!alreadyMaintenance) {
+                    toSave.add(SuiteNight.builder()
+                            .suite(suite.getId())
+                            .branch(suite.getBranch())
+                            .unitSlot(currentSlot)
+                            .dates(Collections.singletonList(date))
+                            .booking(blockRef)
+                            .status("maintenance")
+                            .createdAt(Instant.now())
+                            .build());
+                }
+            }
+        }
+
+        if (!toSave.isEmpty()) {
+            suiteNightRepository.saveAll(toSave);
+        }
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
+
+        return Map.of(
+                "message", "Noches bloqueadas por mantenimiento exitosamente",
+                "blockedNights", toSave.size(),
+                "blockRef", blockRef,
+                "reason", reason != null ? reason : "Mantenimiento programado"
+        );
+    }
+
+    public Map<String, Object> unblockSuiteNights(
+            String propertyId, String suiteId, String ownerId,
+            LocalDate startDate, LocalDate endDate, boolean isAdmin) {
+        getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
+
+        Suite suite = suiteRepository.findById(suiteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Habitación no encontrada"));
+
+        if (!propertyId.equals(suite.getPropertyId()) && !propertyId.equals(suite.getBranch())) {
+            throw new ResourceNotFoundException("Habitación no pertenece a esta propiedad");
+        }
+
+        if (startDate == null || endDate == null) {
+            throw new IllegalArgumentException("Las fechas de inicio y fin son obligatorias");
+        }
+        if (!endDate.isAfter(startDate)) {
+            throw new IllegalArgumentException("La fecha de fin debe ser posterior a la fecha de inicio");
+        }
+
+        if (suiteNightRepository == null) {
+            throw new IllegalStateException("El repositorio de noches no está disponible");
+        }
+
+        List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), startDate, endDate.minusDays(1));
+        List<SuiteNight> maintenanceNights = occupied.stream()
+                .filter(sn -> "maintenance".equalsIgnoreCase(sn.getStatus()))
+                .toList();
+
+        if (!maintenanceNights.isEmpty()) {
+            suiteNightRepository.deleteAll(maintenanceNights);
+        }
+        if (availabilityCacheEvictor != null) {
+            availabilityCacheEvictor.evictAll();
+        }
+
+        return Map.of(
+                "message", "Noches desbloqueadas exitosamente",
+                "unblockedNights", maintenanceNights.size()
+        );
+    }
+
+    public List<Map<String, Object>> getBlockedSuiteNights(
+            String propertyId, String suiteId, String ownerId, boolean isAdmin) {
+        getPropertyEntityWithOwnership(propertyId, ownerId, isAdmin);
+
+        Suite suite = suiteRepository.findById(suiteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Habitación no encontrada"));
+
+        if (!propertyId.equals(suite.getPropertyId()) && !propertyId.equals(suite.getBranch())) {
+            throw new ResourceNotFoundException("Habitación no pertenece a esta propiedad");
+        }
+
+        if (suiteNightRepository == null) {
+            return List.of();
+        }
+
+        LocalDate today = LocalDate.now(ZoneId.of("America/Bogota"));
+        List<SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(2));
+
+        return futureNights.stream()
+                .filter(sn -> "maintenance".equalsIgnoreCase(sn.getStatus()))
+                .map(sn -> {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("id", sn.getId());
+                    map.put("dates", sn.getDates());
+                    map.put("unitSlot", sn.getUnitSlot());
+                    map.put("blockRef", sn.getBooking());
+                    map.put("status", sn.getStatus());
+                    map.put("createdAt", sn.getCreatedAt());
+                    return map;
+                })
+                .toList();
     }
 }

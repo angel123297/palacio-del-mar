@@ -304,6 +304,45 @@ import { Booking } from '../../models/types';
             <p style="color: #ddd; font-style: italic; background: rgba(0,0,0,0.3); padding: 1rem; border-left: 3px solid var(--gold);">{{ booking.notes }}</p>
           </div>
 
+          <!-- Mensajería Directa Huésped ↔ Anfitrión -->
+          <div class="bd-section" style="margin-top: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid rgba(212,175,55,0.3); padding-bottom: 0.5rem;">
+              <h3 class="bd-section-title" style="margin: 0; border: none; padding: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg style="width: 20px; height: 20px; color: var(--gold);" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/></svg>
+                Mensajería con el {{ isGuestOwner ? 'Anfitrión' : 'Huésped' }}
+              </h3>
+              <button type="button" (click)="loadMessages()" class="btn-secondary" style="font-size: 0.75rem; padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(201,169,110,0.4); color: var(--gold); background: transparent; cursor: pointer;">
+                🔄 Actualizar
+              </button>
+            </div>
+
+            <div style="background: #141414; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 1rem; max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+              <div *ngIf="loadingMessages" style="text-align: center; color: #888; font-size: 0.85rem; padding: 1rem;">
+                Cargando mensajes...
+              </div>
+              <div *ngIf="!loadingMessages && messages.length === 0" style="text-align: center; color: #777; font-size: 0.85rem; padding: 1.5rem;">
+                No hay mensajes aún en esta reserva. ¡Escribe aquí para coordinar tu llegada o realizar consultas directas!
+              </div>
+
+              <div *ngFor="let m of messages" [style.alignSelf]="m.me ? 'flex-end' : 'flex-start'" [style.maxWidth]="'80%'">
+                <div [style.background]="m.me ? 'rgba(201,169,110,0.18)' : '#1a1a1a'" [style.border]="m.me ? '1px solid var(--gold)' : '1px solid rgba(255,255,255,0.15)'" style="border-radius: 8px; padding: 0.65rem 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 4px; font-size: 0.72rem;">
+                    <strong [style.color]="m.me ? 'var(--gold)' : '#2ecc71'">{{ m.senderName }} ({{ m.senderRole === 'GUEST' ? 'Huésped' : (m.senderRole === 'HOST' ? 'Anfitrión' : 'Admin') }})</strong>
+                    <span style="color: #888;">{{ m.createdAt | date:'shortTime' }}</span>
+                  </div>
+                  <p style="margin: 0; font-size: 0.85rem; color: #f5f0e8; word-break: break-word; line-height: 1.4;">{{ m.message }}</p>
+                </div>
+              </div>
+            </div>
+
+            <form (ngSubmit)="sendChatMessage()" style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+              <input type="text" [(ngModel)]="newChatMessage" name="chatMessage" placeholder="Escribe un mensaje para el anfitrión..." style="flex: 1; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 0.6rem 0.85rem; color: #fff; font-size: 0.85rem; outline: none;" [disabled]="sendingMessage" />
+              <button type="submit" [disabled]="sendingMessage || !newChatMessage.trim()" class="btn-primary" style="padding: 0.6rem 1.25rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; cursor: pointer;">
+                {{ sendingMessage ? '...' : 'Enviar' }}
+              </button>
+            </form>
+          </div>
+
           <!-- Ubicación y Llegada: ÚNICAMENTE visible para el HUÉSPED -->
           <div class="bd-section" style="margin-top: 2rem;" *ngIf="isGuestOwner">
             <h3 class="bd-section-title">Ubicación y Llegada</h3>
@@ -484,6 +523,12 @@ export class BookingDetailComponent implements OnInit, OnDestroy {
   modifyError = '';
   modifySuccess = '';
 
+  // Mensajería con el Anfitrión / Huésped
+  messages: any[] = [];
+  loadingMessages = false;
+  sendingMessage = false;
+  newChatMessage = '';
+
   private getTodayBogota(): string {
     try {
       return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -549,6 +594,7 @@ export class BookingDetailComponent implements OnInit, OnDestroy {
         if (this.booking?.status === 'checked_out' || this.booking?.status === 'completed') {
           this.fetchBookingReview(this.booking._id || this.booking.id || id);
         }
+        this.loadMessages();
         this.cdr.detectChanges();
       },
       error: () => {
@@ -570,6 +616,44 @@ export class BookingDetailComponent implements OnInit, OnDestroy {
         }
       },
       error: () => {}
+    });
+  }
+
+  loadMessages(): void {
+    if (!this.booking) return;
+    const id = this.booking._id || this.booking.id;
+    if (!id) return;
+    this.loadingMessages = true;
+    this.api.get<any>(`/bookings/${id}/messages`).subscribe({
+      next: (res) => {
+        this.loadingMessages = false;
+        const list = res?.data || res || [];
+        this.messages = Array.isArray(list) ? list : [];
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.loadingMessages = false;
+        this.messages = [];
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  sendChatMessage(): void {
+    if (!this.booking || !this.newChatMessage.trim() || this.sendingMessage) return;
+    const id = this.booking._id || this.booking.id;
+    const text = this.newChatMessage.trim();
+    this.sendingMessage = true;
+    this.api.post<any>(`/bookings/${id}/messages`, { message: text }).subscribe({
+      next: () => {
+        this.sendingMessage = false;
+        this.newChatMessage = '';
+        this.loadMessages();
+      },
+      error: () => {
+        this.sendingMessage = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 

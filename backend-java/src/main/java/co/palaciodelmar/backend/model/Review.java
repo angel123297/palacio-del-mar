@@ -50,6 +50,11 @@ public class Review {
     private String maintenanceResolvedBy;
     private Boolean maintenanceWebhookDispatched;
 
+    // Respuesta pública oficial del anfitrión a la reseña
+    private String hostResponse;
+    private Instant hostResponseAt;
+    private String hostResponseBy;
+
     @Builder.Default
     private Boolean approved = true;
 

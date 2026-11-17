@@ -1,6 +1,7 @@
 package co.palaciodelmar.backend.controller;
 
 import co.palaciodelmar.backend.dto.ApiResponse;
+import co.palaciodelmar.backend.dto.BlockNightsRequest;
 import co.palaciodelmar.backend.dto.HostSuiteRequest;
 import co.palaciodelmar.backend.dto.PropertyDTO;
 import co.palaciodelmar.backend.dto.PropertyRequest;
@@ -136,6 +137,46 @@ public class HostPropertyController {
         return ResponseEntity.ok(ApiResponse.ok("Habitación desactivada exitosamente", null));
     }
 
+    // --- Bloqueo / Desbloqueo de Noches por Mantenimiento ---
+
+    @PostMapping("/{propertyId}/suites/{suiteId}/block-nights")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> blockSuiteNights(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String propertyId,
+            @PathVariable String suiteId,
+            @Valid @RequestBody BlockNightsRequest req) {
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
+        java.util.Map<String, Object> result = propertyService.blockSuiteNightsForMaintenance(
+                propertyId, suiteId, userId, req.getStartDate(), req.getEndDate(), req.getReason(), isAdmin);
+        return ResponseEntity.ok(ApiResponse.ok(result.get("message").toString(), result));
+    }
+
+    @PostMapping("/{propertyId}/suites/{suiteId}/unblock-nights")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> unblockSuiteNights(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String propertyId,
+            @PathVariable String suiteId,
+            @Valid @RequestBody BlockNightsRequest req) {
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
+        java.util.Map<String, Object> result = propertyService.unblockSuiteNights(
+                propertyId, suiteId, userId, req.getStartDate(), req.getEndDate(), isAdmin);
+        return ResponseEntity.ok(ApiResponse.ok(result.get("message").toString(), result));
+    }
+
+    @GetMapping("/{propertyId}/suites/{suiteId}/blocked-nights")
+    public ResponseEntity<ApiResponse<List<java.util.Map<String, Object>>>> getBlockedSuiteNights(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String propertyId,
+            @PathVariable String suiteId) {
+        String userId = resolveUserId(principal);
+        boolean isAdmin = resolveIsAdmin(principal);
+        List<java.util.Map<String, Object>> result = propertyService.getBlockedSuiteNights(
+                propertyId, suiteId, userId, isAdmin);
+        return ResponseEntity.ok(ApiResponse.ok(result));
+    }
+
     // --- Liquidaciones Automáticas (Host Payouts) ---
 
     @GetMapping("/payouts")
@@ -191,6 +232,17 @@ public class HostPropertyController {
         String userId = resolveUserId(principal);
         ReviewDTO dto = reviewService != null ? reviewService.resolveMaintenanceAlert(reviewId, userId) : null;
         return ResponseEntity.ok(ApiResponse.ok("Alerta de mantenimiento marcada como resuelta", dto));
+    }
+
+    @PutMapping("/reviews/{reviewId}/response")
+    public ResponseEntity<ApiResponse<ReviewDTO>> respondToReview(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String reviewId,
+            @RequestBody java.util.Map<String, String> body) {
+        String userId = resolveUserId(principal);
+        String responseText = body != null ? body.get("response") : null;
+        ReviewDTO dto = reviewService != null ? reviewService.respondToReview(reviewId, userId, responseText) : null;
+        return ResponseEntity.ok(ApiResponse.ok("Respuesta del anfitrión publicada exitosamente", dto));
     }
 
     @GetMapping("/{id}/sync/ical")

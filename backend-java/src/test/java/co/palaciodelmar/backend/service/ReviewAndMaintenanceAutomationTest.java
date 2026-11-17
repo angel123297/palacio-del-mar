@@ -229,4 +229,76 @@ class ReviewAndMaintenanceAutomationTest {
         ReviewDTO otherDto = reviewService.getReviewByBookingId("bk-rev-1", otherHost);
         assertNull(otherDto);
     }
+
+    @Test
+    @DisplayName("Host puede responder públicamente a una reseña de su propiedad")
+    void testHostRespondToReviewSuccess() {
+        Review review = Review.builder()
+                .id("rev-100")
+                .suite("suite-1")
+                .rating(5)
+                .comment("Excelente estancia")
+                .build();
+        when(reviewRepository.findById("rev-100")).thenReturn(Optional.of(review));
+        when(reviewRepository.save(any(Review.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        co.palaciodelmar.backend.model.Suite suite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-1")
+                .propertyId("prop-1")
+                .name("Suite Imperial")
+                .build();
+        when(suiteRepository.findById("suite-1")).thenReturn(Optional.of(suite));
+
+        co.palaciodelmar.backend.model.Property property = co.palaciodelmar.backend.model.Property.builder()
+                .id("prop-1")
+                .ownerId("host-owner")
+                .build();
+        when(propertyRepository.findById("prop-1")).thenReturn(Optional.of(property));
+
+        co.palaciodelmar.backend.model.User host = co.palaciodelmar.backend.model.User.builder()
+                .id("host-owner")
+                .role("HOST")
+                .build();
+        when(userRepository.findById("host-owner")).thenReturn(Optional.of(host));
+
+        ReviewDTO dto = reviewService.respondToReview("rev-100", "host-owner", "¡Muchas gracias por visitarnos! Te esperamos pronto.");
+        assertNotNull(dto);
+        assertEquals("¡Muchas gracias por visitarnos! Te esperamos pronto.", dto.getHostResponse());
+        assertNotNull(dto.getHostResponseAt());
+        assertEquals("host-owner", dto.getHostResponseBy());
+    }
+
+    @Test
+    @DisplayName("Host ajeno no puede responder a una reseña de otra propiedad (Anti-IDOR)")
+    void testHostRespondToReviewDeniedForOtherProperty() {
+        Review review = Review.builder()
+                .id("rev-200")
+                .suite("suite-2")
+                .rating(4)
+                .comment("Muy bonito")
+                .build();
+        when(reviewRepository.findById("rev-200")).thenReturn(Optional.of(review));
+
+        co.palaciodelmar.backend.model.Suite suite = co.palaciodelmar.backend.model.Suite.builder()
+                .id("suite-2")
+                .propertyId("prop-2")
+                .build();
+        when(suiteRepository.findById("suite-2")).thenReturn(Optional.of(suite));
+
+        co.palaciodelmar.backend.model.Property property = co.palaciodelmar.backend.model.Property.builder()
+                .id("prop-2")
+                .ownerId("host-real")
+                .build();
+        when(propertyRepository.findById("prop-2")).thenReturn(Optional.of(property));
+
+        co.palaciodelmar.backend.model.User attackerHost = co.palaciodelmar.backend.model.User.builder()
+                .id("host-attacker")
+                .role("HOST")
+                .build();
+        when(userRepository.findById("host-attacker")).thenReturn(Optional.of(attackerHost));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () ->
+                reviewService.respondToReview("rev-200", "host-attacker", "Respuesta fraudulenta")
+        );
+    }
 }

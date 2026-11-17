@@ -28,6 +28,9 @@ public class ReviewDTO {
     private String maintenanceAlert;
     private Instant maintenanceResolvedAt;
     private String maintenanceResolvedBy;
+    private String hostResponse;
+    private Instant hostResponseAt;
+    private String hostResponseBy;
     private Boolean approved;
     private Instant createdAt;
 }

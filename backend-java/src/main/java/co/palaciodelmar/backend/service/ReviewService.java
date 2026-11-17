@@ -295,6 +295,42 @@ public class ReviewService {
     }
 
     /**
+     * Permite al anfitrión de la suite (o a un Administrador) publicar o actualizar
+     * una respuesta pública oficial a una reseña de un huésped.
+     */
+    public ReviewDTO respondToReview(String reviewId, String userId, String response) {
+        if (response == null || response.trim().isBlank()) {
+            throw new IllegalArgumentException("La respuesta del anfitrión no puede estar vacía");
+        }
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Reseña no encontrada: " + reviewId));
+
+        // Validación Anti-IDOR: Host debe ser dueño de la propiedad (o ser Administrador)
+        User user = (userId != null && userRepository != null) ? userRepository.findById(userId).orElse(null) : null;
+        boolean isAdmin = user != null && ("ADMIN".equalsIgnoreCase(user.getRole()) || "ROLE_ADMIN".equalsIgnoreCase(user.getRole()));
+
+        if (!isAdmin) {
+            co.palaciodelmar.backend.model.Suite suite = (review.getSuite() != null && suiteRepository != null)
+                    ? suiteRepository.findById(review.getSuite()).orElse(null)
+                    : null;
+            if (suite == null || suite.getPropertyId() == null) {
+                throw new org.springframework.security.access.AccessDeniedException("No tienes permiso para responder a reseñas de esta habitación");
+            }
+            co.palaciodelmar.backend.model.Property property = (propertyRepository != null)
+                    ? propertyRepository.findById(suite.getPropertyId()).orElse(null)
+                    : null;
+            if (property == null || property.getOwnerId() == null || !property.getOwnerId().equals(userId)) {
+                throw new org.springframework.security.access.AccessDeniedException("No tienes permiso para responder a reseñas de una propiedad ajena");
+            }
+        }
+
+        review.setHostResponse(response.trim());
+        review.setHostResponseAt(Instant.now());
+        review.setHostResponseBy(userId);
+        return toDTO(reviewRepository.save(review));
+    }
+
+    /**
      * Métricas de satisfacción y alertas de mantenimiento para el Administrador.
      */
     public Map<String, Object> getSentimentMetrics() {
@@ -401,6 +437,9 @@ public class ReviewService {
                 .maintenanceAlert(review.getMaintenanceAlert())
                 .maintenanceResolvedAt(review.getMaintenanceResolvedAt())
                 .maintenanceResolvedBy(review.getMaintenanceResolvedBy())
+                .hostResponse(review.getHostResponse())
+                .hostResponseAt(review.getHostResponseAt())
+                .hostResponseBy(review.getHostResponseBy())
                 .approved(review.getApproved())
                 .createdAt(review.getCreatedAt())
                 .build();

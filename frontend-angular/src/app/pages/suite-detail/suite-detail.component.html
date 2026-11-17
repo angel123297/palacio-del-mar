@@ -205,6 +205,15 @@
               <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #2ecc71;">
                 <span>✓ Estadía verificada</span>
               </div>
+
+              <!-- Respuesta pública del anfitrión -->
+              <div *ngIf="rev.hostResponse" style="margin-top: 0.85rem; padding: 0.75rem 0.9rem; background: rgba(201, 169, 110, 0.08); border-left: 3px solid var(--gold); border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                  <strong style="color: var(--gold); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Respuesta del Anfitrión</strong>
+                  <span *ngIf="rev.hostResponseAt" style="color: rgba(245, 240, 232, 0.5); font-size: 0.72rem;">{{ rev.hostResponseAt | date:'dd/MM/yyyy' }}</span>
+                </div>
+                <p style="color: #e0d8cc; font-size: 0.84rem; line-height: 1.45; margin: 0;">{{ rev.hostResponse }}</p>
+              </div>
             </div>
           </div>
         </div>

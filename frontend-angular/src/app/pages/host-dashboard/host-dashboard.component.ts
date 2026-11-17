@@ -169,6 +169,9 @@ export interface HostPromotionItem {
                         <button *ngIf="(b.status === 'checked_in' || b.checkedIn) && b.status !== 'checked_out' && b.status !== 'completed' && !b.checkedOut" (click)="markCheckOut(b)" class="px-2.5 py-1 bg-[rgba(230,126,34,0.15)] text-[#e67e22] hover:bg-[#e67e22] hover:text-[#0d0d0d] rounded text-xs font-semibold transition border border-[#e67e22] cursor-pointer">
                           Registrar Check-out
                         </button>
+                        <button type="button" (click)="openBookingMessages(b)" class="px-2.5 py-1 bg-[rgba(201,169,110,0.15)] text-[#c9a96e] hover:bg-[#c9a96e] hover:text-[#0d0d0d] rounded text-xs font-semibold transition border border-[rgba(201,169,110,0.4)] flex items-center gap-1 cursor-pointer">
+                          <span>💬</span> Mensajes
+                        </button>
                         <a [routerLink]="['/reservas', b.id || b._id]" class="bg-[rgba(201,169,110,0.2)] hover:bg-[rgba(201,169,110,0.4)] text-[#c9a96e] hover:text-white transition px-3 py-1 rounded text-xs font-semibold tracking-wider uppercase border border-[rgba(201,169,110,0.5)]">
                           Gestionar
                         </a>
@@ -569,6 +572,7 @@ export interface HostPromotionItem {
                         </div>
                         <div class="flex items-center gap-1.5">
                           <button type="button" (click)="startEditSuite(s)" class="px-2 py-1 text-[10px] bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(201,169,110,0.2)] text-[#f5f0e8] rounded border border-[rgba(255,255,255,0.15)] cursor-pointer">✏️ Editar</button>
+                          <button type="button" (click)="openMaintenanceModal(s)" class="px-2 py-1 text-[10px] bg-[rgba(230,126,34,0.15)] hover:bg-[rgba(230,126,34,0.3)] text-[#e67e22] rounded border border-[rgba(230,126,34,0.4)] cursor-pointer">🔧 Mantenimiento</button>
                           <button type="button" (click)="toggleSuiteActive(s)" class="px-2 py-1 text-[10px] bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(241,196,15,0.2)] text-[#f5f0e8] rounded border border-[rgba(255,255,255,0.15)] cursor-pointer">{{ s.active === false ? '▶ Activar' : '⏸ Pausar' }}</button>
                           <button type="button" (click)="deleteSuite(s)" class="px-2 py-1 text-[10px] bg-[rgba(231,76,60,0.12)] hover:bg-[rgba(231,76,60,0.25)] text-[#ff6b6b] rounded border border-[rgba(231,76,60,0.3)] cursor-pointer">🗑️</button>
                         </div>
@@ -583,6 +587,129 @@ export interface HostPromotionItem {
                 <button type="button" (click)="closeSuitesModal()" class="px-5 py-2 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)] text-white rounded text-xs uppercase tracking-wider cursor-pointer">
                   Cerrar
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal: Bloqueo de Noches por Mantenimiento -->
+          <div *ngIf="maintenanceModalOpen() && selectedSuiteForMaintenance" class="fixed inset-0 bg-black/85 z-[1050] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Gestionar mantenimiento y bloqueo de noches" (keydown.escape)="closeMaintenanceModal()" tabindex="-1">
+            <div class="bg-[#111] border border-[#e67e22] rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+              <!-- Header -->
+              <div class="p-5 border-b border-[rgba(230,126,34,0.3)] flex justify-between items-center bg-[rgba(230,126,34,0.08)]">
+                <div>
+                  <h3 class="font-serif text-xl text-[#e67e22] mb-1">Mantenimiento: {{ selectedSuiteForMaintenance.name }}</h3>
+                  <p class="text-xs text-[#f5f0e8] opacity-70">Bloquea fechas del calendario para reparaciones o trabajos sin admitir nuevas reservas.</p>
+                </div>
+                <button (click)="closeMaintenanceModal()" class="text-2xl text-[#f5f0e8] opacity-70 hover:opacity-100 px-3 py-1 cursor-pointer">&times;</button>
+              </div>
+
+              <!-- Body -->
+              <div class="p-6 overflow-y-auto space-y-6">
+                <!-- Alerts -->
+                <div *ngIf="maintSuccess()" class="p-3 bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] rounded text-xs">
+                  {{ maintSuccess() }}
+                </div>
+                <div *ngIf="maintError()" class="p-3 bg-[rgba(231,76,60,0.15)] border border-[#e74c3c] text-[#e74c3c] rounded text-xs">
+                  {{ maintError() }}
+                </div>
+
+                <!-- Form to block nights -->
+                <div class="p-4 bg-[rgba(255,255,255,0.02)] border border-[rgba(230,126,34,0.3)] rounded-lg space-y-3">
+                  <h4 class="text-xs font-semibold text-[#e67e22] uppercase tracking-wider">➕ Programar Nuevo Bloqueo</h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Fecha Inicio *</label>
+                      <input type="date" [(ngModel)]="maintStartDate" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#e67e22]">
+                    </div>
+                    <div>
+                      <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Fecha Fin *</label>
+                      <input type="date" [(ngModel)]="maintEndDate" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#e67e22]">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] uppercase tracking-widest text-[#c9a96e] mb-1 font-semibold">Motivo del Mantenimiento</label>
+                    <input type="text" [(ngModel)]="maintReason" placeholder="Ej: Pintura general, revisión de aire acondicionado..." class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded px-3 py-2 text-xs text-[#f5f0e8] outline-none focus:border-[#e67e22]">
+                  </div>
+                  <div class="flex justify-end pt-2">
+                    <button type="button" (click)="submitBlockNights()" [disabled]="submittingMaint() || !maintStartDate || !maintEndDate" class="px-4 py-2 bg-[#e67e22] hover:bg-[#d35400] text-white font-bold rounded text-xs uppercase tracking-wider transition disabled:opacity-50 cursor-pointer">
+                      {{ submittingMaint() ? 'Bloqueando...' : 'Bloquear Fechas' }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- List of blocked nights -->
+                <div>
+                  <h4 class="text-xs font-semibold text-[#c9a96e] uppercase tracking-wider mb-2">Bloqueos Activos de Mantenimiento</h4>
+                  <div *ngIf="loadingMaint()" class="py-4 text-center text-xs text-white/60">Cargando bloqueos...</div>
+                  <div *ngIf="!loadingMaint() && blockedNights().length === 0" class="py-4 text-center text-xs text-white/50 bg-[rgba(255,255,255,0.02)] rounded border border-[rgba(255,255,255,0.05)]">
+                    No hay bloqueos activos de mantenimiento programados para esta habitación.
+                  </div>
+                  <div *ngIf="!loadingMaint() && blockedNights().length > 0" class="space-y-2 max-h-56 overflow-y-auto">
+                    <div *ngFor="let b of blockedNights()" class="p-3 bg-[#161616] border border-[rgba(230,126,34,0.2)] rounded-lg flex justify-between items-center text-xs">
+                      <div>
+                        <span class="font-bold text-[#e67e22]">Fechas: {{ b.dates?.join(', ') || 'Rango bloqueado' }}</span>
+                        <p class="text-[10px] text-white/60 mt-0.5">Ref: {{ b.blockRef || 'Mantenimiento' }} &bull; Slot: {{ b.unitSlot || 1 }}</p>
+                      </div>
+                      <button type="button" (click)="unblockSpecificDates(b)" class="px-2.5 py-1 text-[11px] bg-[rgba(46,204,113,0.15)] border border-[#2ecc71] text-[#2ecc71] hover:bg-[#2ecc71] hover:text-[#0d0d0d] rounded transition font-semibold cursor-pointer">
+                        Desbloquear
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer -->
+              <div class="p-4 border-t border-[rgba(230,126,34,0.2)] bg-[#0d0d0d] flex justify-end">
+                <button type="button" (click)="closeMaintenanceModal()" class="px-5 py-2 bg-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.2)] text-white rounded text-xs uppercase tracking-wider cursor-pointer">
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal: Mensajería con Huésped para el Host -->
+          <div *ngIf="bookingMessagesModalOpen() && selectedBookingForMessages" class="fixed inset-0 bg-black/85 z-[1060] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Mensajería directa con huésped" (keydown.escape)="closeBookingMessagesModal()" tabindex="-1">
+            <div class="bg-[#111] border border-[#c9a96e] rounded-xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+              <!-- Header -->
+              <div class="p-5 border-b border-[rgba(201,169,110,0.3)] flex justify-between items-center bg-[rgba(201,169,110,0.06)]">
+                <div>
+                  <h3 class="font-serif text-lg text-[#c9a96e] mb-0.5">Mensajería con Huésped</h3>
+                  <p class="text-xs text-white/70">
+                    Reserva: <strong class="text-white">{{ selectedBookingForMessages.bookingCode || selectedBookingForMessages._id?.substring(0,8) | uppercase }}</strong>
+                    &bull; {{ selectedBookingForMessages.guestName || selectedBookingForMessages.user?.name || 'Huésped' }}
+                  </p>
+                </div>
+                <button (click)="closeBookingMessagesModal()" class="text-2xl text-[#f5f0e8] opacity-70 hover:opacity-100 px-3 py-1 cursor-pointer">&times;</button>
+              </div>
+
+              <!-- Body / Messages Thread -->
+              <div class="p-5 overflow-y-auto space-y-3 flex-1 min-h-[250px] max-h-[400px] flex flex-col">
+                <div *ngIf="loadingHostMessages()" class="text-center text-xs text-white/60 py-8">
+                  Cargando mensajes...
+                </div>
+                <div *ngIf="!loadingHostMessages() && hostMessages().length === 0" class="text-center text-xs text-white/50 py-10 bg-[rgba(255,255,255,0.02)] rounded border border-[rgba(255,255,255,0.05)]">
+                  No hay mensajes registrados aún para esta reserva. ¡Escribe un mensaje de bienvenida o indicaciones de check-in!
+                </div>
+
+                <div *ngFor="let m of hostMessages()" [ngClass]="m.me ? 'self-end max-w-[80%]' : 'self-start max-w-[80%]'">
+                  <div [ngClass]="m.me ? 'bg-[rgba(201,169,110,0.2)] border-[#c9a96e]' : 'bg-[#1a1a1a] border-[rgba(255,255,255,0.15)]'" class="border rounded-lg p-3 text-xs">
+                    <div class="flex justify-between items-center gap-3 mb-1 text-[10px]">
+                      <span [ngClass]="m.me ? 'text-[#c9a96e] font-bold' : 'text-[#2ecc71] font-semibold'">{{ m.senderName }} ({{ m.senderRole === 'HOST' ? 'Tú' : 'Huésped' }})</span>
+                      <span class="text-white/40">{{ m.createdAt | date:'shortTime' }}</span>
+                    </div>
+                    <p class="text-white/90 leading-relaxed whitespace-pre-wrap">{{ m.message }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Footer / Input Form -->
+              <div class="p-4 border-t border-[rgba(201,169,110,0.2)] bg-[#0d0d0d]">
+                <form (ngSubmit)="sendHostChatMessage()" class="flex gap-2">
+                  <input type="text" [(ngModel)]="hostChatMessageText" name="hostChatMessageText" placeholder="Escribe un mensaje para el huésped..." class="flex-1 bg-[#1a1a1a] border border-[rgba(255,255,255,0.2)] rounded px-3 py-2 text-xs text-white outline-none focus:border-[#c9a96e]">
+                  <button type="submit" [disabled]="submittingHostMessage() || !hostChatMessageText.trim()" class="px-4 py-2 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold text-xs uppercase tracking-wider rounded transition disabled:opacity-50 cursor-pointer">
+                    {{ submittingHostMessage() ? '...' : 'Enviar' }}
+                  </button>
+                </form>
               </div>
             </div>
           </div>
@@ -1176,9 +1303,47 @@ export interface HostPromotionItem {
                     <p class="text-xs text-[#c9a96e] mb-3 font-semibold">{{ r.suiteName || 'Alojamiento' }}</p>
                     <p class="text-xs text-[#f5f0e8] opacity-80 leading-relaxed italic mb-4">"{{ r.comment }}"</p>
                   </div>
-                  <div class="flex justify-between items-center text-[10px] text-[#2ecc71] border-t border-[rgba(255,255,255,0.05)] pt-3">
-                    <span>✓ Estadía verificada</span>
-                    <span class="text-[#f5f0e8] opacity-50">{{ r.createdAt | date:'shortDate' }}</span>
+                  <div>
+                    <div class="flex justify-between items-center text-[10px] text-[#2ecc71] border-t border-[rgba(255,255,255,0.05)] pt-3">
+                      <span>✓ Estadía verificada</span>
+                      <span class="text-[#f5f0e8] opacity-50">{{ r.createdAt | date:'shortDate' }}</span>
+                    </div>
+
+                    <!-- Respuesta pública existente -->
+                    <div *ngIf="r.hostResponse && respondingReviewId() !== r.id" class="mt-3 p-3 bg-[rgba(201,169,110,0.08)] border-l-2 border-[#c9a96e] rounded text-xs space-y-1">
+                      <div class="flex justify-between items-center text-[10px] text-[#c9a96e] font-semibold">
+                        <span>Tu respuesta pública</span>
+                        <span *ngIf="r.hostResponseAt" class="opacity-60">{{ r.hostResponseAt | date:'shortDate' }}</span>
+                      </div>
+                      <p class="text-[#e0d8cc] opacity-90">{{ r.hostResponse }}</p>
+                      <div class="pt-1 flex justify-end">
+                        <button (click)="startResponding(r)" class="text-[11px] text-[#c9a96e] hover:underline cursor-pointer">
+                          Editar respuesta
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Botón para responder si no hay respuesta -->
+                    <div *ngIf="!r.hostResponse && respondingReviewId() !== r.id" class="mt-3 pt-2 flex justify-end">
+                      <button (click)="startResponding(r)" class="px-3 py-1.5 bg-[rgba(201,169,110,0.15)] border border-[rgba(201,169,110,0.4)] text-[#c9a96e] text-xs font-semibold rounded hover:bg-[#c9a96e] hover:text-[#0d0d0d] transition cursor-pointer">
+                        Responder al huésped
+                      </button>
+                    </div>
+
+                    <!-- Formulario de respuesta -->
+                    <div *ngIf="respondingReviewId() === r.id" class="mt-3 p-3 bg-[#111] border border-[rgba(201,169,110,0.3)] rounded space-y-2">
+                      <label class="block text-[11px] text-[#c9a96e] font-semibold">Respuesta del Anfitrión (Pública)</label>
+                      <textarea [(ngModel)]="currentResponseText" rows="3" class="w-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] rounded p-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#c9a96e]" placeholder="Escribe un agradecimiento o aclaración cordial..."></textarea>
+                      <p *ngIf="respondingError()" class="text-xs text-red-400">{{ respondingError() }}</p>
+                      <div class="flex justify-end gap-2 pt-1">
+                        <button (click)="cancelResponding()" type="button" class="px-2.5 py-1 text-xs text-gray-400 hover:text-white transition cursor-pointer">
+                          Cancelar
+                        </button>
+                        <button (click)="submitHostResponse(r.id)" [disabled]="submittingResponse()" type="button" class="px-3 py-1 bg-[#c9a96e] text-[#0d0d0d] text-xs font-bold rounded hover:bg-[#d8b87d] transition disabled:opacity-50 cursor-pointer">
+                          {{ submittingResponse() ? 'Guardando...' : 'Publicar respuesta' }}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1310,6 +1475,45 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
       error: () => {
         this.hostReviews.set([]);
         this.loadingReviews.set(false);
+      }
+    });
+  }
+
+  respondingReviewId = signal<string | null>(null);
+  currentResponseText = '';
+  respondingError = signal<string | null>(null);
+  submittingResponse = signal<boolean>(false);
+
+  startResponding(r: any): void {
+    this.respondingReviewId.set(r.id);
+    this.currentResponseText = r.hostResponse || '';
+    this.respondingError.set(null);
+  }
+
+  cancelResponding(): void {
+    this.respondingReviewId.set(null);
+    this.currentResponseText = '';
+    this.respondingError.set(null);
+  }
+
+  submitHostResponse(reviewId: string): void {
+    const text = this.currentResponseText.trim();
+    if (!text) {
+      this.respondingError.set('La respuesta no puede estar vacía.');
+      return;
+    }
+    this.submittingResponse.set(true);
+    this.respondingError.set(null);
+    this.api.put(`/host/properties/reviews/${reviewId}/response`, { response: text }).subscribe({
+      next: () => {
+        this.submittingResponse.set(false);
+        this.respondingReviewId.set(null);
+        this.currentResponseText = '';
+        this.fetchHostReviews();
+      },
+      error: (err) => {
+        this.submittingResponse.set(false);
+        this.respondingError.set(err?.error?.message || 'Error al guardar la respuesta.');
       }
     });
   }
@@ -2292,5 +2496,181 @@ export class HostDashboardComponent implements OnInit, OnDestroy {
       this.currentPage.set(page);
       this.fetchBookings();
     }
+  }
+
+  // ==================== FEATURE 3: MANTENIMIENTO & BLOQUEO ====================
+  maintenanceModalOpen = signal<boolean>(false);
+  selectedSuiteForMaintenance: any = null;
+  blockedNights = signal<any[]>([]);
+  loadingMaint = signal<boolean>(false);
+  submittingMaint = signal<boolean>(false);
+  maintStartDate = '';
+  maintEndDate = '';
+  maintReason = '';
+  maintSuccess = signal<string>('');
+  maintError = signal<string>('');
+
+  openMaintenanceModal(s: any): void {
+    this.selectedSuiteForMaintenance = s;
+    this.maintenanceModalOpen.set(true);
+    this.maintStartDate = '';
+    this.maintEndDate = '';
+    this.maintReason = '';
+    this.maintSuccess.set('');
+    this.maintError.set('');
+    this.fetchBlockedNights(s);
+  }
+
+  closeMaintenanceModal(): void {
+    this.maintenanceModalOpen.set(false);
+    this.selectedSuiteForMaintenance = null;
+    this.blockedNights.set([]);
+    this.maintSuccess.set('');
+    this.maintError.set('');
+  }
+
+  fetchBlockedNights(s: any): void {
+    if (!this.selectedPropertyForSuites) return;
+    const propId = this.selectedPropertyForSuites.id || this.selectedPropertyForSuites._id;
+    const suiteId = s?.id || s?._id;
+    if (!propId || !suiteId) return;
+
+    this.loadingMaint.set(true);
+    this.api.get<ApiResponse<any[]>>(`/host/properties/${propId}/suites/${suiteId}/blocked-nights`).subscribe({
+      next: (res) => {
+        this.loadingMaint.set(false);
+        const data = res?.data || (res as any) || [];
+        this.blockedNights.set(Array.isArray(data) ? data : []);
+      },
+      error: () => {
+        this.loadingMaint.set(false);
+        this.blockedNights.set([]);
+      }
+    });
+  }
+
+  submitBlockNights(): void {
+    if (!this.selectedPropertyForSuites || !this.selectedSuiteForMaintenance) return;
+    const propId = this.selectedPropertyForSuites.id || this.selectedPropertyForSuites._id;
+    const suiteId = this.selectedSuiteForMaintenance.id || this.selectedSuiteForMaintenance._id;
+    if (!this.maintStartDate || !this.maintEndDate) {
+      this.maintError.set('Debes seleccionar fecha de inicio y fin.');
+      return;
+    }
+    if (this.maintEndDate <= this.maintStartDate) {
+      this.maintError.set('La fecha de fin debe ser posterior a la de inicio.');
+      return;
+    }
+
+    this.submittingMaint.set(true);
+    this.maintError.set('');
+    this.maintSuccess.set('');
+
+    this.api.post<ApiResponse<any>>(`/host/properties/${propId}/suites/${suiteId}/block-nights`, {
+      startDate: this.maintStartDate,
+      endDate: this.maintEndDate,
+      reason: this.maintReason || 'Mantenimiento programado'
+    }).subscribe({
+      next: (res) => {
+        this.submittingMaint.set(false);
+        this.maintSuccess.set(res?.message || 'Noches bloqueadas por mantenimiento exitosamente.');
+        this.maintStartDate = '';
+        this.maintEndDate = '';
+        this.maintReason = '';
+        this.fetchBlockedNights(this.selectedSuiteForMaintenance);
+      },
+      error: (err) => {
+        this.submittingMaint.set(false);
+        this.maintError.set(err?.error?.message || 'Error al bloquear noches por mantenimiento.');
+      }
+    });
+  }
+
+  unblockSpecificDates(b: any): void {
+    if (!this.selectedPropertyForSuites || !this.selectedSuiteForMaintenance) return;
+    const propId = this.selectedPropertyForSuites.id || this.selectedPropertyForSuites._id;
+    const suiteId = this.selectedSuiteForMaintenance.id || this.selectedSuiteForMaintenance._id;
+    const dates = b?.dates;
+    if (!dates || !dates.length) return;
+
+    const startDate = dates[0];
+    const endDate = new Date(new Date(dates[dates.length - 1]).getTime() + 86400000).toISOString().substring(0, 10);
+
+    this.loadingMaint.set(true);
+    this.maintError.set('');
+    this.maintSuccess.set('');
+
+    this.api.post<ApiResponse<any>>(`/host/properties/${propId}/suites/${suiteId}/unblock-nights`, {
+      startDate,
+      endDate
+    }).subscribe({
+      next: (res) => {
+        this.loadingMaint.set(false);
+        this.maintSuccess.set(res?.message || 'Noches desbloqueadas correctamente.');
+        this.fetchBlockedNights(this.selectedSuiteForMaintenance);
+      },
+      error: (err) => {
+        this.loadingMaint.set(false);
+        this.maintError.set(err?.error?.message || 'Error al desbloquear noches.');
+      }
+    });
+  }
+
+  // ==================== FEATURE 5: MENSAJERÍA DIRECTA CON HUÉSPED ====================
+  bookingMessagesModalOpen = signal<boolean>(false);
+  selectedBookingForMessages: any = null;
+  hostMessages = signal<any[]>([]);
+  loadingHostMessages = signal<boolean>(false);
+  submittingHostMessage = signal<boolean>(false);
+  hostChatMessageText = '';
+
+  openBookingMessages(b: any): void {
+    this.selectedBookingForMessages = b;
+    this.bookingMessagesModalOpen.set(true);
+    this.hostChatMessageText = '';
+    const id = b?.id || b?._id;
+    if (id) {
+      this.fetchBookingMessages(id);
+    }
+  }
+
+  closeBookingMessagesModal(): void {
+    this.bookingMessagesModalOpen.set(false);
+    this.selectedBookingForMessages = null;
+    this.hostMessages.set([]);
+    this.hostChatMessageText = '';
+  }
+
+  fetchBookingMessages(bookingId: string): void {
+    this.loadingHostMessages.set(true);
+    this.api.get<ApiResponse<any[]>>(`/bookings/${bookingId}/messages`).subscribe({
+      next: (res) => {
+        this.loadingHostMessages.set(false);
+        const data = res?.data || (res as any) || [];
+        this.hostMessages.set(Array.isArray(data) ? data : []);
+      },
+      error: () => {
+        this.loadingHostMessages.set(false);
+        this.hostMessages.set([]);
+      }
+    });
+  }
+
+  sendHostChatMessage(): void {
+    if (!this.selectedBookingForMessages || !this.hostChatMessageText.trim() || this.submittingHostMessage()) return;
+    const bookingId = this.selectedBookingForMessages.id || this.selectedBookingForMessages._id;
+    const text = this.hostChatMessageText.trim();
+
+    this.submittingHostMessage.set(true);
+    this.api.post<ApiResponse<any>>(`/bookings/${bookingId}/messages`, { message: text }).subscribe({
+      next: () => {
+        this.submittingHostMessage.set(false);
+        this.hostChatMessageText = '';
+        this.fetchBookingMessages(bookingId);
+      },
+      error: () => {
+        this.submittingHostMessage.set(false);
+      }
+    });
   }
 }

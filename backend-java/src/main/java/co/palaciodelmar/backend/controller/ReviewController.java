@@ -91,6 +91,24 @@ public class ReviewController {
     }
 
     /**
+     * Endpoint para que el anfitrión o administrador responda públicamente a una reseña.
+     */
+    @PutMapping("/reviews/{reviewId}/host-response")
+    @PreAuthorize("hasAnyRole('HOST', 'ADMIN')")
+    public ResponseEntity<ApiResponse<ReviewDTO>> addHostResponse(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String reviewId,
+            @RequestBody Map<String, String> body
+    ) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("Debes iniciar sesión como anfitrión o administrador"));
+        }
+        String responseText = body != null ? body.get("response") : null;
+        ReviewDTO review = reviewService.respondToReview(reviewId, principal.getUser().getId(), responseText);
+        return ResponseEntity.ok(ApiResponse.ok("Respuesta del anfitrión publicada exitosamente", review));
+    }
+
+    /**
      * Endpoint administrativo con métricas de sentimiento y alertas de mantenimiento.
      */
     @GetMapping("/admin/reviews/metrics")
