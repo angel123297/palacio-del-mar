@@ -126,8 +126,6 @@ services:
     image: ngrok/ngrok:alpine
     container_name: palacio-ngrok-tunnel
     restart: unless-stopped
-    profiles:
-      - tunnel
     command:
       - "http"
       - "palacio-web-angular:80"
