@@ -39,6 +39,13 @@ public class AdminService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private AvailabilityCacheEvictor availabilityCacheEvictor;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private co.palaciodelmar.backend.security.UserSessionCacheService userSessionCacheService;
+
+    public void setUserSessionCacheService(co.palaciodelmar.backend.security.UserSessionCacheService userSessionCacheService) {
+        this.userSessionCacheService = userSessionCacheService;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired
     public AdminService(
             BookingRepository bookingRepository,
@@ -659,15 +666,51 @@ public class AdminService {
     }
 
     public UserDTO updateUserStatus(String userId, String status) {
+        return updateUserStatus(userId, status, null);
+    }
+
+    public UserDTO updateUserStatus(String userId, String status, String callerId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("El ID del usuario es obligatorio");
+        }
+        if (status == null || status.trim().isEmpty()) {
+            throw new IllegalArgumentException("El estado es obligatorio (active, suspended, inactive)");
+        }
+        String cleanStatus = status.trim().toLowerCase();
+        if (!List.of("active", "suspended", "inactive").contains(cleanStatus)) {
+            throw new IllegalArgumentException("Estado no válido: " + status + ". Valores permitidos: active, suspended, inactive");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
-        String cleanStatus = status != null ? status.trim().toLowerCase() : "active";
-        if (!List.of("active", "suspended", "inactive").contains(cleanStatus)) {
-            throw new IllegalArgumentException("Estado no válido: " + status);
+
+        if (callerId != null && (callerId.equals(user.getId()) || (user.getEmail() != null && callerId.equalsIgnoreCase(user.getEmail())))) {
+            throw new IllegalArgumentException("No puedes modificar el estado de tu propia cuenta de administrador");
         }
+
+        boolean isTargetAdmin = "admin".equalsIgnoreCase(user.getRole());
+        if (isTargetAdmin && !"active".equalsIgnoreCase(cleanStatus)) {
+            long activeAdmins = userRepository.findAll().stream()
+                    .filter(u -> "admin".equalsIgnoreCase(u.getRole()) && "active".equalsIgnoreCase(u.getStatus()) && !userId.equals(u.getId()))
+                    .count();
+            if (activeAdmins == 0) {
+                throw new IllegalArgumentException("No es posible suspender o desactivar al único administrador activo del sistema");
+            }
+        }
+
+        Instant now = Instant.now();
         user.setStatus(cleanStatus);
-        user.setUpdatedAt(Instant.now());
+        user.setUpdatedAt(now);
+        if ("suspended".equalsIgnoreCase(cleanStatus)) {
+            user.setSessionsRevokedAt(now);
+        }
         User saved = userRepository.save(user);
+
+        if (userSessionCacheService != null && saved.getEmail() != null) {
+            userSessionCacheService.recordGlobalRevocation(saved.getEmail(), now);
+            userSessionCacheService.evictUser(saved.getEmail());
+        }
+
         return UserDTO.builder()
                 .id(saved.getId())
                 .name(saved.getName())
@@ -682,15 +725,49 @@ public class AdminService {
     }
 
     public UserDTO updateUserRole(String userId, String role) {
+        return updateUserRole(userId, role, null);
+    }
+
+    public UserDTO updateUserRole(String userId, String role, String callerId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("El ID del usuario es obligatorio");
+        }
+        if (role == null || role.trim().isEmpty()) {
+            throw new IllegalArgumentException("El rol es obligatorio (user, host, admin)");
+        }
+        String cleanRole = role.trim().toLowerCase();
+        if (!List.of("user", "host", "admin").contains(cleanRole)) {
+            throw new IllegalArgumentException("Rol no válido: " + role + ". Valores permitidos: user, host, admin");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
-        String cleanRole = role != null ? role.trim().toLowerCase() : "user";
-        if (!List.of("user", "host", "admin").contains(cleanRole)) {
-            throw new IllegalArgumentException("Rol no válido: " + role);
+
+        if (callerId != null && (callerId.equals(user.getId()) || (user.getEmail() != null && callerId.equalsIgnoreCase(user.getEmail())))) {
+            throw new IllegalArgumentException("No puedes modificar el rol de tu propia cuenta de administrador");
         }
+
+        boolean wasAdmin = "admin".equalsIgnoreCase(user.getRole());
+        if (wasAdmin && !"admin".equalsIgnoreCase(cleanRole)) {
+            long activeAdmins = userRepository.findAll().stream()
+                    .filter(u -> "admin".equalsIgnoreCase(u.getRole()) && "active".equalsIgnoreCase(u.getStatus()) && !userId.equals(u.getId()))
+                    .count();
+            if (activeAdmins == 0) {
+                throw new IllegalArgumentException("No es posible remover el rol al único administrador activo del sistema");
+            }
+        }
+
+        Instant now = Instant.now();
         user.setRole(cleanRole);
-        user.setUpdatedAt(Instant.now());
+        user.setUpdatedAt(now);
+        user.setSessionsRevokedAt(now);
         User saved = userRepository.save(user);
+
+        if (userSessionCacheService != null && saved.getEmail() != null) {
+            userSessionCacheService.recordGlobalRevocation(saved.getEmail(), now);
+            userSessionCacheService.evictUser(saved.getEmail());
+        }
+
         return UserDTO.builder()
                 .id(saved.getId())
                 .name(saved.getName())

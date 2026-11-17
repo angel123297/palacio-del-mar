@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 class AdminServiceTest {
@@ -471,5 +472,67 @@ class AdminServiceTest {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
             adminService.updateUserRole("u1", "super_god_role");
         });
+    }
+
+    @Test
+    @DisplayName("Bug 4: updateUserStatus rechaza body vacío o null con 400 sin reactivar silenciosamente")
+    void testUpdateUserStatusRejectsNullOrBlank() {
+        assertThrows(IllegalArgumentException.class, () -> adminService.updateUserStatus("u1", null));
+        assertThrows(IllegalArgumentException.class, () -> adminService.updateUserStatus("u1", "   "));
+    }
+
+    @Test
+    @DisplayName("Bug 2: Admin no puede auto-suspenderse ni auto-degradarse (Self-Guard)")
+    void testSelfGuardPreventsAdminSelfDestruction() {
+        User admin = User.builder().id("admin-1").email("admin@pdm.com").role("admin").status("active").build();
+        when(userRepository.findById("admin-1")).thenReturn(java.util.Optional.of(admin));
+
+        // Auto-suspensión bloqueada
+        assertThrows(IllegalArgumentException.class, () -> {
+            adminService.updateUserStatus("admin-1", "suspended", "admin-1");
+        });
+
+        // Auto-degradación de rol bloqueada
+        assertThrows(IllegalArgumentException.class, () -> {
+            adminService.updateUserRole("admin-1", "user", "admin-1");
+        });
+    }
+
+    @Test
+    @DisplayName("Bug 2: Protección del último administrador activo del sistema")
+    void testProtectsLastActiveAdminFromLockout() {
+        User soleAdmin = User.builder().id("admin-sole").email("sole@pdm.com").role("admin").status("active").build();
+        when(userRepository.findById("admin-sole")).thenReturn(java.util.Optional.of(soleAdmin));
+        when(userRepository.findAll()).thenReturn(List.of(soleAdmin));
+
+        // Intento de otro caller de suspender al único admin
+        assertThrows(IllegalArgumentException.class, () -> {
+            adminService.updateUserStatus("admin-sole", "suspended", "other-caller");
+        });
+
+        // Intento de remover rol al único admin
+        assertThrows(IllegalArgumentException.class, () -> {
+            adminService.updateUserRole("admin-sole", "user", "other-caller");
+        });
+    }
+
+    @Test
+    @DisplayName("Bug 1: Invalida inmediatamente sesiones activas en cache Redis/L1 al suspender o cambiar rol")
+    void testInvalidatesSessionCacheInstantlyOnStatusOrRoleChange() {
+        User target = User.builder().id("u-target").email("target@pdm.com").role("host").status("active").build();
+        when(userRepository.findById("u-target")).thenReturn(java.util.Optional.of(target));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        co.palaciodelmar.backend.security.UserSessionCacheService cacheService =
+                mock(co.palaciodelmar.backend.security.UserSessionCacheService.class);
+        adminService.setUserSessionCacheService(cacheService);
+
+        adminService.updateUserStatus("u-target", "suspended", "admin-caller");
+        verify(cacheService, times(1)).recordGlobalRevocation(eq("target@pdm.com"), any(java.time.Instant.class));
+        verify(cacheService, times(1)).evictUser("target@pdm.com");
+
+        adminService.updateUserRole("u-target", "user", "admin-caller");
+        verify(cacheService, times(2)).recordGlobalRevocation(eq("target@pdm.com"), any(java.time.Instant.class));
+        verify(cacheService, times(2)).evictUser("target@pdm.com");
     }
 }

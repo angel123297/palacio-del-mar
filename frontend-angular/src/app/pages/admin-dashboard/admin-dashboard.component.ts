@@ -560,27 +560,34 @@ export interface RefundItem {
                     <td class="py-3.5 px-4 text-[#f5f0e8] opacity-90">{{ u.email }}</td>
                     <td class="py-3.5 px-4">
                       <span [ngClass]="{
-                        'bg-purple-900/40 text-purple-300 border-purple-500/50': u.role === 'admin',
-                        'bg-amber-900/40 text-amber-300 border-amber-500/50': u.role === 'host',
-                        'bg-blue-900/40 text-blue-300 border-blue-500/50': u.role !== 'admin' && u.role !== 'host'
+                        'bg-purple-900/40 text-purple-300 border-purple-500/50': (u.role || '').toLowerCase() === 'admin',
+                        'bg-amber-900/40 text-amber-300 border-amber-500/50': (u.role || '').toLowerCase() === 'host',
+                        'bg-blue-900/40 text-blue-300 border-blue-500/50': (u.role || '').toLowerCase() !== 'admin' && (u.role || '').toLowerCase() !== 'host'
                       }" class="px-2.5 py-0.5 text-[10px] uppercase font-bold rounded-full border">
-                        {{ u.role === 'admin' ? 'Administrador' : (u.role === 'host' ? 'Anfitrión' : 'Huésped') }}
+                        {{ (u.role || '').toLowerCase() === 'admin' ? 'Administrador' : ((u.role || '').toLowerCase() === 'host' ? 'Anfitrión' : 'Huésped') }}
                       </span>
                     </td>
                     <td class="py-3.5 px-4">
-                      <span [ngClass]="u.status === 'suspended' ? 'bg-red-900/40 text-red-300 border-red-500/50' : 'bg-emerald-900/40 text-emerald-300 border-emerald-500/50'" class="px-2 py-0.5 text-[10px] uppercase font-semibold rounded border">
-                        {{ u.status === 'suspended' ? '● Suspendido' : '● Activo' }}
+                      <span [ngClass]="{
+                        'bg-red-900/40 text-red-300 border-red-500/50': (u.status || '').toLowerCase() === 'suspended',
+                        'bg-zinc-800 text-zinc-400 border-zinc-600/50': (u.status || '').toLowerCase() === 'inactive',
+                        'bg-emerald-900/40 text-emerald-300 border-emerald-500/50': (u.status || '').toLowerCase() === 'active' || !(u.status)
+                      }" class="px-2 py-0.5 text-[10px] uppercase font-semibold rounded border">
+                        {{ (u.status || '').toLowerCase() === 'suspended' ? '● Suspendido' : ((u.status || '').toLowerCase() === 'inactive' ? '● Inactivo' : '● Activo') }}
                       </span>
                     </td>
                     <td class="py-3.5 px-4 text-right">
                       <div class="flex items-center justify-end gap-2">
-                        <select [value]="u.role" (change)="changeUserRole(u, $any($event.target).value)" [disabled]="updatingUserId() === (u.id || u._id)" class="bg-[#1a1a1a] border border-[rgba(255,255,255,0.2)] rounded px-2 py-1 text-[11px] text-[#c9a96e] outline-none">
+                        <span *ngIf="isSelf(u)" class="text-[10px] text-[#c9a96e] bg-[rgba(201,169,110,0.15)] px-2 py-0.5 rounded border border-[rgba(201,169,110,0.3)] font-semibold">
+                          (Tu cuenta actual)
+                        </span>
+                        <select [value]="(u.role || 'user').toLowerCase()" (change)="changeUserRole(u, $any($event.target).value)" [disabled]="isSelf(u) || updatingUserId() === (u.id || u._id)" class="bg-[#1a1a1a] border border-[rgba(255,255,255,0.2)] rounded px-2 py-1 text-[11px] text-[#c9a96e] outline-none disabled:opacity-50 disabled:cursor-not-allowed">
                           <option value="user">Huésped (user)</option>
                           <option value="host">Anfitrión (host)</option>
                           <option value="admin">Administrador (admin)</option>
                         </select>
-                        <button type="button" (click)="toggleUserStatus(u)" [disabled]="updatingUserId() === (u.id || u._id)" [ngClass]="u.status === 'suspended' ? 'bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border-[#2ecc71]' : 'bg-[rgba(231,76,60,0.15)] text-[#ff6b6b] border-[#e74c3c]'" class="px-2.5 py-1 text-[11px] font-semibold rounded border transition cursor-pointer">
-                          {{ u.status === 'suspended' ? 'Reactivar' : 'Suspender' }}
+                        <button *ngIf="!isSelf(u)" type="button" (click)="toggleUserStatus(u)" [disabled]="updatingUserId() === (u.id || u._id)" [ngClass]="(u.status || '').toLowerCase() === 'suspended' ? 'bg-[rgba(46,204,113,0.15)] text-[#2ecc71] border-[#2ecc71]' : 'bg-[rgba(231,76,60,0.15)] text-[#ff6b6b] border-[#e74c3c]'" class="px-2.5 py-1 text-[11px] font-semibold rounded border transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                          {{ (u.status || '').toLowerCase() === 'suspended' ? 'Reactivar' : 'Suspender' }}
                         </button>
                       </div>
                     </td>
@@ -1208,10 +1215,24 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  isSelf(u: any): boolean {
+    const cur = this.auth.currentUser();
+    if (!cur || !u) return false;
+    const curId = cur.id || (cur as any)._id;
+    const uId = u.id || u._id;
+    return (!!curId && !!uId && curId === uId) || (!!cur.email && !!u.email && cur.email.toLowerCase() === u.email.toLowerCase());
+  }
+
   toggleUserStatus(u: any): void {
+    if (this.isSelf(u)) {
+      this.actionError.set('No puedes suspender tu propia cuenta de administrador');
+      setTimeout(() => this.actionError.set(''), 4000);
+      return;
+    }
     const id = u.id || u._id;
     if (!id || this.updatingUserId()) return;
-    const nextStatus = u.status === 'suspended' ? 'active' : 'suspended';
+    const currentStatus = (u.status || '').toLowerCase();
+    const nextStatus = currentStatus === 'suspended' ? 'active' : 'suspended';
     this.updatingUserId.set(id);
     this.api.put<ApiResponse<any>>(`/admin/users/${id}/status`, { status: nextStatus }).subscribe({
       next: () => {
@@ -1229,6 +1250,11 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   }
 
   changeUserRole(u: any, newRole: string): void {
+    if (this.isSelf(u)) {
+      this.actionError.set('No puedes modificar el rol de tu propia cuenta de administrador');
+      setTimeout(() => this.actionError.set(''), 4000);
+      return;
+    }
     const id = u.id || u._id;
     if (!id || this.updatingUserId()) return;
     this.updatingUserId.set(id);

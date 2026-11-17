@@ -153,19 +153,23 @@ public class AdminController {
 
     @PutMapping("/users/{id}/status")
     public ResponseEntity<ApiResponse<UserDTO>> updateUserStatus(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal co.palaciodelmar.backend.security.UserPrincipal principal,
             @PathVariable String id,
             @RequestBody Map<String, String> body) {
+        String callerId = principal != null && principal.getUser() != null ? principal.getUser().getId() : null;
         String status = body != null ? body.get("status") : null;
-        UserDTO dto = adminService.updateUserStatus(id, status);
+        UserDTO dto = adminService.updateUserStatus(id, status, callerId);
         return ResponseEntity.ok(ApiResponse.ok("Estado de usuario actualizado", dto));
     }
 
     @PutMapping("/users/{id}/role")
     public ResponseEntity<ApiResponse<UserDTO>> updateUserRole(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal co.palaciodelmar.backend.security.UserPrincipal principal,
             @PathVariable String id,
             @RequestBody Map<String, String> body) {
+        String callerId = principal != null && principal.getUser() != null ? principal.getUser().getId() : null;
         String role = body != null ? body.get("role") : null;
-        UserDTO dto = adminService.updateUserRole(id, role);
+        UserDTO dto = adminService.updateUserRole(id, role, callerId);
         return ResponseEntity.ok(ApiResponse.ok("Rol de usuario actualizado", dto));
     }
 
