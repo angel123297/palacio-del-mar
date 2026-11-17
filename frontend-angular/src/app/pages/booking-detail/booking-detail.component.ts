@@ -353,7 +353,7 @@ import { Booking } from '../../models/types';
             <div *ngIf="!booking.airportPickup" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem;">
               <p style="color: #fff; margin: 0; font-weight: bold; display: flex; align-items: center; gap: 0.5rem;"><span style="font-size: 1.2rem;">🚕</span> ¿Cómo llegar al hotel?</p>
               <p style="color: #ccc; margin: 0.5rem 0 1rem 0; font-size: 0.95rem; line-height: 1.5;">Tu reserva no incluye traslado. Te recomendamos tomar un taxi oficial desde el aeropuerto o seguir las indicaciones de navegación.</p>
-              <a [href]="getMapsLink()" target="_blank" style="color: #000; background: var(--gold); padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 0.5rem; transition: background 0.3s;">
+              <a [href]="getMapsLink()" target="_blank" rel="noopener noreferrer" style="color: #000; background: var(--gold); padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 0.5rem; transition: background 0.3s;">
                 <span>📍</span> Abrir en Google Maps
               </a>
             </div>

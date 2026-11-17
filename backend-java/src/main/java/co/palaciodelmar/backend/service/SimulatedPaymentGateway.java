@@ -366,11 +366,17 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                 );
                 org.springframework.data.mongodb.core.query.Update u = new org.springframework.data.mongodb.core.query.Update()
                         .set("status", isFailure ? "failed" : "succeeded")
-                        .set("transactionId", txId)
                         .set("failureMessage", errorMessage)
                         .set("claimLock", null)
                         .set("claimExpiresAt", null)
                         .set("updatedAt", now);
+                // transactionId tiene índice unique+sparse: un null explícito SÍ se indexa y colisiona (E11000);
+                // hay que omitir el campo con $unset cuando el pago falla.
+                if (txId != null) {
+                    u.set("transactionId", txId);
+                } else {
+                    u.unset("transactionId");
+                }
 
                 PaymentIntent updated = mongoTemplate.findAndModify(q, u, PaymentIntent.class);
                 if (updated == null) {

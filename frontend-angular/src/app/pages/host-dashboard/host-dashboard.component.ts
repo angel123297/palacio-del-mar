@@ -1005,7 +1005,7 @@ export interface HostPromotionItem {
                 Conecta tu sistema de administración hotelera (PMS como Cloudbeds, Sirvoy o tu web propia) para publicar habitaciones y bloquear fechas automáticamente, evitando cualquier sobreventa en tus alojamientos.
               </p>
             </div>
-            <a routerLink="/demo/external-hotel" target="_blank" class="px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-lg text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg">
+            <a routerLink="/demo/external-hotel" target="_blank" rel="noopener noreferrer" class="px-5 py-2.5 bg-[#c9a96e] hover:bg-[#d8b87d] text-[#0d0d0d] font-bold rounded-lg text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg">
               <span>🏨 Abrir Simulador de Hotel Aliado (PMS)</span>
               <span>&rarr;</span>
             </a>

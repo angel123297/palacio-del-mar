@@ -62,7 +62,7 @@ export class AuthService {
     }
 
     const currentEpoch = this.sessionEpoch;
-    this.http.get<AuthResponse>(`${this.apiUrl}/me`).subscribe({
+    this.http.get<AuthResponse>(`${this.apiUrl}/me`).pipe(timeout(8000)).subscribe({
       next: (res) => {
         if (currentEpoch !== this.sessionEpoch) return;
         const user = res.user || res.data?.user;

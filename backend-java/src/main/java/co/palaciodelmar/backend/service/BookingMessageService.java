@@ -116,6 +116,11 @@ public class BookingMessageService {
             throw new AccessDeniedException("No tienes autorización para enviar mensajes en esta reserva");
         }
 
+        String bookingStatus = booking.getStatus() != null ? booking.getStatus().toLowerCase() : "";
+        if (bookingStatus.equals("cancelled") || bookingStatus.equals("expired")) {
+            throw new IllegalStateException("No se pueden enviar mensajes en una reserva cancelada o expirada");
+        }
+
         String sanitizedText = (text != null) ? text.trim() : "";
         if (sanitizedText.isEmpty()) {
             throw new IllegalArgumentException("El mensaje no puede estar vacío");

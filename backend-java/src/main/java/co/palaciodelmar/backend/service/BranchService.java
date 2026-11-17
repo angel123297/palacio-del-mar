@@ -133,6 +133,6 @@ public class BranchService {
                                 .active(true)
                                 .build()
                         ))
-                .orElseThrow(() -> new IllegalArgumentException("Sucursal no encontrada con id: " + id));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Sucursal no encontrada con id: " + id));
     }
 }

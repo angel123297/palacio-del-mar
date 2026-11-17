@@ -102,7 +102,8 @@ public class AuthService {
             if ("admin".equalsIgnoreCase(existing.getRole()) || existing.getDeletedAt() != null
                     || "inactive".equalsIgnoreCase(existing.getStatus())
                     || "suspended".equalsIgnoreCase(existing.getStatus())) {
-                throw new IllegalArgumentException("No se permite activar esta cuenta mediante registro público");
+                // Mismo mensaje que una cuenta verificada: no revelar el estado interno de la cuenta
+                throw new IllegalArgumentException("El email ya está registrado");
             }
             // An anonymous retry may rotate verification, but cannot replace credentials,
             // profile or role. Passwordless accounts recover through the emailed reset flow.
@@ -375,6 +376,12 @@ public class AuthService {
             log.info("Solicitud de forgot-password para correo no registrado: {}", normalizedEmail);
             return;
         }
+        if (user.getDeletedAt() != null
+                || "suspended".equalsIgnoreCase(user.getStatus())
+                || "inactive".equalsIgnoreCase(user.getStatus())) {
+            log.info("Solicitud de forgot-password ignorada para cuenta no activa: {}", normalizedEmail);
+            return;
+        }
 
         // Flujo seguro y no destructivo: NO altera password actual ni emailVerified.
         // Genera token criptográficamente seguro con validez de 15 minutos almacenado con hash SHA-256.
@@ -412,7 +419,9 @@ public class AuthService {
 
         // Operación 100% atómica con MongoTemplate para garantizar el consumo único e indivisible del token
         Query query = new Query(Criteria.where("resetPasswordTokenHash").is(hashedToken)
-                .and("resetPasswordTokenExpiresAt").gt(now));
+                .and("resetPasswordTokenExpiresAt").gt(now)
+                .and("status").nin("suspended", "inactive", "SUSPENDED", "INACTIVE")
+                .and("deletedAt").is(null));
 
         Update update = new Update()
                 .set("password", passwordEncoder.encode(newPassword))
@@ -462,14 +471,17 @@ public class AuthService {
             return;
         }
 
+        // Anti-enumeración: cuenta ya verificada o no elegible -> misma respuesta que "no existe" (sin correo ni error).
         if (Boolean.TRUE.equals(user.getEmailVerified())) {
-            throw new IllegalStateException("Tu cuenta ya se encuentra verificada. Puedes iniciar sesión directamente.");
+            log.info("Reenvío de verificación ignorado: cuenta ya verificada {}", normalizedEmail);
+            return;
         }
 
         if ("admin".equalsIgnoreCase(user.getRole()) || user.getDeletedAt() != null
                 || "inactive".equalsIgnoreCase(user.getStatus())
                 || "suspended".equalsIgnoreCase(user.getStatus())) {
-            throw new IllegalArgumentException("No se permite reenviar verificación para esta cuenta");
+            log.info("Reenvío de verificación ignorado: cuenta no elegible {}", normalizedEmail);
+            return;
         }
 
         String rawToken = generateSecureToken();

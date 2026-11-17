@@ -348,8 +348,8 @@ public class BookingService {
         if (children < 0) {
             throw new IllegalArgumentException("El número de niños no puede ser negativo");
         }
-        if (adults + children > maxGuests) {
-            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes (ocupación solicitada: " + (adults + children) + ")");
+        if ((long) adults + (long) children > maxGuests) {
+            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes (ocupación solicitada: " + ((long) adults + (long) children) + ")");
         }
 
         if (request.getCheckIn() == null || request.getCheckOut() == null) {
@@ -463,7 +463,8 @@ public class BookingService {
 
             BigDecimal roomTaxableBase = pricingResult.subtotal().subtract(pricingResult.discount()).max(BigDecimal.ZERO);
             BigDecimal commissionRate = resolveCommissionRate(suite.getPropertyId());
-            BigDecimal taxableTotal = roomTaxableBase.add(experiencesTotal);
+            BigDecimal extrasTotal = vipExtrasTotal.add(extraGuestTotal);
+            BigDecimal taxableTotal = roomTaxableBase.add(experiencesTotal).add(extrasTotal);
             BigDecimal platformFee = taxableTotal.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
             BigDecimal hostPayout = taxableTotal.subtract(platformFee);
 
@@ -616,8 +617,8 @@ public class BookingService {
         if (children < 0) {
             throw new IllegalArgumentException("El número de niños no puede ser negativo");
         }
-        if (adults + children > maxGuests) {
-            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes (ocupación solicitada: " + (adults + children) + ")");
+        if ((long) adults + (long) children > maxGuests) {
+            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes (ocupación solicitada: " + ((long) adults + (long) children) + ")");
         }
 
         if (request.getCheckIn() == null || request.getCheckOut() == null) {
@@ -762,7 +763,8 @@ public class BookingService {
             freshBooking.setTotalPrice(newTotalPrice);
             BigDecimal modRoomTaxableBase = pricingResult.subtotal().subtract(pricingResult.discount()).max(BigDecimal.ZERO);
             BigDecimal modCommissionRate = resolveCommissionRate(suite.getPropertyId());
-            BigDecimal modTaxableTotal = modRoomTaxableBase.add(experiencesTotal);
+            BigDecimal modExtrasTotal = vipExtrasTotal.add(extraGuestFee(effectiveTotalGuests, nights));
+            BigDecimal modTaxableTotal = modRoomTaxableBase.add(experiencesTotal).add(modExtrasTotal);
             BigDecimal modPlatformFee = modTaxableTotal.multiply(modCommissionRate).setScale(2, RoundingMode.HALF_UP);
             freshBooking.setPlatformFee(modPlatformFee);
             freshBooking.setHostPayout(modTaxableTotal.subtract(modPlatformFee));
@@ -1234,7 +1236,12 @@ public class BookingService {
             BigDecimal roomTaxable = subtotal.compareTo(BigDecimal.ZERO) > 0
                     ? subtotal.subtract(discount).max(BigDecimal.ZERO)
                     : currentTotal.subtract(deposit).max(BigDecimal.ZERO);
-            taxableBase = roomTaxable.add(expTotal);
+            BigDecimal vipExtras = calculateVipExtrasTotal(booking);
+            int totalOccupants = (booking.getGuests() != null ? booking.getGuests() : 1)
+                    + (booking.getChildren() != null ? booking.getChildren() : 0);
+            long nights = booking.getNights() != null ? booking.getNights() : 0;
+            BigDecimal extraGuests = extraGuestFee(totalOccupants, nights);
+            taxableBase = roomTaxable.add(expTotal).add(vipExtras).add(extraGuests);
         }
 
         if (extraTaxableIncome != null && extraTaxableIncome.signum() > 0) {

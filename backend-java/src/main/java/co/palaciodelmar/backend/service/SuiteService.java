@@ -143,7 +143,7 @@ public class SuiteService {
                     String alias = AvailabilityService.SLUG_ALIASES.get(lower);
                     return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
                 })
-                .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada con identificador: " + idOrSlug));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Suite no encontrada con identificador: " + idOrSlug));
         if (suite.getPropertyId() != null) {
             Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);
             if (p == null || Boolean.FALSE.equals(p.getActive()) || !"APPROVED".equalsIgnoreCase(p.getStatus())) {
@@ -217,7 +217,7 @@ public class SuiteService {
                     String alias = AvailabilityService.SLUG_ALIASES.get(lowerSuiteId);
                     return alias != null ? suiteRepository.findById(alias).or(() -> suiteRepository.findBySlug(alias)) : Optional.empty();
                 })
-                .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada: " + request.getSuiteId()));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Suite no encontrada: " + request.getSuiteId()));
 
         if (suite.getPropertyId() != null) {
             Property p = propertyRepository.findById(suite.getPropertyId()).orElse(null);

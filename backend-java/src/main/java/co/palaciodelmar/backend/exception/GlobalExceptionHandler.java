@@ -90,6 +90,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Método HTTP " + ex.getMethod() + " no soportado para este endpoint"));
     }
 
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMediaTypeNotSupported(org.springframework.web.HttpMediaTypeNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(ApiResponse.error("Tipo de contenido no soportado: usa application/json"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneralException(Exception ex) {
         log.error("Error no controlado en el servidor: {}", ex.getMessage(), ex);

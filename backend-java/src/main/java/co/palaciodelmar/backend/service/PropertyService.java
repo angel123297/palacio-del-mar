@@ -52,6 +52,9 @@ public class PropertyService {
     @Autowired(required = false)
     private co.palaciodelmar.backend.repository.SuiteNightRepository suiteNightRepository;
 
+    @Autowired(required = false)
+    private co.palaciodelmar.backend.repository.BookingRepository bookingRepository;
+
     public void setEmailService(EmailService emailService) {
         this.emailService = emailService;
     }
@@ -255,7 +258,7 @@ public class PropertyService {
         }
         return list.stream()
                 .filter(p -> Boolean.TRUE.equals(p.getActive()))
-                .map(this::toDTO)
+                .map(this::toPublicDTO)
                 .toList();
     }
 
@@ -265,7 +268,21 @@ public class PropertyService {
         if (!"APPROVED".equalsIgnoreCase(property.getStatus()) || !Boolean.TRUE.equals(property.getActive())) {
             throw new ResourceNotFoundException("Alojamiento no disponible");
         }
-        return toDTO(property);
+        return toPublicDTO(property);
+    }
+
+    /**
+     * DTO para endpoints públicos (sin token): oculta datos internos/sensibles
+     * (comisión, propietario, motivo de rechazo y teléfono del anfitrión).
+     */
+    public PropertyDTO toPublicDTO(Property p) {
+        PropertyDTO dto = toDTO(p);
+        if (dto == null) return null;
+        dto.setOwnerId(null);
+        dto.setCommissionRate(null);
+        dto.setRejectionReason(null);
+        dto.setPhone(null);
+        return dto;
     }
 
     // --- Gestión de Habitaciones/Suites de la Propiedad (Anti-IDOR) ---
@@ -549,15 +566,48 @@ public class PropertyService {
         }
 
         List<SuiteNight> occupied = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), startDate, endDate.minusDays(1));
+        // Reservas ya terminadas (checked_out/no_show/...) no deben impedir el bloqueo por mantenimiento
+        java.util.Set<String> finishedBookingIds = new java.util.HashSet<>();
+        if (bookingRepository != null) {
+            List<String> candidateIds = occupied.stream()
+                    .map(SuiteNight::getBooking)
+                    .filter(b -> b != null && !b.startsWith("MAINT_") && !b.startsWith("EXT_BLOCK_"))
+                    .distinct()
+                    .toList();
+            if (!candidateIds.isEmpty()) {
+                for (co.palaciodelmar.backend.model.Booking bk : bookingRepository.findAllById(candidateIds)) {
+                    String st = bk.getStatus() != null ? bk.getStatus().toLowerCase() : "";
+                    if (st.equals("checked_out") || st.equals("completed") || st.equals("no_show")
+                            || st.equals("cancelled") || st.equals("expired")) {
+                        finishedBookingIds.add(bk.getId());
+                    }
+                }
+            }
+        }
         boolean hasActiveGuestBooking = occupied.stream().anyMatch(sn ->
                 sn.getBooking() != null
                 && !sn.getBooking().startsWith("MAINT_")
                 && !sn.getBooking().startsWith("EXT_BLOCK_")
+                && !finishedBookingIds.contains(sn.getBooking())
                 && !"cancelled".equalsIgnoreCase(sn.getStatus())
                 && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(Instant.now()))
         );
         if (hasActiveGuestBooking) {
             throw new IllegalStateException("No es posible bloquear por mantenimiento: existen reservas activas en las fechas seleccionadas");
+        }
+
+        // Libera noches futuras de reservas ya terminadas (el huésped ya se fue) para que no choquen con el
+        // índice único (suite, slot, fecha) al insertar el bloqueo; las noches pasadas se conservan como histórico.
+        if (!finishedBookingIds.isEmpty()) {
+            List<SuiteNight> releasable = occupied.stream()
+                    .filter(sn -> sn.getBooking() != null && finishedBookingIds.contains(sn.getBooking()))
+                    .filter(sn -> sn.getDates() != null && !sn.getDates().isEmpty()
+                            && sn.getDates().stream().allMatch(dt -> !dt.isBefore(today)))
+                    .toList();
+            if (!releasable.isEmpty()) {
+                suiteNightRepository.deleteAll(releasable);
+                occupied = occupied.stream().filter(sn -> !releasable.contains(sn)).toList();
+            }
         }
 
         int totalUnits = suite.getTotalUnits() != null && suite.getTotalUnits() > 0 ? suite.getTotalUnits() : 1;

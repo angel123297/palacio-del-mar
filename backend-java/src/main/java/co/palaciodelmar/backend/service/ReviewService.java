@@ -147,7 +147,12 @@ public class ReviewService {
 
             if (reviewRepository.existsByBookingId(bookingId)) {
                 Review existing = reviewRepository.findByBookingId(bookingId).orElse(null);
-                if (existing != null && existing.getMaintenanceAlert() != null && !existing.getMaintenanceAlert().isBlank()
+                // Solo se trata como reintento idempotente si el contenido reenviado es idéntico; si cambia
+                // rating/comentario NO se devuelve la reseña vieja como si hubiera sido aceptada la nueva.
+                boolean sameContent = existing != null
+                        && java.util.Objects.equals(existing.getRating(), rating)
+                        && java.util.Objects.equals(existing.getComment(), comment);
+                if (existing != null && sameContent && existing.getMaintenanceAlert() != null && !existing.getMaintenanceAlert().isBlank()
                         && !Boolean.TRUE.equals(existing.getMaintenanceWebhookDispatched())) {
                     boolean recovered = tryDispatchMaintenanceWebhook(booking, existing, bookingId);
                     if (recovered) {

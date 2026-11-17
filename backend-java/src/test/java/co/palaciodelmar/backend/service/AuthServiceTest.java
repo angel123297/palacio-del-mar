@@ -412,13 +412,32 @@ class AuthServiceTest {
     }
 
     @Test
-    void resendVerificationThrowsIllegalStateExceptionIfUserAlreadyVerified() {
+    void resendVerificationIsSilentIfUserAlreadyVerified() {
         testUser.setEmailVerified(true);
         when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> authService.resendVerification("juan.perez@example.com"));
-        assertTrue(ex.getMessage().contains("ya se encuentra verificada"));
+        // Anti-enumeración: misma respuesta (sin error ni correo) que para un email inexistente
+        assertDoesNotThrow(() -> authService.resendVerification("juan.perez@example.com"));
         verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
+    }
+
+    @Test
+    void resendVerificationIsSilentIfUserSuspended() {
+        testUser.setEmailVerified(false);
+        testUser.setStatus("suspended");
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+
+        assertDoesNotThrow(() -> authService.resendVerification("juan.perez@example.com"));
+        verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
+    }
+
+    @Test
+    void forgotPasswordIgnoresSuspendedAccount() {
+        testUser.setStatus("suspended");
+        when(userRepository.findByEmail("juan.perez@example.com")).thenReturn(Optional.of(testUser));
+
+        assertDoesNotThrow(() -> authService.forgotPassword("juan.perez@example.com"));
+        verify(emailService, never()).sendPasswordResetEmail(anyString(), anyString());
     }
 
     @Test
@@ -476,16 +495,17 @@ class AuthServiceTest {
     }
 
     @Test
-    void resendVerificationBlocksSuspendedOrAdminUser() {
+    void resendVerificationSilentlyIgnoresSuspendedOrAdminUser() {
         testUser.setEmailVerified(false);
         testUser.setRole("admin");
         when(userRepository.findByEmail("admin@example.com")).thenReturn(Optional.of(testUser));
-        assertThrows(IllegalArgumentException.class, () -> authService.resendVerification("admin@example.com"));
+        assertDoesNotThrow(() -> authService.resendVerification("admin@example.com"));
 
         testUser.setRole("user");
         testUser.setStatus("suspended");
         when(userRepository.findByEmail("suspended@example.com")).thenReturn(Optional.of(testUser));
-        assertThrows(IllegalArgumentException.class, () -> authService.resendVerification("suspended@example.com"));
+        assertDoesNotThrow(() -> authService.resendVerification("suspended@example.com"));
+        verify(emailService, never()).sendVerificationEmail(anyString(), anyString());
     }
 
     @Test

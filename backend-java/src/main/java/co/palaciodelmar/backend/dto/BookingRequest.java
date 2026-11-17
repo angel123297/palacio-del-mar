@@ -2,6 +2,7 @@ package co.palaciodelmar.backend.dto;
 
 import co.palaciodelmar.backend.model.Booking;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -29,9 +30,11 @@ public class BookingRequest {
     private LocalDate newCheckOut;
 
     @Min(value = 1, message = "Debe haber al menos 1 huésped")
+    @Max(value = 50, message = "El número de huéspedes no puede superar 50")
     private Integer guests;
 
     @Min(value = 0, message = "El número de niños no puede ser negativo")
+    @Max(value = 50, message = "El número de niños no puede superar 50")
     private Integer children;
     private Boolean needsCrib;
 

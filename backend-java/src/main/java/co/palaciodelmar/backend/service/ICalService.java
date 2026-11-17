@@ -250,7 +250,8 @@ public class ICalService {
 
     private boolean isMaintenanceOrExternalBlock(SuiteNight sn) {
         if (sn == null) return false;
-        if (sn.getBooking() != null && !sn.getBooking().isBlank() && !sn.getBooking().startsWith("EXT_BLOCK_")) {
+        if (sn.getBooking() != null && !sn.getBooking().isBlank()
+                && !sn.getBooking().startsWith("EXT_BLOCK_") && !sn.getBooking().startsWith("MAINT_")) {
             return false; // Ya está representada por una reserva nativa
         }
         if (sn.getExpiresAt() != null && sn.getExpiresAt().isBefore(Instant.now())) {

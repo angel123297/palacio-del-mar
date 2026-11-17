@@ -122,7 +122,7 @@ public class PaymentService {
         }
 
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada: " + bookingId));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Reserva no encontrada: " + bookingId));
 
         if (booking.getUser() != null) {
             if (userId != null && !booking.getUser().equals(userId)) {
@@ -143,6 +143,11 @@ public class PaymentService {
         if (booking.getBalanceDue() != null && booking.getBalanceDue().compareTo(BigDecimal.ZERO) <= 0
                 && "paid".equalsIgnoreCase(booking.getPaymentStatus())) {
             throw new IllegalStateException("La reserva ya ha sido pagada en su totalidad.");
+        }
+        // No crear intents huérfanos: si el hold de la reserva pendiente ya venció, el confirm igual fallaría.
+        if ("pending".equalsIgnoreCase(booking.getStatus()) && booking.getExpiresAt() != null
+                && booking.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalStateException("El tiempo para pagar esta reserva ha expirado");
         }
 
         PaymentGateway.PaymentIntentResponse intentResponse = paymentGateway.createIntent(booking, method, idempotencyKey);
@@ -184,7 +189,7 @@ public class PaymentService {
 
     private Map<String, Object> doConfirmPayment(String userId, String intentId, String paymentToken) {
         Payment payment = paymentRepository.findByIntentId(intentId)
-                .orElseThrow(() -> new IllegalArgumentException("Intención de pago no encontrada"));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Intención de pago no encontrada"));
 
         if (redisLockService != null && payment.getBooking() != null && !payment.getBooking().isBlank()) {
             return redisLockService.executeWithLock(
@@ -199,7 +204,7 @@ public class PaymentService {
 
     private Map<String, Object> doConfirmPaymentUnderLocks(String userId, String intentId, String paymentToken, Payment payment) {
         Booking booking = bookingRepository.findById(payment.getBooking())
-                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Reserva no encontrada"));
 
         if (booking.getUser() != null) {
             if (userId != null && !booking.getUser().equals(userId)) {
@@ -534,10 +539,10 @@ public class PaymentService {
 
     public java.util.Map<String, Object> getPaymentStatus(String intentId, String userId) {
         Payment payment = paymentRepository.findByIntentId(intentId)
-                .orElseThrow(() -> new IllegalArgumentException("Intención de pago no encontrada: " + intentId));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Intención de pago no encontrada: " + intentId));
 
         Booking booking = bookingRepository.findById(payment.getBooking())
-                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada"));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Reserva no encontrada"));
 
         if (booking.getUser() != null) {
             if (userId != null && !booking.getUser().equals(userId)) {
