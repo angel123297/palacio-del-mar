@@ -159,9 +159,15 @@
                 <span>Check-out:</span>
                 <span style="color: #fff;">12:00</span>
               </div>
-              <div class="flex-between">
-                <span>Cancelación:</span>
-                <span style="color: #fff;">Gratis hasta 48h antes</span>
+              <div class="flex-between" style="align-items: flex-start; gap: 0.75rem;">
+                <span style="white-space: nowrap;">Cancelación:</span>
+                <div style="text-align: right;">
+                  <span style="color: #2ecc71; font-weight: 600;">Gratis hasta 7 días antes</span>
+                  <div style="font-size: 0.72rem; color: #999; margin-top: 3px; line-height: 1.35; max-width: 250px;">
+                    Retención del 10% entre 48h y 7 días.<br>
+                    Menos de 48h retiene 100% de la estadía (depósito de garantía 100% reembolsable).
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -418,6 +424,15 @@
             <span style="color: var(--gold); font-size: 1.5rem;">{{ currency.formatPrice(grandTotal) }}</span>
           </div>
           <p style="color: #888; font-size: 0.8rem; margin: 0.75rem 0 0 0; text-align: center;">El depósito de garantía se reintegra automáticamente al finalizar tu estadía tras la inspección.</p>
+          
+          <div style="margin-top: 1.25rem; padding: 0.85rem 1rem; background: rgba(201,169,110,0.08); border: 1px solid rgba(201,169,110,0.25); border-radius: 6px; font-size: 0.8rem; color: #ccc; line-height: 1.45; text-align: left;">
+            <strong style="color: var(--gold); display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+              <span>🛡️</span> Política de Cancelación y Reembolso
+            </strong>
+            <span style="display: block;">• <strong>Más de 7 días antes del check-in:</strong> Reembolso del 100% sin penalidad.</span>
+            <span style="display: block;">• <strong>Entre 48h y 7 días antes:</strong> Reembolso del 90% (retención del 10% del alojamiento).</span>
+            <span style="display: block;">• <strong>Menos de 48h o no-show:</strong> Retiene 100% del alojamiento (el depósito de garantía siempre se reintegra al 100%).</span>
+          </div>
         </div>
 
         <!-- Auth Check & Redirect -->

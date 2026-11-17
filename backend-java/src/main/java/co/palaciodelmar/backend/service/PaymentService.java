@@ -61,7 +61,7 @@ public class PaymentService {
                         Map.of("id", "pse", "label", "PSE (débito desde tu banco)"),
                         Map.of("id", "nequi", "label", "Nequi")
                 ),
-                "cancellationPolicy", "Cancelación gratuita hasta 7 días antes del check-in (devolución del 100%). Entre 7 días y 48 horas antes aplica retención del 10%; con menos de 48 horas antes del check-in la retención es del 100%."
+                "cancellationPolicy", "Cancelación gratuita hasta 7 días antes del check-in (devolución del 100%). Entre 7 días y 48 horas antes aplica retención del 10% sobre el alojamiento; con menos de 48 horas antes del check-in la retención es del 100% de la estadía (el depósito de garantía siempre se reintegra al 100%)."
         );
     }
 
