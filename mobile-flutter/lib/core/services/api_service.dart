@@ -130,7 +130,7 @@ class ApiService {
     try {
       final response = await AuthenticatedHttpClient.post('/auth/reset-password', {
         'token': token.trim(),
-        'password': newPassword,
+        'newPassword': newPassword,
       });
       Map<String, dynamic> responseData = {};
       try {
@@ -307,6 +307,7 @@ class ApiService {
         'guestDetails': {
           'firstName': firstName,
           'lastName': lastName,
+          'fullName': guestName.trim(),
           'email': guestEmail.trim().toLowerCase(),
           'phone': guestPhone.trim(),
         },

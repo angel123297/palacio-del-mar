@@ -375,7 +375,7 @@ public class PropertyService {
             int newUnits = Math.max(1, req.getTotalUnits());
             if (suite.getTotalUnits() != null && newUnits < suite.getTotalUnits() && suiteNightRepository != null && suite.getId() != null) {
                 java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));
-                List<co.palaciodelmar.backend.model.SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(2));
+                List<co.palaciodelmar.backend.model.SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(10));
                 boolean hasActiveInHigherSlots = futureNights.stream()
                         .anyMatch(sn -> sn.getUnitSlot() != null && sn.getUnitSlot() > newUnits
                                 && !"cancelled".equalsIgnoreCase(sn.getStatus())
@@ -386,7 +386,19 @@ public class PropertyService {
             }
             suite.setTotalUnits(newUnits);
         }
-        if (req.getActive() != null) suite.setActive(req.getActive());
+        if (req.getActive() != null) {
+            if (Boolean.FALSE.equals(req.getActive()) && Boolean.TRUE.equals(suite.getActive()) && suiteNightRepository != null && suite.getId() != null) {
+                java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));
+                List<co.palaciodelmar.backend.model.SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(10));
+                boolean hasFutureBookings = futureNights.stream()
+                        .anyMatch(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus())
+                                && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(Instant.now())));
+                if (hasFutureBookings) {
+                    throw new IllegalStateException("No se puede desactivar la habitación porque existen reservas activas o futuras");
+                }
+            }
+            suite.setActive(req.getActive());
+        }
         suite.setUpdatedAt(Instant.now());
 
         Suite saved = suiteRepository.save(suite);
@@ -413,7 +425,7 @@ public class PropertyService {
 
         if (suiteNightRepository != null && suite.getId() != null) {
             java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));
-            List<co.palaciodelmar.backend.model.SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(2));
+            List<co.palaciodelmar.backend.model.SuiteNight> futureNights = suiteNightRepository.findBySuiteAndDatesBetween(suite.getId(), today, today.plusYears(10));
             boolean hasFutureBookings = futureNights.stream()
                     .anyMatch(sn -> !"cancelled".equalsIgnoreCase(sn.getStatus())
                             && (sn.getExpiresAt() == null || sn.getExpiresAt().isAfter(Instant.now())));

@@ -369,7 +369,9 @@ public class BookingService {
             List<Booking.FoodOrder> sanitizedFoodOrders = new ArrayList<>();
             if (request.getFoodOrders() != null) {
                 for (Booking.FoodOrder fo : request.getFoodOrders()) {
-                    BigDecimal foodPrice = new BigDecimal("80000");
+                    BigDecimal foodPrice = (fo.getPrice() != null && fo.getPrice().compareTo(BigDecimal.ZERO) > 0)
+                            ? fo.getPrice()
+                            : new BigDecimal("80000");
                     vipExtrasTotal = vipExtrasTotal.add(foodPrice);
                     if (Boolean.TRUE.equals(fo.getIncludesBreakfastCombo())) {
                         vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("35000"));
@@ -475,9 +477,15 @@ public class BookingService {
                     break;
                 } catch (org.springframework.dao.DuplicateKeyException e) {
                     suiteNightRepository.deleteAll(insertedNights);
+                } catch (Exception e) {
+                    suiteNightRepository.deleteAll(insertedNights);
+                    suiteNightRepository.deleteByBooking(persistedBooking.getId());
+                    bookingRepository.delete(persistedBooking);
+                    throw e;
                 }
             }
             if (!nightsLocked) {
+                suiteNightRepository.deleteByBooking(persistedBooking.getId());
                 bookingRepository.delete(persistedBooking);
                 throw new IllegalStateException("Hubo una colisión concurrente. Las fechas ya no están disponibles.");
             }

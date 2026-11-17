@@ -384,13 +384,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
             final statusData = statusJson['data'] ?? statusJson;
             final paymentStatus = statusData['status'];
             final bookingPaymentStatus = statusData['paymentStatus'];
-            final bookingStatus = statusData['bookingStatus'];
             final notes = statusData['notes']?.toString() ?? '';
 
             if (paymentStatus == 'completed' ||
                 paymentStatus == 'succeeded' ||
-                bookingPaymentStatus == 'paid' ||
-                bookingStatus == 'confirmed') {
+                bookingPaymentStatus == 'paid') {
               paymentResolved = true;
 
               // Redirigir exitosamente a Voucher

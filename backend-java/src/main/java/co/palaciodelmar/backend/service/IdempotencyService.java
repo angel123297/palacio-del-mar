@@ -227,14 +227,16 @@ public class IdempotencyService {
     }
 
     private void saveCompleted(String fullKey, String completedJson, String ownerToken) {
+        boolean redisSuccess = false;
         if (redisTemplate != null) {
             try {
                 Long updated = redisTemplate.execute(CONDITIONAL_SET_COMPLETED_SCRIPT,
                         java.util.List.of(fullKey), ownerToken, completedJson,
                         Long.toString(COMPLETED_TTL.toMillis()));
-                if (!Long.valueOf(1).equals(updated)) {
-                    log.warn("La clave de idempotencia {} perdió su propietario; no se sobrescribió", fullKey);
-                    return;
+                if (Long.valueOf(1).equals(updated)) {
+                    redisSuccess = true;
+                } else {
+                    log.warn("La clave de idempotencia {} no tenía propietario en Redis o expiró", fullKey);
                 }
             } catch (Exception e) {
                 log.warn("No se pudo persistir resultado idempotente en Redis ({}): {}", fullKey, e.getMessage());
@@ -247,6 +249,14 @@ public class IdempotencyService {
             }
             return current;
         });
+        if (!redisSuccess && redisTemplate != null) {
+            try {
+                LocalEntry current = localStore.get(fullKey);
+                if (current != null && current.serializedRecord().equals(completedJson)) {
+                    redisTemplate.opsForValue().set(fullKey, completedJson, COMPLETED_TTL);
+                }
+            } catch (Exception ignored) {}
+        }
         if (localStore.size() > MAX_LOCAL_ENTRIES) {
             enforceLocalCapacity(now, fullKey);
         }

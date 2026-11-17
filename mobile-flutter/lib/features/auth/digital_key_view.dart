@@ -58,6 +58,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
     _bookingStreamSub = BookingStreamClient().bookingUpdates.listen((updated) {
       if (!mounted) return;
       final bookingId = updated['id'] ?? updated['_id'];
+      if (bookingId == null || bookingId.toString().isEmpty) return;
       setState(() {
         final idx = _userBookings.indexWhere((b) => (b is Map && (b['id'] == bookingId || b['_id'] == bookingId)));
         if (idx >= 0) {
@@ -145,6 +146,7 @@ class _DigitalKeyViewState extends State<DigitalKeyView> {
       if (!mounted) return;
 
       if (res['success'] == true) {
+        _initBookingStream();
         _loadBookings();
       } else {
         final errorMsg = (res['message'] ?? '').toString();
