@@ -108,6 +108,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 clientIp = resolveClientIp(request);
                 // Receptor demo de webhooks: máx. 30 entregas por minuto por IP
                 result = rateLimitService.checkLimit("demo-webhook-receiver", clientIp, 30, 60);
+            } else if (path.endsWith("/messages") && path.contains("/api/bookings/")) {
+                clientIp = resolveClientIp(request);
+                // Mensajería directa Huésped ↔ Host: máx. 15 mensajes por minuto por IP (anti-flooding)
+                result = rateLimitService.checkLimit("booking-messages", clientIp, 15, 60);
             }
         } else if ("GET".equalsIgnoreCase(method)) {
             if (path.endsWith("/social-proof") && path.contains("/api/suites/")) {

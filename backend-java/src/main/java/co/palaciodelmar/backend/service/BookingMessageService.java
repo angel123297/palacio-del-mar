@@ -46,6 +46,10 @@ public class BookingMessageService {
     }
 
     public List<BookingMessageDTO> getMessages(String bookingId, String userId, boolean isAdmin) {
+        return getMessages(bookingId, userId, isAdmin, 1, 50);
+    }
+
+    public List<BookingMessageDTO> getMessages(String bookingId, String userId, boolean isAdmin, int page, int limit) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada"));
 
@@ -56,7 +60,11 @@ public class BookingMessageService {
             throw new AccessDeniedException("No tienes autorización para consultar los mensajes de esta reserva");
         }
 
-        List<BookingMessage> messages = bookingMessageRepository.findByBookingIdOrderByCreatedAtAsc(bookingId);
+        int cleanPage = Math.max(1, page);
+        int cleanLimit = Math.min(100, Math.max(1, limit));
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(cleanPage - 1, cleanLimit);
+        org.springframework.data.domain.Page<BookingMessage> pageResult = bookingMessageRepository.findByBookingIdOrderByCreatedAtAsc(bookingId, pageable);
+        List<BookingMessage> messages = pageResult.getContent();
         List<BookingMessage> toUpdateRead = new ArrayList<>();
         Instant now = Instant.now();
 

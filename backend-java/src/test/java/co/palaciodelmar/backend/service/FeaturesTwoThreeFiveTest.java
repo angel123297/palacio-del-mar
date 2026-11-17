@@ -305,8 +305,8 @@ class FeaturesTwoThreeFiveTest {
                 .build();
 
         when(bookingRepository.findById("book-1")).thenReturn(Optional.of(booking));
-        when(bookingMessageRepository.findByBookingIdOrderByCreatedAtAsc("book-1"))
-                .thenReturn(List.of(incomingMsg));
+        when(bookingMessageRepository.findByBookingIdOrderByCreatedAtAsc(eq("book-1"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(incomingMsg)));
 
         List<BookingMessageDTO> result = bookingMessageService.getMessages("book-1", "guest-user-1", false);
 
@@ -314,5 +314,61 @@ class FeaturesTwoThreeFiveTest {
         assertEquals(1, result.size());
         assertNotNull(incomingMsg.getReadAt());
         verify(bookingMessageRepository).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("Bug 1: Bloqueo de mantenimiento no colisiona con bloqueos iCal existentes (EXT_BLOCK_*)")
+    void testMaintenanceBlockSkipsExistingIcalBlocksWithoutDuplicateViolation() {
+        Property property = Property.builder()
+                .id("prop-1")
+                .ownerId("host-1")
+                .status("APPROVED")
+                .build();
+        Suite suite = Suite.builder()
+                .id("suite-1")
+                .propertyId("prop-1")
+                .totalUnits(1)
+                .build();
+
+        LocalDate start = LocalDate.now().plusDays(2);
+        LocalDate end = start.plusDays(3);
+
+        SuiteNight externalBlock = SuiteNight.builder()
+                .suite("suite-1")
+                .unitSlot(1)
+                .dates(List.of(start))
+                .booking("EXT_BLOCK_ab12cd34")
+                .status("blocked")
+                .build();
+
+        when(propertyRepository.findById("prop-1")).thenReturn(Optional.of(property));
+        when(suiteRepository.findById("suite-1")).thenReturn(Optional.of(suite));
+        when(suiteNightRepository.findBySuiteAndDatesBetween(eq("suite-1"), any(), any()))
+                .thenReturn(List.of(externalBlock));
+
+        when(suiteNightRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Map<String, Object> result = propertyService.blockSuiteNightsForMaintenance(
+                "prop-1", "suite-1", "host-1", start, end, "Pintura y acabados", false
+        );
+
+        assertNotNull(result);
+        assertEquals("Noches bloqueadas por mantenimiento exitosamente", result.get("message"));
+        // El día que ya tenía EXT_BLOCK no fue reinsertado (se bloquearon los 2 días restantes de 3)
+        assertEquals(2, result.get("blockedNights"));
+        verify(availabilityCacheEvictor).evictAll();
+    }
+
+    @Test
+    @DisplayName("Bug 3: GlobalExceptionHandler retorna 405 Method Not Allowed ante HttpRequestMethodNotSupportedException")
+    void testMethodNotSupportedExceptionReturns405() {
+        co.palaciodelmar.backend.exception.GlobalExceptionHandler handler = new co.palaciodelmar.backend.exception.GlobalExceptionHandler();
+        org.springframework.web.HttpRequestMethodNotSupportedException ex =
+                new org.springframework.web.HttpRequestMethodNotSupportedException("POST");
+
+        var response = handler.handleMethodNotSupported(ex);
+        assertEquals(org.springframework.http.HttpStatus.METHOD_NOT_ALLOWED, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().getMessage().contains("POST"));
     }
 }

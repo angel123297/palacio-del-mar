@@ -569,12 +569,14 @@ public class PropertyService {
             int currentSlot = slot;
             for (int d = 0; d < days; d++) {
                 LocalDate date = startDate.plusDays(d);
-                boolean alreadyMaintenance = occupied.stream().anyMatch(sn ->
+                boolean alreadyBlockedOrMaintenance = occupied.stream().anyMatch(sn ->
                         sn.getUnitSlot() != null && sn.getUnitSlot() == currentSlot &&
                         sn.getDates() != null && sn.getDates().contains(date) &&
-                        "maintenance".equalsIgnoreCase(sn.getStatus())
+                        ("maintenance".equalsIgnoreCase(sn.getStatus())
+                         || "blocked".equalsIgnoreCase(sn.getStatus())
+                         || (sn.getBooking() != null && (sn.getBooking().startsWith("MAINT_") || sn.getBooking().startsWith("EXT_BLOCK_"))))
                 );
-                if (!alreadyMaintenance) {
+                if (!alreadyBlockedOrMaintenance) {
                     toSave.add(SuiteNight.builder()
                             .suite(suite.getId())
                             .branch(suite.getBranch())
@@ -588,8 +590,27 @@ public class PropertyService {
             }
         }
 
-        if (!toSave.isEmpty()) {
-            suiteNightRepository.saveAll(toSave);
+        try {
+            if (!toSave.isEmpty()) {
+                suiteNightRepository.saveAll(toSave);
+            }
+        } catch (Exception e) {
+            try {
+                suiteNightRepository.deleteByBooking(blockRef);
+            } catch (Exception ex) {
+                log.warn("Error al revertir noches de mantenimiento {}: {}", blockRef, ex.getMessage());
+            }
+            if (availabilityCacheEvictor != null) {
+                availabilityCacheEvictor.evictAll();
+            }
+            if (e instanceof org.springframework.dao.DataIntegrityViolationException
+                    || (e.getMessage() != null && e.getMessage().contains("duplicate"))) {
+                throw new IllegalStateException("Colisión de concurrencia al bloquear fechas para mantenimiento. Intente nuevamente.");
+            }
+            if (e instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException("Error persistiendo bloqueo por mantenimiento: " + e.getMessage(), e);
         }
         if (availabilityCacheEvictor != null) {
             availabilityCacheEvictor.evictAll();

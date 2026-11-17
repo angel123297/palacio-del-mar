@@ -22,6 +22,7 @@ import java.util.List;
 public class BookingMessageController {
 
     private final BookingMessageService bookingMessageService;
+    private final co.palaciodelmar.backend.security.RateLimitService rateLimitService;
 
     private String requireUserId(UserPrincipal principal) {
         if (principal == null || principal.getUser() == null || principal.getUser().getId() == null) {
@@ -48,10 +49,12 @@ public class BookingMessageController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<BookingMessageDTO>>> getMessages(
             @PathVariable String bookingId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "50") int limit,
             @AuthenticationPrincipal UserPrincipal principal) {
         String userId = requireUserId(principal);
         boolean isAdmin = resolveIsAdmin(principal);
-        List<BookingMessageDTO> messages = bookingMessageService.getMessages(bookingId, userId, isAdmin);
+        List<BookingMessageDTO> messages = bookingMessageService.getMessages(bookingId, userId, isAdmin, page, limit);
         return ResponseEntity.ok(ApiResponse.ok(messages));
     }
 
@@ -64,6 +67,17 @@ public class BookingMessageController {
         String userId = requireUserId(principal);
         String userName = resolveUserName(principal);
         boolean isAdmin = resolveIsAdmin(principal);
+
+        if (rateLimitService != null) {
+            co.palaciodelmar.backend.security.RateLimitService.RateLimitResult rl =
+                    rateLimitService.checkLimit("booking-msg-user", userId, 15, 60);
+            if (!rl.isAllowed()) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .header("Retry-After", String.valueOf(rl.getRetryAfterSeconds()))
+                        .body(ApiResponse.error(String.format("Has alcanzado el límite de mensajes por minuto. Espera %d segundos antes de reintentar.", rl.getRetryAfterSeconds())));
+            }
+        }
+
         BookingMessageDTO message = bookingMessageService.sendMessage(bookingId, userId, userName, request.getMessage(), isAdmin);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Mensaje enviado exitosamente", message));
     }

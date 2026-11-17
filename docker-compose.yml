@@ -126,12 +126,14 @@ services:
     image: ngrok/ngrok:alpine
     container_name: palacio-ngrok-tunnel
     restart: unless-stopped
+    profiles:
+      - tunnel
     command:
       - "http"
       - "palacio-web-angular:80"
-      - "--url=unbroke-unsized-zandra.ngrok-free.dev"
+      - "--url=${NGROK_DOMAIN:-rehab-perceive-landline.ngrok-free.dev}"
     environment:
-      NGROK_AUTHTOKEN: "${NGROK_AUTHTOKEN:-3BK2wOZ5QxhfPMSPfRqDyCt5gx1_5ShVgm7a8XZXY9SaeU9Bz}"
+      NGROK_AUTHTOKEN: "${NGROK_AUTHTOKEN:-}"
     depends_on:
       - web-angular
 
