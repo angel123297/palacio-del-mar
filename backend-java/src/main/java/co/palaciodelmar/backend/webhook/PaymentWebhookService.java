@@ -222,8 +222,8 @@ public class PaymentWebhookService {
     private void doHandlePaymentSucceeded(PaymentWebhookPayload.PaymentWebhookData data, String eventId) {
         Payment payment = paymentRepository.findByIntentId(data.getIntentId()).orElse(null);
         if (payment == null) {
-            log.warn("No se encontró Payment para intentId: {}", data.getIntentId());
-            return;
+            log.warn("No se encontró Payment para intentId: {} (reintentar)", data.getIntentId());
+            throw new IllegalStateException("Payment no encontrado aún para intentId: " + data.getIntentId() + ", reintentando...");
         }
 
         if ("completed".equalsIgnoreCase(payment.getStatus())) {
@@ -429,9 +429,13 @@ public class PaymentWebhookService {
             payment.setNotes("Pago confirmado exitosamente via webhook (" + eventId + ")");
             paymentRepository.save(payment);
 
-            if (confirmedNow) {
+            boolean shouldSendConfirmation = confirmedNow
+                    || ("confirmed".equalsIgnoreCase(booking.getStatus()) && !Boolean.TRUE.equals(booking.getConfirmationEmailSent()));
+            if (shouldSendConfirmation) {
                 try {
                     emailService.sendBookingConfirmation(booking);
+                    booking.setConfirmationEmailSent(true);
+                    bookingRepository.save(booking);
                 } catch (Exception e) {
                     log.warn("Error enviando email de confirmación: {}", e.getMessage());
                 }

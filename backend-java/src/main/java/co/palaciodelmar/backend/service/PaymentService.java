@@ -238,6 +238,10 @@ public class PaymentService {
             return replayMap;
         }
 
+        if ("failed".equalsIgnoreCase(currentPayStatus)) {
+            throw new IllegalStateException("Este intento de pago ya fue rechazado o falló previamente. Inicie un nuevo intento de pago.");
+        }
+
         boolean alreadyCreditedToBooking = payment.getId() != null
                 && booking.getProcessedPaymentIds() != null
                 && booking.getProcessedPaymentIds().contains(payment.getId());

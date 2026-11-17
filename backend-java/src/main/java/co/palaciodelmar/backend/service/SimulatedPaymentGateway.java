@@ -291,7 +291,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
                         && !Boolean.TRUE.equals(intent.getWebhookDelivered())) {
                     boolean isFailure = "failed".equalsIgnoreCase(intent.getStatus());
                     String eventType = isFailure ? "payment.failed" : "payment.succeeded";
-                    String eventId = "evt_pi_" + intentId + (isFailure ? "_fail" : "");
+                    String eventId = (intentId != null && intentId.startsWith("pi_") ? "evt_" : "evt_pi_") + intentId + (isFailure ? "_fail" : "");
                     PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
                             .eventId(eventId)
                             .eventType(eventType)
@@ -397,7 +397,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
             }
 
             // Generar y emitir el webhook
-            String eventId = "evt_pi_" + intentId + (isFailure ? "_fail" : "");
+            String eventId = (intentId != null && intentId.startsWith("pi_") ? "evt_" : "evt_pi_") + intentId + (isFailure ? "_fail" : "");
             PaymentWebhookPayload payload = PaymentWebhookPayload.builder()
                     .eventId(eventId)
                     .eventType(eventType)

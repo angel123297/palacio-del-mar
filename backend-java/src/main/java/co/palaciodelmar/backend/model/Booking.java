@@ -113,6 +113,9 @@ public class Booking {
     @Builder.Default
     private Boolean guaranteeRefunded = false;
 
+    @Builder.Default
+    private Boolean confirmationEmailSent = false;
+
     @Indexed(unique = true, sparse = true)
     private String bookingCode;
 

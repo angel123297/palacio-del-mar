@@ -341,7 +341,11 @@ public class ReviewService {
         if (lower.contains("ubicacion") || lower.contains("ubicación") || lower.contains("centro")) highlights.add("Ubicación privilegiada");
 
         String maintenanceAlert = null;
-        if (lower.contains("aire") && (lower.contains("ruido") || lower.contains("calor") || lower.contains("suena") || lower.contains("fallo"))) {
+        boolean acMentioned = lower.contains("aire") || lower.contains("a/c") || lower.contains("ac ");
+        boolean acIssue = lower.contains("ruido") || lower.contains("calor") || lower.contains("suena")
+                || lower.contains("fallo") || lower.contains("fuga") || lower.contains("gotea")
+                || lower.contains("goteo") || lower.contains("no enfria") || lower.contains("no enfría");
+        if (acMentioned && acIssue) {
             maintenanceAlert = "Revisión preventiva: Posible fallo o ruido en aire acondicionado";
         } else if ((lower.contains("ducha") || lower.contains("agua")) && (lower.contains("fria") || lower.contains("fría") || lower.contains("presion") || lower.contains("presión"))) {
             maintenanceAlert = "Revisión preventiva: Presión o temperatura de agua en ducha";

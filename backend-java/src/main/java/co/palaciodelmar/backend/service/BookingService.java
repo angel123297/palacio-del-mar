@@ -176,7 +176,38 @@ public class BookingService {
     }
 
 
+    private static final Map<String, BigDecimal> KNOWN_DISH_PRICES = Map.of(
+            "cazuela de mariscos", new BigDecimal("80000"),
+            "posta cartagenera", new BigDecimal("80000"),
+            "pescado frito", new BigDecimal("80000"),
+            "ceviche mixto", new BigDecimal("55000"),
+            "arroz con mariscos", new BigDecimal("75000"),
+            "postre tipico", new BigDecimal("34000"),
+            "torta de coco", new BigDecimal("34000")
+    );
+    private static final BigDecimal DEFAULT_FOOD_PRICE = new BigDecimal("80000");
+
+    public static BigDecimal resolveServerFoodPrice(String dishName, BigDecimal clientPrice) {
+        if (dishName != null) {
+            String norm = dishName.toLowerCase().trim()
+                    .replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u");
+            for (Map.Entry<String, BigDecimal> entry : KNOWN_DISH_PRICES.entrySet()) {
+                if (norm.contains(entry.getKey())) {
+                    return entry.getValue();
+                }
+            }
+        }
+        if (clientPrice != null && clientPrice.compareTo(new BigDecimal("20000")) >= 0) {
+            return clientPrice;
+        }
+        return DEFAULT_FOOD_PRICE;
+    }
+
     private BookingDTO createStandaloneExperienceBooking(String userId, BookingRequest request) {
+        int expGuests = request.getGuests() != null ? request.getGuests() : 1;
+        if (expGuests < 1 || expGuests > 50) {
+            throw new IllegalArgumentException("El número de participantes debe estar entre 1 y 50 personas");
+        }
         List<Booking.SelectedExperience> selectedExpList = parseExperiences(request.getExperiences());
         if (selectedExpList.isEmpty()) {
             throw new IllegalArgumentException("Debes seleccionar al menos una actividad o experiencia válida");
@@ -289,8 +320,16 @@ public class BookingService {
         }
 
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
-        if (request.getGuests() != null && (request.getGuests() < 1 || request.getGuests() > maxGuests)) {
-            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
+        int adults = request.getGuests() != null ? request.getGuests() : 1;
+        int children = request.getChildren() != null ? request.getChildren() : 0;
+        if (adults < 1) {
+            throw new IllegalArgumentException("Debe haber al menos 1 adulto en la reserva");
+        }
+        if (children < 0) {
+            throw new IllegalArgumentException("El número de niños no puede ser negativo");
+        }
+        if (adults + children > maxGuests) {
+            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes (ocupación solicitada: " + (adults + children) + ")");
         }
 
         if (request.getCheckIn() == null || request.getCheckOut() == null) {
@@ -369,9 +408,7 @@ public class BookingService {
             List<Booking.FoodOrder> sanitizedFoodOrders = new ArrayList<>();
             if (request.getFoodOrders() != null) {
                 for (Booking.FoodOrder fo : request.getFoodOrders()) {
-                    BigDecimal foodPrice = (fo.getPrice() != null && fo.getPrice().compareTo(BigDecimal.ZERO) > 0)
-                            ? fo.getPrice()
-                            : new BigDecimal("80000");
+                    BigDecimal foodPrice = resolveServerFoodPrice(fo.getDishName(), fo.getPrice());
                     vipExtrasTotal = vipExtrasTotal.add(foodPrice);
                     if (Boolean.TRUE.equals(fo.getIncludesBreakfastCombo())) {
                         vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("35000"));
@@ -545,8 +582,16 @@ public class BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Suite no encontrada"));
 
         int maxGuests = suite.getMaxGuests() != null ? suite.getMaxGuests() : 2;
-        if (request.getGuests() != null && (request.getGuests() < 1 || request.getGuests() > maxGuests)) {
-            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes");
+        int adults = request.getGuests() != null ? request.getGuests() : 1;
+        int children = request.getChildren() != null ? request.getChildren() : 0;
+        if (adults < 1) {
+            throw new IllegalArgumentException("Debe haber al menos 1 adulto en la reserva");
+        }
+        if (children < 0) {
+            throw new IllegalArgumentException("El número de niños no puede ser negativo");
+        }
+        if (adults + children > maxGuests) {
+            throw new IllegalArgumentException("Esta habitación admite máximo " + maxGuests + " huéspedes (ocupación solicitada: " + (adults + children) + ")");
         }
 
         if (request.getCheckIn() == null || request.getCheckOut() == null) {
@@ -975,10 +1020,31 @@ public class BookingService {
         }
         String resolvedBookingId = outerBooking.getId() != null ? outerBooking.getId() : bookingId;
 
+        if ("cancelled".equalsIgnoreCase(outerBooking.getStatus())) {
+            suiteNightRepository.deleteByBooking(resolvedBookingId);
+            if (redisLockService != null) {
+                redisLockService.releaseSuiteHold(outerBooking.getSuite(), outerBooking.getUnitSlot(), outerBooking.getCheckIn(), outerBooking.getCheckOut(), resolvedBookingId);
+            }
+            if (availabilityCacheEvictor != null) {
+                availabilityCacheEvictor.evictAvailability();
+            }
+            return toDTO(outerBooking);
+        }
+
         java.util.function.Supplier<BookingDTO> cancelCriticalSection = () -> executeWithSuiteLock(outerBooking.getSuite(), () -> {
             Booking booking = bookingRepository.findById(resolvedBookingId).orElse(outerBooking);
             if (!java.util.Objects.equals(booking.getUser(), userId)) {
                 throw new ForbiddenAccessException("No tienes permiso para cancelar esta reserva");
+            }
+            if ("cancelled".equalsIgnoreCase(booking.getStatus())) {
+                suiteNightRepository.deleteByBooking(resolvedBookingId);
+                if (redisLockService != null) {
+                    redisLockService.releaseSuiteHold(booking.getSuite(), booking.getUnitSlot(), booking.getCheckIn(), booking.getCheckOut(), resolvedBookingId);
+                }
+                if (availabilityCacheEvictor != null) {
+                    availabilityCacheEvictor.evictAvailability();
+                }
+                return toDTO(booking);
             }
             if (booking.getCheckIn() == null) {
                 throw new IllegalStateException("La reserva no tiene una fecha de check-in válida");
@@ -1427,12 +1493,14 @@ public class BookingService {
                 BigDecimal refunded = booking.getRefundedAmount() != null ? booking.getRefundedAmount() : BigDecimal.ZERO;
                 BigDecimal refundableExcess = paid.subtract(refunded).min(deposit).max(BigDecimal.ZERO);
 
-                boolean excessRefunded = true;
+                boolean excessRefunded = false;
                 if (refundableExcess.signum() > 0 && paymentGateway != null) {
                     String depKey = "ref_dep_" + booking.getId();
                     excessRefunded = executeSequentialRefund(booking, refundableExcess, depKey);
-                }
-                if (excessRefunded) {
+                    if (excessRefunded) {
+                        booking.setGuaranteeRefunded(true);
+                    }
+                } else if (refundableExcess.compareTo(BigDecimal.ZERO) <= 0) {
                     booking.setGuaranteeRefunded(true);
                 }
             }

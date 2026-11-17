@@ -275,7 +275,7 @@ public class IntegrationService {
                     if (!toInsert.isEmpty()) {
                         inserted.addAll(suiteNightRepository.saveAll(toInsert));
                     }
-                } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                } catch (Exception e) {
                     try {
                         suiteNightRepository.deleteByBooking(blockRef);
                     } catch (Exception ex) {
@@ -284,7 +284,14 @@ public class IntegrationService {
                     if (availabilityCacheEvictor != null) {
                         availabilityCacheEvictor.evictAvailability();
                     }
-                    throw new IllegalStateException("Colisión de concurrencia al bloquear fechas. Intente nuevamente.");
+                    if (e instanceof org.springframework.dao.DataIntegrityViolationException
+                            || (e.getMessage() != null && e.getMessage().contains("duplicate"))) {
+                        throw new IllegalStateException("Colisión de concurrencia al bloquear fechas. Intente nuevamente.");
+                    }
+                    if (e instanceof RuntimeException re) {
+                        throw re;
+                    }
+                    throw new RuntimeException("Error persistiendo bloqueo externo: " + e.getMessage(), e);
                 }
 
                 if (availabilityCacheEvictor != null) {

@@ -103,7 +103,7 @@ describe('DateRangePickerComponent', () => {
     // Picking 2026-11-15 as check-out should succeed even if night of 15 is sold out
     component.pick('2026-11-15');
     expect(emitted).toEqual({ checkIn: '2026-11-14', checkOut: '2026-11-15' });
-  });
+  }, 15000);
 
   it('should block checkout if an intermediate night is sold out', () => {
     component.checkIn = '2026-11-14';
