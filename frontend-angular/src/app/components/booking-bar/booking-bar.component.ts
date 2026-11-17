@@ -97,6 +97,14 @@ import { DateRangePickerComponent } from '../date-range-picker/date-range-picker
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      width: 100%;
+    }
+    #booking-bar {
+      display: block !important;
+      width: 100% !important;
+    }
     .booking-select,
     select.booking-select {
       width: 100% !important;

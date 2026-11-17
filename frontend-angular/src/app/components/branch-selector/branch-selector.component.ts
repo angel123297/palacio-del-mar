@@ -55,8 +55,18 @@ const LUXURY_DEFAULT_BRANCHES: Branch[] = [
   selector: 'app-branch-selector',
   standalone: true,
   imports: [CommonModule],
+  styles: [`
+    :host {
+      display: block;
+      width: 100%;
+    }
+    #location {
+      display: block !important;
+      width: 100% !important;
+    }
+  `],
   template: `
-    <section id="location" class="py-16 px-4 sm:px-6 lg:px-8 bg-[#0d0d0d] border-b border-[rgba(201,169,110,0.15)] relative overflow-hidden" aria-label="Ubicaciones exclusivas de Palacio del Mar">
+    <section id="location" class="block w-full py-16 px-4 sm:px-6 lg:px-8 bg-[#0d0d0d] border-b border-[rgba(201,169,110,0.15)] relative overflow-hidden" aria-label="Ubicaciones exclusivas de Palacio del Mar">
       <div class="max-w-7xl mx-auto w-full">
         <div class="text-center mb-12">
           <p class="text-xs uppercase tracking-[0.28em] text-[#c9a96e] font-semibold mb-2">Nuestras Ubicaciones Exclusivas</p>

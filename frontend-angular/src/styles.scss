@@ -381,12 +381,12 @@ nav {
   background: var(--warm);
   border-bottom: 2px solid rgba(201, 169, 110, 0.2);
   padding: 0;
-  display: flex;
-  align-items: stretch;
+  display: block;
   position: sticky;
   top: 57px;
   z-index: 190;
   box-shadow: 0 6px 28px #00000080;
+  width: 100%;
 }
 .bf {
   flex: 1;
@@ -1245,8 +1245,8 @@ section {
 }
 #location {
   background: var(--dark);
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: block;
+  width: 100%;
 }
 .location-content {
   padding: 72px 64px;
@@ -1436,8 +1436,7 @@ footer {
     padding: 56px 18px;
   }
   #about,
-  #dining,
-  #location {
+  #dining {
     grid-template-columns: 1fr;
   }
   .about-img-wrap img,
@@ -1722,9 +1721,6 @@ footer {
 @media (max-width: 960px) {
   #booking-bar { position: static; }
 }
-
-
-#booking-bar { position: static; }
 
 /* ---------- Mi perfil ---------- */
 .dashboard-head-actions { display: flex; gap: 10px; flex-wrap: wrap; }
