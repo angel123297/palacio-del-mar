@@ -265,9 +265,31 @@ public class SuiteService {
                     .multiply(BigDecimal.valueOf(nights));
         }
 
+        BigDecimal vipExtrasTotal = BigDecimal.ZERO;
+        if (Boolean.TRUE.equals(request.getAirportPickup())) {
+            vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("150000"));
+        }
+        if (Boolean.TRUE.equals(request.getPetFriendly())) {
+            vipExtrasTotal = vipExtrasTotal.add(new BigDecimal("80000"));
+        }
+        if (request.getFoodOrders() != null) {
+            for (var food : request.getFoodOrders()) {
+                if (food != null) {
+                    BigDecimal foodPrice = BookingService.resolveServerFoodPrice(
+                            food.getFoodName() != null ? food.getFoodName() : food.getDishName(),
+                            food.getPrice()
+                    );
+                    if (Boolean.TRUE.equals(food.getIncludesBreakfastCombo())) {
+                        foodPrice = foodPrice.add(new BigDecimal("35000"));
+                    }
+                    vipExtrasTotal = vipExtrasTotal.add(foodPrice);
+                }
+            }
+        }
+
         BigDecimal roomTotal = result.total();
         BigDecimal guaranteeDeposit = new BigDecimal("100000");
-        BigDecimal total = roomTotal.add(experiencesTotal).add(extraGuestsFee);
+        BigDecimal total = roomTotal.add(experiencesTotal).add(extraGuestsFee).add(vipExtrasTotal);
         BigDecimal totalWithDeposit = total.add(guaranteeDeposit);
 
         CalculatePriceResponseDTO.DatesInfo datesInfo = CalculatePriceResponseDTO.DatesInfo.builder()
@@ -291,6 +313,7 @@ public class SuiteService {
                 .roomTotal(roomTotal)
                 .extraGuestsFee(extraGuestsFee)
                 .guaranteeDeposit(guaranteeDeposit)
+                .vipExtrasTotal(vipExtrasTotal)
                 .experiencesTotal(experiencesTotal)
                 .discount(result.discount())
                 .discountReason(result.discount().compareTo(BigDecimal.ZERO) > 0 ? "Promoción / Larga estadía" : null)

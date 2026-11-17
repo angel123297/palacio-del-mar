@@ -907,7 +907,7 @@ public class BookingService {
 
     public BookingDTO getBookingByCode(String bookingCode) {
         Booking booking = bookingRepository.findByBookingCode(bookingCode)
-                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada con código: " + bookingCode));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Reserva no encontrada con código: " + bookingCode));
         return toDTO(booking);
     }
 
@@ -942,7 +942,7 @@ public class BookingService {
 
     public BookingDTO getBookingByCodeSecure(String bookingCode, User user) {
         Booking booking = bookingRepository.findByBookingCode(bookingCode)
-                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada con código: " + bookingCode));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Reserva no encontrada con código: " + bookingCode));
         if (user != null) {
             boolean isAdmin = "ADMIN".equalsIgnoreCase(user.getRole());
             boolean isHost = "HOST".equalsIgnoreCase(user.getRole());
@@ -1044,7 +1044,7 @@ public class BookingService {
     public Booking getBookingEntityById(String id) {
         return bookingRepository.findById(id)
                 .or(() -> bookingRepository.findByBookingCode(id))
-                .orElseThrow(() -> new IllegalArgumentException("Reserva no encontrada con id: " + id));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Reserva no encontrada con id: " + id));
     }
 
     public BookingDTO cancelBooking(String bookingId, String userId, String reason) {
@@ -1801,6 +1801,11 @@ public class BookingService {
     }
 
     public BookingDTO addExperienceToBooking(String bookingId, String userId, String experienceId) {
+        return addExperienceToBooking(bookingId, userId, experienceId, 1);
+    }
+
+    public BookingDTO addExperienceToBooking(String bookingId, String userId, String experienceId, int quantity) {
+        final int addQty = Math.max(1, quantity);
         Booking outerBooking = getBookingEntityById(bookingId);
         String resolvedBookingId = outerBooking.getId() != null ? outerBooking.getId() : bookingId;
         return executeWithBookingLock(resolvedBookingId, () -> {
@@ -1811,7 +1816,7 @@ public class BookingService {
             assertBookingCanBeModified(booking);
             reconcilePendingRefundBeforeChange(booking, resolvedBookingId);
             Experience experience = experienceRepository.findById(experienceId)
-                    .orElseThrow(() -> new IllegalArgumentException("Experiencia no encontrada"));
+                    .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Experiencia no encontrada"));
             if (Boolean.FALSE.equals(experience.getActive()) || Boolean.FALSE.equals(experience.getAvailable())) {
                 throw new IllegalArgumentException("La experiencia no está disponible para reserva");
             }
@@ -1822,7 +1827,7 @@ public class BookingService {
             boolean exists = false;
             for (Booking.SelectedExperience exp : current) {
                 if (exp.getExperienceId() != null && exp.getExperienceId().equals(experienceId)) {
-                    exp.setQuantity((exp.getQuantity() != null ? exp.getQuantity() : 1) + 1);
+                    exp.setQuantity((exp.getQuantity() != null ? exp.getQuantity() : 1) + addQty);
                     exists = true;
                     break;
                 }
@@ -1832,7 +1837,7 @@ public class BookingService {
                         .experienceId(experience.getId())
                         .name(experience.getName())
                         .price(experience.getPrice())
-                        .quantity(1)
+                        .quantity(addQty)
                         .build());
             }
             booking.setExperiences(current);

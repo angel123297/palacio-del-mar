@@ -93,7 +93,7 @@ public class BranchService {
 
         Property property = propertyRepository.findBySlug(lower)
                 .filter(p -> !Boolean.FALSE.equals(p.getActive()) && "APPROVED".equalsIgnoreCase(p.getStatus()))
-                .orElseThrow(() -> new IllegalArgumentException("Sucursal o alojamiento no encontrado: " + slug));
+                .orElseThrow(() -> new co.palaciodelmar.backend.exception.ResourceNotFoundException("Sucursal o alojamiento no encontrado: " + slug));
 
         List<Suite> propSuites = suiteRepository.findByPropertyId(property.getId()).stream()
                 .filter(s -> !Boolean.FALSE.equals(s.getActive()))

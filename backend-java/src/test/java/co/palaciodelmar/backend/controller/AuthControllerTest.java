@@ -49,6 +49,17 @@ class AuthControllerTest {
     }
 
     @Test
+    void loginRejectsMalformedJsonWithBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{ malformed json body"))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message")
+                        .value("El cuerpo de la solicitud (JSON) es inválido o está malformado"));
+        verifyNoInteractions(authService);
+    }
+
+    @Test
     void loginRejectsBlankPasswordAndInvalidEmail() throws Exception {
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"invalid\",\"password\":\" \"}"))

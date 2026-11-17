@@ -139,4 +139,31 @@ class PromotionPricingTest {
         assertEquals(0, BigDecimal.ZERO.compareTo(response.getDiscount()));
         assertNull(response.getDiscountReason());
     }
+
+    @Test
+    void calculatePriceIncludesVipExtrasTotalWhenRequested() {
+        LocalDate checkIn = LocalDate.parse("2026-11-02");
+        LocalDate checkOut = LocalDate.parse("2026-11-04");
+
+        when(suiteRepository.findById("suite-101")).thenReturn(Optional.of(testSuite));
+
+        CalculatePriceRequest request = CalculatePriceRequest.builder()
+                .suiteId("suite-101")
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .airportPickup(true)
+                .petFriendly(true)
+                .foodOrders(List.of(
+                        co.palaciodelmar.backend.model.Booking.FoodOrder.builder()
+                                .foodName("Posta Cartagenera (Típico)")
+                                .price(new BigDecimal("94000"))
+                                .build()
+                ))
+                .build();
+
+        CalculatePriceResponseDTO response = suiteService.calculatePrice(request);
+
+        assertEquals(0, new BigDecimal("324000").compareTo(response.getVipExtrasTotal()));
+        assertTrue(response.getTotal().compareTo(response.getRoomTotal().add(new BigDecimal("324000"))) >= 0);
+    }
 }

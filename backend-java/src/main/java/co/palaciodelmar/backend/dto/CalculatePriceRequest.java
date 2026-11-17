@@ -34,4 +34,8 @@ public class CalculatePriceRequest {
 
     private Boolean includeExperiences;
     private List<String> experienceIds;
+
+    private Boolean airportPickup;
+    private Boolean petFriendly;
+    private List<co.palaciodelmar.backend.model.Booking.FoodOrder> foodOrders;
 }

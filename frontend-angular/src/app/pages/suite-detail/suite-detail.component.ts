@@ -118,13 +118,28 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
   }
 
   foodOptions = [
-    { id: 't1', name: 'Cazuela de Mariscos (Típico)' },
-    { id: 't2', name: 'Mojarra Frita con Arroz de Coco (Típico)' },
-    { id: 't3', name: 'Posta Cartagenera (Típico)' },
-    { id: 'n1', name: 'Hamburguesa Artesanal (Normal)' },
-    { id: 'n2', name: 'Pasta Alfredo (Normal)' },
-    { id: 'other', name: 'Otro (Especificar)' }
+    { id: 't1', name: 'Cazuela de Mariscos (Típico)', price: 80000 },
+    { id: 't2', name: 'Mojarra Frita con Arroz de Coco (Típico)', price: 80000 },
+    { id: 't3', name: 'Posta Cartagenera (Típico)', price: 94000 },
+    { id: 't4', name: 'Pargo Rojo Frito con Patacones', price: 88000 },
+    { id: 't5', name: 'Arroz de Mariscos del Caribe', price: 125000 },
+    { id: 't6', name: 'Langosta al Termidor', price: 160000 },
+    { id: 'c1', name: 'Ceviche de Camarón al Coco', price: 68000 },
+    { id: 'c2', name: 'Ceviche Mixto Tradicional', price: 55000 },
+    { id: 'e1', name: 'Patacones con Hogao', price: 28000 },
+    { id: 'e2', name: 'Arepa de Huevo Tradicional', price: 25000 },
+    { id: 'd1', name: 'Cocada Horneada al Horno de Leña', price: 38000 },
+    { id: 'd2', name: 'Mousse de Mango Biche & Corozo', price: 34000 },
+    { id: 'n1', name: 'Hamburguesa Artesanal (Normal)', price: 80000 },
+    { id: 'n2', name: 'Pasta Alfredo (Normal)', price: 80000 },
+    { id: 'other', name: 'Otro (Especificar)', price: 80000 }
   ];
+
+  get currentFoodPrice(): number {
+    if (!this.wantFood || !this.foodType) return 0;
+    const opt = this.foodOptions.find(f => f.id === this.foodType);
+    return opt ? opt.price : 80000;
+  }
 
   constructor(
     private route: ActivatedRoute,
@@ -430,7 +445,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
     if (this.airportPickup) total += 150000;
     if (this.petFriendly) total += 80000;
     if (this.wantFood && this.foodType) {
-      total += 80000;
+      total += this.currentFoodPrice;
       if (this.breakfastCombo) total += 35000;
     }
     return total;
@@ -674,7 +689,7 @@ export class SuiteDetailComponent implements OnInit, OnDestroy {
        foodOrders.push({
           dishName: selectedDish,
           foodName: selectedDish,
-          price: 80000,
+          price: this.currentFoodPrice,
           includesBreakfastCombo: this.breakfastCombo,
           specialInstructions: this.foodType === 'other' ? (this.customFood || 'Pedido personalizado') : ''
        });

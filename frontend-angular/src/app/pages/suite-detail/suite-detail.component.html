@@ -296,7 +296,7 @@
             <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Selecciona tu almuerzo y disfruta de los mejores platillos.</p>
           </div>
           <div style="text-align: right;">
-            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">+ {{ currency.formatPrice(80000) }}</div>
+            <div style="color: var(--gold); font-weight: bold; margin-bottom: 0.5rem;">{{ wantFood && foodType ? '+ ' + currency.formatPrice(currentFoodPrice) : 'Desde + ' + currency.formatPrice(25000) }}</div>
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
               <input type="checkbox" [(ngModel)]="wantFood" style="width: 20px; height: 20px; accent-color: var(--gold);">
               <span>Agregar Comida</span>
@@ -308,7 +308,7 @@
           <label style="display: block; color: var(--gold); margin-bottom: 0.5rem;">Elige tu platillo principal:</label>
           <select [(ngModel)]="foodType" class="form-control" style="margin-bottom: 1rem;">
             <option value="">-- Seleccionar --</option>
-            <option *ngFor="let opt of foodOptions" [value]="opt.id">{{opt.name}}</option>
+            <option *ngFor="let opt of foodOptions" [value]="opt.id">{{opt.name}} ({{currency.formatPrice(opt.price)}})</option>
           </select>
 
           <div *ngIf="foodType === 'other'" style="margin-bottom: 1rem;">
@@ -391,7 +391,7 @@
               </tr>
               <tr *ngIf="wantFood && foodType" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0;">Comida Gourmet:</td>
-                <td style="text-align: right; padding: 10px 0; color: #fff;">{{ currency.formatPrice(80000) }}</td>
+                <td style="text-align: right; padding: 10px 0; color: #fff;">{{ currency.formatPrice(currentFoodPrice) }}</td>
               </tr>
               <tr *ngIf="wantFood && foodType && breakfastCombo" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
                 <td style="padding: 10px 0;">Combo Desayuno Tradicional:</td>
