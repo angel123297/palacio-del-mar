@@ -1,5 +1,26 @@
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-11-19 — Revisión diaria de Vibe: sin cambios en el día
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** No hay commits nuevos desde el 17 nov ([fbd2c7a — docs(qa): reparar truncado y completar reporte diario 2026-11-17](https://github.com/angel123297/palacio-del-mar/commit/fbd2c7a168ed15d026c9d243d1622f062033659e), 17 nov 14:23 UTC). La rama de trabajo no registra commits funcionales ni de los agentes (Antigravity/Jules); el estancamiento acumula 6 días.
+
+**Pull requests abiertos (sin cambios):**
+- [#25 — Add System Audit Report](https://github.com/angel123297/palacio-del-mar/pull/25) (draft, base `plan/marketplace-webhooks`, sin actividad desde 29 oct).
+- [#23 — Cleanup unused frontend code and dependencies](https://github.com/angel123297/palacio-del-mar/pull/23) (draft, base `proyecto-angular-java`, sin actividad desde 26 oct; base protegida: NO fusionar sin decisión explícita).
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones). Fases 0-4 completadas. Sin avance medible en la rama de trabajo.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios; corregidos y activados desde el 16 oct (commit [1dbd8ee](https://github.com/angel123297/palacio-del-mar/commit/1dbd8ee9434ed6ec78af4918d1e97e7f43dc0773)).
+
+**Tests esperados en verde:** sin corridas nuevas hoy. Se mantiene la expectativa de la bitácora: suite de backend post-R1-R9 (claim 594/594 según commit 945f935, cifra reportada por agentes y aún sin verificar por Vibe en CI) + 20 tests intensivos de Vibe activos. Sin fallos nuevos detectados en la revisión.
+
+**Riesgos / problemas detectados (persisten):**
+- ⚠️ **Divergencia de ramas:** los fixes del 14 nov (PRs #27/#28) siguen solo en `proyecto-angular-java` y no fueron re-sincronizados hacia `plan/marketplace-webhooks`; la rama de trabajo lleva 6 días estancada.
+- ⚠️ Conteo de tests (594/594) sin verificación contra el pipeline `.github/workflows/ci.yml`.
+- ⚠️ PRs draft antiguos (#25, #23) acumulan polvo; decidir cerrar o re-basificar.
+- ⚠️ Hallazgos de AUDITORIA_SEGURIDAD.md aún sin confirmar: PDM-04, PDM-05, PDM-07, PDM-08.
+- ⚠️ Orquestación de túnel ngrok (commit ecb6c51): verificar que sea efímero y autenticado.
+
 ### 📅 2026-11-17 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** El único commit en la ventana es el propio reporte de QA de ayer ([dbf309e — docs(qa): reporte diario 2026-11-16](https://github.com/angel123297/palacio-del-mar/commit/dbf309efb99a47148504081924221d28cff74c69), 16 nov 14:25 UTC). La rama de trabajo no registra commits funcionales ni de los agentes (Antigravity/Jules); el estancamiento acumula 4 días.
@@ -42,8 +63,6 @@
 - ⚠️ Hallazgos de AUDITORIA_SEGURIDAD.md aún sin confirmar: PDM-04, PDM-05, PDM-07, PDM-08.
 - ⚠️ Orquestación de túnel ngrok (commit ecb6c51): verificar que sea efímero y autenticado.
 
-
-
 ### 📅 2026-11-15 — Revisión diaria de Vibe: sin cambios funcionales en la rama de trabajo; actividad intensa en `proyecto-angular-java`
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** El único commit en la ventana es el reporte de QA de ayer ([1f3f0ca — docs(qa): reporte diario 2026-11-14](https://github.com/angel123297/palacio-del-mar/commit/1f3f0ca3100236810eff9d81014d1f6844fd7655), 14 nov 14:05 UTC). La rama de trabajo no registra commits funcionales ni de los agentes (Antigravity/Jules).
@@ -70,7 +89,6 @@
 - ⚠️ PRs draft antiguos (#25, #23) siguen acumulando polvo; decidir cerrar o re-basificar.
 - ⚠️ Hallazgos de AUDITORIA_SEGURIDAD.md aún sin confirmar: PDM-04, PDM-05, PDM-07, PDM-08.
 
-
 ### 📅 2026-11-14 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** ninguno. HEAD sigue en [477d3df — docs(qa): reporte diario 2026-11-13](https://github.com/angel123297/palacio-del-mar/commit/477d3dfd5f419056a7f1f1eba48278d956104af4) (13 nov, 14:22 UTC), es decir, la rama no avanzó desde el reporte de ayer.
@@ -88,7 +106,6 @@
 - ⚠️ PRs draft antiguos (#25, #23, y los #12/#4/#3 citados el 13 nov) acumulan polvo; decidir cerrar o re-basificar.
 - ⚠️ Hallazgos de AUDITORIA_SEGURIDAD.md aún sin confirmar: PDM-04, PDM-05, PDM-07, PDM-08.
 - ⚠️ La rama `plan/marketplace-webhooks` quedó sincronizada con `main` (`proyecto-angular-java`) el 13 nov; vigilar que los agentes (Antigravity/Jules) no vuelvan a trabajar sobre la rama original sin control.
-
 
 ### 📅 2026-11-13 — Revisión diaria de Vibe: reintegro masivo tras el estancamiento
 
@@ -229,7 +246,6 @@
 - ⚠️ Commit 4ddecea ("Actualización de credencial de Gmail"): sigue pendiente verificar secretos en historial y rotar la credencial si se expuso.
 - ⚠️ Causa raíz de la corrupción del archivo: los pushes de QA anteriores serializaron la respuesta completa de la herramienta en el contenido del archivo. Corregido hoy; monitorear en los próximos reportes.
 
-
 ### 📅 2026-11-06 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** El único commit en la ventana es el propio reporte de QA de ayer: [docs(qa): reporte diario 2026-11-05](https://github.com/angel123297/palacio-del-mar/commit/0c3f8396ae88399bf773cf13a0c29d5c637035fa) (5 nov 14:23 UTC). Sin actividad de los agentes (Antigravity/Jules) ni commits funcionales.
@@ -250,7 +266,6 @@
 - ⚠️ PR #25 (`REPORT.md` en la raíz, duplica `docs/QA_REPORTE.md`) y PR #23 (base protegida) pendientes de decisión del usuario.
 - ⚠️ Docs eliminados por 0ff7a9e (`docs/PLAN_MARKETPLACE.md`, `docs/AUDITORIA_SEGURIDAD.md`, `docs/CORRECCIONES.md`, etc.) siguen sin restaurarse (recuperables del commit fd81791).
 - ⚠️ Commit 4ddecea ("Actualización de credencial de Gmail"): sigue pendiente verificar secretos en historial y rotar la credencial si se expuso.
-
 
 ### 📅 2026-11-05 — Revisión diaria de Vibe: sin cambios en el día
 
@@ -357,7 +372,6 @@
 - ⚠️ Docs eliminados por 0ff7a9e (`docs/PLAN_MARKETPLACE.md`, `docs/AUDITORIA_SEGURIDAD.md`, `docs/CORRECCIONES.md`, etc.) siguen sin restaurarse (recuperables del commit fd81791).
 - ⚠️ Commit 4ddecea ("Actualización de credencial de Gmail"): sigue pendiente verificar secretos en historial y rotar la credencial si se expuso.
 
-
 ### 📅 2026-10-31 — Revisión diaria de Vibe: sin cambios de código en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios de código en el día.** El único commit en la ventana es el propio reporte de QA de ayer: [docs(qa): reporte diario 2026-10-30](https://github.com/angel123297/palacio-del-mar/commit/9d3af9a0bd7d0bcc93be431999e1e2b16e765bef) (30 oct 14:04 UTC). Ningún commit nuevo de agentes (Antigravity/Jules) ni actividad funcional.
@@ -460,7 +474,6 @@
 - ⚠️ Commit 4ddecea ("Actualización de credencial de Gmail", 26 oct): sigue pendiente verificar secretos en historial y rotar la credencial si se expuso.
 - ⚠️ La app móvil (respaldada en `archive/mobile-flutter-v1`) sigue sin suite de tests propia.
 
-
 ### 📅 2026-10-27 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`, 26–27 oct):** solo el propio reporte de QA — [docs(qa): reporte diario 2026-10-26](https://github.com/angel123297/palacio-del-mar/commit/e6c9992db8d2ec153fbf83bd83262b70ccd73233) (26 oct 14:13 UTC, Vibe). **Sin cambios de código nuevos en el día.**
@@ -536,7 +549,6 @@
 **Bugs PDM-01/02/03 y tests @Disabled:** sin cambios — siguen confirmados corregidos y activados desde el 16 oct (`PriceIntegritySecurityTest` sin `@Disabled`). Los 10 hallazgos de AUDITORIA_SEGURIDAD.md permanecen cerrados.
 
 **Tests esperados en verde:** ~263+ de backend y ~14+ de frontend (cifras heredadas del 22–23 oct; al no haber commits de código, la línea base del 22 oct se mantiene). No se detectan fallos; riesgo menor: sin commits no hay evidencia fresca de CI del día, se recomienda verificar Actions en el próximo commit.
-
 
 ### 📅 2026-10-23 — Revisión diaria de Vibe: fixes de auth/UX, calendario con días de rotación y builds Docker; sin PRs abiertos
 
@@ -816,5 +828,4 @@
 - `docs/CORRECCIONES.md` — bitácora de correcciones
 - `PLAN_MARKETPLACE.md` — plan aprobado (5 fases)
 - `AGENTS.md` — reglas para agentes de IA
-
 
