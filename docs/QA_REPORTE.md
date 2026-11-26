@@ -1,5 +1,31 @@
 ## 🗓️ Reporte diario (bitácora)
 
+### 📅 2026-11-26 — Revisión diaria de Vibe: sin cambios funcionales en el día
+
+**Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** los únicos commits en la ventana son los dos reportes de QA de ayer, de documentación, sin cambios funcionales:
+- [45b91c7 — docs(qa): reporte diario 2026-11-25 (repara truncado del historial)](https://github.com/angel123297/palacio-del-mar/commit/45b91c782379a86c340df8fd440918d8cc24eec9) (25 nov 14:41 UTC)
+- [e0ae2bc — docs(qa): reporte diario 2026-11-25](https://github.com/angel123297/palacio-del-mar/commit/e0ae2bc63479eae940883da4358b06a2875a4403) (25 nov 14:41 UTC)
+
+La rama de trabajo no registra commits funcionales ni de los agentes (Antigravity/Jules); el estancamiento funcional acumula 13 días.
+
+**Pull requests abiertos (sin cambios):**
+- [#25 — Add System Audit Report](https://github.com/angel123297/palacio-del-mar/pull/25) (draft, base `plan/marketplace-webhooks`, sin actividad desde 29 oct).
+- [#23 — Cleanup unused frontend code and dependencies](https://github.com/angel123297/palacio-del-mar/pull/23) (draft, base `proyecto-angular-java`, sin actividad desde 26 oct; base protegida: NO fusionar sin decisión explícita).
+
+**Fase en curso:** Fase 5 (CI/CD, Swagger, Actuator y automaciones). Fases 0-4 completadas. Sin avance medible en la rama de trabajo.
+
+**Bugs PDM-01/02/03 y tests @Disabled:** sin cambios; corregidos y activados desde el 16 oct (commit [1dbd8ee](https://github.com/angel123297/palacio-del-mar/commit/1dbd8ee9434ed6ec78af4918d1e97e7f43dc0773)).
+
+**Tests esperados en verde:** sin corridas nuevas hoy. Se mantiene la expectativa de la bitácora: suite de backend post-R1-R9 (claim 594/594 según commit 945f935, cifra reportada por agentes y sin verificar por Vibe en CI) + 20 tests intensivos de Vibe activos. Sin fallos nuevos detectados en la revisión.
+
+**Riesgos / problemas detectados (persisten):**
+- ⚠️ **Divergencia de ramas:** los fixes del 14 nov (PRs #27/#28) siguen solo en `proyecto-angular-java` y no fueron re-sincronizados hacia `plan/marketplace-webhooks`; la rama de trabajo lleva 13 días estancada y diverge de la rama original.
+- ⚠️ Conteo de tests (594/594) sin verificación contra el pipeline `.github/workflows/ci.yml`.
+- ⚠️ PRs draft antiguos (#25, #23) acumulan polvo; decidir cerrar o re-basificar.
+- ⚠️ Hallazgos de AUDITORIA_SEGURIDAD.md aún sin confirmar: PDM-04, PDM-05, PDM-07, PDM-08.
+- ⚠️ Orquestación de túnel ngrok (commit ecb6c51): verificar que sea efímero y autenticado.
+
+
 ### 📅 2026-11-25 — Revisión diaria de Vibe: sin cambios en el día
 
 **Commits de las últimas 24h (rama `plan/marketplace-webhooks`):** **sin cambios en el día.** El único commit en la ventana es el propio reporte de QA de ayer ([5615632 — docs(qa): reporte diario 2026-11-24](https://github.com/angel123297/palacio-del-mar/commit/5615632729a80cd042e9ec6a3bfc6d9d9d0e4760), 24 nov 14:26 UTC). La rama de trabajo no registra commits funcionales ni de los agentes (Antigravity/Jules); el estancamiento acumula 12 días.
@@ -957,6 +983,7 @@
 - `docs/CORRECCIONES.md` — bitácora de correcciones
 - `PLAN_MARKETPLACE.md` — plan aprobado (5 fases)
 - `AGENTS.md` — reglas para agentes de IA
+
 
 
 
